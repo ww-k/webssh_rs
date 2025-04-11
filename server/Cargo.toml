@@ -1,0 +1,13 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8.3"
+russh = "0.51.1"
+socketioxide = { version = "0.16.2", features = ["tracing"] }
+tokio = "1.44.2"
+tower-http = { version = "0.6.2", features = ["fs"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }

@@ -1,0 +1,22 @@
+# vscode
+.vscode/*
+
+# build output
+dist/*
+build/*
+server/target
+
+# npm
+npm-debug.log*
+
+# Dependency directories
+node_modules
+
+# Optional npm cache directory
+.npm
+
+### OSX template
+.DS_Store
+
+# Thumbnails
+._*
