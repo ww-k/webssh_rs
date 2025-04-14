@@ -1732,6 +1732,8 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "russh",
+ "serde",
+ "serde_json",
  "socketioxide",
  "tokio",
  "tower-http",
