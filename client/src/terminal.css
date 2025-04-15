@@ -1,0 +1,28 @@
+html,
+body {
+    height: 100%;
+    width: 100%;
+    margin: 0px;
+}
+
+#root {
+    display: block;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    -ms-user-select: text;
+    background-color: #000;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    border: 0;
+    background-color: transparent;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+    border: 1;
+    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.3);
+}

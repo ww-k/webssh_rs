@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Loading</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+</head>
+
+<body>
+    <div id="root">
+        <div style="text-align: center">
+            <style>
+                .cssload-container {
+                    position: absolute;
+                    left: 0;
+                    right: 0;
+                    top: 0;
+                    bottom: 0;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .cssload-content {
+                    margin-top: -4rem;
+                    display: inline-block;
+                    font-size: 4rem;
+                    text-align: center;
+                    background: linear-gradient(
+                        -45deg,
+                        #375cb8,
+                        #fefefe,
+                        #375cb8,
+                        #fefefe,
+                        #375cb8,
+                        #fefefe,
+                        #375cb8
+                    );
+                    background-clip: text;
+                    -webkit-background-clip: text;
+                    color: transparent;
+                    background-position: 100% 0;
+                    background-size: 200% 100%;
+                    animation: bgMove 4s infinite linear;
+                }
+
+                @keyframes bgMove {
+                    0% {
+                        background-position: 100% 0;
+                    }
+                    100% {
+                        background-position: 23% 0;
+                    }
+                }
+            </style>
+            <div class="cssload-container">
+                <div class="cssload-content">WebSSH</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

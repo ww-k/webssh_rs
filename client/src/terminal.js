@@ -1,3 +1,11 @@
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { io } from "socket.io-client";
+
+import '@xterm/xterm/css/xterm.css';
+import './terminal.css';
+
+var terminalContainer = document.getElementById("root");
 var SSH_BASEPATH = location.origin;
 /** @type {import('@xterm/xterm').Terminal} */
 var term;
@@ -28,10 +36,6 @@ function initTerm() {
         query: query,
         transports: "WebSocket" in window ? ["websocket"] : ["polling", "websocket"],
     });
-    // var socket = ioLookup("ws://localhost:8080/term", {
-    //     transports:
-    //         "WebSocket" in window ? ["websocket"] : ["polling", "websocket"],
-    // });
     var buf = "";
     var xtermTheme = getConfig(queryParams.configPath);
 
@@ -86,7 +90,6 @@ function initTerm() {
  * @returns
  */
 function createTerminal(socket, xtermTheme) {
-    var terminalContainer = document.getElementById("terminal");
     terminalContainer.innerHTML = "";
 
     term = new Terminal();

@@ -21,8 +21,8 @@ async fn main() {
     info!("Starting server...");
 
     let app = Router::new()
-        .nest("/term", svc_term_router_builder())
-        .nest("/connection", svc_connection_router_builder())
+        .nest("/api/term", svc_term_router_builder())
+        .nest("/api/connection", svc_connection_router_builder())
         .fallback_service(ServeDir::new("../client"));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
