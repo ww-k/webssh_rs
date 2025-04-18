@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::Router;
 use socketioxide::{
     SocketIo,
@@ -5,7 +7,9 @@ use socketioxide::{
 };
 use tracing::{debug, info};
 
-pub(crate) fn svc_term_router_builder() -> Router {
+use crate::AppState;
+
+pub(crate) fn svc_term_router_builder(app_state: Arc<AppState>) -> Router {
     let (svc, io) = SocketIo::new_svc();
     io.ns("/", |socket: SocketRef| async move {
         debug!("io connected: {:?}", socket.id);
@@ -19,5 +23,5 @@ pub(crate) fn svc_term_router_builder() -> Router {
             info!("socket disconnect {}", socket.id);
         });
     });
-    Router::new().fallback_service(svc)
+    Router::new().with_state(app_state).fallback_service(svc)
 }
