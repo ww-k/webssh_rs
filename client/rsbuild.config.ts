@@ -28,4 +28,9 @@ export default defineConfig({
         assetPrefix: ".",
     },
     plugins: [pluginReact()],
+    resolve: {
+        alias: {
+            "@": "./src",
+        },
+    }
 });

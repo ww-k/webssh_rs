@@ -1,0 +1,9 @@
+.targetSelector {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+.targetSelector .ant-modal-mask,
+.targetSelector .ant-modal-wrap {
+    position: absolute;
+}

@@ -1,32 +1,41 @@
+import { useMemo } from "react";
 import { Tabs } from "antd";
-import React from "react";
 
-const onChange = (key: string) => {
-    console.log(key);
-};
+import "./App.css";
 
-const App: React.FC = () => (
-    <Tabs
-        defaultActiveKey="1"
-        onChange={onChange}
-        items={[
-            {
-                label: `Tab 1`,
-                key: "1",
-                children: `Content of Tab Pane 1`,
-            },
-            {
-                label: `Tab 2`,
-                key: "2",
-                children: `Content of Tab Pane 2`,
-            },
-            {
-                label: `Tab 3`,
-                key: "3",
-                children: `Content of Tab Pane 3`,
-            },
-        ]}
-    />
-);
+import useAppStore from "./store";
+import Terminal from "./components/terminal";
+import TargetSelector from "./components/target_selector";
 
-export default App;
+export default function App() {
+    const { activeTabKey, tabs, setActiveTabKey, addTab, removeTab } = useAppStore();
+    const tabsItems = useMemo(
+        () =>
+            tabs.map((tab) => ({
+                ...tab,
+                children: (
+                    tab.path.startsWith("/terminal/") ? <Terminal tab={tab} /> : <TargetSelector tab={tab} />
+                ),
+            })),
+        [tabs]
+    );
+
+    const onEdit = (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: "add" | "remove") => {
+        if (action === "add") {
+            addTab();
+        } else {
+            removeTab(targetKey as string);
+        }
+    };
+
+    return (
+        <Tabs
+            className="WebSSH-Root-Tabs"
+            type="editable-card"
+            onChange={setActiveTabKey}
+            activeKey={activeTabKey}
+            onEdit={onEdit}
+            items={tabsItems}
+        />
+    );
+}
