@@ -20,9 +20,10 @@ pub struct Model {
     id: i32,
     host: String,
     port: u16,
-    user: String,
-    password: String,
     method: u8,
+    user: String,
+    key: String,
+    password: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

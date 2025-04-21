@@ -1,17 +1,18 @@
+mod entities;
+mod migrations;
+mod svc_target;
+mod svc_term;
+
 use std::sync::Arc;
 
 use axum::{Router, http::StatusCode, routing::any};
 use sea_orm::Database;
-// use tower_http::services::ServeDir;
-use tracing::info;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
+use migrations::{Migrator, MigratorTrait};
 use svc_target::*;
 use svc_term::*;
 
-mod entities;
-mod svc_target;
-mod svc_term;
 
 struct AppState {
     db: sea_orm::DatabaseConnection,
@@ -28,9 +29,11 @@ async fn main() {
 
     println!("Starting server...");
 
-    let db = Database::connect("sqlite::memory:")
+    let db = Database::connect("sqlite:target/db.sqlite?mode=rwc")
         .await
         .expect("Database connection failed");
+
+    Migrator::up(&db, None).await.unwrap();
 
     let app_state = Arc::new(AppState { db });
 
