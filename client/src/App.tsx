@@ -5,7 +5,7 @@ import "./App.css";
 
 import useAppStore from "./store";
 import Terminal from "./components/terminal";
-import TargetSelector from "./components/target_selector";
+import TargetSelector from "./components/target/selector";
 
 export default function App() {
     const { activeTabKey, tabs, setActiveTabKey, addTab, removeTab } = useAppStore();
