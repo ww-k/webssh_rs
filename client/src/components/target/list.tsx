@@ -15,29 +15,29 @@ const mockData: ITarget[] = [
     {
         id: 1,
         host: "127.0.0.1",
-        port: 22,
+        port: undefined,
         method: 1,
         user: "user1",
         key: "",
-        password: "",
+        password: "111111",
     },
     {
         id: 2,
         host: "127.0.0.1",
-        port: 22,
+        port: undefined,
         method: 1,
         user: "user2",
         key: "",
-        password: "",
+        password: "222222",
     },
     {
         id: 3,
         host: "127.0.0.1",
-        port: 22,
+        port: 2222,
         method: 1,
         user: "user3",
         key: "",
-        password: "",
+        password: "333333",
     },
 ];
 
@@ -127,7 +127,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 </Button>
             </div>
             <Table columns={columns} dataSource={dataSource} />
-            <TargetEditor open={editorOpen} data={editorData} onCancel={() => setEditorOpen(false)} />
+            <TargetEditor open={editorOpen} data={editorData} onOk={refresh} onCancel={() => setEditorOpen(false)} />
         </>
     );
 }

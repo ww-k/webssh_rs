@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Tabs } from "antd";
+import { ConfigProvider, Tabs } from "antd";
 
 import "./App.css";
 
@@ -13,9 +13,7 @@ export default function App() {
         () =>
             tabs.map((tab) => ({
                 ...tab,
-                children: (
-                    tab.path.startsWith("/terminal/") ? <Terminal tab={tab} /> : <TargetSelector tab={tab} />
-                ),
+                children: tab.path.startsWith("/terminal/") ? <Terminal tab={tab} /> : <TargetSelector tab={tab} />,
             })),
         [tabs]
     );
@@ -29,13 +27,15 @@ export default function App() {
     };
 
     return (
-        <Tabs
-            className="WebSSH-Root-Tabs"
-            type="editable-card"
-            onChange={setActiveTabKey}
-            activeKey={activeTabKey}
-            onEdit={onEdit}
-            items={tabsItems}
-        />
+        <ConfigProvider theme={{ cssVar: true, hashed: false }}>
+            <Tabs
+                className="WebSSH-Root-Tabs"
+                type="editable-card"
+                onChange={setActiveTabKey}
+                activeKey={activeTabKey}
+                onEdit={onEdit}
+                items={tabsItems}
+            />
+        </ConfigProvider>
     );
 }

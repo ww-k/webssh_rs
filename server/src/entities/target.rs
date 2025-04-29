@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TargetAuthMethod {
     Password = 1,
-    PublicKey = 2,
+    PrivateKey = 2,
     None = 3,
     // HostBased,
     // HostBased,
