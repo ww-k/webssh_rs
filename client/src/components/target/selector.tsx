@@ -1,4 +1,4 @@
-import { Button, Card, Form, FormProps, Input } from "antd";
+import { Button, Card, Form, FormProps, Input, InputNumber } from "antd";
 
 import "./selector.css";
 
@@ -11,7 +11,10 @@ export default function TargetSelector({ tab }: { tab: ITab }) {
     const [form] = Form.useForm();
 
     const onFinish: FormProps["onFinish"] = async (values) => {
-        await postTargetAdd(values);
+        await postTargetAdd({
+            ...values,
+            method: 1,
+        });
     };
 
     const onFinishFailed: FormProps["onFinishFailed"] = ({ values, errorFields, outOfDate }) => {
@@ -32,14 +35,14 @@ export default function TargetSelector({ tab }: { tab: ITab }) {
                     <Form.Item name="host" style={{ width: 200 }} rules={[{ required: true }]}>
                         <Input placeholder="Host" />
                     </Form.Item>
-                    <Form.Item name="username" rules={[{ required: true }]}>
-                        <Input placeholder="Username" style={{ width: 120 }} />
+                    <Form.Item name="user" rules={[{ required: true }]}>
+                        <Input placeholder="User" style={{ width: 120 }} />
                     </Form.Item>
                     <Form.Item name="password">
-                        <Input type="password" placeholder="Password" style={{ width: 120 }} />
+                        <Input.Password placeholder="Password" style={{ width: 120 }} />
                     </Form.Item>
                     <Form.Item name="port">
-                        <Input placeholder="22" style={{ width: 68 }} />
+                        <InputNumber min={1} max={65535} placeholder="22" style={{ width: 68 }} />
                     </Form.Item>
                     <Form.Item shouldUpdate>
                         <Button type="primary" htmlType="submit">

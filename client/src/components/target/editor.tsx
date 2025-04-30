@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Form, Input, Modal, Select } from "antd";
+import { Button, Form, Input, InputNumber, Modal, Select } from "antd";
 
 import "./editor.css";
 
@@ -26,12 +26,12 @@ export default function TargetEditor({
     const [requirePassword, setRequirePassword] = useState(false);
 
     useEffect(() => {
-        if (data) {
+        if (open && data) {
             form.setFieldsValue(data);
         } else {
             form.resetFields();
         }
-    }, [data]);
+    }, [data, open]);
 
     const onFinish = async () => {
         const values = await form.validateFields();
@@ -121,7 +121,7 @@ export default function TargetEditor({
                     <Input.Password placeholder="Password" />
                 </Form.Item>
                 <Form.Item name="port" label="Port">
-                    <Input placeholder="22" />
+                    <InputNumber min={1} max={65535} placeholder="22" />
                 </Form.Item>
                 <Form.Item>
                     <Button type="primary" htmlType="submit">

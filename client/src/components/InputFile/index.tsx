@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CloseCircleFilled, CloseOutlined, FolderOutlined } from "@ant-design/icons";
-
-import "./index.css";
 
 // @ts-ignore
 import openNativeFileSelector from "@/helpers/open_native_file_selector";
 
 export interface IInputFileProps {
+    value?: File[];
     allowClear?: boolean;
     /** 是否允许多选 */
     multiple?: boolean;
@@ -18,13 +17,14 @@ export interface IInputFileProps {
 }
 
 export default function InputFile({
+    value,
     allowClear = false,
     multiple = false,
     directory = false,
     placeholder,
     onChange,
 }: IInputFileProps) {
-    const [files, setFiles] = useState<File[]>([]);
+    const [files, setFiles] = useState<File[]>(value || []);
     const handleOpenFileSelector = async () => {
         const option = {
             multiple,
@@ -63,11 +63,16 @@ export default function InputFile({
         evt.preventDefault();
         inputFiles(Array.from(evt.dataTransfer.files), multiple);
     }
-
     function onFileRemoveHandle(file: File) {
         const _files = files.filter((_file) => _file !== file);
         inputFiles(_files);
     }
+
+    useEffect(() => {
+        if (Array.isArray(value) && value !== files) {
+            inputFiles(value);
+        }
+    }, [value]);
 
     return (
         <div

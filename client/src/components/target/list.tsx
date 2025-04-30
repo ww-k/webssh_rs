@@ -5,11 +5,11 @@ import "./list.css";
 
 import useAppStore from "@/store";
 import { getTargetList, postTargetRemove } from "@/api";
+import TargetEditor from "./editor";
 
 import type { ColumnsType } from "antd/es/table/interface";
 import type { ITab } from "@/store";
 import type { ITarget } from "@/api";
-import TargetEditor from "./editor";
 
 const mockData: ITarget[] = [
     {
@@ -25,9 +25,9 @@ const mockData: ITarget[] = [
         id: 2,
         host: "127.0.0.1",
         port: undefined,
-        method: 1,
+        method: 2,
         user: "user2",
-        key: "",
+        key: "123123",
         password: "222222",
     },
     {
@@ -48,7 +48,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
 
     async function refresh() {
         const res = await getTargetList();
-        // setDataSource(res);
+        setDataSource(res);
     }
 
     const columns: ColumnsType<ITarget> = useMemo(
@@ -125,9 +125,22 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 >
                     New target
                 </Button>
+                <Button
+                    onClick={refresh}
+                >
+                    Refresh
+                </Button>
             </div>
-            <Table columns={columns} dataSource={dataSource} />
-            <TargetEditor open={editorOpen} data={editorData} onOk={refresh} onCancel={() => setEditorOpen(false)} />
+            <Table rowKey="id" columns={columns} dataSource={dataSource} />
+            <TargetEditor
+                open={editorOpen}
+                data={editorData}
+                onOk={() => {
+                    refresh();
+                    setEditorOpen(false);
+                }}
+                onCancel={() => setEditorOpen(false)}
+            />
         </>
     );
 }
