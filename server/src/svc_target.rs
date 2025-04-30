@@ -42,7 +42,10 @@ async fn target_add(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<target::Model>,
 ) -> Result<Json<target::Model>, String> {
-    match target::ActiveModel::from(payload).insert(&state.db).await {
+    let mut active_model = target::ActiveModel::from(payload);
+    active_model.id = sea_orm::ActiveValue::NotSet;
+
+    match active_model.insert(&state.db).await {
         Ok(target) => Ok(Json(target)),
         Err(e) => Err(format!("Failed to add target: {}", e)),
     }

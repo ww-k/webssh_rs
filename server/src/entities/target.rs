@@ -19,11 +19,11 @@ pub struct Model {
     #[serde(skip_deserializing)]
     id: i32,
     host: String,
-    port: u16,
+    port: Option<u16>,
     method: u8,
     user: String,
-    key: String,
-    password: String,
+    key: Option<String>,
+    password: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
