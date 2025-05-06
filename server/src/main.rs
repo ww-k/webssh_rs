@@ -1,7 +1,7 @@
+mod consts;
 mod entities;
 mod migrations;
-mod svc_target;
-mod svc_term;
+mod services;
 
 use std::sync::Arc;
 
@@ -10,9 +10,7 @@ use sea_orm::Database;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use migrations::{Migrator, MigratorTrait};
-use svc_target::*;
-use svc_term::*;
-
+use services::{target::svc_target_router_builder, term::svc_term_router_builder};
 
 struct AppState {
     db: sea_orm::DatabaseConnection,
