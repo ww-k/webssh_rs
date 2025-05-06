@@ -32,7 +32,7 @@ function initTerm() {
     var ioLookup = io;
     /** @type {import('socket.io-client').Socket} */
     var socket = ioLookup(SSH_BASEPATH, {
-        path: "/term/socket.io",
+        path: "/api/term/socket.io",
         query: query,
         transports: "WebSocket" in window ? ["websocket"] : ["polling", "websocket"],
     });
@@ -93,7 +93,7 @@ function createTerminal(socket, xtermTheme) {
     terminalContainer.innerHTML = "";
 
     term = new Terminal();
-    fitAddon = new FitAddon.FitAddon();
+    fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
 
     if (xtermTheme) {

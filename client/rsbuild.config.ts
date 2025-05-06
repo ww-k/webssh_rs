@@ -18,6 +18,11 @@ export default defineConfig({
             },
         ],
         proxy: {
+            '/api/term': {
+                target: 'ws://localhost:8080',
+                ws: true,
+                changeOrigin: true,
+            },
             "/api": {
                 target: "http://localhost:8080",
                 changeOrigin: true,
