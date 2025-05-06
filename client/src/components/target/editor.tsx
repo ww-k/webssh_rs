@@ -5,7 +5,7 @@ import "./editor.css";
 
 import InputTextFromFile from "../InputTextFromFile";
 
-import { postTargetAdd, type ITarget } from "@/api";
+import { postTargetAdd, postTargetUpdate, type ITarget } from "@/api";
 import { validateCertContent } from "@/helpers/validate_cert_file";
 
 export default function TargetEditor({
@@ -35,7 +35,11 @@ export default function TargetEditor({
 
     const onFinish = async () => {
         const values = await form.validateFields();
-        await postTargetAdd(values);
+        if (data) {
+            await postTargetUpdate(values);
+        } else {
+            await postTargetAdd(values);
+        }
         onOk?.();
     };
 
@@ -121,7 +125,7 @@ export default function TargetEditor({
                     <Input.Password placeholder="Password" />
                 </Form.Item>
                 <Form.Item name="port" label="Port">
-                    <InputNumber min={1} max={65535} placeholder="22" />
+                    <InputNumber min={1} max={65535} placeholder="22" style={{width: '100%'}} />
                 </Form.Item>
                 <Form.Item>
                     <Button type="primary" htmlType="submit">
