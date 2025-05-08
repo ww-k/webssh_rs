@@ -6,10 +6,10 @@
 .targetSelector > .ant-card {
     margin: 0 auto;
     top: 50%;
-    transform: translateY(-65%);
+    transform: translateY(-55%);
     box-shadow: 0 3px 8px 0 rgba(0, 0, 0, 0.2);
 }
 
-.targetSelectorAddForm {
-    margin-bottom: 20px;
+.targetSelectorAddForm.ant-form-inline .ant-form-item {
+    margin-bottom: var(--ant-form-item-margin-bottom);
 }

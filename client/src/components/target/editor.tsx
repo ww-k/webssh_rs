@@ -22,7 +22,7 @@ export default function TargetEditor({
     const rootElRef = useRef<HTMLDivElement>(null);
 
     const [form] = Form.useForm();
-    const method = Form.useWatch('method', form);
+    const method = Form.useWatch("method", form);
     const [requirePassword, setRequirePassword] = useState(false);
 
     useEffect(() => {
@@ -125,7 +125,7 @@ export default function TargetEditor({
                     <Input.Password placeholder="Password" />
                 </Form.Item>
                 <Form.Item name="port" label="Port">
-                    <InputNumber min={1} max={65535} placeholder="22" style={{width: '100%'}} />
+                    <InputNumber min={1} max={65535} placeholder="22" style={{ width: "100%" }} />
                 </Form.Item>
                 <Form.Item>
                     <Button type="primary" htmlType="submit">

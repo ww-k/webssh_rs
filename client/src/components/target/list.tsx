@@ -125,13 +125,17 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 >
                     New target
                 </Button>
-                <Button
-                    onClick={refresh}
-                >
-                    Refresh
-                </Button>
+                <Button onClick={refresh}>Refresh</Button>
             </div>
-            <Table rowKey="id" columns={columns} dataSource={dataSource} />
+            <Table
+                className="targetListTable"
+                rowKey="id"
+                columns={columns}
+                dataSource={dataSource}
+                size="small"
+                scroll={{ y: 390 }}
+                pagination={false}
+            />
             <TargetEditor
                 open={editorOpen}
                 data={editorData}

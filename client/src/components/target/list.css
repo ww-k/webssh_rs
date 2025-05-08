@@ -3,3 +3,7 @@
     justify-content: space-between;
     padding-bottom: 20px;
 }
+
+.targetListTable .ant-empty-normal {
+    height: calc(389px - 2 * var(--ant-table-cell-padding-block-sm) - 2 * var(--ant-margin-xl));
+}
