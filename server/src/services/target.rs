@@ -1,13 +1,15 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::State, routing::{get, post}, Json, Router
+    Json, Router,
+    extract::State,
+    routing::{get, post},
 };
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait};
 use serde::Deserialize;
 
-use crate::consts::services_err_code::*;
 use crate::{AppState, entities::target};
+use crate::{consts::services_err_code::*, entities::target::TargetAuthMethod};
 
 use super::{ApiErr, ValidJson};
 
@@ -61,7 +63,7 @@ struct TargetUpdatePayload {
     id: i32,
     host: String,
     port: Option<u16>,
-    method: u8,
+    method: TargetAuthMethod,
     user: String,
     key: Option<String>,
     password: Option<String>,

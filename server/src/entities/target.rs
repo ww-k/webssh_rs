@@ -1,7 +1,13 @@
-use sea_orm::entity::prelude::*;
+use sea_orm::{
+    ColIdx, TryGetable,
+    entity::prelude::*,
+    sea_query::{ArrayType, ValueType, ValueTypeErr},
+};
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug, PartialEq, Eq)]
+#[repr(i32)]
 pub enum TargetAuthMethod {
     Password = 1,
     PrivateKey = 2,
@@ -11,23 +17,77 @@ pub enum TargetAuthMethod {
     // KeyboardInteractive,
 }
 
-#[derive(Deserialize, Serialize)]
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+impl TryFrom<i32> for TargetAuthMethod {
+    type Error = ();
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(TargetAuthMethod::Password),
+            2 => Ok(TargetAuthMethod::PrivateKey),
+            3 => Ok(TargetAuthMethod::None),
+            _ => Err(()),
+        }
+    }
+}
+
+// 为 SeaORM 实现 Value::from()
+impl From<TargetAuthMethod> for Value {
+    fn from(method: TargetAuthMethod) -> Self {
+        Value::Int(Some(method as i32))
+    }
+}
+
+// 为 SeaORM 实现 ValueType（用于数据库 schema）
+impl ValueType for TargetAuthMethod {
+    fn try_from(v: Value) -> Result<Self, ValueTypeErr> {
+        if let Value::Int(Some(v)) = v {
+            <TargetAuthMethod as TryFrom<i32>>::try_from(v).map_err(|_| ValueTypeErr)
+        } else {
+            Err(ValueTypeErr)
+        }
+    }
+
+    fn type_name() -> String {
+        "TargetAuthMethod".to_string()
+    }
+
+    fn column_type() -> ColumnType {
+        ColumnType::Integer
+    }
+
+    fn array_type() -> ArrayType {
+        ArrayType::Int
+    }
+}
+
+// 必须实现 TryGetable，以便从查询结果中提取值
+impl TryGetable for TargetAuthMethod {
+    fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
+        let value: i32 = res.try_get_by(index)?;
+        <TargetAuthMethod as TryFrom<i32>>::try_from(value).map_err(|_| {
+            TryGetError::DbErr(DbErr::Custom(
+                "invalid target auth method value".to_string(),
+            ))
+        })
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "target")]
 pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
-    id: i32,
-    host: String,
-    port: Option<u16>,
-    method: u8,
-    user: String,
-    key: Option<String>,
-    password: Option<String>,
+    pub id: i32,
+    pub host: String,
+    pub port: Option<u16>,
+    #[sea_orm(from = "i32")]
+    pub method: TargetAuthMethod,
+    pub user: String,
+    pub key: Option<String>,
+    pub password: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-}
+pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
