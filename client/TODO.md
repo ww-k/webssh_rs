@@ -1,2 +1,7 @@
 - [ ] [用户体验] 添加新Target时，记录选择的密钥文件，下次可以从已有的密钥文件中选择
-- [ ] [用户体验] 优化快速连接表单教研失败交互, 现在失败信息显示在输入框下，导致后面按钮换行了
+- [x] [用户体验] 优化快速连接表单教研失败交互, 现在失败信息显示在输入框下，导致后面按钮换行了
+- [ ] [新特性] 与sftp联动, support [detect CurrentDir](https://iterm2.com/documentation-escape-codes.html)
+    ```
+    OSC 1337 ; CurrentDir=[current directory] ST
+    "\u001b]1337;CurrentDir=/Users/root\u0007"
+    ```
