@@ -31,13 +31,13 @@ pub(crate) fn svc_target_router_builder(app_state: Arc<AppState>) -> Router {
 
 async fn target_list(
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<target::Model>>, Json<ApiErr>> {
+) -> Result<Json<Vec<target::Model>>, ApiErr> {
     match target::Entity::find().all(&state.db).await {
         Ok(targets) => Ok(Json(targets)),
-        Err(e) => Err(Json(ApiErr {
+        Err(e) => Err(ApiErr {
             code: ERR_CODE_DB_ERR,
             message: format!("Failed to get target list: {}", e),
-        })),
+        }),
     }
 }
 
@@ -45,16 +45,16 @@ async fn target_list(
 async fn target_add(
     State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<target::Model>,
-) -> Result<Json<target::Model>, Json<ApiErr>> {
+) -> Result<Json<target::Model>, ApiErr> {
     let mut active_model = target::ActiveModel::from(payload);
     active_model.id = sea_orm::ActiveValue::NotSet;
 
     match active_model.insert(&state.db).await {
         Ok(target) => Ok(Json(target)),
-        Err(e) => Err(Json(ApiErr {
+        Err(e) => Err(ApiErr {
             code: ERR_CODE_DB_ERR,
             message: format!("Failed to add target: {}", e),
-        })),
+        }),
     }
 }
 
@@ -86,15 +86,15 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
 async fn target_update(
     State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<TargetUpdatePayload>,
-) -> Result<Json<target::Model>, Json<ApiErr>> {
+) -> Result<Json<target::Model>, ApiErr> {
     let active_model = target::ActiveModel::from(payload);
 
     match active_model.update(&state.db).await {
         Ok(target) => Ok(Json(target)),
-        Err(e) => Err(Json(ApiErr {
+        Err(e) => Err(ApiErr {
             code: ERR_CODE_DB_ERR,
             message: format!("Failed to update target: {}", e),
-        })),
+        }),
     }
 }
 
@@ -106,15 +106,15 @@ struct TargetRemovePayload {
 async fn target_remove(
     State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<TargetRemovePayload>,
-) -> Result<String, Json<ApiErr>> {
+) -> Result<String, ApiErr> {
     match target::Entity::delete_by_id(payload.id)
         .exec(&state.db)
         .await
     {
         Ok(_) => Ok(format!("")),
-        Err(e) => Err(Json(ApiErr {
+        Err(e) => Err(ApiErr {
             code: ERR_CODE_DB_ERR,
             message: format!("Failed to remove target: {}", e),
-        })),
+        }),
     }
 }
