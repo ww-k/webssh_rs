@@ -18,14 +18,14 @@ pub enum TargetAuthMethod {
 }
 
 impl TryFrom<i32> for TargetAuthMethod {
-    type Error = ();
+    type Error = String;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(TargetAuthMethod::Password),
             2 => Ok(TargetAuthMethod::PrivateKey),
             3 => Ok(TargetAuthMethod::None),
-            _ => Err(()),
+            _ => Err(format!("invalid target auth method value {}", value)),
         }
     }
 }
@@ -64,10 +64,8 @@ impl ValueType for TargetAuthMethod {
 impl TryGetable for TargetAuthMethod {
     fn try_get_by<I: ColIdx>(res: &QueryResult, index: I) -> Result<Self, TryGetError> {
         let value: i32 = res.try_get_by(index)?;
-        <TargetAuthMethod as TryFrom<i32>>::try_from(value).map_err(|_| {
-            TryGetError::DbErr(DbErr::Custom(
-                "invalid target auth method value".to_string(),
-            ))
+        <TargetAuthMethod as TryFrom<i32>>::try_from(value).map_err(|err| {
+            TryGetError::DbErr(DbErr::Custom(err))
         })
     }
 }
