@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { ConfigProvider, Tabs } from "antd";
 
 import "./App.css";
@@ -17,6 +17,12 @@ export default function App() {
             })),
         [tabs]
     );
+
+    useEffect(() => {
+        window.onkeydown = (evt) => {
+            console.log(`${evt.ctrlKey ? "Ctrl + " : ""}${evt.altKey ? "Alt + " : ""}${evt.shiftKey ? "Shift + " : ""}${evt.metaKey ? "Meta + " : ""}${evt.key} ${evt.code}`);
+        };
+    }, []);
 
     const onEdit = (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: "add" | "remove") => {
         if (action === "add") {

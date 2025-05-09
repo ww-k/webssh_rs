@@ -15,7 +15,7 @@ type AppStore = {
     setActiveTabKey: (key: string) => void;
     addTab: () => void;
     removeTab: (key: string) => void;
-    setTabPath: (key: string, path: string) => void;
+    setTabPath: (key: string, path: string, label?: string) => void;
 };
 
 const useAppStore = create<AppStore>((set) => {
@@ -61,11 +61,11 @@ const useAppStore = create<AppStore>((set) => {
                 }
                 return { activeTabKey: newActiveKey, tabs: newTabs };
             }),
-        setTabPath: (key: string, path: string) =>
+        setTabPath: (key: string, path: string, label?: string) =>
             set((state) => {
                 const newTabs = state.tabs.map((tab) => {
                     if (tab.key === key) {
-                        return { ...tab, path };
+                        return { ...tab, path, label: label || tab.label };
                     }
                     return tab;
                 });

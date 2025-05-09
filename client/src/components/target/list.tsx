@@ -75,7 +75,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     <Space size="middle">
                         <a
                             onClick={() => {
-                                setTabPath(tab.key, `/terminal/${record.id}`);
+                                setTabPath(tab.key, `/terminal/${record.id}`, `${record.user}@${record.host}`);
                             }}
                         >
                             Connect
