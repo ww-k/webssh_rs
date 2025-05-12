@@ -60,7 +60,7 @@ function initTerm() {
         }
     });
 
-    socket.on("termCreated", function (option) {
+    socket.on("server_ready", function (option) {
         if (typeof option.maxDisconnectionDuration === "number") {
             maxDisconnectionDuration = option.maxDisconnectionDuration;
         }
