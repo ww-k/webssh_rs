@@ -25,11 +25,12 @@ struct QueryParams {
 pub(crate) fn svc_term_router_builder(app_state: Arc<AppState>) -> Router {
     let (svc, io) = SocketIo::builder().build_svc();
     io.ns("/", async move |socket: SocketRef| {
+        let sid = socket.id;
         let result = start(socket.clone(), app_state).await;
 
         if let Err(err) = result {
+            error!("sid={} start fail. {:?}", sid, err);
             let _ = socket.disconnect();
-            error!("{:?}", err);
             return;
         }
     });
@@ -37,19 +38,27 @@ pub(crate) fn svc_term_router_builder(app_state: Arc<AppState>) -> Router {
 }
 
 async fn start(socket: SocketRef, app_state: Arc<AppState>) -> Result<()> {
+    let sid = socket.id;
     let target = get_target(socket.clone(), app_state).await?;
+    info!("sid={} get target: {:?}", sid, target);
 
     let mut session = Session::connect(target).await?;
+    info!("sid={} target connected", sid);
 
     let channel = session.open_channel().await?;
+    info!("sid={} channel opened", sid);
+
     open_tunnel(socket, channel).await;
+    info!("sid={} tunnel closed", sid);
 
     session.close().await?;
+    info!("sid={} session closed", sid);
 
     Ok(())
 }
 
 async fn get_target(socket: SocketRef, app_state: Arc<AppState>) -> Result<target::Model> {
+    let sid = socket.id;
     let query = socket.req_parts().uri.query().unwrap_or_default();
     let result: Result<QueryParams, serde_qs::Error> = serde_qs::from_str(query);
     if let Err(err) = result {
@@ -57,7 +66,7 @@ async fn get_target(socket: SocketRef, app_state: Arc<AppState>) -> Result<targe
     }
     let params = result.unwrap();
 
-    debug!("{:?}", params);
+    debug!("sid={} {:?}", sid, params);
 
     let result = target::Entity::find_by_id(params.connect_id)
         .one(&app_state.db)
@@ -82,6 +91,7 @@ struct Resize {
 }
 
 async fn open_tunnel(socket: SocketRef, channel: russh::Channel<russh::client::Msg>) {
+    let sid = socket.id;
     let (mut read_half, write_half) = channel.split();
     let write_half_arc = Arc::new(write_half);
 
@@ -101,16 +111,19 @@ async fn open_tunnel(socket: SocketRef, channel: russh::Channel<russh::client::M
 
     loop {
         let Some(msg) = read_half.wait().await else {
-            info!("None ChannelMsg");
+            debug!("sid={} None ChannelMsg", sid);
             break;
         };
         match msg {
+            ChannelMsg::Success => {
+                let _ = socket.emit("server_ready", "");
+            }
             ChannelMsg::Data { ref data } => {
                 let str = String::from_utf8(data.to_vec()).unwrap();
                 let _ = socket.emit("output", &str);
             }
             ChannelMsg::ExitStatus { exit_status } => {
-                info!("Exitcode: {}", exit_status);
+                debug!("sid={} Exitcode: {}", sid, exit_status);
                 break;
             }
             _ => {}

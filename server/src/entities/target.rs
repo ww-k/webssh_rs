@@ -70,7 +70,7 @@ impl TryGetable for TargetAuthMethod {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "target")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -83,6 +83,21 @@ pub struct Model {
     pub user: String,
     pub key: Option<String>,
     pub password: Option<String>,
+}
+
+
+impl std::fmt::Debug for Model {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Model")
+            .field("id", &self.id)
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("method", &self.method)
+            .field("user", &self.user)
+            .field("key", &"<secret>")
+            .field("password", &"<secret>")
+            .finish()
+    }
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
