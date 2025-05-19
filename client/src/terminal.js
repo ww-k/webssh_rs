@@ -11,7 +11,6 @@ var SSH_BASEPATH = location.origin;
 var term;
 /** @type {import('@xterm/addon-fit').FitAddon} */
 var fitAddon;
-/** @type {import('./typing').ITermSize} */
 var sizeCache;
 var maxDisconnectionDuration = 5 * 60000;
 
@@ -37,11 +36,10 @@ function initTerm() {
         transports: "WebSocket" in window ? ["websocket"] : ["polling", "websocket"],
     });
     var buf = "";
-    var xtermTheme = getConfig(queryParams.configPath);
 
     socket.on("connect", function () {
         if (!term) {
-            createTerminal(socket, xtermTheme);
+            createTerminal(socket);
         } else {
             if (socket.recovered) {
                 console.log(new Date(), socket.id, "socket recovered");
@@ -86,29 +84,14 @@ function initTerm() {
 
 /**
  * @param {import('socket.io-client').Socket} socket
- * @param {import('./typing').IXtermThemeConfig} xtermTheme
  * @returns
  */
-function createTerminal(socket, xtermTheme) {
+function createTerminal(socket) {
     terminalContainer.innerHTML = "";
 
     term = new Terminal();
     fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
-
-    if (xtermTheme) {
-        terminalContainer.style.backgroundColor = xtermTheme.background;
-        term.options.theme = {
-            background: xtermTheme.background,
-            foreground: xtermTheme.foreground,
-            cursor: xtermTheme.foreground,
-            cursorAccent: xtermTheme.background,
-        };
-        if (xtermTheme.fontFamily) {
-            term.options.fontFamily = xtermTheme.fontFamily;
-        }
-        term.options.fontSize = parseInt(xtermTheme.fontSize) || 12;
-    }
 
     term.open(terminalContainer);
 
@@ -143,10 +126,22 @@ function createTerminal(socket, xtermTheme) {
         "message",
         function receiveMessage(event) {
             var data = event.data;
-            //云桌面
-            if (data.type == "focus" && typeof window.term == "object") {
-                fitAddon.fit();
-                term.focus();
+
+            if (typeof term !== "object") return;
+            switch (data.command) {
+                case "focus":
+                    fitAddon.fit();
+                    term.focus();
+                    break;
+                case "setTheme":
+                    term.options.theme = {
+                        ...term.options.theme,
+                        ...data.args,
+                    };
+                    break;
+                default:
+                    console.log("unknown command", data)
+                    break;
             }
         },
         false
@@ -168,7 +163,7 @@ function decodeQueryParam(searchStr) {
     return param;
 }
 
-/** @type {import('./typing').IXtermThemeConfig} */
+/** @type {import('@xterm/xterm').ITheme} */
 const defaultOption = {
     background: "#000000",
     foreground: "#ffffff",
@@ -178,7 +173,7 @@ const defaultOption = {
 
 /**
  * @param {string} configPath
- * @returns {import('./typing').IXtermThemeConfig}
+ * @returns {import('@xterm/xterm').ITheme}
  */
 function getConfig(configPath) {
     if (!configPath) {

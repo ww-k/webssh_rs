@@ -13,14 +13,22 @@ export default function App() {
         () =>
             tabs.map((tab) => ({
                 ...tab,
-                children: tab.path.startsWith("/terminal/") ? <Terminal tab={tab} /> : <TargetSelector tab={tab} />,
+                children: tab.path.startsWith("/terminal/") ? (
+                    <Terminal tab={tab} active={activeTabKey === tab.key} />
+                ) : (
+                    <TargetSelector tab={tab} />
+                ),
             })),
-        [tabs]
+        [tabs, activeTabKey]
     );
 
     useEffect(() => {
         window.onkeydown = (evt) => {
-            console.log(`${evt.ctrlKey ? "Ctrl + " : ""}${evt.altKey ? "Alt + " : ""}${evt.shiftKey ? "Shift + " : ""}${evt.metaKey ? "Meta + " : ""}${evt.key} ${evt.code}`);
+            console.log(
+                `${evt.ctrlKey ? "Ctrl + " : ""}${evt.altKey ? "Alt + " : ""}${evt.shiftKey ? "Shift + " : ""}${
+                    evt.metaKey ? "Meta + " : ""
+                }${evt.key} ${evt.code}`
+            );
         };
     }, []);
 
