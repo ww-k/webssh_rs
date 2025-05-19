@@ -95,6 +95,14 @@ async fn open_tunnel(socket: SocketRef, channel: russh::Channel<russh::client::M
     let (mut read_half, write_half) = channel.split();
     let write_half_arc = Arc::new(write_half);
 
+    socket.on_disconnect({
+        let channel_write_half = write_half_arc.clone();
+        async move |socket: SocketRef, reason: socketioxide::socket::DisconnectReason| {
+            info!("sid={} socket disconnect: {:?}", socket.id, reason);
+            let _ = channel_write_half.close().await;
+        }
+    });
+
     socket.on("resize", {
         let channel_write_half = write_half_arc.clone();
         async move |Data::<Resize>(data)| {
