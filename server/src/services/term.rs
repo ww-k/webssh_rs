@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{Ok, Result};
 use axum::Router;
@@ -39,14 +39,10 @@ pub(crate) fn svc_term_router_builder(app_state: Arc<AppState>) -> Router {
 
 async fn start(socket: SocketRef, app_state: Arc<AppState>) -> Result<()> {
     let sid = socket.id;
-    let target = get_target(socket.clone(), app_state).await?;
-    info!("sid={} get target: {:?}", sid, target);
-
-    let mut session = Session::connect(target).await?;
-    info!("sid={} target connected", sid);
-
-    let channel = session.open_channel().await?;
-    info!("sid={} channel opened", sid);
+    let (mut session, channel) = tokio::select! {
+        _   = tokio::time::sleep(Duration::from_secs(30)) => anyhow::bail!("connect_target tiemout"),
+        res = connect_target(socket.clone(), app_state) => res,
+    }?;
 
     open_tunnel(socket, channel).await;
     info!("sid={} tunnel closed", sid);
@@ -55,6 +51,23 @@ async fn start(socket: SocketRef, app_state: Arc<AppState>) -> Result<()> {
     info!("sid={} session closed", sid);
 
     Ok(())
+}
+
+async fn connect_target(
+    socket: SocketRef,
+    app_state: Arc<AppState>,
+) -> Result<(Session, russh::Channel<russh::client::Msg>)> {
+    let sid = socket.id;
+    let target = get_target(socket, app_state).await?;
+    info!("sid={} get target: {:?}", sid, target);
+
+    let mut session = Session::connect(target).await?;
+    info!("sid={} target connected", sid);
+
+    let channel = session.open_channel().await?;
+    info!("sid={} channel opened", sid);
+
+    Ok((session, channel))
 }
 
 async fn get_target(socket: SocketRef, app_state: Arc<AppState>) -> Result<target::Model> {
