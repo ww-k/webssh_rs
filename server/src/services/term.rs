@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 
 use anyhow::{Ok, Result};
 use axum::Router;
@@ -140,7 +140,7 @@ async fn open_tunnel(socket: SocketRef, channel: russh::Channel<russh::client::M
                 let _ = socket.emit("server_ready", "");
             }
             ChannelMsg::Data { ref data } => {
-                let str = String::from_utf8(data.to_vec()).unwrap();
+                let str = String::from_utf8_lossy(data);
                 let _ = socket.emit("output", &str);
             }
             ChannelMsg::ExitStatus { exit_status } => {
@@ -211,12 +211,19 @@ impl Session {
         channel
             .request_pty(
                 false,
-                "xterm",
+                "xterm-256color",
                 80,
                 25,
                 0,
                 0,
                 &[], // ideally you want to pass the actual terminal modes here
+            )
+            .await?;
+        channel
+            .set_env(
+                false,
+                "LANG",
+                env::var("LANG").unwrap_or("zh_CN.UTF-8".to_string()),
             )
             .await?;
         channel.request_shell(true).await?;
