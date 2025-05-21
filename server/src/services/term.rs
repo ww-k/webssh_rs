@@ -2,7 +2,9 @@ use std::{env, sync::Arc, time::Duration};
 
 use anyhow::{Ok, Result};
 use axum::Router;
-use russh::{ChannelMsg, Disconnect, client, keys::ssh_key};
+use russh::{
+    client, keys::{decode_secret_key, ssh_key, HashAlg, PrivateKeyWithHashAlg}, ChannelMsg, Disconnect
+};
 use sea_orm::EntityTrait;
 use serde::Deserialize;
 use socketioxide::{
@@ -186,11 +188,19 @@ impl Session {
         let auth_res = match target.method {
             TargetAuthMethod::Password => {
                 let username = target.user;
-                let password = target.password.unwrap();
+                let password = target.password.unwrap_or("".to_string());
                 session.authenticate_password(username, password).await?
             }
             TargetAuthMethod::PrivateKey => {
-                todo!();
+                let username = target.user;
+                let key_data = target.key.unwrap_or("".to_string());
+                let private_key = decode_secret_key(&key_data, target.password.as_deref())?;
+                let private_key_with_hash_alg =
+                    PrivateKeyWithHashAlg::new(Arc::new(private_key), Some(HashAlg::Sha512));
+                debug!("{:?}", private_key_with_hash_alg);
+                session
+                    .authenticate_publickey(username, private_key_with_hash_alg)
+                    .await?
             }
             TargetAuthMethod::None => {
                 todo!();
