@@ -1,5 +1,6 @@
 pub mod target;
 pub mod ssh;
+pub mod sftp;
 
 use axum::{
     extract::{rejection::JsonRejection, FromRequest}, http::StatusCode,

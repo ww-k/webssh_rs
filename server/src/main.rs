@@ -10,7 +10,9 @@ use sea_orm::Database;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use migrations::{Migrator, MigratorTrait};
-use services::{target::svc_target_router_builder, ssh::svc_ssh_router_builder};
+use services::{
+    sftp::svc_sftp_router_builder, ssh::svc_ssh_router_builder, target::svc_target_router_builder,
+};
 
 struct AppState {
     db: sea_orm::DatabaseConnection,
@@ -38,6 +40,7 @@ async fn main() {
     let app = Router::new()
         //.with_state(app_state.clone())
         .nest("/api/ssh", svc_ssh_router_builder(app_state.clone()))
+        .nest("/api/sftp", svc_sftp_router_builder(app_state.clone()))
         .nest("/api/target", svc_target_router_builder(app_state.clone()))
         .fallback(any(|| async { (StatusCode::NOT_FOUND, "404 Not Found") }));
     //.fallback_service(ServeDir::new("../client"));
