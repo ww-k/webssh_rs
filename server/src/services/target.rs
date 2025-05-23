@@ -41,7 +41,6 @@ async fn target_list(
     }
 }
 
-#[axum::debug_handler]
 async fn target_add(
     State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<target::Model>,

@@ -18,7 +18,7 @@ export default defineConfig({
             },
         ],
         proxy: {
-            '/api/term': {
+            '/api/ssh': {
                 target: 'ws://localhost:8080',
                 ws: true,
                 changeOrigin: true,

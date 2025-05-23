@@ -25,11 +25,11 @@ struct QueryParams {
     // Add other query parameters here as needed
 }
 
-pub(crate) fn svc_term_router_builder(app_state: Arc<AppState>) -> Router {
+pub(crate) fn svc_ssh_router_builder(app_state: Arc<AppState>) -> Router {
     let (svc, io) = SocketIo::builder().build_svc();
     io.ns("/", async move |socket: SocketRef| {
         let sid = socket.id;
-        let result = TermSession::start(socket.clone(), app_state).await;
+        let result = SshSvcSession::start(socket.clone(), app_state).await;
 
         if let Err(err) = result {
             error!("sid={} start fail. {:?}", sid, err);
@@ -40,15 +40,15 @@ pub(crate) fn svc_term_router_builder(app_state: Arc<AppState>) -> Router {
     Router::new().fallback_service(svc)
 }
 
-struct TermSession {
+struct SshSvcSession {
     socket: SocketRef,
     app_state: Arc<AppState>,
     ssh_client_handle: Option<client::Handle<SshClientHandler>>,
 }
 
-impl TermSession {
+impl SshSvcSession {
     async fn start(socket: SocketRef, app_state: Arc<AppState>) -> Result<Self> {
-        let mut term_session = TermSession {
+        let mut term_session = SshSvcSession {
             socket,
             app_state,
             ssh_client_handle: None,

@@ -1,5 +1,5 @@
 pub mod target;
-pub mod term;
+pub mod ssh;
 
 use axum::{
     extract::{rejection::JsonRejection, FromRequest}, http::StatusCode,

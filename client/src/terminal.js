@@ -31,7 +31,7 @@ function initTerm() {
     var ioLookup = io;
     /** @type {import('socket.io-client').Socket} */
     var socket = ioLookup(SSH_BASEPATH, {
-        path: "/api/term/socket.io",
+        path: "/api/ssh/socket.io",
         query: query,
         transports: "WebSocket" in window ? ["websocket"] : ["polling", "websocket"],
     });
