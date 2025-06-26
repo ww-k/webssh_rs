@@ -1,12 +1,8 @@
-use std::{env, sync::Arc, time::Duration};
+use std::{env, sync::Arc};
 
 use anyhow::{Ok, Result};
 use axum::Router;
-use russh::{
-    ChannelMsg, Disconnect, client,
-    keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, decode_secret_key, ssh_key},
-};
-use sea_orm::EntityTrait;
+use russh::{ChannelMsg, client, keys::PublicKeyBase64};
 use serde::Deserialize;
 use socketioxide::{
     SocketIo,
@@ -16,7 +12,7 @@ use tracing::{debug, error, info};
 
 use crate::{
     AppState,
-    entities::target::{self, TargetAuthMethod},
+    ssh_session_pool::{SshSessionPool, SshChannelGuard},
 };
 
 #[derive(Deserialize, Debug)]
@@ -25,11 +21,20 @@ struct QueryParams {
     // Add other query parameters here as needed
 }
 
-pub(crate) fn svc_ssh_router_builder(app_state: Arc<AppState>) -> Router {
+#[derive(Deserialize, Debug)]
+struct Resize {
+    col: u32,
+    row: u32,
+}
+
+pub(crate) fn svc_ssh_router_builder(
+    app_state: Arc<AppState>,
+    session_pool: Arc<SshSessionPool>,
+) -> Router {
     let (svc, io) = SocketIo::builder().build_svc();
     io.ns("/", async move |socket: SocketRef| {
         let sid = socket.id;
-        let result = SshSvcSession::start(socket.clone(), app_state).await;
+        let result = SshSvcSession::start(socket.clone(), app_state, session_pool).await;
 
         if let Err(err) = result {
             error!("sid={} start fail. {:?}", sid, err);
@@ -42,76 +47,52 @@ pub(crate) fn svc_ssh_router_builder(app_state: Arc<AppState>) -> Router {
 
 struct SshSvcSession {
     socket: SocketRef,
-    app_state: Arc<AppState>,
-    ssh_client_handle: Option<client::Handle<SshClientHandler>>,
 }
 
 impl SshSvcSession {
-    async fn start(socket: SocketRef, app_state: Arc<AppState>) -> Result<Self> {
-        let mut term_session = SshSvcSession {
-            socket,
-            app_state,
-            ssh_client_handle: None,
-        };
-        let sid = term_session.socket.id;
-        let channel = tokio::select! {
-            _   = tokio::time::sleep(Duration::from_secs(30)) => anyhow::bail!("connect_target tiemout"),
-            res = term_session.open_target_channel() => res,
-        }?;
-
-        term_session.open_socket_channel_tunnel(channel).await;
-        info!("sid={} tunnel closed", sid);
-
-        term_session.close().await?;
-        info!("sid={} session closed", sid);
-
-        Ok(term_session)
-    }
-
-    async fn open_target_channel(&mut self) -> Result<russh::Channel<russh::client::Msg>> {
-        let sid = self.socket.id;
-        let target = self.get_target().await?;
-        info!("sid={} get target: {:?}", sid, target);
-
-        self.connect_target(target).await?;
-        info!("sid={} target connected", sid);
-
-        let channel = self.open_session_channel_request_pty_shell().await?;
-        info!("sid={} channel opened", sid);
-
-        Ok(channel)
-    }
-
-    async fn get_target(&self) -> Result<target::Model> {
-        let sid = self.socket.id;
-        let query = self.socket.req_parts().uri.query().unwrap_or_default();
+    async fn start(
+        socket: SocketRef,
+        _app_state: Arc<AppState>,
+        session_pool: Arc<SshSessionPool>,
+    ) -> Result<Self> {
+        let query = socket.req_parts().uri.query().unwrap_or_default();
         let result: Result<QueryParams, serde_qs::Error> = serde_qs::from_str(query);
         if let Err(err) = result {
             anyhow::bail!("Failed to parse query parameters: {:?}", err);
         }
         let params = result.unwrap();
+        let result = session_pool.get(params.connect_id).await;
+        if let Err(err) = result {
+            anyhow::bail!("Failed to get channel: {:?}", err);
+        }
+        let sid = socket.id;
+        let channel = result.unwrap();
 
-        debug!("sid={} {:?}", sid, params);
+        info!("sid={} target {} SshChannel {}", sid, params.connect_id, channel.id());
 
-        let result = target::Entity::find_by_id(params.connect_id)
-            .one(&self.app_state.db)
+        let term_session = SshSvcSession { socket };
+        let result = term_session
+            .open_session_channel_request_pty_shell(channel)
             .await;
-
-        if let Err(db_err) = result {
-            anyhow::bail!("Failed to get target {:?}", db_err);
+        if let Err(err) = result {
+            anyhow::bail!(
+                "Failed to open_session_channel_request_pty_shell: {:?}",
+                err
+            );
         }
+        info!("sid={} open_session_channel_request_pty_shell", sid);
 
-        let model = result.unwrap();
-        if model.is_none() {
-            anyhow::bail!("no target found");
-        }
+        let channel = result.unwrap();
+        term_session.open_socket_channel_tunnel(channel).await;
+        info!("sid={} tunnel closed", sid);
 
-        Ok(model.unwrap())
+        Ok(term_session)
     }
 
-    async fn open_socket_channel_tunnel(&self, channel: russh::Channel<russh::client::Msg>) {
+    async fn open_socket_channel_tunnel(&self, mut channel_guard: SshChannelGuard) {
         let socket = self.socket.clone();
         let sid = socket.id;
+        let channel = channel_guard.take_channel().unwrap();
         let (mut read_half, write_half) = channel.split();
         let write_half_arc = Arc::new(write_half);
 
@@ -156,67 +137,19 @@ impl SshSvcSession {
                     debug!("sid={} Exitcode: {}", sid, exit_status);
                     break;
                 }
+                ChannelMsg::Close => {
+                    debug!("sid={} ChannelMsg::Close", sid);
+                    break;
+                }
                 _ => {}
             }
         }
     }
 
-    async fn connect_target(&mut self, target: target::Model) -> Result<()> {
-        let config = client::Config::default();
-        let sh: SshClientHandler = SshClientHandler {
-            host: target.host.clone(),
-        };
-
-        let mut session = client::connect(
-            Arc::new(config),
-            (target.host, target.port.unwrap_or(22)),
-            sh,
-        )
-        .await?;
-        let auth_res = match target.method {
-            TargetAuthMethod::Password => {
-                let username = target.user;
-                let password = target.password.unwrap_or("".to_string());
-                session.authenticate_password(username, password).await?
-            }
-            TargetAuthMethod::PrivateKey => {
-                let username = target.user;
-                let key_data = target.key.unwrap_or("".to_string());
-                let private_key = decode_secret_key(&key_data, target.password.as_deref())?;
-                let private_key_with_hash_alg =
-                    PrivateKeyWithHashAlg::new(Arc::new(private_key), Some(HashAlg::Sha256));
-                session
-                    .authenticate_publickey(username, private_key_with_hash_alg)
-                    .await?
-            }
-            TargetAuthMethod::None => {
-                todo!();
-            }
-        };
-
-        if !auth_res.success() {
-            anyhow::bail!("Authentication failed");
-        }
-
-        self.ssh_client_handle = Some(session);
-
-        Ok(())
-    }
-
     async fn open_session_channel_request_pty_shell(
-        &mut self,
-    ) -> Result<russh::Channel<russh::client::Msg>> {
-        if self.ssh_client_handle.is_none() {
-            anyhow::bail!("SSH client handle is not set");
-        }
-
-        let channel = self
-            .ssh_client_handle
-            .as_ref()
-            .unwrap()
-            .channel_open_session()
-            .await?;
-
+        &self,
+        channel: SshChannelGuard,
+    ) -> Result<SshChannelGuard> {
         // Request an interactive PTY from the server
         channel
             .request_pty(
@@ -239,46 +172,5 @@ impl SshSvcSession {
         channel.request_shell(true).await?;
 
         Ok(channel)
-    }
-
-    async fn close(&self) -> Result<()> {
-        if let Some(handle) = self.ssh_client_handle.as_ref() {
-            handle
-                .disconnect(Disconnect::ByApplication, "", "English")
-                .await?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Deserialize, Debug)]
-struct Resize {
-    col: u32,
-    row: u32,
-}
-
-struct SshClientHandler {
-    host: String,
-}
-
-// More SSH event handlers
-// can be defined in this trait
-// In this example, we're only using Channel, so these aren't needed.
-impl client::Handler for SshClientHandler {
-    type Error = anyhow::Error;
-
-    /// Called to check the server's public key. This is a very important
-    /// step to help prevent man-in-the-middle attacks. The default
-    /// implementation rejects all keys.
-    fn check_server_key(
-        &mut self,
-        server_public_key: &ssh_key::PublicKey,
-    ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
-        debug!(
-            "ClientHandler @check_server_key {} {:?}",
-            self.host,
-            server_public_key.public_key_base64()
-        );
-        async { Ok(true) }
     }
 }

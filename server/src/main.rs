@@ -1,12 +1,15 @@
+mod config;
 mod consts;
 mod entities;
 mod migrations;
 mod services;
+mod ssh_session_pool;
 
 use std::sync::Arc;
 
 use axum::{Router, http::StatusCode, routing::any};
-use sea_orm::Database;
+use config::Config;
+use sea_orm::{Database, DatabaseConnection};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use migrations::{Migrator, MigratorTrait};
@@ -14,8 +17,11 @@ use services::{
     sftp::svc_sftp_router_builder, ssh::svc_ssh_router_builder, target::svc_target_router_builder,
 };
 
+use crate::ssh_session_pool::SshSessionPool;
+
 struct AppState {
-    db: sea_orm::DatabaseConnection,
+    db: DatabaseConnection,
+    config: Config,
 }
 
 #[tokio::main]
@@ -29,17 +35,20 @@ async fn main() {
 
     println!("Starting server...");
 
+    let config = Config::load_config().await.unwrap();
+
     let db = Database::connect("sqlite:target/db.sqlite?mode=rwc")
         .await
         .expect("Database connection failed");
 
     Migrator::up(&db, None).await.unwrap();
 
-    let app_state = Arc::new(AppState { db });
+    let app_state = Arc::new(AppState{db, config});
+    let session_pool = Arc::new(SshSessionPool::new(app_state.clone()));
 
     let app = Router::new()
         //.with_state(app_state.clone())
-        .nest("/api/ssh", svc_ssh_router_builder(app_state.clone()))
+        .nest("/api/ssh", svc_ssh_router_builder(app_state.clone(), session_pool.clone()))
         .nest("/api/sftp", svc_sftp_router_builder(app_state.clone()))
         .nest("/api/target", svc_target_router_builder(app_state.clone()))
         .fallback(any(|| async { (StatusCode::NOT_FOUND, "404 Not Found") }));

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.98"
 axum = { version = "0.8.3", features = [ "macros" ] }
+nanoid = "0.4.0"
 russh = "0.52.1"
 russh-sftp = "2.1.1"
 sea-orm = { version = "1.1.10", features = [ "sqlx-sqlite", "runtime-tokio-native-tls", "macros" ] }
