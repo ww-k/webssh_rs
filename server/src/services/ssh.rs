@@ -2,7 +2,7 @@ use std::{env, sync::Arc};
 
 use anyhow::{Ok, Result};
 use axum::Router;
-use russh::{ChannelMsg, client, keys::PublicKeyBase64};
+use russh::ChannelMsg;
 use serde::Deserialize;
 use socketioxide::{
     SocketIo,
@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(Deserialize, Debug)]
 struct QueryParams {
-    connect_id: i32,
+    target_id: i32,
     // Add other query parameters here as needed
 }
 
@@ -61,14 +61,14 @@ impl SshSvcSession {
             anyhow::bail!("Failed to parse query parameters: {:?}", err);
         }
         let params = result.unwrap();
-        let result = session_pool.get(params.connect_id).await;
+        let result = session_pool.get(params.target_id).await;
         if let Err(err) = result {
             anyhow::bail!("Failed to get channel: {:?}", err);
         }
         let sid = socket.id;
         let channel = result.unwrap();
 
-        info!("sid={} target {} SshChannel {}", sid, params.connect_id, channel.id());
+        info!("sid={} target {} SshChannel {}", sid, params.target_id, channel.id());
 
         let term_session = SshSvcSession { socket };
         let result = term_session

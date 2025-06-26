@@ -4,7 +4,7 @@ import "./index.css";
 
 import type { ITab } from "@/store";
 export default function Terminal({ active, tab }: { active: boolean; tab: ITab }) {
-    const url = useMemo(() => tab.path.replace("/terminal/", "terminal.html?connect_id="), [tab.path]);
+    const url = useMemo(() => tab.path.replace("/terminal/", "terminal.html?target_id="), [tab.path]);
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     useEffect(() => {

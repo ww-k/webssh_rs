@@ -21,10 +21,10 @@ function init() {
 function initTerm() {
     var queryParams = decodeQueryParam(location.search);
     var query = {};
-    if (queryParams.connect_id) {
-        query.connect_id = queryParams.connect_id;
+    if (queryParams.target_id) {
+        query.target_id = queryParams.target_id;
     } else {
-        return console.error(`initTerm missing params. connect_id.`);
+        return console.error(`initTerm missing params. target_id.`);
     }
 
     /** @type {import('socket.io-client').io} */
