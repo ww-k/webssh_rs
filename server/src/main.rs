@@ -49,7 +49,7 @@ async fn main() {
     let app = Router::new()
         //.with_state(app_state.clone())
         .nest("/api/ssh", svc_ssh_router_builder(app_state.clone(), session_pool.clone()))
-        .nest("/api/sftp", svc_sftp_router_builder(app_state.clone()))
+        .nest("/api/sftp", svc_sftp_router_builder(app_state.clone(), session_pool.clone()))
         .nest("/api/target", svc_target_router_builder(app_state.clone()))
         .fallback(any(|| async { (StatusCode::NOT_FOUND, "404 Not Found") }));
     //.fallback_service(ServeDir::new("../client"));
