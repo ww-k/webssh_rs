@@ -193,7 +193,7 @@ impl SshConnectionPool {
     async fn get_async(&self) -> Result<Arc<SshChannelPool>> {
         let mut state = self.state.lock().await;
 
-        debug!("SshSessionPool: {} start find idle resource.", self.id);
+        debug!("SshConnectionPool: {} start find idle resource.", self.id);
         // 尝试从空闲队列获取资源
         let result = async {
             let mut iter = state.idle_resources.iter().enumerate();
@@ -203,11 +203,11 @@ impl SshConnectionPool {
                 let has_idle = resource.has_idle().await;
                 if has_idle {
                     let resource = state.idle_resources.remove(index);
-                    debug!("SshSessionPool: {} find idle resource.", self.id);
+                    debug!("SshConnectionPool: {} find idle resource.", self.id);
                     return resource;
                 }
             }
-            debug!("SshSessionPool: {} no idle resource.", self.id);
+            debug!("SshConnectionPool: {} no idle resource.", self.id);
             None
         }
         .await;
@@ -217,14 +217,17 @@ impl SshConnectionPool {
         }
 
         if state.total_count >= self.max_size {
-            anyhow::bail!("SshSessionPool: {} Maximum resource limit reached", self.id);
+            anyhow::bail!(
+                "SshConnectionPool: {} Maximum resource limit reached",
+                self.id
+            );
         }
 
         // 增加总资源计数
         state.total_count += 1;
 
         debug!(
-            "SshSessionPool: {} start create resource. total_count {}",
+            "SshConnectionPool: {} start create resource. total_count {}",
             self.id, state.total_count
         );
         // 创建资源前释放锁，避免长时间持有
@@ -246,7 +249,7 @@ impl SshConnectionPool {
                 ssh_session,
             });
             debug!(
-                "SshSessionPool {} creating SshChannelPool {}",
+                "SshConnectionPool {} creating SshChannelPool {}",
                 self.id, ssh_channel_pool.id
             );
             Ok(ssh_channel_pool)
@@ -254,11 +257,11 @@ impl SshConnectionPool {
         .await;
 
         if resource.is_err() {
-            debug!("SshSessionPool: {} create resource fail.", self.id);
+            debug!("SshConnectionPool: {} create resource fail.", self.id);
             // 创建失败，释放资源
             self.drop_resource().await;
         } else {
-            debug!("SshSessionPool: {} resource created.", self.id);
+            debug!("SshConnectionPool: {} resource created.", self.id);
         }
         resource
     }
@@ -268,7 +271,7 @@ impl SshConnectionPool {
         if (state.idle_resources.len() as u8) < self.max_size {
             state.idle_resources.push_back(resource);
             debug!(
-                "SshSessionPool: {} push back resource. idle length {}",
+                "SshConnectionPool: {} push back resource. idle length {}",
                 self.id,
                 state.idle_resources.len()
             );
@@ -281,7 +284,7 @@ impl SshConnectionPool {
         if state.total_count > 0 {
             state.total_count -= 1;
             debug!(
-                "SshSessionPool: {} drop resource. total_count {}",
+                "SshConnectionPool: {} drop resource. total_count {}",
                 self.id, state.total_count
             );
         }
@@ -434,7 +437,7 @@ impl SshSessionPool {
                     let ssh_session_pool =
                         Arc::new(SshConnectionPool::new(self.app_state.clone(), target_id));
                     debug!(
-                        "SessionPool: target {} creating SshSessionPool {}",
+                        "SshSessionPool: target {} creating SshConnectionPool {}",
                         target_id, ssh_session_pool.id
                     );
                     ssh_session_pool
@@ -445,7 +448,7 @@ impl SshSessionPool {
         };
 
         debug!(
-            "SessionPool: target {} get SshSessionPool {}",
+            "SshSessionPool: target {} get SshConnectionPool {}",
             target_id, ssh_session_pool.id
         );
 
@@ -456,13 +459,13 @@ impl SshSessionPool {
         };
 
         debug!(
-            "SessionPool: target {} get SshChannelPool {}",
+            "SshSessionPool: target {} get SshChannelPool {}",
             target_id, ssh_session_guard.id
         );
 
         let ssh_channel = ssh_session_guard.get_async().await?;
         debug!(
-            "SessionPool: target {} get SshChannel {}",
+            "SshSessionPool: target {} get SshChannel {}",
             target_id,
             ssh_channel.id()
         );
@@ -472,7 +475,7 @@ impl SshSessionPool {
             .await;
 
         debug!(
-            "SessionPool: target {} return SshChannelPool {}",
+            "SshSessionPool: target {} return SshChannelPool {}",
             target_id,
             ssh_channel.id()
         );
