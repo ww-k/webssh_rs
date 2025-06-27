@@ -190,7 +190,7 @@ impl SshConnectionPool {
         }
     }
 
-    async fn get_async(&self) -> Result<Arc<SshChannelPool>> {
+    async fn get(&self) -> Result<Arc<SshChannelPool>> {
         let mut state = self.state.lock().await;
 
         debug!("SshConnectionPool: {} start find idle resource.", self.id);
@@ -203,11 +203,21 @@ impl SshConnectionPool {
                 let has_idle = resource.has_idle().await;
                 if has_idle {
                     let resource = state.idle_resources.remove(index);
-                    debug!("SshConnectionPool: {} find idle resource.", self.id);
+                    debug!(
+                        "SshConnectionPool: {} find idle resource. idle length {}. total_count {}",
+                        self.id,
+                        state.idle_resources.len(),
+                        state.total_count
+                    );
                     return resource;
                 }
             }
-            debug!("SshConnectionPool: {} no idle resource.", self.id);
+            debug!(
+                "SshConnectionPool: {} no idle resource. idle length {}. total_count {}",
+                self.id,
+                state.idle_resources.len(),
+                state.total_count
+            );
             None
         }
         .await;
@@ -299,7 +309,7 @@ struct SshChannelPool {
 }
 
 impl SshChannelPool {
-    async fn get_async(&self) -> Result<russh::Channel<russh::client::Msg>> {
+    async fn get(&self) -> Result<russh::Channel<russh::client::Msg>> {
         let mut state = self.state.lock().await;
 
         if state.total_count >= self.max_size {
@@ -452,7 +462,7 @@ impl SshSessionPool {
             target_id, ssh_session_pool.id
         );
 
-        let ssh_channel_pool = ssh_session_pool.get_async().await?;
+        let ssh_channel_pool = ssh_session_pool.get().await?;
         let ssh_session_guard = SshSessionGuard {
             resource: Some(ssh_channel_pool),
             pool: ssh_session_pool.clone(),
@@ -463,19 +473,9 @@ impl SshSessionPool {
             target_id, ssh_session_guard.id
         );
 
-        let ssh_channel = ssh_session_guard.get_async().await?;
+        let ssh_channel: russh::Channel<russh::client::Msg> = ssh_session_guard.get().await?;
         debug!(
             "SshSessionPool: target {} get SshChannel {}",
-            target_id,
-            ssh_channel.id()
-        );
-
-        ssh_session_pool
-            .return_resource(ssh_session_guard.clone())
-            .await;
-
-        debug!(
-            "SshSessionPool: target {} return SshChannelPool {}",
             target_id,
             ssh_channel.id()
         );
