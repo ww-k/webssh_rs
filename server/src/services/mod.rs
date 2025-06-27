@@ -31,7 +31,7 @@ impl IntoResponse for ApiErr {
 impl From<JsonRejection> for ApiErr {
     fn from(rejection: JsonRejection) -> Self {
         Self {
-            code: ERR_CODE_JSON_NERR,
+            code: ERR_CODE_JSON_ERR,
             message: rejection.body_text(),
         }
     }
