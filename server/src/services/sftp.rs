@@ -8,12 +8,16 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
-use russh_sftp::{client::SftpSession, protocol};
+use russh::ChannelMsg;
+use russh_sftp::{
+    client::{SftpSession, fs::DirEntry},
+    protocol::FileType,
+};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
-use crate::consts::services_err_code::*;
 use crate::{AppState, entities::target, ssh_session_pool::SshSessionPool};
+use crate::{consts::services_err_code::*, ssh_session_pool::SshChannelGuard};
 
 use super::ApiErr;
 
@@ -39,10 +43,50 @@ pub(crate) fn svc_sftp_router_builder(
         }))
 }
 
-#[derive(Debug, Clone, Serialize)]
+const URI_SEP: &str = ":";
+const PATH_SEP: &str = "/";
+
+#[derive(Serialize)]
 pub struct SftpFile {
     pub name: String,
-    pub attrs: protocol::FileAttributes,
+    pub r#type: char,
+    pub size: Option<u64>,
+    pub atime: Option<u32>,
+    pub mtime: Option<u32>,
+    pub permissions: String,
+}
+
+impl SftpFile {
+    fn from_dir_entry(dir_entry: DirEntry) -> Self {
+        let attrs = dir_entry.metadata();
+        let permissions = attrs.permissions();
+        SftpFile {
+            name: dir_entry.file_name(),
+            r#type: match dir_entry.file_type() {
+                FileType::File => 'f',
+                FileType::Dir => 'd',
+                FileType::Symlink => 'l',
+                _ => '?',
+            },
+            size: attrs.size,
+            atime: attrs.atime,
+            mtime: attrs.mtime,
+            permissions: permissions.to_string(),
+        }
+    }
+}
+
+impl Default for SftpFile {
+    fn default() -> Self {
+        SftpFile {
+            name: "".to_string(),
+            r#type: '?',
+            size: None,
+            atime: None,
+            mtime: None,
+            permissions: "".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,116 +94,340 @@ struct SftpFileUriPayload {
     uri: String,
 }
 
-struct SftpFileUri {
+#[derive(Debug)]
+struct SftpFileUri<'a> {
     target_id: i32,
-    path: String,
+    path: &'a str,
 }
 
-impl SftpFileUri {
-    fn from_str(str: &str) -> Option<Self> {
-        let mut split = str.split(":");
+impl<'a> SftpFileUri<'a> {
+    fn from_str(str: &'a str) -> Option<Self> {
+        let mut split = str.split(URI_SEP);
         if Some("sftp") != split.next() {
             return None;
         }
+
         let target_id_str = split.next();
         let target_id = match target_id_str {
             Some(id) => id.parse::<i32>().ok()?,
             None => return None,
         };
-        let path = split.collect::<Vec<_>>().join(":");
-        // let offset = 6 + target_id_str.unwrap().len();
-        // let path = str[offset..].to_string();
+        let offset = 6 + target_id_str.unwrap().len();
+        let mut path = &str[offset..];
 
-        Some(SftpFileUri {
-            target_id,
-            path,
-        })
+        if !path.starts_with(PATH_SEP) {
+            return None;
+        }
+
+        if path.split(PATH_SEP).last() == Some("") {
+            path = &path[..path.len() - 1];
+        }
+
+        Some(SftpFileUri { target_id, path })
     }
 }
 
 struct SftpSvcSession {}
 
-async fn get_sftp_session(state: Arc<AppStateWrapper>, target_id: i32) -> anyhow::Result<SftpSession> {
-    let result = state.session_pool.get(target_id).await;
-    if result.is_err() {
-        return Err(result.err().unwrap());
+/// 将错误转换为 code 为 ERR_CODE_SSH_ERR 的 ApiErr
+macro_rules! map_ssh_err {
+    ($expr:expr) => {
+        $expr.map_err(|err| ApiErr {
+            code: ERR_CODE_SSH_ERR,
+            message: err.to_string(),
+        })
+    };
+}
+
+fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri, ApiErr> {
+    let sftp_file_uri = SftpFileUri::from_str(file_uri_str);
+    sftp_file_uri.ok_or(ApiErr {
+        code: ERR_CODE_SFTP_INVALID_URI,
+        message: "invalid uri".to_string(),
+    })
+}
+
+/// 将路径分隔位为(parent_path, file_name)
+fn split_path(path: &str) -> Option<(&str, &str)> {
+    if path == PATH_SEP {
+        return None;
     }
-    let channel = result.unwrap().take_channel().unwrap();
-    let result = channel.request_subsystem(true, "sftp").await;
-    if result.is_err() {
-        anyhow::bail!(result.err().unwrap().to_string());
+    if !path.starts_with(PATH_SEP) {
+        return None;
     }
-    let sftp = SftpSession::new(channel.into_stream()).await;
-    if result.is_err() {
-        anyhow::bail!(result.err().unwrap().to_string());
+
+    let mut split = path.split(PATH_SEP);
+    let file_name = split.last();
+    let path_len = path.len();
+    match file_name {
+        Some(file_name) => {
+            if file_name == "" {
+                let path1 = &path[..path_len - 1];
+                split = path1.split(PATH_SEP);
+                let file_name = split.last().unwrap();
+                let parent_path = &path1[..path1.len() - file_name.len()];
+                Some((parent_path, file_name))
+            } else {
+                let parent_path = &path[..path_len - file_name.len()];
+                Some((parent_path, file_name))
+            }
+        }
+        None => None,
     }
-    Ok(sftp.ok().unwrap())
+}
+
+async fn get_sftp_session(
+    state: Arc<AppStateWrapper>,
+    target_id: i32,
+) -> Result<SftpSession, ApiErr> {
+    let mut guard = map_ssh_err!(state.session_pool.get(target_id).await)?;
+    let channel = guard.take_channel().ok_or(ApiErr {
+        code: ERR_CODE_SSH_ERR,
+        message: "take none channel".to_string(),
+    })?;
+    let _ = map_ssh_err!(channel.request_subsystem(true, "sftp").await)?;
+    let sftp = map_ssh_err!(SftpSession::new(channel.into_stream()).await)?;
+    Ok(sftp)
+}
+
+async fn ssh_exec(mut channel: SshChannelGuard, command: &str) -> Result<String, ApiErr> {
+    debug!("@ssh_exec start {:?}", command);
+    map_ssh_err!(channel.exec(true, command).await)?;
+
+    let mut code = None;
+    let mut buf = Vec::<u8>::new();
+
+    loop {
+        // There's an event available on the session channel
+        let Some(msg) = channel.wait().await else {
+            break;
+        };
+        match msg {
+            // Write data to the terminal
+            ChannelMsg::Data { ref data } => {
+                buf.extend_from_slice(data);
+            }
+            // The command has returned an exit code
+            ChannelMsg::ExitStatus { exit_status } => {
+                code = Some(exit_status);
+                // cannot leave the loop immediately, there might still be more data to receive
+            }
+            _ => {}
+        }
+    }
+    let str = String::from_utf8_lossy(&buf);
+    debug!("@ssh_exec done {:?}", command);
+    debug!("exit_status {:?}. result ", code);
+    debug!("{:?}", str);
+    Ok(str.to_string())
+}
+
+fn mode_to_string(mode: u32) -> String {
+    let mut s = String::with_capacity(9);
+    let perms = ['r', 'w', 'x']; // 权限字符
+
+    for i in (0..3).rev() {
+        // owner, group, other
+        let octet = (mode >> (i * 3)) & 0b111;
+        for j in 0..3 {
+            s.push(if octet & (0b100 >> j) != 0 {
+                perms[j]
+            } else {
+                '-'
+            });
+        }
+    }
+
+    s
+}
+
+/// 解析GNU风格的stat输出（格式：%n,%s,%x,%y,%a,%F）
+// 示例输入:
+// /Users/xxx/Downloads/test,160,1751351720,1749194783,755,directory\n
+// /Users/xxx/Downloads/test/file,160,1751351720,1749194783,755,regular file\n
+// /Users/xxx/Downloads/test/file,160,1751351720,1749194783,755,symbolic link\n
+fn parse_stat_gnu(output: &str) -> Result<SftpFile, ApiErr> {
+    let sep = ",";
+    let mut parts: Vec<&str> = output.split(sep).collect();
+
+    if parts.len() < 6 {
+        return Err(ApiErr {
+            code: ERR_CODE_SSH_EXEC,
+            message: format!("Invalid stat output format. parts len less than 6."),
+        });
+    }
+
+    parts.reverse();
+
+    let r#type = match parts[0].trim() {
+        "directory" => 'd',
+        "regular file" => 'f',
+        "symbolic link" => 'l',
+        _ => '?',
+    };
+
+    let permissions = match u32::from_str_radix(parts[1], 8) {
+        Ok(mode) => mode_to_string(mode),
+        Err(_) => {
+            return Err(ApiErr {
+                code: ERR_CODE_SSH_EXEC,
+                message: format!("Invalid stat output format. Failed to parse file size: {}", parts[1]),
+            });
+        }
+    };
+
+    let mtime = parts[2].parse::<u32>().ok();
+
+    let atime = parts[3].parse::<u32>().ok();
+
+    let size = Some(parts[4].parse::<u64>().map_err(|_| ApiErr {
+        code: ERR_CODE_SSH_EXEC,
+        message: format!("Failed to parse file size: {}", parts[1]),
+    })?);
+
+    // 处理文件名中有,的情况
+    let mut parts5 = parts[5..].to_vec();
+    parts5.reverse();
+    let path = parts5.join(sep);
+    let name = match split_path(path.as_str()) {
+        Some((_, name)) => name.to_string(),
+        None => path,
+    };
+
+    Ok(SftpFile {
+        name,
+        r#type,
+        size,
+        atime,
+        mtime,
+        permissions,
+    })
+}
+
+/// 解析GNU风格的stat输出（格式：%n,%s,%x,%y,%a,%F）
+// 示例输入:
+// /Users/xxx/Downloads/test,160,1720508748,1720508748,drwxr-xr-x,Directory\n
+// /Users/xxx/Downloads/test/file,160,1720508748,1720508748,drwxr-xr-x,Regular File\n
+// /Users/xxx/Downloads/test/file,160,1720508748,1720508748,drwxr-xr-x,Symbolic Link\n
+fn parse_stat_bsd(output: &str) -> Result<SftpFile, ApiErr> {
+    let sep = ",";
+    let mut parts: Vec<&str> = output.split(sep).collect();
+
+    if parts.len() < 6 {
+        return Err(ApiErr {
+            code: ERR_CODE_SSH_EXEC,
+            message: format!("Invalid stat output format. parts len less than 6."),
+        });
+    }
+
+    parts.reverse();
+
+    let r#type = match parts[0].trim() {
+        "Directory" => 'd',
+        "Regular File" => 'f',
+        "Symbolic Link" => 'l',
+        _ => '?',
+    };
+
+    let permissions = parts[1][1..].to_string();
+
+    let mtime = parts[2].parse::<u32>().ok();
+
+    let atime = parts[3].parse::<u32>().ok();
+
+    let size = Some(parts[4].parse::<u64>().map_err(|_| ApiErr {
+        code: ERR_CODE_SSH_EXEC,
+        message: format!("Invalid stat output format. Failed to parse file size: {}", parts[1]),
+    })?);
+
+    // 处理文件名中有,的情况
+    let mut parts5 = parts[5..].to_vec();
+    parts5.reverse();
+    let path = parts5.join(sep);
+    let name = match split_path(path.as_str()) {
+        Some((_, name)) => name.to_string(),
+        None => path,
+    };
+
+    Ok(SftpFile {
+        name,
+        r#type,
+        size,
+        atime,
+        mtime,
+        permissions,
+    })
 }
 
 async fn sftp_ls(
     State(state): State<Arc<AppStateWrapper>>,
     Query(payload): Query<SftpFileUriPayload>,
 ) -> Result<Json<Vec<SftpFile>>, ApiErr> {
-    debug!("@sftp_ls {:?}", payload);
+    info!("@sftp_ls {:?}", payload);
 
-    let sftp_file_uri = SftpFileUri::from_str(payload.uri.as_str());
-    if sftp_file_uri.is_none() {
-        return Err(ApiErr {
-            code: ERR_CODE_SFTP_INVALID_URI,
-            message: "invalid uri".to_string(),
-        });
-    }
-    let sftp_file_uri = sftp_file_uri.unwrap();
-
-    let sftp = match get_sftp_session(state, sftp_file_uri.target_id).await {
-        Ok(value) => value,
-        Err(value) => {
-            return Err(ApiErr {
-                code: ERR_CODE_SSH_ERR,
-                message: value.to_string(),
-            });
-        }
-    };
-    let result = sftp.read_dir(sftp_file_uri.path).await;
-    if result.is_err() {
-        return Err(ApiErr {
-            code: ERR_CODE_SSH_ERR,
-            message: result.err().unwrap().to_string(),
-        });
-    }
+    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
+    let read_dir = map_ssh_err!(sftp.read_dir(sftp_file_uri.path).await)?;
 
     debug!("@sftp_ls sftp.read_dir {:?}", payload);
 
-    let files = result.unwrap().map(|dir_entry| {
-        SftpFile {
-            name: dir_entry.file_name(),
-            attrs: dir_entry.metadata(),
-        }
-    });
-
+    let files = read_dir.map(|dir_entry| SftpFile::from_dir_entry(dir_entry));
     Ok(Json(Vec::from_iter(files)))
 }
 
 async fn sftp_mkdir(
     State(state): State<Arc<AppStateWrapper>>,
     Query(payload): Query<SftpFileUriPayload>,
-) -> Result<Json<SftpFile>, ApiErr> {
-    let file = SftpFile {
-        name: "test".to_string(),
-        attrs: protocol::FileAttributes::default(),
-    };
-    Ok(Json(file))
+) -> Result<(), ApiErr> {
+    info!("@sftp_mkdir {:?}", payload);
+
+    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
+    let _ = map_ssh_err!(sftp.create_dir(sftp_file_uri.path).await)?;
+
+    debug!("@sftp_mkdir sftp.create_dir done {:?}", payload);
+
+    Ok(())
 }
 
 async fn sftp_stat(
     State(state): State<Arc<AppStateWrapper>>,
     Query(payload): Query<SftpFileUriPayload>,
 ) -> Result<Json<SftpFile>, ApiErr> {
-    let file = SftpFile {
-        name: "test".to_string(),
-        attrs: protocol::FileAttributes::default(),
-    };
-    Ok(Json(file))
+    info!("@sftp_stat {:?}", payload);
+
+    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
+    let channel = map_ssh_err!(state.session_pool.get(sftp_file_uri.target_id).await)?;
+    let command = r#"stat -c "%n" / 2>/dev/null && echo "GNU" || echo "BSD""#;
+    debug!("@sftp_stat exec command {:?}", command);
+    let stat_type = ssh_exec(channel, command).await?;
+    let stat_type = stat_type.trim();
+    debug!("@sftp_stat stat_type {:?}", stat_type);
+
+    match stat_type {
+        "GNU" => {
+            let channel = map_ssh_err!(state.session_pool.get(sftp_file_uri.target_id).await)?;
+            let command = format!("stat -c \"%n,%s,%X,%Y,%a,%F\" {}", sftp_file_uri.path);
+            debug!("@sftp_stat exec command {:?}", command);
+            let result = ssh_exec(channel, command.as_str()).await?;
+            debug!("@sftp_stat GNU {:?}", result);
+            let file = parse_stat_gnu(result.as_str())?;
+            Ok(Json(file))
+        }
+        "BSD" => {
+            let channel = map_ssh_err!(state.session_pool.get(sftp_file_uri.target_id).await)?;
+            let command = format!("stat -f \"%N,%z,%a,%m,%Sp,%HT\" {}", sftp_file_uri.path);
+            debug!("@sftp_stat exec command {:?}", command);
+            let result = ssh_exec(channel, command.as_str()).await?;
+            debug!("@sftp_stat BSD {:?}", result);
+            let file = parse_stat_bsd(result.as_str())?;
+            Ok(Json(file))
+        }
+        &_ => Err(ApiErr {
+            code: ERR_CODE_SSH_EXEC,
+            message: "detect stat version fail".to_string(),
+        }),
+    }
 }
 
 async fn sftp_upload(
@@ -187,4 +455,240 @@ async fn sftp_download(
     ];
 
     Ok((headers, data))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_path() {
+        assert_eq!(
+            split_path("/"),
+            None,
+            "@split_path: Root path should return None"
+        );
+        assert_eq!(
+            split_path("a"),
+            None,
+            "@split_path: Path should starts with slash"
+        );
+        assert_eq!(
+            split_path("/foo"),
+            Some(("/", "foo")),
+            "@split_path: /foo fail"
+        );
+        assert_eq!(
+            split_path("/foo/bar"),
+            Some(("/foo/", "bar")),
+            "@split_path: /foo/bar fail"
+        );
+        assert_eq!(
+            split_path("/foo/bar/"),
+            Some(("/foo/", "bar")),
+            "@split_path: /foo/bar/ fail"
+        );
+    }
+
+    #[test]
+    fn test_sftp_file_uri_from_str() {
+        let uri = "sftp:123:/path/to/file";
+        let result = SftpFileUri::from_str(uri);
+        assert!(
+            result.is_some(),
+            "@test_sftp_file_uri_from_str: parse fail. {uri}"
+        );
+        let sftp_uri = result.unwrap();
+        assert_eq!(
+            sftp_uri.target_id, 123,
+            "@test_sftp_file_uri_from_str: parse target_id fail. {uri}"
+        );
+        assert_eq!(
+            sftp_uri.path, "/path/to/file",
+            "@test_sftp_file_uri_from_str: parse path fail. {uri}"
+        );
+
+        let uri = "ftp:123:/path/to/file";
+        let result = SftpFileUri::from_str(uri);
+        assert!(
+            result.is_none(),
+            "@test_sftp_file_uri_from_str: Invalid protocol. {uri}"
+        );
+
+        let uri = "sftp:abc:/path/to/file";
+        let result = SftpFileUri::from_str(uri);
+        assert!(
+            result.is_none(),
+            "@test_sftp_file_uri_from_str: Invalid target_id. {uri}"
+        );
+
+        let uri = "sftp:123:";
+        let result = SftpFileUri::from_str(uri);
+        assert!(
+            result.is_none(),
+            "@test_sftp_file_uri_from_str: Invalid path. {uri}"
+        );
+
+        let uri = "sftp:123:path/to/file";
+        let result = SftpFileUri::from_str(uri);
+        assert!(
+            result.is_none(),
+            "@test_sftp_file_uri_from_str: Invalid path. {uri}"
+        );
+    }
+
+    #[test]
+    fn test_mode_to_string() {
+        assert_eq!(
+            mode_to_string(0o777),
+            "rwxrwxrwx",
+            "@test_mode_to_string: 0o777 fail"
+        );
+        assert_eq!(
+            mode_to_string(0o755),
+            "rwxr-xr-x",
+            "@test_mode_to_string: 0o755 fail"
+        );
+        assert_eq!(
+            mode_to_string(0o700),
+            "rwx------",
+            "@test_mode_to_string: 0o700 fail"
+        );
+        assert_eq!(
+            mode_to_string(0o666),
+            "rw-rw-rw-",
+            "@test_mode_to_string: 0o666 fail"
+        );
+        assert_eq!(
+            mode_to_string(0o644),
+            "rw-r--r--",
+            "@test_mode_to_string: 0o644 fail"
+        );
+        assert_eq!(
+            mode_to_string(0o444),
+            "r--r--r--",
+            "@test_mode_to_string: 0o444 fail"
+        );
+        assert_eq!(
+            mode_to_string(0o222),
+            "-w--w--w-",
+            "@test_mode_to_string: 0o222 fail"
+        );
+        assert_eq!(
+            mode_to_string(0o111),
+            "--x--x--x",
+            "@test_mode_to_string: 0o111 fail"
+        );
+        assert_eq!(
+            mode_to_string(0o000),
+            "---------",
+            "@test_mode_to_string: 0o000 fail"
+        );
+    }
+
+    #[test]
+    fn test_parse_stat_gnu() {
+        let output = "/Users/xxx/Downloads/test,160,1720508748,1720508748,755,directory\n";
+        let file = parse_stat_gnu(output).unwrap();
+        assert_eq!(
+            file.name, "/Users/xxx/Downloads/test",
+            "@test_parse_gnu_stat: 1 name fail"
+        );
+        assert_eq!(
+            file.r#type, 'd',
+            "@test_parse_gnu_stat: type directory fail"
+        );
+        assert_eq!(file.size, Some(160), "@test_parse_gnu_stat: size fail");
+        assert!(file.atime.is_some(), "@test_parse_gnu_stat: atime fail");
+        assert!(file.mtime.is_some(), "@test_parse_gnu_stat: mtime fail");
+        assert_eq!(
+            file.permissions, "rwxr-xr-x",
+            "@test_parse_gnu_stat: permissions fail"
+        );
+
+        let output = "/Users/xxx/Downloads/test/file,160,1720508748,1720508748,755,regular file\n";
+        let file = parse_stat_gnu(output).unwrap();
+        assert_eq!(
+            file.name, "/Users/xxx/Downloads/test/file",
+            "@test_parse_gnu_stat: 2 name fail"
+        );
+        assert_eq!(
+            file.r#type, 'f',
+            "@test_parse_gnu_stat: type regular file fail"
+        );
+
+        let output = "/Users/xxx/Downloads/test/file,160,1720508748,1720508748,755,symbolic link\n";
+        let file = parse_stat_gnu(output).unwrap();
+        assert_eq!(
+            file.r#type, 'l',
+            "@test_parse_gnu_stat: type symbolic link fail"
+        );
+
+        let output = "/Use,rs/xxx/Downloads/tes,t/fi,le,160,1720508748,1720508748,755,symbolic link\n";
+        let file = parse_stat_gnu(output).unwrap();
+        assert_eq!(
+            file.name, "/Use,rs/xxx/Downloads/tes,t/fi,le",
+            "@test_parse_gnu_stat: file name with comma fail"
+        );
+
+        let output = "invalid,format";
+        assert!(
+            parse_stat_gnu(output).is_err(),
+            "@test_parse_gnu_stat: invalid format fail"
+        );
+    }
+
+    #[test]
+    fn test_parse_stat_bsd() {
+        let output = "/Users/xxx/Downloads/test,160,1720508748,1720508748,drwxr-xr-x,Directory\n";
+        let file = parse_stat_bsd(output).unwrap();
+        assert_eq!(
+            file.name, "/Users/xxx/Downloads/test",
+            "@test_parse_bsd_stat: 1 name fail"
+        );
+        assert_eq!(
+            file.r#type, 'd',
+            "@test_parse_bsd_stat: type directory fail"
+        );
+        assert_eq!(file.size, Some(160), "@test_parse_bsd_stat: size fail");
+        assert!(file.atime.is_some(), "@test_parse_bsd_stat: atime fail");
+        assert!(file.mtime.is_some(), "@test_parse_bsd_stat: mtime fail");
+        assert_eq!(
+            file.permissions, "rwxr-xr-x",
+            "@test_parse_bsd_stat: permissions fail"
+        );
+
+        let output =
+            "/Users/xxx/Downloads/test/file,160,1720508748,1720508748,drwxr-xr-x,Regular File\n";
+        let file = parse_stat_bsd(output).unwrap();
+        assert_eq!(
+            file.name, "/Users/xxx/Downloads/test/file",
+            "@test_parse_bsd_stat: 2 name fail"
+        );
+        assert_eq!(
+            file.r#type, 'f',
+            "@test_parse_bsd_stat: type regular file fail"
+        );
+
+        let output =
+            "/Users/xxx/Downloads/test/file,160,1720508748,1720508748,drwxr-xr-x,Symbolic Link\n";
+        let file = parse_stat_bsd(output).unwrap();
+        assert_eq!(
+            file.r#type, 'l',
+            "@test_parse_bsd_stat: type symbolic link fail"
+        );
+
+        let output = "/Use,rs/xxx/Downloads/tes,t/fi,le,160,1720508748,1720508748,drwxr-xr-x,Symbolic Link\n";
+        let file = parse_stat_bsd(output).unwrap();
+        assert_eq!(
+            file.name, "/Use,rs/xxx/Downloads/tes,t/fi,le",
+            "@test_parse_bsd_stat: file name with comma fail"
+        );
+
+        let output = "invalid,format";
+        assert!(
+            parse_stat_bsd(output).is_err(),
+            "@test_parse_bsd_stat: invalid format fail"
+        );
+    }
 }
