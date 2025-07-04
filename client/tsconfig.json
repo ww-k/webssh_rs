@@ -6,6 +6,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "useDefineForClassFields": true,
+    "allowJs": true,
 
     "baseUrl": "./",
     "paths": {
@@ -22,7 +23,11 @@
     /* type checking */
     "strict": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "typeRoots": [
+      "node_modules/@types",
+      "src/types"
+    ],
   },
   "include": ["src"]
 }

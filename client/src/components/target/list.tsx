@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Modal, Space, Table } from "antd";
+import { useTranslation } from 'react-i18next';
 
 import "./list.css";
 
@@ -42,6 +43,7 @@ const mockData: ITarget[] = [
 ];
 
 export default function TargetList({ tab }: { tab: ITab }) {
+    const { t } = useTranslation();
     const { setTabPath } = useAppStore();
     const [editorOpen, setEditorOpen] = useState(false);
     const [editorData, setEditorData] = useState<ITarget>();
@@ -67,6 +69,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 title: "Port",
                 dataIndex: "port",
                 key: "port",
+                width: 80,
             },
             {
                 title: "Action",
@@ -78,7 +81,14 @@ export default function TargetList({ tab }: { tab: ITab }) {
                                 setTabPath(tab.key, `/terminal/${record.id}`, `${record.user}@${record.host}`);
                             }}
                         >
-                            Connect
+                            SSH
+                        </a>
+                        <a
+                            onClick={() => {
+                                setTabPath(tab.key, `/filesview/${record.id}`, `${record.user}@${record.host}`);
+                            }}
+                        >
+                            SFTP
                         </a>
                         <a
                             onClick={() => {
@@ -123,7 +133,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                         setEditorOpen(true);
                     }}
                 >
-                    New target
+                    {t('New target')}
                 </Button>
                 <Button onClick={refresh}>Refresh</Button>
             </div>

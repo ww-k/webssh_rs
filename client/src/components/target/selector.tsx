@@ -1,13 +1,15 @@
 import { Button, Card, Form, FormProps, Input, InputNumber } from "antd";
+import { useTranslation } from 'react-i18next';
+
+import { postTargetAdd } from "@/api";
 
 import "./selector.css";
-
 import TargetList from "./list";
 
 import type { ITab } from "@/store";
-import { postTargetAdd } from "@/api";
 
 export default function TargetSelector({ tab }: { tab: ITab }) {
+    const { t } = useTranslation();
     const [form] = Form.useForm();
 
     const onFinish: FormProps["onFinish"] = async (values) => {
@@ -23,7 +25,7 @@ export default function TargetSelector({ tab }: { tab: ITab }) {
 
     return (
         <div className="targetSelector">
-            <Card style={{ width: 800 }} title="Select target">
+            <Card className="targetSelectorCard" title="Select target">
                 <Form
                     form={form}
                     autoComplete="off"
@@ -46,7 +48,7 @@ export default function TargetSelector({ tab }: { tab: ITab }) {
                     </Form.Item>
                     <Form.Item shouldUpdate>
                         <Button type="primary" htmlType="submit">
-                            Save and connect
+                            {t("target_save_and_connect")}
                         </Button>
                     </Form.Item>
                 </Form>

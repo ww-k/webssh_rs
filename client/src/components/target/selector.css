@@ -10,6 +10,10 @@
     box-shadow: 0 3px 8px 0 rgba(0, 0, 0, 0.2);
 }
 
+.targetSelectorCard {
+    width: 900px;
+}
+
 .targetSelectorAddForm.ant-form-inline .ant-form-item {
     margin-bottom: var(--ant-form-item-margin-bottom);
 }

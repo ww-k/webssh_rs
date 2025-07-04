@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { create } from "zustand";
+import i18n from "i18next";
 
 import type { TabPaneProps } from "antd";
 
@@ -25,7 +26,7 @@ const useAppStore = create<AppStore>((set) => {
         tabs: [
             {
                 key: firstTabKey,
-                label: "New Tab",
+                label: i18n.t("app_new_tab"),
                 path: "/",
             },
         ],
