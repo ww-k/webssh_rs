@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Form, Input, InputNumber, Modal, Select } from "antd";
+import { useTranslation } from "react-i18next";
 
 import "./editor.css";
 
@@ -19,6 +20,7 @@ export default function TargetEditor({
     onOk?: () => void;
     onCancel?: () => void;
 }) {
+    const { t } = useTranslation();
     const rootElRef = useRef<HTMLDivElement>(null);
 
     const [form] = Form.useForm();
@@ -45,7 +47,7 @@ export default function TargetEditor({
 
     return (
         <Modal
-            title={data ? "Edit target" : "New target"}
+            title={data ? t("target_edit") : t("target_new")}
             width={800}
             open={open}
             footer={null}
@@ -65,7 +67,7 @@ export default function TargetEditor({
                 <Form.Item name="id" hidden>
                     <Input hidden />
                 </Form.Item>
-                <Form.Item name="method" label="Method" rules={[{ required: true }]}>
+                <Form.Item name="method" label={t("target_method")} rules={[{ required: true }]}>
                     <Select
                         options={[
                             {
@@ -79,15 +81,15 @@ export default function TargetEditor({
                         ]}
                     />
                 </Form.Item>
-                <Form.Item name="host" label="Host" rules={[{ required: true }]}>
+                <Form.Item name="host" label={t("target_host")} rules={[{ required: true }]}>
                     <Input placeholder="Host" />
                 </Form.Item>
-                <Form.Item name="user" label="User" rules={[{ required: true }]}>
+                <Form.Item name="user" label={t("target_user")} rules={[{ required: true }]}>
                     <Input placeholder="Username" />
                 </Form.Item>
                 <Form.Item
                     name="key"
-                    label="Private key"
+                    label={t("target_private_key")}
                     hidden={method === 1}
                     rules={[
                         { required: method === 2 },
@@ -119,17 +121,17 @@ export default function TargetEditor({
                 </Form.Item>
                 <Form.Item
                     name="password"
-                    label="Password"
+                    label={t("target_password")}
                     rules={[{ required: method === 1 || (method === 2 && requirePassword) }]}
                 >
-                    <Input.Password placeholder="Password" />
+                    <Input.Password placeholder={t("target_password")} />
                 </Form.Item>
-                <Form.Item name="port" label="Port">
+                <Form.Item name="port" label={t("target_port")}>
                     <InputNumber min={1} max={65535} placeholder="22" style={{ width: "100%" }} />
                 </Form.Item>
                 <Form.Item>
                     <Button type="primary" htmlType="submit">
-                        Save
+                        {t("app_btn_save")}
                     </Button>
                 </Form.Item>
             </Form>

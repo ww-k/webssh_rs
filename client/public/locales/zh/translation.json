@@ -1,5 +1,26 @@
 {
-  "app_new_tab": "新标签页",
+  "app_btn_delete": "删除",
+  "app_btn_edit": "编辑",
+  "app_btn_refresh": "刷新",
+  "app_btn_save": "保存",
+  "app_common_action": "操作",
+  "app_tab_new": "新标签页",
   "app_title": "WebSSH",
-  "target_save_and_connect": "Save and connect"
+  "pathbar_home_path_": "未知链接",
+  "pathbar_home_path_/": "此电脑",
+  "pathbar_home_path_Desktop": "桌面",
+  "pathbar_home_path_Documents": "文档",
+  "pathbar_home_path_Downloads": "下载",
+  "pathbar_home_path_Home": "用户",
+  "pathbar_search_displayname": "“{target}”中的搜索结果'",
+  "target_edit": "编辑目标",
+  "target_host": "主机",
+  "target_method": "验证方式",
+  "target_new": "创建目标",
+  "target_password": "密码",
+  "target_port": "端口",
+  "target_private_key": "私钥",
+  "target_save_and_connect": "保存并连接",
+  "target_select": "选择目标",
+  "target_user": "用户"
 }

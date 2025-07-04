@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Modal, Space, Table } from "antd";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 
 import "./list.css";
 
@@ -56,23 +56,23 @@ export default function TargetList({ tab }: { tab: ITab }) {
     const columns: ColumnsType<ITarget> = useMemo(
         () => [
             {
-                title: "User",
+                title: t("target_user"),
                 dataIndex: "user",
                 key: "user",
             },
             {
-                title: "Host",
+                title: t("target_host"),
                 dataIndex: "host",
                 key: "host",
             },
             {
-                title: "Port",
+                title: t("target_port"),
                 dataIndex: "port",
                 key: "port",
                 width: 80,
             },
             {
-                title: "Action",
+                title: t("app_common_action"),
                 key: "action",
                 render: (_, record) => (
                     <Space size="middle">
@@ -97,7 +97,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                                 refresh();
                             }}
                         >
-                            Edit
+                            {t("app_btn_edit")}
                         </a>
                         <a
                             onClick={() => {
@@ -110,7 +110,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                                 });
                             }}
                         >
-                            Delete
+                            {t("app_btn_delete")}
                         </a>
                     </Space>
                 ),
@@ -133,9 +133,9 @@ export default function TargetList({ tab }: { tab: ITab }) {
                         setEditorOpen(true);
                     }}
                 >
-                    {t('New target')}
+                    {t("target_new")}
                 </Button>
-                <Button onClick={refresh}>Refresh</Button>
+                <Button onClick={refresh}>{t("app_btn_refresh")}</Button>
             </div>
             <Table
                 className="targetListTable"

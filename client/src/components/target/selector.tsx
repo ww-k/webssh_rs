@@ -1,5 +1,5 @@
 import { Button, Card, Form, FormProps, Input, InputNumber } from "antd";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 
 import { postTargetAdd } from "@/api";
 
@@ -25,7 +25,7 @@ export default function TargetSelector({ tab }: { tab: ITab }) {
 
     return (
         <div className="targetSelector">
-            <Card className="targetSelectorCard" title="Select target">
+            <Card className="targetSelectorCard" title={t("target_select")}>
                 <Form
                     form={form}
                     autoComplete="off"
@@ -35,13 +35,13 @@ export default function TargetSelector({ tab }: { tab: ITab }) {
                     onFinishFailed={onFinishFailed}
                 >
                     <Form.Item name="host" style={{ width: 200 }} rules={[{ required: true }]}>
-                        <Input placeholder="Host" />
+                        <Input placeholder={t("target_host")} />
                     </Form.Item>
                     <Form.Item name="user" rules={[{ required: true }]}>
-                        <Input placeholder="User" style={{ width: 120 }} />
+                        <Input placeholder={t("target_user")} style={{ width: 120 }} />
                     </Form.Item>
                     <Form.Item name="password">
-                        <Input.Password placeholder="Password" style={{ width: 120 }} />
+                        <Input.Password placeholder={t("target_password")} style={{ width: 120 }} />
                     </Form.Item>
                     <Form.Item name="port">
                         <InputNumber min={1} max={65535} placeholder="22" style={{ width: 68 }} />
