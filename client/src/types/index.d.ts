@@ -35,7 +35,7 @@ export interface IFileListColumn {
     align?: React.CSSProperties["textAlign"];
     headerAlign?: React.CSSProperties["textAlign"];
     render?: (
-        text: any,
+        text: string,
         record: IFile & { type: string },
         index: number,
     ) => string;

@@ -2,10 +2,10 @@ import { Button, Form, Input, InputNumber, Modal, Select } from "antd";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import "./editor.css";
+import "./Editor.css";
 
 import { postTargetAdd, postTargetUpdate } from "@/api";
-import { validateCertContent } from "@/helpers/validate_cert_file";
+import { validateCertContent } from "@/helpers/validateCertContent";
 
 import InputTextFromFile from "../InputTextFromFile";
 

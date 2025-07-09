@@ -6,9 +6,9 @@ import { useTranslation } from "react-i18next";
 import { getTargetList, postTargetRemove } from "@/api";
 import useAppStore from "@/store";
 
-import "./list.css";
+import "./List.css";
 
-import TargetEditor from "./editor";
+import TargetEditor from "./Editor";
 
 import type { ColumnsType } from "antd/es/table/interface";
 import type { ITarget } from "@/api";

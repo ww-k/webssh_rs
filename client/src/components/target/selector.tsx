@@ -2,9 +2,9 @@ import { Button, Card, Form, Input, InputNumber } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { postTargetAdd } from "@/api";
-import "./selector.css";
+import "./Selector.css";
 
-import TargetList from "./list";
+import TargetList from "./List";
 
 import type { FormProps } from "antd";
 import type { ITab } from "@/store";

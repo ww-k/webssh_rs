@@ -9,9 +9,12 @@ var fileEl;
 export default function openNativeFileSelector(option) {
     let directory = false;
     let multiple = false;
+    let defaultPath = "";
     if (option) {
         directory = !!option.directory;
         multiple = !!option.multiple;
+        defaultPath =
+            typeof option.defaultPath === "string" ? option.defaultPath : "";
     }
     return new Promise(function openNativeFileSelectorInner(resolve, reject) {
         if (!fileEl) {
@@ -31,6 +34,12 @@ export default function openNativeFileSelector(option) {
             fileEl.setAttribute("multiple", "true");
         } else {
             fileEl.removeAttribute("multiple");
+        }
+
+        if (defaultPath) {
+            fileEl.setAttribute("nwworkingdir", defaultPath);
+        } else {
+            fileEl.removeAttribute("nwworkingdir");
         }
 
         fileEl.onchange = function fileElOnChange(e) {

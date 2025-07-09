@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import readFileAsText from "@/helpers/read_file_as_text";
+import readFileAsText from "@/helpers/readFileAsText";
 
 import InputFile from "../InputFile";
 

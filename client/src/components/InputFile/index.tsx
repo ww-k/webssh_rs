@@ -5,7 +5,7 @@ import {
 } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 
-import openNativeFileSelector from "@/helpers/open_native_file_selector";
+import openNativeFileSelector from "@/helpers/openNativeFileSelector";
 
 export interface IInputFileProps {
     value?: File[];

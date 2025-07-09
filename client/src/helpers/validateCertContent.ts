@@ -1,4 +1,4 @@
-import readFileAsText from "./read_file_as_text";
+import readFileAsText from "./readFileAsText";
 
 /**
  * 校验证书文件内容
