@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+
 import readFileAsText from "@/helpers/read_file_as_text";
+
 import InputFile from "../InputFile";
+
 import type { IInputFileProps } from "../InputFile";
 
 export type IInputTextFromFileProps = {
@@ -20,7 +23,7 @@ export default function InputTextFromFile({
     ...restProps
 }: IInputTextFromFileProps) {
     const [files, setFiles] = useState<File[]>(EMPTY_FILES);
-    const filesStringRef = useRef<[File[], string]>(null);
+    const filesStringRef = useRef<[File[], string]>();
 
     useEffect(() => {
         if (!value) {

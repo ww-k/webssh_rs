@@ -9,18 +9,17 @@ export function validateCertContent(fileContent: string): 0 | 1 | 2 {
         /^-----BEGIN (?:RSA|DSA) PRIVATE KEY-----\r?\n((?:.*\r?\n)+)-----END (?:RSA|DSA) PRIVATE KEY-----\r?\n?$/;
     const openSshKeyReg =
         /^-----BEGIN OPENSSH PRIVATE KEY-----\r?\n((?:.*\r?\n)+)-----END OPENSSH PRIVATE KEY-----\r?\n?$/;
-    let result: any = fileContent.match(sshKeyReg);
+    let result = fileContent.match(sshKeyReg);
     if (result) {
-        if (result[1].indexOf('ENCRYPTED') !== -1) {
+        if (result[1].indexOf("ENCRYPTED") !== -1) {
             return 2;
         }
         return 1;
     }
     result = fileContent.match(openSshKeyReg);
-    if (result) {
-        result = result[1].split('\n');
-        result = atob(result[0]);
-        if (result.indexOf('bcrypt') !== -1) {
+    if (result?.[1]) {
+        const item = atob(result[1].split('\n')[0]);
+        if (item.indexOf('bcrypt') !== -1) {
             return 2;
         }
         return 1;
@@ -39,7 +38,7 @@ export async function validateCertFile(file: File): Promise<0 | 1 | 2> {
     try {
         const fileContent = await readFileAsText(file);
         return validateCertContent(fileContent);
-    } catch (err) {
+    } catch (_err) {
         return 0;
     }
 }

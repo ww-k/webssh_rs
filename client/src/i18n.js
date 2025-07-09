@@ -25,7 +25,7 @@ i18n
         partialBundledLanguages: true,
         // 将默认语言资源直接包含在配置中
         resources: {
-            "zh": {
+            zh: {
                 translation,
             },
         },

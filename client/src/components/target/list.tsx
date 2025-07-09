@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMount } from "ahooks";
 import { Button, Modal, Space, Table } from "antd";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { getTargetList, postTargetRemove } from "@/api";
+import useAppStore from "@/store";
 
 import "./list.css";
 
-import useAppStore from "@/store";
-import { getTargetList, postTargetRemove } from "@/api";
 import TargetEditor from "./editor";
 
 import type { ColumnsType } from "antd/es/table/interface";
-import type { ITab } from "@/store";
 import type { ITarget } from "@/api";
+import type { ITab } from "@/store";
 
 const mockData: ITarget[] = [
     {
@@ -53,6 +55,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
         setDataSource(res);
     }
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: 没用到可能变化的状态
     const columns: ColumnsType<ITarget> = useMemo(
         () => [
             {
@@ -78,14 +81,22 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     <Space size="middle">
                         <a
                             onClick={() => {
-                                setTabPath(tab.key, `/terminal/${record.id}`, `${record.user}@${record.host}`);
+                                setTabPath(
+                                    tab.key,
+                                    `/terminal/${record.id}`,
+                                    `${record.user}@${record.host}`,
+                                );
                             }}
                         >
                             SSH
                         </a>
                         <a
                             onClick={() => {
-                                setTabPath(tab.key, `/filesview/${record.id}`, `${record.user}@${record.host}`);
+                                setTabPath(
+                                    tab.key,
+                                    `/filesview/${record.id}`,
+                                    `${record.user}@${record.host}`,
+                                );
                             }}
                         >
                             SFTP
@@ -116,13 +127,11 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 ),
             },
         ],
-        []
+        [],
     );
     const [dataSource, setDataSource] = useState<ITarget[]>(mockData);
 
-    useEffect(() => {
-        refresh();
-    }, []);
+    useMount(refresh);
 
     return (
         <>

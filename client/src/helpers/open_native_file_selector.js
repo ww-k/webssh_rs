@@ -15,33 +15,33 @@ export default function openNativeFileSelector(option) {
     }
     return new Promise(function openNativeFileSelectorInner(resolve, reject) {
         if (!fileEl) {
-            fileEl = document.createElement('input');
-            fileEl.setAttribute('type', 'file');
-            fileEl.style.display = 'none';
+            fileEl = document.createElement("input");
+            fileEl.setAttribute("type", "file");
+            fileEl.style.display = "none";
         }
         if (directory) {
-            fileEl.setAttribute('webkitdirectory', 'true');
-            fileEl.setAttribute('directory', 'true');
+            fileEl.setAttribute("webkitdirectory", "true");
+            fileEl.setAttribute("directory", "true");
         } else {
-            fileEl.removeAttribute('webkitdirectory');
-            fileEl.removeAttribute('directory');
+            fileEl.removeAttribute("webkitdirectory");
+            fileEl.removeAttribute("directory");
         }
 
         if (multiple) {
-            fileEl.setAttribute('multiple', 'true');
+            fileEl.setAttribute("multiple", "true");
         } else {
-            fileEl.removeAttribute('multiple');
+            fileEl.removeAttribute("multiple");
         }
 
         fileEl.onchange = function fileElOnChange(e) {
-            let files = Array.from(e.target.files);
+            const files = Array.from(e.target.files);
             if (files.length > 0) {
                 resolve(files);
             } else {
-                reject('not select any file');
+                reject("not select any file");
             }
         };
-        fileEl.value = '';
+        fileEl.value = "";
         fileEl.click();
     });
 }

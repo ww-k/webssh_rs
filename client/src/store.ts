@@ -1,10 +1,12 @@
 import { nanoid } from "nanoid";
 import { create } from "zustand";
+
 import i18n from "@/i18n";
 
 import type { TabPaneProps } from "antd";
 
-export interface ITab extends Omit<TabPaneProps, "tab" | "children" | "closeIcon" | "icon"> {
+export interface ITab
+    extends Omit<TabPaneProps, "tab" | "children" | "closeIcon" | "icon"> {
     key: string;
     label: string;
     path: string;

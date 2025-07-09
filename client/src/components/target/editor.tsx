@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from "react";
 import { Button, Form, Input, InputNumber, Modal, Select } from "antd";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./editor.css";
 
+import { postTargetAdd, postTargetUpdate } from "@/api";
+import { validateCertContent } from "@/helpers/validate_cert_file";
+
 import InputTextFromFile from "../InputTextFromFile";
 
-import { postTargetAdd, postTargetUpdate, type ITarget } from "@/api";
-import { validateCertContent } from "@/helpers/validate_cert_file";
+import type { ITarget } from "@/api";
 
 export default function TargetEditor({
     data,
@@ -21,7 +23,6 @@ export default function TargetEditor({
     onCancel?: () => void;
 }) {
     const { t } = useTranslation();
-    const rootElRef = useRef<HTMLDivElement>(null);
 
     const [form] = Form.useForm();
     const method = Form.useWatch("method", form);
@@ -33,7 +34,7 @@ export default function TargetEditor({
         } else {
             form.resetFields();
         }
-    }, [data, open]);
+    }, [data, open, form]);
 
     const onFinish = async () => {
         const values = await form.validateFields();
@@ -51,7 +52,6 @@ export default function TargetEditor({
             width={800}
             open={open}
             footer={null}
-            getContainer={() => rootElRef.current!}
             onCancel={onCancel}
         >
             <Form
@@ -67,7 +67,11 @@ export default function TargetEditor({
                 <Form.Item name="id" hidden>
                     <Input hidden />
                 </Form.Item>
-                <Form.Item name="method" label={t("target_method")} rules={[{ required: true }]}>
+                <Form.Item
+                    name="method"
+                    label={t("target_method")}
+                    rules={[{ required: true }]}
+                >
                     <Select
                         options={[
                             {
@@ -81,10 +85,18 @@ export default function TargetEditor({
                         ]}
                     />
                 </Form.Item>
-                <Form.Item name="host" label={t("target_host")} rules={[{ required: true }]}>
+                <Form.Item
+                    name="host"
+                    label={t("target_host")}
+                    rules={[{ required: true }]}
+                >
                     <Input placeholder="Host" />
                 </Form.Item>
-                <Form.Item name="user" label={t("target_user")} rules={[{ required: true }]}>
+                <Form.Item
+                    name="user"
+                    label={t("target_user")}
+                    rules={[{ required: true }]}
+                >
                     <Input placeholder="Username" />
                 </Form.Item>
                 <Form.Item
@@ -105,7 +117,9 @@ export default function TargetEditor({
                                 const result = validateCertContent(value);
                                 setRequirePassword(result === 2);
                                 return result === 0
-                                    ? Promise.reject(new Error("Invalid private key"))
+                                    ? Promise.reject(
+                                        new Error("Invalid private key"),
+                                    )
                                     : Promise.resolve();
                             },
                         },
@@ -122,12 +136,23 @@ export default function TargetEditor({
                 <Form.Item
                     name="password"
                     label={t("target_password")}
-                    rules={[{ required: method === 1 || (method === 2 && requirePassword) }]}
+                    rules={[
+                        {
+                            required:
+                                method === 1 ||
+                                (method === 2 && requirePassword),
+                        },
+                    ]}
                 >
                     <Input.Password placeholder={t("target_password")} />
                 </Form.Item>
                 <Form.Item name="port" label={t("target_port")}>
-                    <InputNumber min={1} max={65535} placeholder="22" style={{ width: "100%" }} />
+                    <InputNumber
+                        min={1}
+                        max={65535}
+                        placeholder="22"
+                        style={{ width: "100%" }}
+                    />
                 </Form.Item>
                 <Form.Item>
                     <Button type="primary" htmlType="submit">

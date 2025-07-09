@@ -1,9 +1,9 @@
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
+import { FitAddon } from "@xterm/addon-fit";
+import { Terminal } from "@xterm/xterm";
 import { io } from "socket.io-client";
 
-import '@xterm/xterm/css/xterm.css';
-import './terminal.css';
+import "@xterm/xterm/css/xterm.css";
+import "./terminal.css";
 
 var terminalContainer = document.getElementById("root");
 var SSH_BASEPATH = location.origin;
@@ -24,7 +24,7 @@ function initTerm() {
     if (queryParams.target_id) {
         query.target_id = queryParams.target_id;
     } else {
-        return console.error(`initTerm missing params. target_id.`);
+        return console.error("initTerm missing params. target_id.");
     }
 
     /** @type {import('socket.io-client').io} */
@@ -33,11 +33,12 @@ function initTerm() {
     var socket = ioLookup(SSH_BASEPATH, {
         path: "/api/ssh/socket.io",
         query: query,
-        transports: "WebSocket" in window ? ["websocket"] : ["polling", "websocket"],
+        transports:
+            "WebSocket" in window ? ["websocket"] : ["polling", "websocket"],
     });
     var buf = "";
 
-    socket.on("connect", function () {
+    socket.on("connect", () => {
         if (!term) {
             createTerminal(socket);
         } else {
@@ -52,13 +53,13 @@ function initTerm() {
             }
         }
 
-        if (buf && buf != "") {
+        if (buf && buf !== "") {
             term.write(buf);
             buf = "";
         }
     });
 
-    socket.on("server_ready", function (option) {
+    socket.on("server_ready", (option) => {
         if (typeof option.maxDisconnectionDuration === "number") {
             maxDisconnectionDuration = option.maxDisconnectionDuration;
         }
@@ -67,12 +68,12 @@ function initTerm() {
             return;
         }
 
-        setTimeout(function () {
+        setTimeout(() => {
             fitAddon.fit();
         }, 0);
     });
 
-    socket.on("output", function (data) {
+    socket.on("output", (data) => {
         if (!term) {
             buf += data;
             return;
@@ -95,7 +96,7 @@ function createTerminal(socket) {
 
     term.open(terminalContainer);
 
-    term.onResize(function (size) {
+    term.onResize((size) => {
         if (!sizeCache) {
             sizeCache = { col: size.cols, row: size.rows };
         } else {
@@ -107,7 +108,7 @@ function createTerminal(socket) {
         }
     });
 
-    term.onData(function (data) {
+    term.onData((data) => {
         if (socket.connected) {
             socket.emit("input", data);
         }
@@ -118,7 +119,7 @@ function createTerminal(socket) {
 
     term.focus();
 
-    window.addEventListener("resize", function () {
+    window.addEventListener("resize", () => {
         fitAddon.fit();
     });
 
@@ -140,22 +141,22 @@ function createTerminal(socket) {
                     };
                     break;
                 default:
-                    console.log("unknown command", data)
+                    console.log("unknown command", data);
                     break;
             }
         },
-        false
+        false,
     );
 
     return term;
 }
 
 function decodeQueryParam(searchStr) {
-    var str = searchStr.indexOf("?") == -1 ? searchStr : searchStr.substr(1),
-        arr = str == "" ? [] : str.split("&"),
-        param = {};
+    var str = searchStr.indexOf("?") === -1 ? searchStr : searchStr.substr(1);
+    var arr = str === "" ? [] : str.split("&");
+    var param = {};
 
-    arr.forEach(function (val) {
+    arr.forEach((val) => {
         var itemArr = val.split("=");
         param[itemArr[0]] = decodeURIComponent(itemArr[1]);
     });
@@ -175,7 +176,7 @@ const defaultOption = {
  * @param {string} configPath
  * @returns {import('@xterm/xterm').ITheme}
  */
-function getConfig(configPath) {
+function _getConfig(configPath) {
     if (!configPath) {
         return defaultOption;
     }
@@ -202,23 +203,23 @@ var manuallyRetryPlugin = {
      * @param {import('xterm').Terminal} term
      */
     apply(socket, term) {
-        socket.on("connect", function () {
+        socket.on("connect", () => {
             manuallyRetryPlugin.resetState();
         });
 
-        socket.on("disconnect", function (reason) {
+        socket.on("disconnect", (reason) => {
             console.log("disconnect", reason);
 
             manuallyRetryPlugin.manuallyRetry = false;
         });
 
-        socket.on("connect_error", function (err) {
+        socket.on("connect_error", (err) => {
             console.log("connect_error", err);
 
             manuallyRetryPlugin.manuallyRetry = false;
         });
 
-        term.onData(function () {
+        term.onData(() => {
             if (socket.disconnected && !manuallyRetryPlugin.manuallyRetry) {
                 manuallyRetryPlugin.manuallyRetry = true;
                 socket.connect();
@@ -281,12 +282,15 @@ function addDisposableDomListener(node, type, handler, options) {
  * - 在nwjs中，实现鼠标中键和右键粘贴剪贴板中的文本
  */
 function enhanceMouseCopyPaste(terminal) {
-    const isNwjs = typeof nw == "object" && typeof nw.App == "object" ? true : false;
-    const isMSWindows = contains(["Windows", "Win16", "Win32", "WinCE", "win32"], navigator.platform);
-    term.onSelectionChange(function (evt) {
+    const isNwjs = !!(typeof nw === "object" && typeof nw.App === "object");
+    const isMSWindows = contains(
+        ["Windows", "Win16", "Win32", "WinCE", "win32"],
+        navigator.platform,
+    );
+    term.onSelectionChange((_evt) => {
         if (!isNwjs) return;
 
-        console.log("selection and copy: " + term.getSelection());
+        console.log(`selection and copy: ${term.getSelection()}`);
         const clipboard = nw.Clipboard.get();
         clipboard.set(term.getSelection(), "text");
     });
@@ -300,9 +304,13 @@ function enhanceMouseCopyPaste(terminal) {
             if (isNwjs) {
                 clipboard.set(term.getSelection(), "text");
             } else {
-                paste(terminal.getSelection(), _termCore.textarea, _termCore.coreService);
+                paste(
+                    terminal.getSelection(),
+                    _termCore.textarea,
+                    _termCore.coreService,
+                );
             }
-        })
+        }),
     );
 
     _termCore.register(
@@ -310,7 +318,7 @@ function enhanceMouseCopyPaste(terminal) {
             if (isNwjs || !isMSWindows) {
                 event.preventDefault();
             }
-        })
+        }),
     );
 }
 
@@ -328,14 +336,17 @@ function prepareTextForTerminal(text) {
  */
 function bracketTextForPaste(text, bracketedPasteMode) {
     if (bracketedPasteMode) {
-        return "\x1b[200~" + text + "\x1b[201~";
+        return `\x1b[200~${text}\x1b[201~`;
     }
     return text;
 }
 
 function paste(text, textarea, coreService) {
     text = prepareTextForTerminal(text);
-    text = bracketTextForPaste(text, coreService.decPrivateModes.bracketedPasteMode);
+    text = bracketTextForPaste(
+        text,
+        coreService.decPrivateModes.bracketedPasteMode,
+    );
     coreService.triggerDataEvent(text, true);
     textarea.value = "";
 }

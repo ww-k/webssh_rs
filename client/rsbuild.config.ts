@@ -18,8 +18,8 @@ export default defineConfig({
             },
         ],
         proxy: {
-            '/api/ssh': {
-                target: 'ws://localhost:8080',
+            "/api/ssh": {
+                target: "ws://localhost:8080",
                 ws: true,
                 changeOrigin: true,
             },
@@ -37,5 +37,5 @@ export default defineConfig({
         alias: {
             "@": "./src",
         },
-    }
+    },
 });

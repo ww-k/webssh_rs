@@ -1,7 +1,10 @@
+import {
+    CloseCircleFilled,
+    CloseOutlined,
+    FolderOutlined,
+} from "@ant-design/icons";
 import { useEffect, useState } from "react";
-import { CloseCircleFilled, CloseOutlined, FolderOutlined } from "@ant-design/icons";
 
-// @ts-ignore
 import openNativeFileSelector from "@/helpers/open_native_file_selector";
 
 export interface IInputFileProps {
@@ -30,7 +33,7 @@ export default function InputFile({
             multiple,
             directory,
         };
-        let files1: File[] = await openNativeFileSelector(option);
+        const files1: File[] = await openNativeFileSelector(option);
         inputFiles(files1);
     };
 
@@ -68,6 +71,7 @@ export default function InputFile({
         inputFiles(_files);
     }
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: 只需要在value变化时调用
     useEffect(() => {
         if (Array.isArray(value) && value !== files) {
             inputFiles(value);
@@ -89,7 +93,9 @@ export default function InputFile({
                                 className="ant-select-selection-overflow-item"
                             >
                                 <span className="ant-select-selection-item">
-                                    <span className="ant-select-selection-item-content">{file.name}</span>
+                                    <span className="ant-select-selection-item-content">
+                                        {file.name}
+                                    </span>
                                     <span className="ant-select-selection-item-remove">
                                         <CloseOutlined
                                             onClick={(evt) => {
@@ -102,7 +108,10 @@ export default function InputFile({
                             </div>
                         ))}
                         <div className="ant-select-selection-overflow-item ant-select-selection-overflow-item-suffix">
-                            <div className="ant-select-selection-search" style={{ width: 4 }}>
+                            <div
+                                className="ant-select-selection-search"
+                                style={{ width: 4 }}
+                            >
                                 <input
                                     type="search"
                                     autoComplete="off"
@@ -110,7 +119,9 @@ export default function InputFile({
                                     role="combobox"
                                     value=""
                                 />
-                                <span className="ant-select-selection-search-mirror">&nbsp;</span>
+                                <span className="ant-select-selection-search-mirror">
+                                    &nbsp;
+                                </span>
                             </div>
                         </div>
                     </div>

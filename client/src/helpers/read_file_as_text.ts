@@ -1,6 +1,9 @@
-export default function readFileAsText(file: File, maxFileSize?: number): Promise<string> {
+export default function readFileAsText(
+    file: File,
+    maxFileSize?: number,
+): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-        if (typeof maxFileSize == 'number' && file.size > maxFileSize) {
+        if (typeof maxFileSize === "number" && file.size > maxFileSize) {
             reject(new Error(`File size exceeds limit ${maxFileSize} bytes`));
             return;
         }
@@ -12,7 +15,7 @@ export default function readFileAsText(file: File, maxFileSize?: number): Promis
         };
 
         fileReader.onerror = (err) => {
-            console.error('readFileAsText error', err);
+            console.error("readFileAsText error", err);
             reject(new Error("FileReader error"));
         };
 
