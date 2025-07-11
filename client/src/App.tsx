@@ -5,6 +5,7 @@ import "./App.css";
 
 import useAppStore from "@/store";
 
+import Filesview from "./components/Filesview";
 import TargetSelector from "./components/Target/Selector";
 import Terminal from "./components/Terminal";
 
@@ -19,6 +20,14 @@ export default function App() {
                     case tab.path.startsWith("/terminal/"):
                         children = (
                             <Terminal
+                                active={activeTabKey === tab.key}
+                                tab={tab}
+                            />
+                        );
+                        break;
+                    case tab.path.startsWith("/filesview/"):
+                        children = (
+                            <Filesview
                                 active={activeTabKey === tab.key}
                                 tab={tab}
                             />

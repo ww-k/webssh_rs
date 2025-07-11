@@ -1,0 +1,15 @@
+.filesviewBase {
+    border: 1px solid #dfdfdf;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.filesviewBase:focus-within {
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.2);
+}
+
+.filesviewBaseFilelist {
+    flex-grow: 1;
+}

@@ -1,0 +1,18 @@
+@scale-edge-width: 4px;
+
+.resizeLineRootCls {
+    &.horizontal {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: @scale-edge-width;
+        cursor: ns-resize;
+    }
+    &.vertical {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: @scale-edge-width;
+        cursor: ew-resize;
+    }
+}

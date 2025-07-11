@@ -1,5 +1,5 @@
 {
-    "$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
+    "$schema": "./client/node_modules/@biomejs/biome/configuration_schema.json",
     "assist": {
         "actions": {
             "source": {
@@ -19,10 +19,7 @@
                             ":BLANK_LINE:",
                             {
                                 "type": false,
-                                "source": [
-                                    "./*.css",
-                                    "./*.less"
-                                ]
+                                "source": ["./*.css", "./*.less"]
                             },
                             ":BLANK_LINE:",
                             {
