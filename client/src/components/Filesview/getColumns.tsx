@@ -2,13 +2,13 @@ import moment from "moment";
 
 import flowFormatter from "@/helpers/flowFormatter";
 
-import type { IFileListColumn } from "../Filelist/type";
+import type { IFileListColumn } from "../Filelist/types";
 
 export default function getColumns() {
     const columns: IFileListColumn[] = [
         {
             title: "文件名",
-            className: "col-name",
+            className: "filelistTableCellColName",
             dataIndex: "name",
             sortKey: "_sortName",
             width: 200,
@@ -19,7 +19,7 @@ export default function getColumns() {
         },
         {
             title: "最近修改时间",
-            className: "col-lastModified",
+            className: "filelistTableCellColMtime",
             dataIndex: "mtime",
             width: 145,
             sorter: true,
@@ -31,7 +31,7 @@ export default function getColumns() {
         },
         {
             title: "文件大小",
-            className: "file-size",
+            className: "filelistTableCellColSize",
             dataIndex: "size",
             sortKey: "size",
             width: 90,

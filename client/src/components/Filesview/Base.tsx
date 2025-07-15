@@ -21,7 +21,9 @@ const mockFiles: IFile[] = [
         atime: 1638400000000,
         mtime: 1638400000000,
         permissions: "rw-r--r--",
-        url: "",
+        uri: "sftp:1:/Users/test/Downloads/file1.txt",
+        sortName: "file1.txt",
+        isDir: false,
     },
     {
         name: "file2.txt",
@@ -30,7 +32,9 @@ const mockFiles: IFile[] = [
         atime: 1638400000000,
         mtime: 1638400000000,
         permissions: "rw-r--r--",
-        url: "",
+        uri: "sftp:1:/Users/test/Downloads/file2.txt",
+        sortName: "file2.txt",
+        isDir: false,
     },
     {
         name: "dir1",
@@ -39,7 +43,9 @@ const mockFiles: IFile[] = [
         atime: 1638400000000,
         mtime: 1638400000000,
         permissions: "rw-r--r--",
-        url: "",
+        uri: "sftp:1:/Users/test/Downloads/dir1",
+        sortName: "dir1",
+        isDir: true,
     },
     {
         name: "dir2",
@@ -48,7 +54,9 @@ const mockFiles: IFile[] = [
         atime: 1638400000000,
         mtime: 1638400000000,
         permissions: "rw-r--r--",
-        url: "",
+        uri: "sftp:1:/Users/test/Downloads/dir2",
+        sortName: "dir2",
+        isDir: true,
     },
 ];
 
@@ -71,7 +79,8 @@ export default function FilesviewBase({
         const sftpFiles = await getSftpLs(cwd);
         const files: IFile[] = sftpFiles.map((item) => ({
             ...item,
-            url: `${baseUrl}/${cwd}/${item.name}`,
+            isDir: item.type === "d",
+            uri: `${baseUrl}/${cwd}/${item.name}`,
             sortName: item.name.toLowerCase(),
         }));
         setFiles(files);
@@ -130,13 +139,11 @@ export default function FilesviewBase({
             />
             <Filelist
                 className="filesviewBaseFilelist"
-                isRemote={true}
+                posix={true}
                 columns={columns}
-                host={""}
-                path={cwd}
-                fileUrl={cwd}
+                fileUri={cwd}
                 data={files}
-                hideParentFile={searching}
+                enableParentFile={!searching}
                 loading={false}
             />
         </div>

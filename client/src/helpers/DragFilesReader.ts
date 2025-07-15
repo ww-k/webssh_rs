@@ -7,7 +7,7 @@ export default class DragFilesReader {
     _resolve?: (value: File[]) => void;
     _reject?: (reason?: unknown) => void;
 
-    read(e: DragEvent) {
+    read(e: DragEvent): Promise<File[]> {
         return new Promise((resolve, reject) => {
             this._resolve = resolve;
             this._reject = reject;

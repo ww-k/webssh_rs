@@ -345,7 +345,7 @@ export default class Pathbar extends Component<IProps, IState> {
                             ) : (
                                 dirList.map((item) => (
                                     <li
-                                        key={item.url}
+                                        key={item.uri}
                                         onClick={this.handleClickDir.bind(
                                             this,
                                             item,
@@ -354,7 +354,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                         <div
                                             className={classNames({
                                                 "selected-dir":
-                                                    item.url === activedPath,
+                                                    item.uri === activedPath,
                                             })}
                                         >
                                             <FolderTwoTone />
@@ -760,11 +760,11 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     handleClickDir(dir: IFile) {
-        if (dir.url === this.state.activedPath) {
+        if (dir.uri === this.state.activedPath) {
             return;
         }
 
-        this.props.onChange?.(dir.url);
+        this.props.onChange?.(dir.uri);
     }
 
     getQuickLinks() {
