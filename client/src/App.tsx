@@ -49,7 +49,8 @@ export default function App() {
     useEffect(() => {
         window.onkeydown = (evt) => {
             console.log(
-                `${evt.ctrlKey ? "Ctrl + " : ""}${evt.altKey ? "Alt + " : ""}${evt.shiftKey ? "Shift + " : ""}${evt.metaKey ? "Meta + " : ""
+                `${evt.ctrlKey ? "Ctrl + " : ""}${evt.altKey ? "Alt + " : ""}${evt.shiftKey ? "Shift + " : ""}${
+                    evt.metaKey ? "Meta + " : ""
                 }${evt.key} ${evt.code}`,
             );
         };

@@ -10,7 +10,7 @@ export default function getColumns() {
             title: "文件名",
             className: "filelistTableCellColName",
             dataIndex: "name",
-            sortKey: "_sortName",
+            sortKey: "sortName",
             width: 200,
             sorter: true,
             display: true,

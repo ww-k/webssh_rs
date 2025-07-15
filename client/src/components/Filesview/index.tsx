@@ -14,14 +14,26 @@ export default function Filesview({
     tab: ITab;
     [key: string]: unknown;
 }) {
-    const baseUrl = useMemo(
-        () => tab.path.replace("/filesview/", "sftp:"),
-        [tab.path],
-    );
+    const { baseUrl, targetId } = useMemo(() => {
+        // 从路径中解析 target ID: /filesview/123 -> targetId: 123
+        const match = tab.path.match(/\/filesview\/(\d+)/);
+        const targetId = match ? parseInt(match[1], 10) : null;
+        const baseUrl = `sftp:${targetId}:`;
+
+        return { baseUrl, targetId };
+    }, [tab.path]);
+
+    if (!targetId) {
+        return <div>missing targetId</div>;
+    }
 
     return (
         <div className="filesview">
-            <FilesviewBase baseUrl={baseUrl} />
+            <FilesviewBase
+                baseUrl={baseUrl}
+                targetId={targetId}
+                active={active}
+            />
         </div>
     );
 }
