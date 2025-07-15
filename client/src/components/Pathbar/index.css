@@ -4,18 +4,14 @@
     align-items: flex-start;
     border-bottom: 1px solid #dfdfdf;
     height: 28px;
+    position: relative;
 }
 
 .pathbar .anticon {
     color: #2999ea;
 }
 
-.pathbar .link-color {
-    color: #2999ea;
-    cursor: pointer;
-}
-
-.pathbar .button {
+.pathbarIconBtn {
     z-index: 1;
     width: 28px;
     height: 28px;
@@ -27,38 +23,44 @@
     border-radius: 0;
 }
 
-.pathbar .button:hover {
+.pathbarIconBtn:hover {
     background: linear-gradient(#ffffff, #eeeeee);
 }
 
-.pathbar .button:focus,
-.pathbar .button:active:focus,
-.pathbar .button.active:focus {
+.pathbarIconBtn:focus,
+.pathbarIconBtn:active:focus,
+.pathbarIconBtn.active:focus {
     outline: 0;
 }
 
-.pathbar .button.active,
-.pathbar .button:active {
+.pathbarIconBtn.active,
+.pathbarIconBtn:active {
     background-image: none;
     outline: 0;
     box-shadow: inset 0 3px 5px #00000020;
     color: #333;
 }
 
-.pathbar .button.last-btn {
+.pathbarIconBtn:last-child {
     border-right: 0;
-    border-top-right-radius: 4px;
 }
 
-.pathbar .ant-breadcrumb {
+.pathbarRouteList {
+    position: absolute;
+    left: 0;
+    display: flex;
+    height: 100%;
+    white-space: nowrap;
     line-height: 28px;
 }
 
-.pathbar .ant-breadcrumb-separator {
+.pathbarRouteSeparator {
     margin: 0;
+    padding: 0 3px;
+    cursor: pointer;
 }
 
-.pathbar .dropdown-btn {
+.pathbarDropdownBtn {
     position: relative;
     z-index: 2;
     width: 25px;
@@ -69,22 +71,15 @@
     border-radius: 0;
 }
 
-.pathbar .dropdown-btn i {
-    color: #2999ea;
-}
-
-.pathbar .dropdown-btn:hover,
-.pathbar .dropdown-btn.hover {
+.pathbarDropdownBtn:hover,
+.pathbarDropdownBtn.hover {
     background: linear-gradient(#ffffff, #eeeeee);
     transition: border-color 0.5s linear;
 }
 
-.pathbar .dropdown-btn:focus,
-.pathbar .dropdown-btn:active:focus,
-.pathbar .dropdown-btn.active:focus,
-.pathbar .dropdown-btn.focus,
-.pathbar .dropdown-btn:active.focus,
-.pathbar .dropdown-btn.active.focus {
+.pathbarDropdownBtn:focus,
+.pathbarDropdownBtn:active:focus,
+.pathbarDropdownBtn.active:focus {
     outline: 0;
 }
 
@@ -94,18 +89,11 @@
     vertical-align: middle;
 }
 
-.pathbarHomeBox .home-btn {
-    color: #2999ea;
+.pathbarHomeBtn {
     border-right: 1px solid transparent;
-    border-top-left-radius: 4px;
 }
-
-.pathbarHomeBox .home-btn i {
-    margin-left: -2px;
-}
-
-.pathbarHomeBox .home-btn:hover,
-.pathbarHomeBox .home-btn.hover {
+.pathbarHomeBtn:hover,
+.pathbarHomeBtn.hover {
     border-right-color: #dfdfdf;
 }
 
@@ -114,37 +102,19 @@
     flex-grow: 1;
 }
 
-.pathbarInputGroup .input-content {
+.pathbarInputContent {
     display: flex;
     align-items: flex-start;
 }
 
-.pathbarInputGroup .input-content .ant-double-left {
-    position: relative;
-    z-index: 1;
-    height: 28px;
-    padding: 0 5px 0 8px;
-    color: #2999ea;
-    font-size: 8px;
-    line-height: 28px;
-    background: #fff;
-    border-right: 1px solid transparent;
-    cursor: pointer;
-}
-
-.pathbarInputGroup .input-content .ant-double-left:hover {
-    background: #e5f3ff;
-    border-right: 1px solid #cce8ff;
-    transition: border-color 0.5s linear;
-}
-
-.pathbarInputGroup .input-content .select-span {
+.pathbarRouteSelect {
     box-sizing: border-box;
     background-color: #e5f3ff;
     border-right: 1px solid #cce8ff;
+    outline: 1px solid #cce8ff;
 }
 
-.pathbarInputGroup .input-content .form-control {
+.pathbarInputContentMain {
     position: relative;
     z-index: auto;
     flex-grow: 1;
@@ -155,125 +125,82 @@
     box-shadow: none;
 }
 
-.pathbarInputGroup .input-content .form-control .limit {
-    position: absolute;
-    left: 0;
-    display: flex;
-    height: 100%;
-    white-space: nowrap;
-}
 
-.pathbarInputGroup .input-content .form-control .limit .select-span {
+
+.pathbarRoute:hover {
     box-sizing: border-box;
     background-color: #e5f3ff;
     outline: 1px solid #cce8ff;
 }
 
-.pathbarInputGroup .input-content .form-control .limit .select-span .ant-breadcrumb-link {
-    border-right: 1px solid #cce8ff;
-}
-
-.pathbarInputGroup .input-content .form-control .limit .span:hover {
-    box-sizing: border-box;
-    background-color: #e5f3ff;
-    outline: 1px solid #cce8ff;
-}
-
-.pathbarInputGroup .input-content .form-control .limit .span:hover .ant-breadcrumb-link {
-    border-right: 1px solid #cce8ff;
-}
-
-.pathbarInputGroup .input-content .form-control .limit .ant-breadcrumb-link {
+.pathbarRouteName {
+    padding: 0 3px;
     border-right: 1px solid transparent;
 }
 
-.pathbarInputGroup .input-content .form-control .limit>.span {
+.pathbarRouteNameLink {
+    color: #2999ea;
+    cursor: pointer;
+}
+
+.pathbarRouteSelect .pathbarRouteName,
+.pathbarRoute:hover .pathbarRouteName {
+    border-right: 1px solid #cce8ff;
+}
+
+.pathbarRoute {
     display: flex;
     transition: background-color 0.26s linear;
 }
 
-.pathbarInputGroup .input-content .form-control .limit>.span .ant-breadcrumb-link {
-    padding: 0 3px;
-}
-
-.pathbarInputGroup .input-content .form-control .limit>.span .arrow-down {
+.pathbarRouteSeparatorDown {
     display: inline-block;
     -webkit-transform: rotate(90deg);
     transform: rotate(90deg);
 }
 
-.pathbarInputGroup .input-content .editorWrapper {
+.pathbarEditorWrapper {
     display: flex;
 }
 
-.pathbarInputGroup .input-content .breadcrumbBox {
+.pathbarRouteListWrapper {
     overflow: hidden;
 }
 
-.pathbarInputGroup .input-content .breadcrumbBox .arrow {
-    position: absolute;
-    top: 0;
-    z-index: 2;
-    display: inline-block;
-    width: 15px;
-    height: 100%;
-    line-height: 28px;
-    background: #fff;
-}
-
-.pathbarInputGroup .input-content .breadcrumbBox .arrow:hover {
-    cursor: pointer;
-}
-
-.pathbarInputGroup .input-content .breadcrumbBox .leftBlock {
-    left: 0;
-}
-
-.pathbarInputGroup .input-content .breadcrumbBox .rightBlock {
-    right: 0;
-}
-
-.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb>span:last-child {
+.pathbarRouteList > span:last-child {
     font-weight: normal;
 }
 
-.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb .ant-breadcrumb-separator {
-    padding: 0 3px;
-    cursor: pointer;
-}
 
-.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .link-color {
+.pathbarRouteListDisable .pathbarRouteNameLink {
     color: #333;
     text-decoration: none;
 }
 
-.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .link-color:hover {
+.pathbarRouteListDisable .pathbarRouteNameLink:hover {
     text-decoration: none;
     outline: none;
 }
 
-.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .ant-breadcrumb-separator {
+.pathbarRouteListDisable .pathbarRouteSeparator {
     cursor: auto;
 }
 
-.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .span:hover {
+.pathbarRouteListDisable .pathbarRoute:hover {
     background: none;
     outline: none;
 }
 
-.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .span:hover .ant-breadcrumb-link {
+.pathbarRouteListDisable .pathbarRoute:hover .pathbarRouteName {
     border-right: 1px solid transparent;
 }
 
-.pathbarInputGroup .input-content .history-btn {
-    width: 25px;
+.pathbarHistoryBtn {
     border-right: 1px solid #dfdfdf;
     border-left: 1px solid transparent;
-    border-radius: 0;
 }
-
-.pathbarInputGroup .input-content .history-btn:hover,
-.pathbarInputGroup .input-content .history-btn.hover {
+.pathbarHistoryBtn:hover,
+.pathbarHistoryBtn.hover {
     border-left-color: #dfdfdf;
 }
 
@@ -287,8 +214,11 @@
 }
 
 .pathbarDropdownMenu {
+    z-index: 1050;
     display: none;
     width: 100%;
+    background-color: #fff;
+    background-clip: padding-box;
     border: 1px solid #dfdfdf;
     border-radius: 6px;
     box-shadow: 0 6px 12px #0000002d;
@@ -303,7 +233,7 @@
     list-style: none;
 }
 
-.pathbarDropdownMenu>li>div {
+.pathbarDropdownMenu > li > div {
     padding: 5px 12px;
     overflow: hidden;
     white-space: nowrap;
@@ -311,8 +241,8 @@
     cursor: pointer;
 }
 
-.pathbarDropdownMenu>li>div:hover,
-.pathbarDropdownMenu>li>div:focus {
+.pathbarDropdownMenu > li > div:hover,
+.pathbarDropdownMenu > li > div:focus {
     background-color: #f5f5f5;
 }
 
@@ -331,11 +261,11 @@
     overflow: auto;
 }
 
-.pathbarDropdownMenuDirMenu .remote-loading-msg {
+.pathbarDropdownMenuDirMenuLoading {
     text-align: center;
 }
 
-.pathbarDropdownMenuDirMenu .selected-dir {
+.pathbarDropdownMenuDirMenuSelect {
     font-weight: 700;
 }
 
@@ -346,7 +276,7 @@
     border-top: 1px solid #eee;
 }
 
-.pathbarDropdownMenuQuickLinsMenu li>div {
+.pathbarDropdownMenuQuickLinsMenu li > div {
     clear: both;
     padding: 5px 12px;
     overflow: hidden;
@@ -358,11 +288,11 @@
     cursor: pointer;
 }
 
-.pathbarDropdownMenuQuickLinsMenu li>div:hover {
+.pathbarDropdownMenuQuickLinsMenu li > div:hover {
     background-color: #f5f5f5;
 }
 
-.pathbarDropdownMenuQuickLinsMenu li>div>.anticon {
+.pathbarDropdownMenuQuickLinsMenu li > div > .anticon {
     margin-right: 10px;
 }
 
@@ -371,13 +301,13 @@
     display: flex;
 }
 
-.pathbarInputSearch>input {
+.pathbarInputSearch > input {
     width: 120%;
     padding: 0 10px;
     border: 0;
 }
 
-.pathbarInputSearch>input:focus {
+.pathbarInputSearch > input:focus {
     outline: 0;
 }
 

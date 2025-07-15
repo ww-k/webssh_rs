@@ -222,10 +222,6 @@ export default class Pathbar extends Component<IProps, IState> {
             pathbar: true,
             [className || ""]: className !== undefined,
         });
-        const inputGroupCls = classNames({
-            pathbarInputGroup: true,
-            open: historyOpen,
-        });
 
         return (
             <div
@@ -237,7 +233,7 @@ export default class Pathbar extends Component<IProps, IState> {
                     <div className="pathbarHomeBox">
                         <button
                             className={classNames({
-                                "btn dropdown-btn home-btn": true,
+                                "pathbarDropdownBtn pathbarHomeBtn": true,
                                 hover: quickLinksVisible,
                             })}
                             onClick={this.btnHomeClickHandle.bind(this)}
@@ -334,7 +330,7 @@ export default class Pathbar extends Component<IProps, IState> {
                         >
                             {dirListLoading || dirListLoadingMsg ? (
                                 <li>
-                                    <div className="remote-loading-msg">
+                                    <div className="pathbarDropdownMenuDirMenuLoading">
                                         {dirListLoadingMsg ? (
                                             <span>{dirListLoadingMsg}</span>
                                         ) : (
@@ -353,7 +349,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                     >
                                         <div
                                             className={classNames({
-                                                "selected-dir":
+                                                pathbarDropdownMenuDirMenuSelect:
                                                     item.uri === activedPath,
                                             })}
                                         >
@@ -366,15 +362,16 @@ export default class Pathbar extends Component<IProps, IState> {
                         </ul>
                     </div>
                 )}
-                <div className={inputGroupCls}>
-                    <div className="input-content">
+                <div className="pathbarInputGroup">
+                    <div className="pathbarInputContent">
                         {isFocus ? (
-                            <div className="form-control editorWrapper">
+                            <div className="pathbarInputContentMain pathbarEditorWrapper">
                                 <input
-                                    autoFocus={true}
                                     type="text"
                                     name="pathbarEditorInput"
                                     className="pathbarEditorInput"
+                                    autoFocus={true}
+                                    autoComplete="off"
                                     value={editorValue}
                                     onChange={this.editorChangeHandle.bind(
                                         this,
@@ -387,16 +384,16 @@ export default class Pathbar extends Component<IProps, IState> {
                             </div>
                         ) : (
                             <div
-                                className="form-control breadcrumbBox"
                                 ref={this.breadcrumbBoxRef}
+                                className="pathbarInputContentMain pathbarRouteListWrapper"
                                 onClick={this.editorFocusHandle.bind(this)}
                             >
                                 <div
-                                    className={classNames({
-                                        "ant-breadcrumb limit": true,
-                                        "ant-breadcrumb-disable": !enableReact,
-                                    })}
                                     ref={this.breadcrumbRef}
+                                    className={classNames({
+                                        pathbarRouteList: true,
+                                        pathbarRouteListDisable: !enableReact,
+                                    })}
                                     style={{ left: `${breadcrumbLeft}px` }}
                                 >
                                     {routes.map((route, i, arr) => (
@@ -408,8 +405,8 @@ export default class Pathbar extends Component<IProps, IState> {
                                                 ] = el;
                                             }}
                                             className={classNames({
-                                                span: true,
-                                                "select-span":
+                                                pathbarRoute: true,
+                                                pathbarRouteSelect:
                                                     activedIndex === i,
                                             })}
                                             onMouseOver={this.handleMouseOver.bind(
@@ -419,10 +416,10 @@ export default class Pathbar extends Component<IProps, IState> {
                                             )}
                                             title={route.title}
                                         >
-                                            <span className="ant-breadcrumb-link">
+                                            <span className="pathbarRouteName">
                                                 {route.link ? (
                                                     <span
-                                                        className="link-color"
+                                                        className="pathbarRouteNameLink"
                                                         onClick={this.clickPathHandle.bind(
                                                             this,
                                                             route,
@@ -441,13 +438,11 @@ export default class Pathbar extends Component<IProps, IState> {
                                                         route,
                                                         i,
                                                     )}
-                                                    className={classNames({
-                                                        "ant-breadcrumb-separator": true,
-                                                    })}
+                                                    className="pathbarRouteSeparator"
                                                 >
                                                     <span
                                                         className={classNames({
-                                                            "arrow-down":
+                                                            pathbarRouteSeparatorDown:
                                                                 activedIndex ===
                                                                 i,
                                                         })}
@@ -463,7 +458,7 @@ export default class Pathbar extends Component<IProps, IState> {
                         )}
                         <button
                             className={classNames({
-                                "btn dropdown-btn history-btn": true,
+                                "pathbarDropdownBtn pathbarHistoryBtn": true,
                                 hover: historyOpen,
                             })}
                             onClick={this.btnHistoryClickHandle.bind(this)}
@@ -476,7 +471,7 @@ export default class Pathbar extends Component<IProps, IState> {
                             <li key={item.path}>
                                 <div
                                     key={item.path}
-                                    className="link-color"
+                                    className="pathbarRouteNameLink"
                                     onClick={(e) => {
                                         e.preventDefault();
                                         this.historyItemClickHandle(item.path);
@@ -489,7 +484,7 @@ export default class Pathbar extends Component<IProps, IState> {
                     </ul>
                 </div>
                 <button
-                    className={`button ${enableSearch ? "" : "last-btn"}`}
+                    className="pathbarIconBtn"
                     type="button"
                     onClick={this.btnRefreshClickHandle.bind(this)}
                 >
@@ -515,7 +510,7 @@ export default class Pathbar extends Component<IProps, IState> {
                             </span>
                         )}
                         <button
-                            className={"button last-btn"}
+                            className="pathbarIconBtn"
                             onClick={this.btnSearchClickHandle.bind(this)}
                         >
                             <SearchOutlined />
