@@ -30,9 +30,7 @@ export default function useResizeLine(
             info._containerWidth = container.getBoundingClientRect().width;
         }
 
-        if (Number.isNaN(info._seperatorPosition)) {
-            return console.error("useResizeLine: position format error");
-        }
+        if (!info._seperatorPosition || !info._containerWidth) return;
 
         const move = direction === "h" ? e.moveY : e.moveX;
         setPosition(
@@ -40,8 +38,8 @@ export default function useResizeLine(
                 0,
                 Math.min(
                     100,
-                    (info._seperatorPosition || 0) +
-                        (move * 100) / (info._containerWidth || 0),
+                    info._seperatorPosition +
+                        (move * 100) / info._containerWidth,
                 ),
             ),
         );

@@ -19,7 +19,7 @@ import { Component, createRef } from "react";
 import path, { posix as pathPosix } from "@/helpers/path";
 import i18n from "@/i18n";
 
-import "./index.less";
+import "./index.css";
 
 import { buildSearchUri, isSearchUri, parseSearchUri } from "./search";
 

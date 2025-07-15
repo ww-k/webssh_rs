@@ -31,8 +31,18 @@
     background-color: #2999ea;
 }
 
-.filelist:focus .filelistTable > tbody > tr.filelistTableTrActive > td input[type="checkbox"]:checked,
-.filelist:focus-within .filelistTable > tbody > tr.filelistTableTrActive > td input[type="checkbox"]:checked {
+.filelist:focus
+    .filelistTable
+    > tbody
+    > tr.filelistTableTrActive
+    > td
+    input[type="checkbox"]:checked,
+.filelist:focus-within
+    .filelistTable
+    > tbody
+    > tr.filelistTableTrActive
+    > td
+    input[type="checkbox"]:checked {
     border-color: #eee;
 }
 
@@ -103,8 +113,10 @@
     font-size: 10px;
 }
 
-.filelistTableColumnSorter .anticon-caret-up.filelistTableColumnSorterIconActive,
-.filelistTableColumnSorter .anticon-caret-down.filelistTableColumnSorterIconActive {
+.filelistTableColumnSorter
+    .anticon-caret-up.filelistTableColumnSorterIconActive,
+.filelistTableColumnSorter
+    .anticon-caret-down.filelistTableColumnSorterIconActive {
     color: #1890ff;
 }
 
@@ -220,7 +232,10 @@
     cursor: move;
 }
 
-.filelistTable > tbody > tr.filelistTableTrDragEnter.filelistTableTrActive > td {
+.filelistTable
+    > tbody
+    > tr.filelistTableTrDragEnter.filelistTableTrActive
+    > td {
     color: inherit;
     background-color: inherit;
     cursor: move;

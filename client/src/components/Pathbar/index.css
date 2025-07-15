@@ -1,0 +1,392 @@
+.pathbar {
+    font-size: 12px;
+    display: flex;
+    align-items: flex-start;
+    border-bottom: 1px solid #dfdfdf;
+    height: 28px;
+}
+
+.pathbar .anticon {
+    color: #2999ea;
+}
+
+.pathbar .link-color {
+    color: #2999ea;
+    cursor: pointer;
+}
+
+.pathbar .button {
+    z-index: 1;
+    width: 28px;
+    height: 28px;
+    padding: 0 7px;
+    color: #2999ea;
+    background: #fff;
+    border: none;
+    border-right: 1px solid #dfdfdf;
+    border-radius: 0;
+}
+
+.pathbar .button:hover {
+    background: linear-gradient(#ffffff, #eeeeee);
+}
+
+.pathbar .button:focus,
+.pathbar .button:active:focus,
+.pathbar .button.active:focus {
+    outline: 0;
+}
+
+.pathbar .button.active,
+.pathbar .button:active {
+    background-image: none;
+    outline: 0;
+    box-shadow: inset 0 3px 5px #00000020;
+    color: #333;
+}
+
+.pathbar .button.last-btn {
+    border-right: 0;
+    border-top-right-radius: 4px;
+}
+
+.pathbar .ant-breadcrumb {
+    line-height: 28px;
+}
+
+.pathbar .ant-breadcrumb-separator {
+    margin: 0;
+}
+
+.pathbar .dropdown-btn {
+    position: relative;
+    z-index: 2;
+    width: 25px;
+    height: 28px;
+    padding: 5px;
+    background-color: #fff;
+    border: none;
+    border-radius: 0;
+}
+
+.pathbar .dropdown-btn i {
+    color: #2999ea;
+}
+
+.pathbar .dropdown-btn:hover,
+.pathbar .dropdown-btn.hover {
+    background: linear-gradient(#ffffff, #eeeeee);
+    transition: border-color 0.5s linear;
+}
+
+.pathbar .dropdown-btn:focus,
+.pathbar .dropdown-btn:active:focus,
+.pathbar .dropdown-btn.active:focus,
+.pathbar .dropdown-btn.focus,
+.pathbar .dropdown-btn:active.focus,
+.pathbar .dropdown-btn.active.focus {
+    outline: 0;
+}
+
+.pathbarHomeBox {
+    position: relative;
+    width: 25px;
+    vertical-align: middle;
+}
+
+.pathbarHomeBox .home-btn {
+    color: #2999ea;
+    border-right: 1px solid transparent;
+    border-top-left-radius: 4px;
+}
+
+.pathbarHomeBox .home-btn i {
+    margin-left: -2px;
+}
+
+.pathbarHomeBox .home-btn:hover,
+.pathbarHomeBox .home-btn.hover {
+    border-right-color: #dfdfdf;
+}
+
+.pathbarInputGroup {
+    position: relative;
+    flex-grow: 1;
+}
+
+.pathbarInputGroup .input-content {
+    display: flex;
+    align-items: flex-start;
+}
+
+.pathbarInputGroup .input-content .ant-double-left {
+    position: relative;
+    z-index: 1;
+    height: 28px;
+    padding: 0 5px 0 8px;
+    color: #2999ea;
+    font-size: 8px;
+    line-height: 28px;
+    background: #fff;
+    border-right: 1px solid transparent;
+    cursor: pointer;
+}
+
+.pathbarInputGroup .input-content .ant-double-left:hover {
+    background: #e5f3ff;
+    border-right: 1px solid #cce8ff;
+    transition: border-color 0.5s linear;
+}
+
+.pathbarInputGroup .input-content .select-span {
+    box-sizing: border-box;
+    background-color: #e5f3ff;
+    border-right: 1px solid #cce8ff;
+}
+
+.pathbarInputGroup .input-content .form-control {
+    position: relative;
+    z-index: auto;
+    flex-grow: 1;
+    height: 28px;
+    padding: 0;
+    line-height: 28px;
+    border: none;
+    box-shadow: none;
+}
+
+.pathbarInputGroup .input-content .form-control .limit {
+    position: absolute;
+    left: 0;
+    display: flex;
+    height: 100%;
+    white-space: nowrap;
+}
+
+.pathbarInputGroup .input-content .form-control .limit .select-span {
+    box-sizing: border-box;
+    background-color: #e5f3ff;
+    outline: 1px solid #cce8ff;
+}
+
+.pathbarInputGroup .input-content .form-control .limit .select-span .ant-breadcrumb-link {
+    border-right: 1px solid #cce8ff;
+}
+
+.pathbarInputGroup .input-content .form-control .limit .span:hover {
+    box-sizing: border-box;
+    background-color: #e5f3ff;
+    outline: 1px solid #cce8ff;
+}
+
+.pathbarInputGroup .input-content .form-control .limit .span:hover .ant-breadcrumb-link {
+    border-right: 1px solid #cce8ff;
+}
+
+.pathbarInputGroup .input-content .form-control .limit .ant-breadcrumb-link {
+    border-right: 1px solid transparent;
+}
+
+.pathbarInputGroup .input-content .form-control .limit>.span {
+    display: flex;
+    transition: background-color 0.26s linear;
+}
+
+.pathbarInputGroup .input-content .form-control .limit>.span .ant-breadcrumb-link {
+    padding: 0 3px;
+}
+
+.pathbarInputGroup .input-content .form-control .limit>.span .arrow-down {
+    display: inline-block;
+    -webkit-transform: rotate(90deg);
+    transform: rotate(90deg);
+}
+
+.pathbarInputGroup .input-content .editorWrapper {
+    display: flex;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox {
+    overflow: hidden;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .arrow {
+    position: absolute;
+    top: 0;
+    z-index: 2;
+    display: inline-block;
+    width: 15px;
+    height: 100%;
+    line-height: 28px;
+    background: #fff;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .arrow:hover {
+    cursor: pointer;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .leftBlock {
+    left: 0;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .rightBlock {
+    right: 0;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb>span:last-child {
+    font-weight: normal;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb .ant-breadcrumb-separator {
+    padding: 0 3px;
+    cursor: pointer;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .link-color {
+    color: #333;
+    text-decoration: none;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .link-color:hover {
+    text-decoration: none;
+    outline: none;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .ant-breadcrumb-separator {
+    cursor: auto;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .span:hover {
+    background: none;
+    outline: none;
+}
+
+.pathbarInputGroup .input-content .breadcrumbBox .ant-breadcrumb-disable .span:hover .ant-breadcrumb-link {
+    border-right: 1px solid transparent;
+}
+
+.pathbarInputGroup .input-content .history-btn {
+    width: 25px;
+    border-right: 1px solid #dfdfdf;
+    border-left: 1px solid transparent;
+    border-radius: 0;
+}
+
+.pathbarInputGroup .input-content .history-btn:hover,
+.pathbarInputGroup .input-content .history-btn.hover {
+    border-left-color: #dfdfdf;
+}
+
+.pathbarEditorInput {
+    flex-grow: 1;
+    border: 0;
+}
+
+.pathbarEditorInput:focus {
+    outline: 0;
+}
+
+.pathbarDropdownMenu {
+    display: none;
+    width: 100%;
+    border: 1px solid #dfdfdf;
+    border-radius: 6px;
+    box-shadow: 0 6px 12px #0000002d;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.pathbarDropdownMenu ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.pathbarDropdownMenu>li>div {
+    padding: 5px 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.pathbarDropdownMenu>li>div:hover,
+.pathbarDropdownMenu>li>div:focus {
+    background-color: #f5f5f5;
+}
+
+.pathbarDropdownMenu .anticon {
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+}
+
+.pathbarDropdownMenuDirMenu {
+    position: absolute;
+    top: 29px;
+    left: 0;
+    width: 170px;
+    max-height: 270px;
+    overflow: auto;
+}
+
+.pathbarDropdownMenuDirMenu .remote-loading-msg {
+    text-align: center;
+}
+
+.pathbarDropdownMenuDirMenu .selected-dir {
+    font-weight: 700;
+}
+
+.pathbarDropdownMenuQuickLinsMenu {
+    padding-left: 0;
+    color: #666;
+    list-style: none;
+    border-top: 1px solid #eee;
+}
+
+.pathbarDropdownMenuQuickLinsMenu li>div {
+    clear: both;
+    padding: 5px 12px;
+    overflow: hidden;
+    color: #666;
+    font-weight: normal;
+    line-height: 1.42857143;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.pathbarDropdownMenuQuickLinsMenu li>div:hover {
+    background-color: #f5f5f5;
+}
+
+.pathbarDropdownMenuQuickLinsMenu li>div>.anticon {
+    margin-right: 10px;
+}
+
+.pathbarInputSearch {
+    width: 120px;
+    display: flex;
+}
+
+.pathbarInputSearch>input {
+    width: 120%;
+    padding: 0 10px;
+    border: 0;
+}
+
+.pathbarInputSearch>input:focus {
+    outline: 0;
+}
+
+.pathbarInputSearch .pathbarInputSearchClear {
+    color: #999;
+    line-height: 26px;
+    cursor: pointer;
+}
+
+.pathbarInputSearch .pathbarInputSearchClear:hover {
+    color: #666;
+}

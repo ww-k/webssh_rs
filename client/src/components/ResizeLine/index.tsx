@@ -1,93 +1,69 @@
 import classNames from "classnames";
-import { Component } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
-import "./index.less";
+import "./index.css";
 
-interface IResizeLineProps {
+interface IProps {
     className?: string;
     style?: React.CSSProperties;
-    direction: "h" | "v";
+    direction?: "h" | "v";
     onMove?: (evt: { moveX: number; moveY: number }) => void;
     onMoved?: () => void;
 }
 
-export default class ResizeLine extends Component<IResizeLineProps> {
-    initInfo: {
-        x: number;
-        y: number;
-    } | null;
+export default function ResizeLine({
+    className,
+    style,
+    direction = "h",
+    onMove,
+    onMoved,
+}: IProps) {
+    const rootCls = classNames({
+        resizeLineHorizontal: direction === "h",
+        resizeLineVertical: direction === "v",
+        [className || ""]: className !== "",
+    });
 
-    static defaultProps: { className: string; direction: string };
-    mouseMoveListener: (e: MouseEvent) => void;
-    mouseUpListener: () => void;
+    const initInfoRef = useRef<{ x: number; y: number }>();
 
-    constructor(props: IResizeLineProps) {
-        super(props);
-
-        this.initInfo = null;
-        this.mouseMoveListener = this._onMove.bind(this);
-        this.mouseUpListener = this._onUp.bind(this);
-    }
-
-    componentDidMount() {
-        window.addEventListener("mousemove", this._onMove.bind(this));
-        window.addEventListener("mouseup", this._onUp.bind(this));
-    }
-
-    componentWillUnmount() {
-        window.removeEventListener("mousemove", this.mouseMoveListener);
-        window.removeEventListener("mouseup", this.mouseUpListener);
-    }
-
-    render() {
-        const { direction, className, style } = this.props;
-        const rootCls = classNames({
-            resizeLineRootCls: true,
-            horizontal: direction === "h",
-            vertical: direction === "v",
-            [className || ""]: !!className,
-        });
-        return (
-            <div
-                className={rootCls}
-                style={style}
-                onMouseDown={this._dragMouseDownHandle.bind(this)}
-            />
-        );
-    }
-
-    _dragMouseDownHandle(e: React.MouseEvent) {
-        this.initInfo = {
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        initInfoRef.current = {
             x: e.clientX,
             y: e.clientY,
         };
-    }
+    }, []);
 
-    _onUp() {
-        if (this.initInfo != null) {
-            this.initInfo = null;
+    // biome-ignore lint/correctness/useExhaustiveDependencies: no need add onMove and onMoved to dependencies
+    useEffect(() => {
+        function handleMouseMove(e: MouseEvent) {
+            if (!initInfoRef.current) {
+                return;
+            }
 
-            this.props.onMoved?.();
+            const { clientX, clientY } = e;
+            const moveX = clientX - initInfoRef.current.x;
+            const moveY = clientY - initInfoRef.current.y;
+
+            onMove?.({
+                moveX,
+                moveY,
+            });
         }
-    }
-
-    _onMove(e: MouseEvent) {
-        if (this.initInfo == null) {
-            return;
+        function handleMouseUp() {
+            if (initInfoRef.current) {
+                initInfoRef.current = undefined;
+                onMoved?.();
+            }
         }
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
+        return () => {
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, []);
 
-        const { clientX, clientY } = e;
-        const moveX = clientX - this.initInfo.x;
-        const moveY = clientY - this.initInfo.y;
-
-        this.props.onMove?.({
-            moveX,
-            moveY,
-        });
-    }
+    return (
+        <div className={rootCls} style={style} onMouseDown={handleMouseDown} />
+    );
 }
-
-ResizeLine.defaultProps = {
-    className: "",
-    direction: "h",
-};
