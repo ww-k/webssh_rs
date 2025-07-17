@@ -1,0 +1,94 @@
+.pcd-contextmenu {
+    width: 170px;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    max-height: 600px;
+    overflow: auto;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    min-width: 160px;
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+    text-align: left;
+    list-style: none;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    -webkit-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+}
+.pcd-contextmenu li {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.pcd-contextmenu > li > div {
+    box-sizing: border-box;
+    cursor: pointer;
+    height: 30px;
+    display: block;
+    clear: both;
+    padding: 6.5px 10px;
+    font-weight: normal;
+    line-height: 1.42857143;
+    white-space: nowrap;
+    text-decoration: none;
+    background-color: transparent;
+}
+.pcd-contextmenu > li > div:hover {
+    text-decoration: none;
+    background-color: #f5f5f5;
+}
+.pcd-contextmenu > li > div .key-tooltip {
+    right: 0;
+    float: right;
+    color: #999999;
+    font-size: 12px;
+}
+.pcd-contextmenu > li > div span {
+    color: #333;
+    font-size: 12px;
+}
+.pcd-contextmenu > li > div span.anticon {
+    font-size: 14px;
+}
+.pcd-contextmenu > li > div .submenu-indicator {
+    margin-right: 10px;
+    float: right;
+}
+.pcd-contextmenu > li > div .submenu-indicator:before {
+    color: rgba(50, 50, 50, 0.55);
+    font-size: 12px;
+    font-family: sans-serif;
+    font-style: normal;
+    line-height: 1.5;
+    content: "\25B6";
+}
+.pcd-contextmenu > li.disabled > div span {
+    color: #dfdfdf;
+}
+.pcd-contextmenu > li.disabled > div:hover {
+    background: transparent;
+    cursor: not-allowed;
+}
+.pcd-contextmenu .menu-icon {
+    display: inline-block;
+    width: 22px;
+    height: 12px;
+}
+.pcd-contextmenu .menu-icon i:first-child,
+.pcd-contextmenu .menu-icon span:first-child {
+    float: left;
+}
+.pcd-contextmenu .divider {
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    background-color: #dfdfdf;
+}

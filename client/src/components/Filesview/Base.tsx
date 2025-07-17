@@ -8,6 +8,7 @@ import { isSearchUri } from "@/components/Pathbar/search";
 import "./Base.css";
 
 import Filelist from "../Filelist";
+import handleContextmenu from "./handleContextmenu";
 
 import type { IFile } from "@/types";
 
@@ -157,6 +158,7 @@ export default function FilesviewBase({
                 enableParentFile={!searching}
                 loading={false}
                 onSelecteChange={setSelectedFiles}
+                onContextMenu={handleContextmenu}
             />
         </div>
     );

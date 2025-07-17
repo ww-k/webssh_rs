@@ -19,6 +19,4 @@ export const isMSWindows = contains(
     ["Windows", "Win16", "Win32", "WinCE", "win32"],
     platform,
 );
-export const isMSWindowsX64 =
-    isNode && process.platform === "win32" && process.arch === "x64";
 export const isLinux = platform.indexOf("Linux") >= 0;
