@@ -19,33 +19,6 @@
     transform: translatey(0) !important;
 }
 
-.filelist:focus .filelistTable > tbody > tr.filelistTableTrActiveBorder,
-.filelist:focus-within .filelistTable > tbody > tr.filelistTableTrActiveBorder {
-    box-sizing: border-box;
-    outline: 1px solid #2999ea;
-}
-
-.filelist:focus .filelistTable > tbody > tr.filelistTableTrActive > td,
-.filelist:focus-within .filelistTable > tbody > tr.filelistTableTrActive > td {
-    color: #fff;
-    background-color: #2999ea;
-}
-
-.filelist:focus
-    .filelistTable
-    > tbody
-    > tr.filelistTableTrActive
-    > td
-    input[type="checkbox"]:checked,
-.filelist:focus-within
-    .filelistTable
-    > tbody
-    > tr.filelistTableTrActive
-    > td
-    input[type="checkbox"]:checked {
-    border-color: #eee;
-}
-
 .filelistEmptyContent {
     position: absolute;
     width: 100%;
@@ -99,6 +72,7 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     word-break: keep-all;
+    text-align: left;
 }
 
 .filelistTableColumnSorter {
@@ -146,17 +120,6 @@
     user-select: none;
 }
 
-.filelistTable td {
-    overflow: hidden;
-}
-
-.filelistTable th.filelistTableCellColCheckbox,
-.filelistTable td.filelistTableCellColCheckbox {
-    padding-left: 0;
-    padding-right: 0;
-    overflow: hidden;
-}
-
 .filelistTable th {
     position: relative;
     height: 30px;
@@ -170,6 +133,17 @@
 .filelistTable th:hover {
     background-color: #eee;
     cursor: pointer;
+}
+
+.filelistTable td {
+    overflow: hidden;
+}
+
+.filelistTable th.filelistTableCellColCheckbox,
+.filelistTable td.filelistTableCellColCheckbox {
+    padding-left: 0;
+    padding-right: 0;
+    overflow: hidden;
 }
 
 .filelistTable th .filelistTableThBorderRight {
@@ -272,6 +246,7 @@
     width: 14px;
     height: 14px;
     position: relative;
+    top: 2px;
 }
 
 .filelistTableCellColCheckbox input[type="checkbox"]:checked {
@@ -306,14 +281,45 @@
     text-overflow: ellipsis;
 }
 
-td.filelistTableCellColMtime {
+.filelistTableCellColName .anticon {
+    margin-right: 6px;
+}
+
+.filelistTableCellColMtime {
     padding-top: 2px;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     text-overflow: ellipsis;
 }
 
-td.filelistTableCellColSize {
+.filelistTableCellColSize {
     padding-right: 10px;
     padding-left: 0;
     text-align: right;
+}
+
+.filelist:focus .filelistTable > tbody > tr.filelistTableTrActive > td,
+.filelist:focus-within .filelistTable > tbody > tr.filelistTableTrActive > td {
+    color: #fff;
+    background-color: #2999ea;
+}
+
+.filelist:focus .filelistTable > tbody > tr.filelistTableTrActiveBorder,
+.filelist:focus-within .filelistTable > tbody > tr.filelistTableTrActiveBorder {
+    box-sizing: border-box;
+    outline: 1px solid #2999ea;
+}
+
+.filelist:focus
+    .filelistTable
+    > tbody
+    > tr.filelistTableTrActive
+    > td
+    input[type="checkbox"]:checked,
+.filelist:focus-within
+    .filelistTable
+    > tbody
+    > tr.filelistTableTrActive
+    > td
+    input[type="checkbox"]:checked {
+    border-color: #eee;
 }

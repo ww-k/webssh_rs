@@ -1,19 +1,13 @@
 import { useMemoizedFn, useMount, useUpdateEffect } from "ahooks";
 import { useMemo, useState } from "react";
 
-import {
-    downloadFile,
-    downloadFileWithChunks,
-    getSftpHome,
-    getSftpLs,
-} from "@/api/sftp";
+import { getSftpHome, getSftpLs } from "@/api/sftp";
 import Pathbar from "@/components/Pathbar";
 import { isSearchUri } from "@/components/Pathbar/search";
 
 import "./Base.css";
 
 import Filelist from "../Filelist";
-import getColumns from "./getColumns";
 
 import type { IFile } from "@/types";
 
@@ -66,6 +60,8 @@ const mockFiles: IFile[] = import.meta.env.DEV
       ]
     : [];
 
+const mockCwd = import.meta.env.DEV ? "/Users/test/Downloads" : "";
+
 export default function FilesviewBase({
     baseUrl,
     targetId,
@@ -78,8 +74,7 @@ export default function FilesviewBase({
     style?: React.CSSProperties;
     [key: string]: unknown;
 }) {
-    const columns = useMemo(getColumns, []);
-    const [cwd, setCwd] = useState("");
+    const [cwd, setCwd] = useState(mockCwd);
     const [files, setFiles] = useState<IFile[]>(mockFiles);
     const [selectedFiles, setSelectedFiles] = useState<IFile[]>([]);
     const searching = useMemo(() => isSearchUri(cwd), [cwd]);
@@ -96,45 +91,6 @@ export default function FilesviewBase({
         setFiles(files);
     });
 
-    const handleFileDownload = useMemoizedFn(async (file: IFile) => {
-        try {
-            const chunkSize = 2 * 1024 * 1024; // 2MB分片
-            let blob: Blob;
-
-            if (file.size && file.size > chunkSize) {
-                // 大文件使用分片下载
-                blob = await downloadFileWithChunks(file.uri, chunkSize);
-            } else {
-                // 小文件直接下载
-                blob = await downloadFile(file.uri);
-            }
-
-            // 创建下载链接
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = file.name;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error("Download failed:", error);
-        }
-    });
-
-    const handleContextMenu = useMemoizedFn(
-        (files: IFile[] | null, evt: MouseEvent | React.MouseEvent) => {
-            if (!files || files.length === 0) return;
-
-            // 这里可以添加右键菜单逻辑
-            // 暂时直接触发下载
-            if (files.length === 1 && files[0].type === "f") {
-                handleFileDownload(files[0]);
-            }
-        },
-    );
-
     useMount(async () => {
         const home = await getSftpHome(targetId);
         setCwd(home);
@@ -145,7 +101,7 @@ export default function FilesviewBase({
     }, [cwd]);
 
     return (
-        <div className="filesviewBase" style={style}>
+        <div className={`filesviewBase ${className || ""}`} style={style}>
             <Pathbar
                 className="filesviewBasePathbar"
                 posix={true}
@@ -196,18 +152,11 @@ export default function FilesviewBase({
             <Filelist
                 className="filesviewBaseFilelist"
                 posix={true}
-                columns={columns}
                 fileUri={cwd}
                 data={files}
                 enableParentFile={!searching}
                 loading={false}
                 onSelecteChange={setSelectedFiles}
-                onContextMenu={handleContextMenu}
-                onFileDoubleClick={(file) => {
-                    if (file.type === "f") {
-                        handleFileDownload(file);
-                    }
-                }}
             />
         </div>
     );

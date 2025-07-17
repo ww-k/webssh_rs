@@ -120,7 +120,8 @@ export default class Tbody extends Component<IProps, IState> {
 
     shouldComponentUpdate(nextProps: IProps, nextState: IState) {
         const { props } = this;
-        const { onSelected, columns, layoutContainerWidth } = props;
+        const { onSelected, columns, layoutContainerWidth, layoutTableWidth } =
+            props;
 
         /* 属性改变，重新生成某些状态 */
         if (
@@ -152,7 +153,8 @@ export default class Tbody extends Component<IProps, IState> {
 
         if (
             columns !== nextProps.columns ||
-            layoutContainerWidth !== nextProps.layoutContainerWidth
+            layoutContainerWidth !== nextProps.layoutContainerWidth ||
+            layoutTableWidth !== nextProps.layoutTableWidth
         ) {
             this._refreshColgroup(nextProps);
         }
@@ -229,15 +231,15 @@ export default class Tbody extends Component<IProps, IState> {
         const { layoutTableWidth } = this.props;
         return (
             <div
+                ref={this.rootElRef}
                 className="filelistTableBodyWrapper"
                 onMouseDown={this.mouseDownHandle.bind(this)}
                 onMouseMove={this.mouseMoveHandle.bind(this)}
                 onMouseUp={this.mouseUpHandle.bind(this)}
-                ref={this.rootElRef}
             >
                 <table
-                    className="filelistTable filelistTableBody"
                     ref={this.tableElRef}
+                    className="filelistTable filelistTableBody"
                     style={{ width: layoutTableWidth }}
                 >
                     <colgroup ref={this.colgroupRef} />
@@ -289,15 +291,15 @@ export default class Tbody extends Component<IProps, IState> {
 
     _refreshList(nextProps: IProps, nextState: IState) {
         console.debug("Filelist/Tbody: _refreshList");
-        var {
+        const {
             columns,
             enableCheckbox,
             layoutRowHeight,
             layoutContainerHeight,
             draggable,
         } = nextProps;
-        var { data, tbodyScrollOffset } = nextState;
-        var tbody = this.tbodyElRef.current;
+        const { data, tbodyScrollOffset } = nextState;
+        const tbody = this.tbodyElRef.current;
         if (
             !tbody ||
             !columns ||
@@ -432,7 +434,7 @@ export default class Tbody extends Component<IProps, IState> {
 
     /** 鼠标框选——鼠标抬起事件 */
     mouseUpHandle(e: MouseEvent | React.MouseEvent) {
-        console.debug("Filelist/Tbody: mouseUpHandle");
+        // console.debug("Filelist/Tbody: mouseUpHandle");
         if (this._isUp) {
             const { parentFile } = this.props;
             const { data } = this.props;
@@ -712,18 +714,15 @@ export default class Tbody extends Component<IProps, IState> {
         let selected = this.state.selected || [];
         //已经选中点TD也默认选中
         const isSelect = selected.some((item) => item.name === file.name);
+
         //判断菜单是否需要拼接前面
         if (
             // @ts-ignore
-            e.target.nodeName === "SPAN" ||
-            // @ts-ignore
-            e.target.nodeName === "I" ||
+            e.target.nodeName !== "TD" ||
             isSelect
         ) {
-            // @ts-ignore
-            e.isSelectedMenu = true;
             if (selected.indexOf(file) === -1) {
-                selected = file ? [file] : [];
+                selected = [file];
                 this.setState({
                     activeKey: null,
                     lasterSelected: null,
@@ -731,15 +730,14 @@ export default class Tbody extends Component<IProps, IState> {
                 });
             }
         } else {
-            // @ts-ignore
-            e.isSelectedMenu = false;
+            selected = [];
             this.setState({
                 lasterSelected: selected[selected.length - 1],
                 selected: [],
             });
         }
 
-        onContextMenu(file ? selected : null, e);
+        onContextMenu(selected, e);
     }
 
     /**
@@ -1090,7 +1088,7 @@ export default class Tbody extends Component<IProps, IState> {
      * 手动高亮选中的文件，提升性能。
      */
     _highlightSelected(_nextProps: IProps, nextState: IState) {
-        console.debug("Filelist/Tbody: _highlightSelected");
+        // console.debug("Filelist/Tbody: _highlightSelected");
         const {
             activeKey,
             selected,
@@ -1099,7 +1097,7 @@ export default class Tbody extends Component<IProps, IState> {
             lasterSelected,
             dropFileHover,
         } = this.state;
-        var refs = this._refs;
+        const refs = this._refs;
         if (nextState.activeKey && activeKey !== nextState.activeKey) {
             this.ensureActiveItemVisible(nextState.activeKey);
         }
@@ -1234,7 +1232,7 @@ export default class Tbody extends Component<IProps, IState> {
     getMaxColsWidths() {
         const maxCols = this.getMaxCols();
         const colsWidth: Record<string, number> = {};
-        var tbody = this.tbodyElRef.current;
+        const tbody = this.tbodyElRef.current;
         if (!tbody) {
             return colsWidth;
         }

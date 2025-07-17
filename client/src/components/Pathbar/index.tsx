@@ -292,6 +292,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                                     break;
                                                 case "Downloads":
                                                     icon = <DownloadOutlined />;
+                                                    break;
                                             }
 
                                             return (

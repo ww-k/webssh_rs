@@ -7,6 +7,7 @@ import "./index.css";
 
 import { getParentDirUri } from "@/helpers/file_uri";
 
+import getColumns from "./getColumns";
 import Tbody from "./tbody";
 import Theader from "./theader";
 
@@ -23,7 +24,6 @@ const LAYOUT_ROW_HEIGHT = 24;
 
 interface IProps {
     className?: string;
-    columns: IFileListColumn[];
     data: IFile[];
     fileUri: string;
     loading?: boolean;
@@ -54,6 +54,7 @@ interface IProps {
 }
 
 interface IState {
+    columns: IFileListColumn[];
     data: IFile[];
     sortBy: string;
     sortByDefault: string;
@@ -117,8 +118,11 @@ export default class Filelist extends Component<IProps, IState> {
         const sortByDefault = props.sortByDefault || "sortName";
         const sortOrderDefault = props.sortOrderDefault || "ascend";
         const defaultOrder = sortOrderDefault === "ascend" ? "asc" : "desc";
+
+        const columns = getColumns();
         this.state = {
             activeKey: null,
+            columns,
             data: this._prepareData(
                 props.data,
                 ["isDir", sortByDefault],
@@ -131,7 +135,10 @@ export default class Filelist extends Component<IProps, IState> {
                 : 0,
             layoutContainerHeight: 0,
             layoutContainerWidth: 0,
-            layoutTableWidth: this.caculatelayoutTableWidth(props),
+            layoutTableWidth: this.caculatelayoutTableWidth(
+                columns,
+                props.enableCheckbox,
+            ),
             scrollOffset: 0,
             selected: EMPTY_FILE_ARR,
             sortBy: sortByDefault,
@@ -145,12 +152,6 @@ export default class Filelist extends Component<IProps, IState> {
 
     componentDidUpdate(prevProps: IProps) {
         const nextProps = this.props;
-
-        if (prevProps.columns !== nextProps.columns) {
-            this.setState({
-                layoutTableWidth: this.caculatelayoutTableWidth(nextProps),
-            });
-        }
 
         if (
             prevProps.fileUri !== nextProps.fileUri &&
@@ -257,14 +258,15 @@ export default class Filelist extends Component<IProps, IState> {
     render() {
         const {
             className,
-            columns,
             fileUri,
             loading,
             draggable,
             emptyContent,
             enableCheckbox,
+            onColResize,
         } = this.props;
         const {
+            columns,
             data,
             activeKey,
             selected,
@@ -296,17 +298,18 @@ export default class Filelist extends Component<IProps, IState> {
                 tabIndex={-1}
             >
                 <Theader
+                    ref={this.listTheaderRef}
                     columns={columns}
                     enableCheckbox={enableCheckbox}
                     layoutColCheckboxWidth={layoutColCheckboxWidth}
                     layoutTableWidth={layoutTableWidth}
-                    onCheckChange={this.handleCheckAllChange.bind(this)}
-                    onContextMenu={this.handleHeaderContextMenu.bind(this)}
-                    onThClick={this.handleSort.bind(this)}
-                    ref={this.listTheaderRef}
                     sortByDefault={sortByDefault}
                     sortOrderDefault={sortOrderDefault}
-                    tableColResizeHandle={this.tableColResizeHandle.bind(this)}
+                    onCheckChange={this.handleCheckAllChange.bind(this)}
+                    onContextMenu={this.handleHeaderContextMenu.bind(this)}
+                    onColResize={this.handleColResize.bind(this)}
+                    onColResizeDone={onColResize}
+                    onSort={this.handleSort.bind(this)}
                 />
                 {emptyContent ? (
                     typeof emptyContent === "function" ? (
@@ -521,7 +524,7 @@ export default class Filelist extends Component<IProps, IState> {
     }
 
     filesSelectedChange(selected: IFile[]) {
-        console.debug("Filelist/index: filesSelectedChange", selected);
+        // console.debug("Filelist/index: filesSelectedChange", selected);
         if (selected.length > 1) {
             selected = this._removeParentFile(selected);
         }
@@ -576,7 +579,7 @@ export default class Filelist extends Component<IProps, IState> {
     }
 
     onDeleteHandle() {
-        var selected = this.state.selected;
+        const selected = this.state.selected;
         if (selected.length === 0) {
             return;
         }
@@ -589,7 +592,7 @@ export default class Filelist extends Component<IProps, IState> {
     }
 
     onEnterHandle(file?: IFile) {
-        var selected = this.state.selected;
+        let selected = this.state.selected;
 
         if (file) {
             selected = [file];
@@ -640,11 +643,12 @@ export default class Filelist extends Component<IProps, IState> {
         });
     }
 
-    tableColResizeHandle() {
-        const { onColResize } = this.props;
-        onColResize?.();
+    handleColResize() {
         this.setState({
-            layoutTableWidth: this.caculatelayoutTableWidth(this.props),
+            layoutTableWidth: this.caculatelayoutTableWidth(
+                this.state.columns,
+                this.props.enableCheckbox,
+            ),
         });
     }
 
@@ -656,8 +660,10 @@ export default class Filelist extends Component<IProps, IState> {
         }
     }
 
-    caculatelayoutTableWidth(nextProps: IProps) {
-        const { columns, enableCheckbox } = nextProps;
+    caculatelayoutTableWidth(
+        columns: IFileListColumn[],
+        enableCheckbox?: boolean,
+    ) {
         const layoutColCheckboxWidth = enableCheckbox
             ? LAYOUT_COL_CHECKBOX_WIDTH
             : 0;

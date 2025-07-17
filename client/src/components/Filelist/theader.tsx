@@ -13,10 +13,11 @@ interface IProps {
     layoutColCheckboxWidth: number;
     sortByDefault: string;
     sortOrderDefault: "ascend" | "descend";
-    onThClick?: (key: string, ascend: boolean) => void;
+    onSort?: (key: string, ascend: boolean) => void;
     onCheckChange?: (checked: boolean) => void;
     onContextMenu?: (e: React.MouseEvent) => void;
-    tableColResizeHandle?: (column: IFileListColumn) => void;
+    onColResize?: (column: IFileListColumn) => void;
+    onColResizeDone?: (column: IFileListColumn) => void;
 }
 
 interface IState {
@@ -28,8 +29,6 @@ interface IState {
 export default class Theader extends Component<IProps, IState> {
     static defaultProps = {
         enableCheckbox: true,
-        onCheckChange: null,
-        onThClick: null,
     };
     isClick: boolean = true;
     _tmpOriginWidth?: number | null;
@@ -156,14 +155,13 @@ export default class Theader extends Component<IProps, IState> {
         const key = column.sortKey || column.dataIndex;
         if (this.isClick) {
             const state = this.state;
-            const onThClick = this.props.onThClick;
             const ascend = state.sortBy === key ? !state.ascend : state.ascend;
             this.setState({
                 ascend,
                 sortBy: key,
             });
 
-            onThClick?.(key, ascend);
+            this.props.onSort?.(key, ascend);
         } else {
             this.isClick = true;
         }
@@ -180,15 +178,14 @@ export default class Theader extends Component<IProps, IState> {
         const newWidth = this._tmpOriginWidth + evt.moveX;
         if (!Number.isNaN(newWidth)) {
             column.width = newWidth;
-
-            const { tableColResizeHandle } = this.props;
-            tableColResizeHandle?.(column);
+            this.props.onColResize?.(column);
         }
     }
 
-    tableColResizeDoneHandle(_column: IFileListColumn) {
+    tableColResizeDoneHandle(column: IFileListColumn) {
         this.isClick = false;
         this._tmpOriginWidth = null;
+        this.props.onColResizeDone?.(column);
     }
 
     checkboxClickHandle(evt: React.ChangeEvent<HTMLInputElement>) {
