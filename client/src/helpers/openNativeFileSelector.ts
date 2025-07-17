@@ -1,4 +1,4 @@
-var fileEl;
+var fileEl: HTMLInputElement;
 /**
  * 打开原生的文件选择器
  * @param {object} [option]
@@ -6,15 +6,15 @@ var fileEl;
  * @param {boolean} [option.multiple=false] 是否多选, 默认为false
  * @returns {Promise<File[]>}
  */
-export default function openNativeFileSelector(option) {
+export default function openNativeFileSelector(option?: {
+    directory?: boolean;
+    multiple?: boolean;
+}): Promise<File[]> {
     let directory = false;
     let multiple = false;
-    let defaultPath = "";
     if (option) {
         directory = !!option.directory;
         multiple = !!option.multiple;
-        defaultPath =
-            typeof option.defaultPath === "string" ? option.defaultPath : "";
     }
     return new Promise(function openNativeFileSelectorInner(resolve, reject) {
         if (!fileEl) {
@@ -36,14 +36,9 @@ export default function openNativeFileSelector(option) {
             fileEl.removeAttribute("multiple");
         }
 
-        if (defaultPath) {
-            fileEl.setAttribute("nwworkingdir", defaultPath);
-        } else {
-            fileEl.removeAttribute("nwworkingdir");
-        }
-
-        fileEl.onchange = function fileElOnChange(e) {
-            const files = Array.from(e.target.files);
+        fileEl.onchange = function fileElOnChange(evt) {
+            // @ts-ignore
+            const files: File[] = Array.from(evt.target.files);
             if (files.length > 0) {
                 resolve(files);
             } else {

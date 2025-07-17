@@ -11,7 +11,9 @@ import {
     UploadOutlined,
 } from "@ant-design/icons";
 
+import openNativeFileSelector from "@/helpers/openNativeFileSelector";
 import { isMac } from "@/helpers/platform";
+import transferService from "@/services/transfer";
 
 import popContextMenu from "../Contextmenu";
 
@@ -22,7 +24,10 @@ import type { IFileListCopyEvent } from "../Filelist/types";
 export default function handleContextmenu(
     files: IFile[] | null,
     evt: MouseEvent | React.MouseEvent,
-    pasteData?: IFileListCopyEvent,
+    option: {
+        pasteData?: IFileListCopyEvent;
+        fileUri: string;
+    },
 ) {
     const menus: IContextmenuDataItem[] = [];
 
@@ -86,8 +91,14 @@ export default function handleContextmenu(
     } else {
         menus.push({
             label: "上传",
-            click: () => {
-                // TODO:
+            click: async () => {
+                const files = await openNativeFileSelector();
+                files.forEach((file) => {
+                    transferService.upload({
+                        file,
+                        fileUri: option.fileUri,
+                    });
+                });
             },
             iconRender: () => <UploadOutlined />,
         });
@@ -108,9 +119,9 @@ export default function handleContextmenu(
         menus.push({
             label: "粘贴",
             disabled: !(
-                pasteData?.copyTarget &&
-                Array.isArray(pasteData.copyTarget.files) &&
-                pasteData.copyTarget.files.length > 0
+                option.pasteData?.copyTarget &&
+                Array.isArray(option.pasteData.copyTarget.files) &&
+                option.pasteData.copyTarget.files.length > 0
             ),
             click: () => {
                 // TODO:

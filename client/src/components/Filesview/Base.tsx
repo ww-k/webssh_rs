@@ -109,6 +109,7 @@ export default function FilesviewBase({
                 data={cwd}
                 quickLinks={[]}
                 history={[]}
+                enableSearch={true}
                 getDirs={(fileUrl) => {
                     console.debug("FilesviewBase: getDirs", fileUrl);
                     return new Promise((resolve) => {
@@ -158,7 +159,11 @@ export default function FilesviewBase({
                 enableParentFile={!searching}
                 loading={false}
                 onSelecteChange={setSelectedFiles}
-                onContextMenu={handleContextmenu}
+                onContextMenu={(files, evt) => {
+                    handleContextmenu(files, evt, {
+                        fileUri: `${baseUrl}${cwd}`,
+                    });
+                }}
             />
         </div>
     );
