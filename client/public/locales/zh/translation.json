@@ -12,7 +12,7 @@
     "pathbar_home_path_Documents": "文档",
     "pathbar_home_path_Downloads": "下载",
     "pathbar_home_path_Home": "用户",
-    "pathbar_search_displayname": "“{target}”中的搜索结果'",
+    "pathbar_search_displayname": "“{{target}}”中的搜索结果",
     "target_edit": "编辑目标",
     "target_host": "主机",
     "target_method": "验证方式",

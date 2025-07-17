@@ -174,7 +174,6 @@ export default class Pathbar extends Component<IProps, IState> {
     componentDidUpdate(preProps: IProps) {
         const { data, history: curHistory } = this.props;
         if (preProps.data !== data || preProps.history !== curHistory) {
-            //TODO: 变化触发不及时，当路径是过程目录时，没有及时更新界面
             const routes = this.generateRoutes(data);
             const history = this.generateHisotory(curHistory);
             const newState = {
