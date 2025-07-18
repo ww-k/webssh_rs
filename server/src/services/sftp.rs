@@ -4,24 +4,29 @@ use axum::{
     Json, Router,
     body::Bytes,
     extract::{Query, State},
-    http::header,
+    http::{
+        HeaderMap,
+        header::{self, HeaderValue},
+    },
     response::IntoResponse,
     routing::{get, post},
 };
 use russh::ChannelMsg;
 use russh_sftp::{
     client::{SftpSession, fs::DirEntry},
-    protocol::FileType,
+    protocol::{FileAttributes, FileType},
 };
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tracing::{debug, info};
 
-use crate::{AppState, entities::target, ssh_session_pool::SshSessionPool};
+use crate::{AppState, ssh_session_pool::SshSessionPool};
 use crate::{consts::services_err_code::*, ssh_session_pool::SshChannelGuard};
 
 use super::ApiErr;
 
 struct AppStateWrapper {
+    #[allow(dead_code)]
     app_state: Arc<AppState>,
     session_pool: Arc<SshSessionPool>,
 }
@@ -34,6 +39,7 @@ pub(crate) fn svc_sftp_router_builder(
         .route("/ls", get(sftp_ls))
         .route("/mkdir", post(sftp_mkdir))
         .route("/stat", get(sftp_stat))
+        .route("/home", get(sftp_home))
         .route("/upload", post(sftp_upload))
         .route("/download", post(sftp_download))
         .fallback(|| async { "not supported" })
@@ -60,10 +66,14 @@ pub struct SftpFile {
 impl SftpFile {
     fn from_dir_entry(dir_entry: DirEntry) -> Self {
         let attrs = dir_entry.metadata();
+        Self::from_name_attrs(dir_entry.file_name(), attrs)
+    }
+
+    fn from_name_attrs(name: String, attrs: FileAttributes) -> Self {
         let permissions = attrs.permissions();
         SftpFile {
-            name: dir_entry.file_name(),
-            r#type: match dir_entry.file_type() {
+            name,
+            r#type: match attrs.file_type() {
                 FileType::File => 'f',
                 FileType::Dir => 'd',
                 FileType::Symlink => 'l',
@@ -129,6 +139,7 @@ impl SftpFile {
     // /Users/xxx/Downloads/test,160,1751351720,1749194783,755,directory\n
     // /Users/xxx/Downloads/test/file,160,1751351720,1749194783,755,regular file\n
     // /Users/xxx/Downloads/test/file,160,1751351720,1749194783,755,symbolic link\n
+    #[allow(dead_code)]
     fn from_stat_gnu(output: &str) -> Result<Self, ApiErr> {
         let sep = ",";
         let mut parts: Vec<&str> = output.split(sep).collect();
@@ -195,6 +206,7 @@ impl SftpFile {
     // /Users/xxx/Downloads/test,160,1720508748,1720508748,drwxr-xr-x,Directory\n
     // /Users/xxx/Downloads/test/file,160,1720508748,1720508748,drwxr-xr-x,Regular File\n
     // /Users/xxx/Downloads/test/file,160,1720508748,1720508748,drwxr-xr-x,Symbolic Link\n
+    #[allow(dead_code)]
     fn from_stat_bsd(output: &str) -> Result<Self, ApiErr> {
         let sep = ",";
         let mut parts: Vec<&str> = output.split(sep).collect();
@@ -263,8 +275,19 @@ impl Default for SftpFile {
 }
 
 #[derive(Debug, Deserialize)]
+struct SftpTargetPayload {
+    target_id: i32,
+}
+
+#[derive(Debug, Deserialize)]
 struct SftpFileUriPayload {
     uri: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SftpLsPayload {
+    uri: String,
+    all: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -320,6 +343,14 @@ fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri, ApiErr> {
     })
 }
 
+fn get_file_name(path: &str) -> String {
+    let split = path.split(PATH_SEP);
+    let Some(name) = split.last() else {
+        return "".to_string();
+    };
+    name.to_string()
+}
+
 async fn get_sftp_session(
     state: Arc<AppStateWrapper>,
     target_id: i32,
@@ -331,6 +362,7 @@ async fn get_sftp_session(
     })?;
     let _ = map_ssh_err!(channel.request_subsystem(true, "sftp").await)?;
     let sftp = map_ssh_err!(SftpSession::new(channel.into_stream()).await)?;
+    // TODO: reuse SftpSession
     Ok(sftp)
 }
 
@@ -366,9 +398,25 @@ async fn ssh_exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
     Ok(str.to_string())
 }
 
+async fn sftp_home(
+    State(state): State<Arc<AppStateWrapper>>,
+    Query(payload): Query<SftpTargetPayload>,
+) -> Result<Json<String>, ApiErr> {
+    info!("@sftp_home {:?}", payload);
+
+    let channel = map_ssh_err!(state.session_pool.get(payload.target_id).await)?;
+    let home_path = ssh_exec(channel, "pwd").await?;
+    let home_path = home_path.trim().to_string();
+    // TODO: 缓存，存入SftpSvcSession
+
+    debug!("@sftp_home home_path: {}", home_path);
+
+    Ok(Json(home_path))
+}
+
 async fn sftp_ls(
     State(state): State<Arc<AppStateWrapper>>,
-    Query(payload): Query<SftpFileUriPayload>,
+    Query(payload): Query<SftpLsPayload>,
 ) -> Result<Json<Vec<SftpFile>>, ApiErr> {
     info!("@sftp_ls {:?}", payload);
 
@@ -378,8 +426,20 @@ async fn sftp_ls(
 
     debug!("@sftp_ls sftp.read_dir {:?}", payload);
 
-    let files = read_dir.map(|dir_entry| SftpFile::from_dir_entry(dir_entry));
-    Ok(Json(Vec::from_iter(files)))
+    let files = match payload.all {
+        Some(true) => {
+            let files = read_dir.map(|dir_entry| SftpFile::from_dir_entry(dir_entry));
+            Vec::from_iter(files)
+        }
+        _ => {
+            let files = read_dir
+                .filter(|dir_entry| !dir_entry.file_name().starts_with("."))
+                .map(|dir_entry| SftpFile::from_dir_entry(dir_entry));
+            Vec::from_iter(files)
+        }
+    };
+
+    Ok(Json(files))
 }
 
 async fn sftp_mkdir(
@@ -404,62 +464,74 @@ async fn sftp_stat(
     info!("@sftp_stat {:?}", payload);
 
     let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
-    let channel = map_ssh_err!(state.session_pool.get(sftp_file_uri.target_id).await)?;
-    let command = r#"stat -c "%n" / 2>/dev/null && echo "GNU" || echo "BSD""#;
-    debug!("@sftp_stat exec command {:?}", command);
-    let stat_type = ssh_exec(channel, command).await?;
-    let stat_type = stat_type.trim();
-    debug!("@sftp_stat stat_type {:?}", stat_type);
-
-    match stat_type {
-        "GNU" => {
-            let channel = map_ssh_err!(state.session_pool.get(sftp_file_uri.target_id).await)?;
-            let command = format!("stat -c \"%n,%s,%X,%Y,%a,%F\" {}", sftp_file_uri.path);
-            debug!("@sftp_stat exec command {:?}", command);
-            let result = ssh_exec(channel, command.as_str()).await?;
-            debug!("@sftp_stat GNU {:?}", result);
-            let file = SftpFile::from_stat_gnu(result.as_str())?;
-            Ok(Json(file))
-        }
-        "BSD" => {
-            let channel = map_ssh_err!(state.session_pool.get(sftp_file_uri.target_id).await)?;
-            let command = format!("stat -f \"%N,%z,%a,%m,%Sp,%HT\" {}", sftp_file_uri.path);
-            debug!("@sftp_stat exec command {:?}", command);
-            let result = ssh_exec(channel, command.as_str()).await?;
-            debug!("@sftp_stat BSD {:?}", result);
-            let file = SftpFile::from_stat_bsd(result.as_str())?;
-            Ok(Json(file))
-        }
-        &_ => Err(ApiErr {
-            code: ERR_CODE_SSH_EXEC,
-            message: "detect stat version fail".to_string(),
-        }),
-    }
+    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
+    let attr = map_ssh_err!(sftp.metadata(sftp_file_uri.path).await)?;
+    let file = SftpFile::from_name_attrs(get_file_name(sftp_file_uri.path), attr);
+    Ok(Json(file))
 }
 
 async fn sftp_upload(
     State(state): State<Arc<AppStateWrapper>>,
     Query(payload): Query<SftpFileUriPayload>,
+    headers: HeaderMap,
     content: Bytes,
-) -> Result<Json<Vec<SftpFile>>, ApiErr> {
-    todo!();
+) -> Result<Json<SftpFile>, ApiErr> {
+    info!("@sftp_upload {:?}", payload);
+    info!("@sftp_upload ranges {:?}", headers.get("ranges"));
+    info!(
+        "@sftp_upload content-range {:?}",
+        headers.get("content-range")
+    );
+
+    Ok(Json(SftpFile::default()))
 }
 
 async fn sftp_download(
     State(state): State<Arc<AppStateWrapper>>,
     Query(payload): Query<SftpFileUriPayload>,
 ) -> Result<impl IntoResponse, ApiErr> {
-    let data = Bytes::from("Hello, this is binary data");
+    info!("@sftp_download {:?}", payload);
+
+    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
+
+    // 获取文件信息
+    let stat = map_ssh_err!(sftp.metadata(sftp_file_uri.path).await)?;
+    let file_name = sftp_file_uri.path.split('/').last().unwrap_or("download");
+
+    // 读取文件内容
+    let mut file = map_ssh_err!(sftp.open(sftp_file_uri.path).await)?;
+    let mut buffer = Vec::new();
+    map_ssh_err!(file.read_to_end(&mut buffer).await)?;
+
+    let data = Bytes::from(buffer);
+
     // 设置响应头
-    let headers = [
-        // 设置内容类型
-        (header::CONTENT_TYPE, "application/octet-stream"),
-        // 设置内容处置，指定文件名
-        (
-            header::CONTENT_DISPOSITION,
-            "attachment; filename=\"file.txt\"",
-        ),
-    ];
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        "application/octet-stream".parse().unwrap(),
+    );
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        format!("attachment; filename=\"{}\"", file_name)
+            .parse()
+            .unwrap(),
+    );
+    headers.insert(
+        header::CONTENT_LENGTH,
+        stat.size
+            .unwrap_or(data.len() as u64)
+            .to_string()
+            .parse()
+            .unwrap(),
+    );
+    headers.insert("Accept-Ranges", HeaderValue::from_static("bytes"));
+
+    debug!(
+        "@sftp_download file downloaded successfully, size: {}",
+        data.len()
+    );
 
     Ok((headers, data))
 }
@@ -597,10 +669,7 @@ mod tests {
     fn test_parse_stat_gnu() {
         let output = "/Users/xxx/Downloads/test,160,1720508748,1720508748,755,directory\n";
         let file = SftpFile::from_stat_gnu(output).unwrap();
-        assert_eq!(
-            file.name, "test",
-            "@test_parse_stat_gnu: name fail"
-        );
+        assert_eq!(file.name, "test", "@test_parse_stat_gnu: name fail");
         assert_eq!(
             file.r#type, 'd',
             "@test_parse_stat_gnu: type directory fail"
@@ -615,10 +684,7 @@ mod tests {
 
         let output = "/Users/xxx/Downloads/test/file,160,1720508748,1720508748,755,regular file\n";
         let file = SftpFile::from_stat_gnu(output).unwrap();
-        assert_eq!(
-            file.name, "file",
-            "@test_parse_stat_gnu: name fail"
-        );
+        assert_eq!(file.name, "file", "@test_parse_stat_gnu: name fail");
         assert_eq!(
             file.r#type, 'f',
             "@test_parse_stat_gnu: type regular file fail"
@@ -650,10 +716,7 @@ mod tests {
     fn test_parse_stat_bsd() {
         let output = "/Users/xxx/Downloads/test,160,1720508748,1720508748,drwxr-xr-x,Directory\n";
         let file = SftpFile::from_stat_bsd(output).unwrap();
-        assert_eq!(
-            file.name, "test",
-            "@test_parse_stat_bsd: name fail"
-        );
+        assert_eq!(file.name, "test", "@test_parse_stat_bsd: name fail");
         assert_eq!(
             file.r#type, 'd',
             "@test_parse_stat_bsd: type directory fail"
@@ -669,10 +732,7 @@ mod tests {
         let output =
             "/Users/xxx/Downloads/test/file,160,1720508748,1720508748,drwxr-xr-x,Regular File\n";
         let file = SftpFile::from_stat_bsd(output).unwrap();
-        assert_eq!(
-            file.name, "file",
-            "@test_parse_stat_bsd: name fail"
-        );
+        assert_eq!(file.name, "file", "@test_parse_stat_bsd: name fail");
         assert_eq!(
             file.r#type, 'f',
             "@test_parse_stat_bsd: type regular file fail"
