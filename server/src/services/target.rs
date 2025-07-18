@@ -66,6 +66,7 @@ struct TargetUpdatePayload {
     user: String,
     key: Option<String>,
     password: Option<String>,
+    system: Option<String>,
 }
 
 impl From<TargetUpdatePayload> for target::ActiveModel {
@@ -78,6 +79,7 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
             user: Set(p.user),
             key: Set(p.key),
             password: Set(p.password),
+            system: Set(p.system),
         }
     }
 }
