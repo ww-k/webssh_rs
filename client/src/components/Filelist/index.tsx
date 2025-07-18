@@ -695,20 +695,23 @@ export default class Filelist extends Component<IProps, IState> {
     }
 
     scrollToItem(index: number) {
-        const { data, scrollOffset, layoutContainerHeight } = this.state;
+        const {
+            data,
+            scrollOffset,
+            layoutContainerHeight: containerHeight,
+        } = this.state;
         const itemCount = data.length;
 
         index = Math.max(0, Math.min(index, itemCount - 1));
 
-        const size = layoutContainerHeight;
         const lastItemOffset = Math.max(
             0,
-            itemCount * LAYOUT_ROW_HEIGHT - size,
+            itemCount * LAYOUT_ROW_HEIGHT - containerHeight,
         );
         const maxOffset = Math.min(lastItemOffset, index * LAYOUT_ROW_HEIGHT);
         const minOffset = Math.max(
             0,
-            index * LAYOUT_ROW_HEIGHT - size + LAYOUT_ROW_HEIGHT,
+            index * LAYOUT_ROW_HEIGHT - containerHeight + LAYOUT_ROW_HEIGHT,
         );
         console.debug(
             "Filelist/index: scrollToItem ",

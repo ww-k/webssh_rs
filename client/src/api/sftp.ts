@@ -1,5 +1,7 @@
 import axios from "axios";
 
+import type { AxiosRequestConfig, GenericAbortSignal } from "axios";
+
 export interface ISftpFile {
     /** 文件名 */
     name: string;
@@ -21,5 +23,60 @@ export async function getSftpLs(uri: string) {
             uri,
         },
     });
+    return response.data;
+}
+
+export async function getSftpHome(target_id: number): Promise<string> {
+    const response = await axios.get<string>("/api/sftp/home", {
+        params: {
+            target_id,
+        },
+    });
+    return response.data;
+}
+
+export async function postSftpUpload(
+    fileUri: string,
+    fileSlice: File | Blob,
+    option?: {
+        start?: number;
+        end?: number;
+        /** 文件总大小, 非分片大小 */
+        size?: number;
+        // browser only
+        onUploadProgress?: (progressEvent: any) => void;
+        signal?: GenericAbortSignal;
+    },
+) {
+    const config: AxiosRequestConfig = {
+        headers: {
+            "content-type": "application/octet-stream",
+        },
+    };
+    if (option) {
+        if (
+            config.headers &&
+            typeof option.start === "number" &&
+            typeof option.end === "number" &&
+            typeof option.size === "number"
+        ) {
+            config.headers["content-range"] =
+                `bytes ${option.start}-${option.end}/${option.size}`;
+            config.timeout = Math.max(
+                Math.ceil((option.end - option.start + 1) / 5),
+                30000,
+            );
+        }
+        if (option.onUploadProgress) {
+            config.onUploadProgress = option.onUploadProgress;
+        }
+    }
+    const response = await axios.post<{
+        hash: string;
+    }>(
+        `/api/sftp/upload?uri=${encodeURIComponent(fileUri)}`,
+        fileSlice,
+        config,
+    );
     return response.data;
 }

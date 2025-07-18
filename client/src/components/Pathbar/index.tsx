@@ -21,6 +21,8 @@ import i18n from "@/i18n";
 
 import "./index.css";
 
+import { getDirPath } from "@/helpers/file_uri";
+
 import { buildSearchUri, isSearchUri, parseSearchUri } from "./search";
 
 import type { DebouncedFuncLeading } from "lodash";
@@ -33,14 +35,14 @@ interface IRouteItem {
     link: boolean;
 }
 
-interface IQuickLink {
+export interface IQuickLink {
     name: string;
     path: string;
 }
 
 interface IProps {
     className?: string;
-    data: string;
+    cwd: string;
     /** 是否是posix风格路径 */
     posix?: boolean;
     enableHomeIcon?: boolean;
@@ -53,6 +55,7 @@ interface IProps {
     history: string[];
     getDirs?: (fileUrlOrPath: string) => Promise<IFile[]>;
     getQuickLinks?: () => Promise<IQuickLink[]>;
+    getCwdFiles: () => void;
     onChange?: (newPath: string) => void;
 }
 
@@ -106,7 +109,7 @@ export default class Pathbar extends Component<IProps, IState> {
 
     static defaultProps = {
         className: "",
-        data: "",
+        cwd: "",
         history: [],
         quickLinks: [],
         enableHomeIcon: true,
@@ -120,8 +123,8 @@ export default class Pathbar extends Component<IProps, IState> {
         super(props);
 
         this.path = props.posix ? pathPosix : path;
-        const routes = this.generateRoutes(props.data);
-        const editorValue = this.generateEditorValue(props.data);
+        const routes = this.generateRoutes(props.cwd);
+        const editorValue = this.generateEditorValue(props.cwd);
         const history = this.generateHisotory(props.history);
 
         this.state = {
@@ -141,7 +144,7 @@ export default class Pathbar extends Component<IProps, IState> {
             dirListLeft: null,
             dirListLoading: false,
             dirListLoadingMsg: "",
-            searchValue: parseSearchUri(props.data).searchValue,
+            searchValue: parseSearchUri(props.cwd).searchValue,
         };
         this.dirListCache = {};
 
@@ -172,18 +175,18 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     componentDidUpdate(preProps: IProps) {
-        const { data, history: curHistory } = this.props;
-        if (preProps.data !== data || preProps.history !== curHistory) {
-            const routes = this.generateRoutes(data);
+        const { cwd, history: curHistory } = this.props;
+        if (preProps.cwd !== cwd || preProps.history !== curHistory) {
+            const routes = this.generateRoutes(cwd);
             const history = this.generateHisotory(curHistory);
             const newState = {
                 routes,
                 history,
                 editorValue: this.state.editorValue,
-                searchValue: parseSearchUri(data).searchValue,
+                searchValue: parseSearchUri(cwd).searchValue,
             };
             if (!this.state.isFocus) {
-                newState.editorValue = this.generateEditorValue(data);
+                newState.editorValue = this.generateEditorValue(cwd);
             }
             this.setState(newState, () => this.resizeViewThrottle());
         }
@@ -341,7 +344,7 @@ export default class Pathbar extends Component<IProps, IState> {
                             ) : (
                                 dirList.map((item) => (
                                     <li
-                                        key={item.uri}
+                                        key={item.name}
                                         onClick={this.handleClickDir.bind(
                                             this,
                                             item,
@@ -350,7 +353,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                         <div
                                             className={classNames({
                                                 pathbarDropdownMenuDirMenuSelect:
-                                                    item.uri === activedPath,
+                                                    item.name === activedPath,
                                             })}
                                         >
                                             <FolderTwoTone />
@@ -659,11 +662,11 @@ export default class Pathbar extends Component<IProps, IState> {
             this.setState(
                 Object.assign(
                     {
+                        activedPath: routes[i + 1].path,
                         dirList: this.dirListCache[objKey],
                         activedIndex: i,
                         dirListLoading: false,
                         dirListLoadingMsg: "",
-                        activedPath: routes[i + 1].path,
                         dirListLeft:
                             breadcrumbLeft < 0
                                 ? newDirListLeft + breadcrumbLeft
@@ -676,15 +679,15 @@ export default class Pathbar extends Component<IProps, IState> {
             this.setState(
                 Object.assign(
                     {
+                        activedIndex: i,
+                        activedPath: routes[i + 1].path,
                         dirList: [],
                         dirListLoading: true,
                         dirListLoadingMsg: "",
-                        activedIndex: i,
                         dirListLeft:
                             breadcrumbLeft < 0
                                 ? newDirListLeft + breadcrumbLeft
                                 : newDirListLeft,
-                        activedPath: routes[i + 1].path,
                     },
                     newState,
                 ),
@@ -755,11 +758,11 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     handleClickDir(dir: IFile) {
-        if (dir.uri === this.state.activedPath) {
+        if (dir.name === this.state.activedPath) {
             return;
         }
 
-        this.props.onChange?.(dir.uri);
+        this.props.onChange?.(getDirPath(dir.uri));
     }
 
     getQuickLinks() {
@@ -768,13 +771,13 @@ export default class Pathbar extends Component<IProps, IState> {
         });
     }
 
-    generateRoutes(data: string) {
-        if (isSearchUri(data)) {
+    generateRoutes(cwd: string) {
+        if (isSearchUri(cwd)) {
             return [
                 {
-                    name: this.generateSearchDisplay(data),
+                    name: this.generateSearchDisplay(cwd),
                     title: "",
-                    path: data,
+                    path: cwd,
                     link: false,
                 },
             ];
@@ -782,17 +785,14 @@ export default class Pathbar extends Component<IProps, IState> {
 
         const sep = this.path.sep;
         const routes: IRouteItem[] = [];
-        const arr = data === sep ? [] : data.split(sep);
+        const arr = cwd === sep ? [] : cwd.split(sep);
         let fullpath = "";
         let title = "";
-        if (arr[0] && arr[0].substring(0, 4) === "prn:") {
-            fullpath = arr[0];
-            arr[0] = "";
-        }
+
         routes.push({
             name: "/",
             title: "/",
-            path: `${fullpath}/`,
+            path: "/",
             link: true,
         });
 
@@ -854,7 +854,7 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     editorBlurHandle() {
-        const editorValue = this.generateEditorValue(this.props.data);
+        const editorValue = this.generateEditorValue(this.props.cwd);
         this.setState({
             editorValue,
             isFocus: false,
@@ -893,14 +893,12 @@ export default class Pathbar extends Component<IProps, IState> {
 
             this.editorBlurHandle();
 
-            const { onChange } = this.props;
-            onChange?.(normalizePath);
+            this.props.onChange?.(normalizePath);
         }
     }
 
     btnRefreshClickHandle() {
-        const { onChange, data } = this.props;
-        onChange?.(data);
+        this.props.getCwdFiles();
     }
 
     btnHistoryClickHandle(e: React.MouseEvent) {
@@ -984,30 +982,26 @@ export default class Pathbar extends Component<IProps, IState> {
         this.setState({
             searchValue: "",
         });
-        const { data, onChange } = this.props;
-        if (isSearchUri(data)) {
-            const searchLocation = parseSearchUri(data).searchLocation;
+        const { cwd, onChange } = this.props;
+        if (isSearchUri(cwd)) {
+            const searchLocation = parseSearchUri(cwd).searchLocation;
             onChange?.(searchLocation);
             return;
         }
     }
 
     btnSearchClickHandle() {
-        const { data, onChange } = this.props;
+        const { cwd, onChange } = this.props;
         if (this.state.searchValue === "") {
             this.btnClearSearchClickHandle();
             return;
         }
-        const path = buildSearchUri(
-            data,
-            this.state.searchValue,
-            this.path.sep,
-        );
+        const path = buildSearchUri(cwd, this.state.searchValue, this.path.sep);
         onChange?.(path);
     }
 
-    generateSearchDisplay(data: string) {
-        const { dirName } = parseSearchUri(data);
+    generateSearchDisplay(cwd: string) {
+        const { dirName } = parseSearchUri(cwd);
         return i18n.t("pathbar_search_displayname", { target: dirName });
     }
 }

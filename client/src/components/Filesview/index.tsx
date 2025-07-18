@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import "./index.css";
 
-import FilesviewBase from "./Base";
+import FilesviewRemote from "./Remote";
 
 import type { ITab } from "@/store";
 
@@ -29,11 +29,7 @@ export default function Filesview({
 
     return (
         <div className="filesview">
-            <FilesviewBase
-                baseUrl={baseUrl}
-                targetId={targetId}
-                active={active}
-            />
+            <FilesviewRemote baseUrl={baseUrl} targetId={targetId} />
         </div>
     );
 }

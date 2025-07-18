@@ -21,7 +21,7 @@ import type { IFile } from "@/types";
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
 import type { IFileListCopyEvent } from "../Filelist/types";
 
-export default function handleContextmenu(
+export default function remoteHandleContextmenu(
     files: IFile[] | null,
     evt: MouseEvent | React.MouseEvent,
     option: {

@@ -245,6 +245,7 @@
     outline: none;
     width: 14px;
     height: 14px;
+    margin: 0;
     position: relative;
     top: 2px;
 }
