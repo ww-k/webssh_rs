@@ -298,6 +298,8 @@ struct SftpFileUri<'a> {
 
 impl<'a> SftpFileUri<'a> {
     fn from_str(str: &'a str) -> Option<Self> {
+        // linux，unix sftp:1/Users/xxx
+        // windows sftp:1/C:/Users/xxx
         let mut split = str.split(URI_SEP);
         if Some("sftp") != split.next() {
             return None;
@@ -405,6 +407,7 @@ async fn sftp_home(
     info!("@sftp_home {:?}", payload);
 
     let channel = map_ssh_err!(state.session_pool.get(payload.target_id).await)?;
+    // TODO: 如果target.system 为windows，使用cd命令
     let home_path = ssh_exec(channel, "pwd").await?;
     let home_path = home_path.trim().to_string();
     // TODO: 缓存，存入SftpSvcSession
