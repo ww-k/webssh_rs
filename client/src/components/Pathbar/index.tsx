@@ -21,7 +21,7 @@ import i18n from "@/i18n";
 
 import "./index.css";
 
-import { getDirPath } from "@/helpers/file_uri";
+import { getFilePath } from "@/helpers/file_uri";
 
 import { buildSearchUri, isSearchUri, parseSearchUri } from "./search";
 
@@ -762,7 +762,7 @@ export default class Pathbar extends Component<IProps, IState> {
             return;
         }
 
-        this.props.onChange?.(getDirPath(dir.uri));
+        this.props.onChange?.(getFilePath(dir.uri));
     }
 
     getQuickLinks() {

@@ -19,7 +19,7 @@ export default class DragFilesReader {
                 if (item) {
                     this.traverseFileTree(
                         item,
-                        '',
+                        "",
                         // @ts-ignore
                         item.isFile && items[i].getAsFile(),
                     );
@@ -33,7 +33,7 @@ export default class DragFilesReader {
         path1: string,
         symlink?: File | false,
     ) {
-        const path = path1 || '';
+        const path = path1 || "";
 
         if (item1.isFile) {
             const item = item1 as FileSystemFileEntry;
@@ -42,7 +42,7 @@ export default class DragFilesReader {
                 .then((file) => this.pushFile(file, path))
                 .catch((error) => {
                     if (this.debug) {
-                        const fn = symlink ? 'debug' : 'warn';
+                        const fn = symlink ? "debug" : "warn";
 
                         console[fn](
                             'Failed to get File from FileEntry for "%s", %s',
@@ -100,7 +100,7 @@ export default class DragFilesReader {
 
     pushFile(file: File, path: string) {
         if (this.debug) {
-            console.warn('Adding file %s', file.name, file);
+            console.warn("Adding file %s", file.name, file);
         }
         if (file) {
             if (path) {

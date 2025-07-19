@@ -35,6 +35,43 @@ export async function getSftpHome(target_id: number): Promise<string> {
     return response.data;
 }
 
+export async function postSftpMkdir(uri: string) {
+    await axios.post<boolean>("/api/sftp/mkdir", null, {
+        params: {
+            uri,
+        },
+    });
+    return true;
+}
+
+export async function postSftpRename(uri: string, newPath: string) {
+    await axios.post<boolean>("/api/sftp/rename", null, {
+        params: {
+            uri,
+            new_path: newPath,
+        },
+    });
+    return true;
+}
+
+export async function postSftpRm(uri: string) {
+    await axios.post<boolean>("/api/sftp/rm", null, {
+        params: {
+            uri,
+        },
+    });
+    return true;
+}
+
+export async function postSftpRmRf(uri: string) {
+    await axios.post<boolean>("/api/sftp/rm/rf", null, {
+        params: {
+            uri,
+        },
+    });
+    return true;
+}
+
 export async function postSftpUpload(
     fileUri: string,
     fileSlice: File | Blob,

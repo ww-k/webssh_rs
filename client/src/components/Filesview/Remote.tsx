@@ -5,7 +5,7 @@ import "./index.css";
 import { useMemoizedFn } from "ahooks";
 
 import { getSftpHome, getSftpLs } from "@/api/sftp";
-import { getDirPath } from "@/helpers/file_uri";
+import { getFilePath } from "@/helpers/file_uri";
 
 import { isSearchUri } from "../Pathbar/search";
 import FilesviewBase from "./Base";
@@ -19,8 +19,8 @@ const mockFiles: IFile[] = import.meta.env.DEV
               name: "file1.txt",
               type: "f",
               size: 1024,
-              atime: 1638400000000,
-              mtime: 1638400000000,
+              atime: 1638400000,
+              mtime: 1638400000,
               permissions: "rw-r--r--",
               uri: "sftp:1:/Users/test/Downloads/file1.txt",
               sortName: "file1.txt",
@@ -30,8 +30,8 @@ const mockFiles: IFile[] = import.meta.env.DEV
               name: "file2.txt",
               type: "f",
               size: 2048,
-              atime: 1638400000000,
-              mtime: 1638400000000,
+              atime: 1638400000,
+              mtime: 1638400000,
               permissions: "rw-r--r--",
               uri: "sftp:1:/Users/test/Downloads/file2.txt",
               sortName: "file2.txt",
@@ -41,8 +41,8 @@ const mockFiles: IFile[] = import.meta.env.DEV
               name: "dir1",
               type: "d",
               size: 2048,
-              atime: 1638400000000,
-              mtime: 1638400000000,
+              atime: 1638400000,
+              mtime: 1638400000,
               permissions: "rw-r--r--",
               uri: "sftp:1:/Users/test/Downloads/dir1",
               sortName: "dir1",
@@ -52,8 +52,8 @@ const mockFiles: IFile[] = import.meta.env.DEV
               name: "dir2",
               type: "d",
               size: 2048,
-              atime: 1638400000000,
-              mtime: 1638400000000,
+              atime: 1638400000,
+              mtime: 1638400000,
               permissions: "rw-r--r--",
               uri: "sftp:1:/Users/test/Downloads/dir2",
               sortName: "dir2",
@@ -83,6 +83,8 @@ export default function FilesviewRemote({
         const sftpFiles = await getSftpLs(cwdUri);
         const files: IFile[] = sftpFiles.map((item) => ({
             ...item,
+            mtime: item.mtime * 1000,
+            atime: item.atime * 1000,
             isDir: item.type === "d",
             uri: `${cwdUri}/${item.name}`,
             sortName: item.name.toLowerCase(),
@@ -92,7 +94,12 @@ export default function FilesviewRemote({
     const getHome = useMemoizedFn(() => getSftpHome(targetId));
     const onFileDoubleClick = useMemoizedFn((file: IFile) => {
         if (file.isDir) {
-            setCwd(getDirPath(file.uri));
+            setCwd(getFilePath(file.uri));
+        }
+    });
+    const onEnter = useMemoizedFn((file: IFile) => {
+        if (file.isDir) {
+            setCwd(getFilePath(file.uri));
         }
     });
 
@@ -143,9 +150,11 @@ export default function FilesviewRemote({
                 onContextMenu={(files, evt) => {
                     handleContextmenu(files, evt, {
                         fileUri: cwdUri,
+                        getCwdFiles,
                     });
                 }}
                 onFileDoubleClick={onFileDoubleClick}
+                onEnter={onEnter}
             />
         </div>
     );

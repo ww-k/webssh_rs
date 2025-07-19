@@ -8,7 +8,11 @@ export function isFileUri(uri: string) {
     return uri.startsWith("file:");
 }
 
-export function getDirPath(uri: string) {
+/**
+ * uri: sftp:1:/Users/test
+ * return: /Users/test
+ */
+export function getFilePath(uri: string) {
     if (isSftpFileUri(uri)) {
         const items = uri.split(":");
         return items.slice(2).join(":");
@@ -18,6 +22,10 @@ export function getDirPath(uri: string) {
     return uri;
 }
 
+/**
+ * uri: sftp:1:/Users/test
+ * return: sftp:1:/Users
+ */
 export function getParentDirUri(uri: string) {
     const items = uri.split("/");
     items.pop();

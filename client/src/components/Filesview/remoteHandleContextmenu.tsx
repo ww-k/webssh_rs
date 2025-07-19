@@ -10,8 +10,12 @@ import {
     ScissorOutlined,
     UploadOutlined,
 } from "@ant-design/icons";
+import { Modal } from "antd";
 
+import { postSftpMkdir, postSftpRename, postSftpRm, postSftpRmRf } from "@/api";
+import { getFilePath } from "@/helpers/file_uri";
 import openNativeFileSelector from "@/helpers/openNativeFileSelector";
+import { posix } from "@/helpers/path";
 import { isMac } from "@/helpers/platform";
 import transferService from "@/services/transfer";
 
@@ -24,9 +28,10 @@ import type { IFileListCopyEvent } from "../Filelist/types";
 export default function remoteHandleContextmenu(
     files: IFile[] | null,
     evt: MouseEvent | React.MouseEvent,
-    option: {
+    context: {
         pasteData?: IFileListCopyEvent;
         fileUri: string;
+        getCwdFiles: () => void;
     },
 ) {
     const menus: IContextmenuDataItem[] = [];
@@ -73,8 +78,23 @@ export default function remoteHandleContextmenu(
         menus.push({
             label: "删除",
             disabled: !files,
-            click: () => {
-                // TODO:
+            click: async () => {
+                Modal.confirm({
+                    content: "删除后将不可恢复，确认删除吗?",
+                    okText: "删除",
+                    cancelText: "取消",
+                    okType: "danger",
+                    onOk: async () => {
+                        for (const file of files) {
+                            if (file.isDir) {
+                                await postSftpRmRf(file.uri);
+                            } else {
+                                await postSftpRm(file.uri);
+                            }
+                        }
+                        context.getCwdFiles();
+                    },
+                });
             },
             iconRender: () => <DeleteOutlined />,
             tooltip: "Delete",
@@ -82,8 +102,16 @@ export default function remoteHandleContextmenu(
         menus.push({
             label: "重命名",
             disabled: !(Array.isArray(files) && files.length === 1),
-            click: () => {
-                // TODO:
+            click: async () => {
+                const newName = window.prompt("请输入文件名", files[0].name);
+                if (!newName) {
+                    return;
+                }
+
+                const filePath = getFilePath(files[0].uri);
+                const newPath = posix.resolve(filePath, `../${newName}`);
+                await postSftpRename(files[0].uri, newPath);
+                context.getCwdFiles();
             },
             iconRender: () => <EditOutlined />,
             tooltip: "F2",
@@ -96,7 +124,7 @@ export default function remoteHandleContextmenu(
                 files.forEach((file) => {
                     transferService.upload({
                         file,
-                        fileUri: option.fileUri,
+                        fileUri: context.fileUri,
                     });
                 });
             },
@@ -104,24 +132,27 @@ export default function remoteHandleContextmenu(
         });
         menus.push({
             label: "刷新",
-            click: () => {
-                // TODO:
-            },
+            click: context.getCwdFiles,
             iconRender: () => <ReloadOutlined />,
         });
         menus.push({
             label: "创建文件夹",
-            click: () => {
-                // TODO:
+            click: async () => {
+                const newName = window.prompt("请输入文件夹名", "");
+                if (!newName) {
+                    return;
+                }
+                await postSftpMkdir(context.fileUri + "/" + newName);
+                context.getCwdFiles();
             },
             iconRender: () => <FolderAddOutlined />,
         });
         menus.push({
             label: "粘贴",
             disabled: !(
-                option.pasteData?.copyTarget &&
-                Array.isArray(option.pasteData.copyTarget.files) &&
-                option.pasteData.copyTarget.files.length > 0
+                context.pasteData?.copyTarget &&
+                Array.isArray(context.pasteData.copyTarget.files) &&
+                context.pasteData.copyTarget.files.length > 0
             ),
             click: () => {
                 // TODO:

@@ -24,6 +24,7 @@ export default function FilesviewBase({
     onContextMenu,
     onSelecteChange,
     onFileDoubleClick,
+    onEnter,
 }: {
     className?: string;
     style?: React.CSSProperties;
@@ -41,6 +42,7 @@ export default function FilesviewBase({
         files: IFile[] | null,
         evt: MouseEvent | React.MouseEvent,
     ) => void;
+    onEnter?: (file: IFile) => void;
     [key: string]: unknown;
 }) {
     const [pathHistory, setPathHistory] = useState<string[]>([]);
@@ -89,6 +91,7 @@ export default function FilesviewBase({
                 onSelecteChange={onSelecteChange}
                 onFileDoubleClick={onFileDoubleClick}
                 onContextMenu={onContextMenu}
+                onEnter={onEnter}
             />
         </div>
     );

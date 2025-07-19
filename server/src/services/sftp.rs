@@ -40,6 +40,9 @@ pub(crate) fn svc_sftp_router_builder(
         .route("/mkdir", post(sftp_mkdir))
         .route("/stat", get(sftp_stat))
         .route("/home", get(sftp_home))
+        .route("/rename", post(sftp_rename))
+        .route("/rm", post(sftp_rm))
+        .route("/rm/rf", post(sftp_rm_rf))
         .route("/upload", post(sftp_upload))
         .route("/download", post(sftp_download))
         .fallback(|| async { "not supported" })
@@ -290,6 +293,12 @@ struct SftpLsPayload {
     all: Option<bool>,
 }
 
+#[derive(Debug, Deserialize)]
+struct SftpRenamePayload {
+    uri: String,
+    new_path: String,
+}
+
 #[derive(Debug)]
 struct SftpFileUri<'a> {
     target_id: i32,
@@ -374,6 +383,7 @@ async fn ssh_exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
 
     let mut code = None;
     let mut buf = Vec::<u8>::new();
+    let mut buf_e = Vec::<u8>::new();
 
     loop {
         // There's an event available on the session channel
@@ -381,6 +391,9 @@ async fn ssh_exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
             break;
         };
         match msg {
+            ChannelMsg::ExtendedData { ref data, ext: _ } => {
+                buf_e.extend_from_slice(data);
+            }
             // Write data to the terminal
             ChannelMsg::Data { ref data } => {
                 buf.extend_from_slice(data);
@@ -394,10 +407,17 @@ async fn ssh_exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
         }
     }
     let str = String::from_utf8_lossy(&buf);
+    let str_e = String::from_utf8_lossy(&buf_e);
     debug!("@ssh_exec done {:?}", command);
     debug!("exit_status {:?}. result ", code);
     debug!("{:?}", str);
-    Ok(str.to_string())
+    match code {
+        Some(0) => Ok(str.to_string()),
+        _ => Err(ApiErr {
+            code: ERR_CODE_SSH_EXEC,
+            message: format!("exit status {:?}. result\n {}", code, str_e),
+        }),
+    }
 }
 
 async fn sftp_home(
@@ -407,7 +427,7 @@ async fn sftp_home(
     info!("@sftp_home {:?}", payload);
 
     let channel = map_ssh_err!(state.session_pool.get(payload.target_id).await)?;
-    // TODO: 如果target.system 为windows，使用cd命令
+    // TODO: 如果target.system 为windows，返回/C:
     let home_path = ssh_exec(channel, "pwd").await?;
     let home_path = home_path.trim().to_string();
     // TODO: 缓存，存入SftpSvcSession
@@ -471,6 +491,64 @@ async fn sftp_stat(
     let attr = map_ssh_err!(sftp.metadata(sftp_file_uri.path).await)?;
     let file = SftpFile::from_name_attrs(get_file_name(sftp_file_uri.path), attr);
     Ok(Json(file))
+}
+
+async fn sftp_rename(
+    State(state): State<Arc<AppStateWrapper>>,
+    Query(payload): Query<SftpRenamePayload>,
+) -> Result<(), ApiErr> {
+    info!("@sftp_rename {:?}", payload);
+
+    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
+    let _ = map_ssh_err!(
+        sftp.rename(sftp_file_uri.path, payload.new_path.as_str())
+            .await
+    )?;
+
+    debug!("@sftp_rename sftp.rename done {:?}", payload);
+
+    Ok(())
+}
+
+async fn sftp_rm(
+    State(state): State<Arc<AppStateWrapper>>,
+    Query(payload): Query<SftpFileUriPayload>,
+) -> Result<(), ApiErr> {
+    info!("@sftp_rm {:?}", payload);
+
+    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
+    let _ = map_ssh_err!(sftp.remove_file(sftp_file_uri.path).await)?;
+
+    debug!("@sftp_rm sftp.remove_file done {:?}", payload);
+
+    Ok(())
+}
+
+async fn sftp_rm_rf(
+    State(state): State<Arc<AppStateWrapper>>,
+    Query(payload): Query<SftpFileUriPayload>,
+) -> Result<(), ApiErr> {
+    info!("@sftp_rm_rf {:?}", payload);
+
+    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
+    let channel = map_ssh_err!(state.session_pool.get(sftp_file_uri.target_id).await)?;
+    ssh_exec(
+        channel,
+        format!(r#"rm -rf "{}""#, sftp_file_uri.path).as_str(),
+    )
+    .await?;
+    // TODO: 如果target.system 为windows，使用rd /s /q "D:\temp\test"命令， sftp_file_uri.path路径需要转换
+    // ssh_exec(
+    //     channel,
+    //     format!(r#"rmdir /s /q "{}""#, sftp_file_uri.path).as_str(),
+    // )
+    // .await?;
+
+    debug!("@sftp_rm_rf done {:?}", payload);
+
+    Ok(())
 }
 
 async fn sftp_upload(
