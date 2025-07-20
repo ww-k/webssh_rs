@@ -6,6 +6,7 @@ import "./index.css";
 import { getSftpHome } from "@/api/sftp";
 import { isSftpFileUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
+import useAppStore from "@/store";
 
 import { isSearchUri } from "../Pathbar/search";
 import FilesviewBase from "./Base";
@@ -71,6 +72,7 @@ export default function FilesviewRemote({
     baseUrl: string;
     targetId: number;
 }) {
+    const { copyData, setCopyData } = useAppStore();
     const [cwd, setCwd] = useState(mockCwd);
     const [pathHistory, setPathHistory] = useState<string[]>([]);
 
@@ -172,7 +174,9 @@ export default function FilesviewRemote({
                 onContextMenu={(files, evt) => {
                     handleContextmenu(files, evt, {
                         fileUri: cwd,
+                        copyData,
                         getCwdFiles,
+                        setCopyData,
                     });
                 }}
                 onFileDoubleClick={onFileDoubleClick}

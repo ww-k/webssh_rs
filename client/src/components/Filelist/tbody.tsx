@@ -32,7 +32,7 @@ interface IProps {
     parentFile?: IFile;
     columns: IFileListColumn[];
     data: IFile[];
-    fileUri?: string;
+    cwd?: string;
     selected?: IFile[];
     activeKey?: string | null;
     enableCheckbox?: boolean;
@@ -767,7 +767,7 @@ export default class Tbody extends Component<IProps, IState> {
 
         this._dragTarget = {
             files: newState.dragFiles,
-            fileUri: this.props.fileUri,
+            fileUri: this.props.cwd,
         };
         if (e.dataTransfer) {
             e.dataTransfer.setData(
@@ -839,7 +839,7 @@ export default class Tbody extends Component<IProps, IState> {
     dropHandle(file: IFile | null, e: DragEvent) {
         e.stopPropagation();
         e.preventDefault();
-        const { onDrop, enableDragFromOS, fileUri } = this.props;
+        const { onDrop, enableDragFromOS, cwd: fileUri } = this.props;
         const dragEvent = new Event("file-drag-drop") as IFileListDragDropEvent;
         const dataTransfer = e.dataTransfer;
         if (!dataTransfer) return;

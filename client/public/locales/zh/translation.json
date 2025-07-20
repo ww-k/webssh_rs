@@ -1,6 +1,8 @@
 {
+    "app_btn_cancel": "取消",
     "app_btn_delete": "删除",
     "app_btn_edit": "编辑",
+    "app_btn_ok": "确定",
     "app_btn_refresh": "刷新",
     "app_btn_save": "保存",
     "app_common_action": "操作",

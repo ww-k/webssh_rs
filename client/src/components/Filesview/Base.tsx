@@ -1,12 +1,15 @@
 import { useMemoizedFn } from "ahooks";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import Pathbar, { type IQuickLink } from "@/components/Pathbar";
 import { isSearchUri } from "@/components/Pathbar/search";
 
 import "./Base.css";
 
+import useAppStore from "@/store";
+
 import Filelist from "../Filelist";
+import handlePaste from "./handlePaste";
 
 import type { IFile } from "@/types";
 
@@ -46,6 +49,7 @@ export default function FilesviewBase({
     ) => void;
     onEnter?: (file: IFile) => void;
 }) {
+    const { copyData, setCopyData } = useAppStore();
     const searching = useMemo(() => isSearchUri(cwd), [cwd]);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: just init run
@@ -65,6 +69,12 @@ export default function FilesviewBase({
         console.debug("FilesviewBase: newFileUrl", newFileUrl);
         setCwd(newFileUrl);
     });
+    const onPaste = useMemoizedFn(async () => {
+        if (!copyData) return;
+
+        await handlePaste(copyData, cwd);
+        getCwdFiles();
+    });
 
     return (
         <div className={`filesviewBase ${className || ""}`} style={style}>
@@ -83,7 +93,7 @@ export default function FilesviewBase({
             <Filelist
                 className="filesviewBaseFilelist"
                 posix={true}
-                fileUri={cwd}
+                cwd={cwd}
                 data={files}
                 enableParentFile={!searching}
                 loading={loading}
@@ -91,6 +101,8 @@ export default function FilesviewBase({
                 onFileDoubleClick={onFileDoubleClick}
                 onContextMenu={onContextMenu}
                 onEnter={onEnter}
+                onCopy={setCopyData}
+                onPaste={onPaste}
             />
         </div>
     );

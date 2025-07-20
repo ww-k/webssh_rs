@@ -4,6 +4,7 @@ import { create } from "zustand";
 import i18n from "@/i18n";
 
 import type { TabPaneProps } from "antd";
+import type { IFileListCopyEvent } from "./components/Filelist/types";
 
 export interface ITab
     extends Omit<TabPaneProps, "tab" | "children" | "closeIcon" | "icon"> {
@@ -19,6 +20,9 @@ type AppStore = {
     addTab: () => void;
     removeTab: (key: string) => void;
     setTabPath: (key: string, path: string, label?: string) => void;
+
+    copyData?: IFileListCopyEvent;
+    setCopyData: (data: IFileListCopyEvent) => void;
 };
 
 const useAppStore = create<AppStore>((set) => {
@@ -74,6 +78,10 @@ const useAppStore = create<AppStore>((set) => {
                 });
                 return { tabs: newTabs };
             }),
+
+        copyData: undefined,
+        setCopyData: (data: IFileListCopyEvent) =>
+            set({ copyData: data }),
     };
 });
 

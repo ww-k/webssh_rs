@@ -23,9 +23,7 @@ export interface IFileListDragDropEvent<T = File | IFile> extends Event {
 }
 
 export interface IFileListCopyEvent {
-    copyTarget: {
-        fileUri: string;
-        files: IFile[];
-        type: "cut" | "copy";
-    };
+    fileUri: string;
+    files: IFile[];
+    type: "cut" | "copy";
 }

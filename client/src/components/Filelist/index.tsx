@@ -25,13 +25,12 @@ const LAYOUT_ROW_HEIGHT = 24;
 interface IProps {
     className?: string;
     data: IFile[];
-    fileUri: string;
+    cwd: string;
     loading?: boolean;
     draggable?: boolean;
     emptyContent?: React.ReactNode | (() => React.ReactNode);
     enableCheckbox?: boolean;
     enableParentFile?: boolean;
-    pasteData?: IFileListCopyEvent;
     sortByDefault?: string;
     sortOrderDefault?: "ascend" | "descend";
     posix?: boolean;
@@ -47,7 +46,7 @@ interface IProps {
     onEnter?: (file: IFile) => void;
     onDelete?: (files: IFile[]) => void;
     onCopy?: (evt: IFileListCopyEvent) => void;
-    onPaste?: (evt: IFileListCopyEvent) => void;
+    onPaste?: () => void;
     onCut?: () => void;
     onRename?: (file: IFile) => void;
     onColResize?: () => void;
@@ -74,21 +73,9 @@ export default class Filelist extends Component<IProps, IState> {
         className: "",
         data: [],
         draggable: false,
-        emptyContent: null,
         enableCheckbox: true,
         enableParentFile: false,
         loading: true,
-        pasteData: {},
-        onContextMenu: null,
-        onCopy: null,
-        onCut: null,
-        onDelete: null,
-        onDrop: null,
-        onEnter: null,
-        onFileClick: null,
-        onFileDoubleClick: null,
-        onPaste: null,
-        onSelecteChange: null,
     };
     rootElRef: React.RefObject<HTMLDivElement> = createRef();
     listTbodyRef: React.RefObject<Tbody> = createRef();
@@ -102,7 +89,7 @@ export default class Filelist extends Component<IProps, IState> {
     constructor(props: IProps) {
         super(props);
 
-        const parentUri = getParentDirUri(props.fileUri);
+        const parentUri = getParentDirUri(props.cwd);
         this.parentFile = {
             atime: 0,
             isDir: true,
@@ -127,7 +114,7 @@ export default class Filelist extends Component<IProps, IState> {
                 props.data,
                 ["isDir", sortByDefault],
                 ["desc", defaultOrder],
-                props.fileUri,
+                props.cwd,
                 props.enableParentFile || false,
             ),
             layoutColCheckboxWidth: props.enableCheckbox
@@ -153,11 +140,8 @@ export default class Filelist extends Component<IProps, IState> {
     componentDidUpdate(prevProps: IProps) {
         const nextProps = this.props;
 
-        if (
-            prevProps.fileUri !== nextProps.fileUri &&
-            nextProps.enableParentFile
-        ) {
-            this.parentFile.uri = getParentDirUri(nextProps.fileUri);
+        if (prevProps.cwd !== nextProps.cwd && nextProps.enableParentFile) {
+            this.parentFile.uri = getParentDirUri(nextProps.cwd);
             this.listTheaderRef.current?.unselectAll();
         }
 
@@ -171,7 +155,7 @@ export default class Filelist extends Component<IProps, IState> {
                     this.state.sortOrderAscend ? "desc" : "asc",
                     this.state.sortOrderAscend ? "asc" : "desc",
                 ],
-                nextProps.fileUri,
+                nextProps.cwd,
                 nextProps.enableParentFile || false,
             );
             if (this._active_path) {
@@ -258,7 +242,7 @@ export default class Filelist extends Component<IProps, IState> {
     render() {
         const {
             className,
-            fileUri,
+            cwd,
             loading,
             draggable,
             emptyContent,
@@ -324,7 +308,7 @@ export default class Filelist extends Component<IProps, IState> {
                         ref={this.listTbodyRef}
                         columns={columns}
                         data={data}
-                        fileUri={fileUri}
+                        cwd={cwd}
                         activeKey={activeKey}
                         draggable={draggable}
                         enableCheckbox={enableCheckbox}
@@ -383,11 +367,11 @@ export default class Filelist extends Component<IProps, IState> {
         data: IFile[],
         iteratees: string[],
         orders: ("asc" | "desc")[],
-        fileUri: string,
+        cwd: string,
         enableParentFile: boolean,
     ) {
         const newData = orderBy(data, iteratees, orders);
-        if (this.parentFile.uri !== fileUri && enableParentFile) {
+        if (this.parentFile.uri !== cwd && enableParentFile) {
             newData.unshift(this.parentFile);
         }
         return newData;
@@ -476,20 +460,18 @@ export default class Filelist extends Component<IProps, IState> {
      */
     handleCopy(isCut?: boolean) {
         const { selected } = this.state;
-        const { onCopy, fileUri } = this.props;
+        const { onCopy, cwd: fileUri } = this.props;
         if (selected.length === 1 && selected[0].name === "..") {
             return;
         }
 
         if (selected.length > 0) {
-            const pasteData: IFileListCopyEvent = {
-                copyTarget: {
-                    files: selected,
-                    fileUri,
-                    type: isCut ? "cut" : "copy",
-                },
+            const copyData: IFileListCopyEvent = {
+                files: selected,
+                fileUri,
+                type: isCut ? "cut" : "copy",
             };
-            onCopy?.(pasteData);
+            onCopy?.(copyData);
         }
     }
 
@@ -497,16 +479,7 @@ export default class Filelist extends Component<IProps, IState> {
      * 选中ctrl+v
      */
     handlePaste() {
-        const { onPaste, pasteData } = this.props;
-        if (
-            onPaste &&
-            pasteData &&
-            pasteData.copyTarget &&
-            Array.isArray(pasteData.copyTarget.files) &&
-            pasteData.copyTarget.files.length > 0
-        ) {
-            onPaste(pasteData);
-        }
+        this.props.onPaste?.();
     }
 
     /**
@@ -551,7 +524,7 @@ export default class Filelist extends Component<IProps, IState> {
      */
     fileDoubleClickHandle(file: IFile) {
         if (file.name === "..") {
-            this._active_path = this.props.fileUri;
+            this._active_path = this.props.cwd;
         }
         const { onFileDoubleClick } = this.props;
         onFileDoubleClick?.(file);
@@ -603,7 +576,7 @@ export default class Filelist extends Component<IProps, IState> {
         }
 
         if (selected[0] === this.parentFile) {
-            this._active_path = this.props.fileUri;
+            this._active_path = this.props.cwd;
         }
 
         const { onEnter } = this.props;
@@ -634,7 +607,7 @@ export default class Filelist extends Component<IProps, IState> {
                 props.data,
                 ["isDir", sortBy],
                 [ascend ? "desc" : "asc", ascend ? "asc" : "desc"],
-                props.fileUri,
+                props.cwd,
                 props.enableParentFile || false,
             ),
             selected: EMPTY_FILE_ARR,

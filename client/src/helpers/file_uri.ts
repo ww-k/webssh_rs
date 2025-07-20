@@ -10,6 +10,28 @@ export function isFileUri(uri: string) {
 
 /**
  * uri: sftp:1:/Users/test
+ * return: {protocal: "sftp", targetId: 1, path: "/Users/test"}
+ */
+export function parseSftpUri(uri: string) {
+    if (!isSftpFileUri(uri)) {
+        return;
+    }
+    const arr = uri.split(":");
+    const protocal = arr[0];
+    const targetId = parseInt(arr[1]);
+    const path = arr.slice(2).join(":");
+    if (Number.isNaN(targetId)) {
+        return;
+    }
+    return {
+        protocal,
+        targetId,
+        path,
+    };
+}
+
+/**
+ * uri: sftp:1:/Users/test
  * return: /Users/test
  */
 export function getFilePath(uri: string) {

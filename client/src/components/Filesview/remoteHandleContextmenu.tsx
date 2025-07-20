@@ -20,6 +20,7 @@ import { isMac } from "@/helpers/platform";
 import transferService from "@/services/transfer";
 
 import popContextMenu from "../Contextmenu";
+import handlePaste from "./handlePaste";
 
 import type { IFile } from "@/types";
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
@@ -29,9 +30,10 @@ export default function remoteHandleContextmenu(
     files: IFile[] | null,
     evt: MouseEvent | React.MouseEvent,
     context: {
-        pasteData?: IFileListCopyEvent;
+        copyData?: IFileListCopyEvent;
         fileUri: string;
         getCwdFiles: () => void;
+        setCopyData: (data: IFileListCopyEvent) => void;
     },
 ) {
     const menus: IContextmenuDataItem[] = [];
@@ -48,12 +50,13 @@ export default function remoteHandleContextmenu(
         });
         menus.push({
             label: "查看/编辑",
-            disabled: !(
-                Array.isArray(files) &&
-                files.length === 1 &&
-                files[0].type === "f" &&
-                files[0].size < 20971520
-            ),
+            disabled: true,
+            // disabled: !(
+            //     Array.isArray(files) &&
+            //     files.length === 1 &&
+            //     files[0].type === "f" &&
+            //     files[0].size < 20971520
+            // ),
             click: () => {
                 // TODO:
             },
@@ -62,15 +65,24 @@ export default function remoteHandleContextmenu(
         menus.push({
             label: "剪切",
             click: () => {
-                // TODO:
+                context.setCopyData({
+                    fileUri: context.fileUri,
+                    files,
+                    type: "cut",
+                });
             },
             iconRender: () => <ScissorOutlined />,
             tooltip: isMac ? "⌘+X" : "Ctrl+X",
         });
         menus.push({
             label: "复制",
+            disabled: true,
             click: () => {
-                // TODO:
+                context.setCopyData({
+                    fileUri: context.fileUri,
+                    files,
+                    type: "copy",
+                });
             },
             iconRender: () => <CopyOutlined />,
             tooltip: isMac ? "⌘+C" : "Ctrl+C",
@@ -142,7 +154,7 @@ export default function remoteHandleContextmenu(
                 if (!newName) {
                     return;
                 }
-                await postSftpMkdir(context.fileUri + "/" + newName);
+                await postSftpMkdir(`${context.fileUri}/${newName}`);
                 context.getCwdFiles();
             },
             iconRender: () => <FolderAddOutlined />,
@@ -150,12 +162,15 @@ export default function remoteHandleContextmenu(
         menus.push({
             label: "粘贴",
             disabled: !(
-                context.pasteData?.copyTarget &&
-                Array.isArray(context.pasteData.copyTarget.files) &&
-                context.pasteData.copyTarget.files.length > 0
+                context.copyData &&
+                Array.isArray(context.copyData.files) &&
+                context.copyData.files.length > 0
             ),
-            click: () => {
-                // TODO:
+            click: async () => {
+                if (!context.copyData) return;
+
+                await handlePaste(context.copyData, context.fileUri);
+                context.getCwdFiles();
             },
             iconRender: () => <FileDoneOutlined />,
             tooltip: isMac ? "⌘+V" : "Ctrl+V",
