@@ -10,13 +10,13 @@ use russh::{
     client::DisconnectReason,
     keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, decode_secret_key, ssh_key},
 };
-use sea_orm::EntityTrait;
 use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::{
     AppState,
     entities::target::{self, TargetAuthMethod},
+    services::target::get_target_by_id,
 };
 
 struct SshClientHandler {
@@ -82,30 +82,13 @@ impl SshClient {
     }
 
     async fn new_connect(&self) -> Result<russh::client::Handle<SshClientHandler>> {
-        let target = self.get_target().await?;
+        let target = get_target_by_id(&self.app_state.db, self.target_id).await?;
         debug!("SshClient: {} get target: {:?}", self.id, target);
 
         let ssh_client_handle = self.connect_target(target).await?;
         debug!("SshClient: {} target connected", self.id);
 
         Ok(ssh_client_handle)
-    }
-
-    async fn get_target(&self) -> Result<target::Model> {
-        let result = target::Entity::find_by_id(self.target_id)
-            .one(&self.app_state.db)
-            .await;
-
-        if let Err(db_err) = result {
-            anyhow::bail!("Failed to get target {:?}", db_err);
-        }
-
-        let model = result.unwrap();
-        if model.is_none() {
-            anyhow::bail!("no target found");
-        }
-
-        Ok(model.unwrap())
     }
 
     async fn connect_target(

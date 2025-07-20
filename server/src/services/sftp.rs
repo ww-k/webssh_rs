@@ -17,10 +17,10 @@ use russh_sftp::{
     protocol::{FileAttributes, FileType},
 };
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
+use tokio::io::AsyncReadExt;
 use tracing::{debug, info};
 
-use crate::{AppState, ssh_session_pool::SshSessionPool};
+use crate::{AppState, services::target::get_target_by_id, ssh_session_pool::SshSessionPool};
 use crate::{consts::services_err_code::*, ssh_session_pool::SshChannelGuard};
 
 use super::ApiErr;
@@ -54,6 +54,7 @@ pub(crate) fn svc_sftp_router_builder(
 
 const URI_SEP: &str = ":";
 const PATH_SEP: &str = "/";
+const WINDOWS: &str = "windows";
 
 #[derive(Serialize)]
 pub struct SftpFile {
@@ -347,8 +348,8 @@ macro_rules! map_ssh_err {
 }
 
 fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri, ApiErr> {
-    let sftp_file_uri = SftpFileUri::from_str(file_uri_str);
-    sftp_file_uri.ok_or(ApiErr {
+    let uri = SftpFileUri::from_str(file_uri_str);
+    uri.ok_or(ApiErr {
         code: ERR_CODE_SFTP_INVALID_URI,
         message: "invalid uri".to_string(),
     })
@@ -423,18 +424,22 @@ async fn ssh_exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
 async fn sftp_home(
     State(state): State<Arc<AppStateWrapper>>,
     Query(payload): Query<SftpTargetPayload>,
-) -> Result<Json<String>, ApiErr> {
+) -> Result<String, ApiErr> {
     info!("@sftp_home {:?}", payload);
 
+    let target = map_ssh_err!(get_target_by_id(&state.app_state.db, payload.target_id).await)?;
     let channel = map_ssh_err!(state.session_pool.get(payload.target_id).await)?;
-    // TODO: 如果target.system 为windows，返回/C:
+    if target.system.as_deref() == Some(WINDOWS) {
+        return Ok("/C:".to_string());
+    }
+
     let home_path = ssh_exec(channel, "pwd").await?;
     let home_path = home_path.trim().to_string();
     // TODO: 缓存，存入SftpSvcSession
 
     debug!("@sftp_home home_path: {}", home_path);
 
-    Ok(Json(home_path))
+    Ok(home_path)
 }
 
 async fn sftp_ls(
@@ -443,9 +448,9 @@ async fn sftp_ls(
 ) -> Result<Json<Vec<SftpFile>>, ApiErr> {
     info!("@sftp_ls {:?}", payload);
 
-    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
-    let read_dir = map_ssh_err!(sftp.read_dir(sftp_file_uri.path).await)?;
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, uri.target_id).await?;
+    let read_dir = map_ssh_err!(sftp.read_dir(uri.path).await)?;
 
     debug!("@sftp_ls sftp.read_dir {:?}", payload);
 
@@ -471,9 +476,9 @@ async fn sftp_mkdir(
 ) -> Result<(), ApiErr> {
     info!("@sftp_mkdir {:?}", payload);
 
-    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
-    let _ = map_ssh_err!(sftp.create_dir(sftp_file_uri.path).await)?;
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, uri.target_id).await?;
+    let _ = map_ssh_err!(sftp.create_dir(uri.path).await)?;
 
     debug!("@sftp_mkdir sftp.create_dir done {:?}", payload);
 
@@ -486,10 +491,10 @@ async fn sftp_stat(
 ) -> Result<Json<SftpFile>, ApiErr> {
     info!("@sftp_stat {:?}", payload);
 
-    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
-    let attr = map_ssh_err!(sftp.metadata(sftp_file_uri.path).await)?;
-    let file = SftpFile::from_name_attrs(get_file_name(sftp_file_uri.path), attr);
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, uri.target_id).await?;
+    let attr = map_ssh_err!(sftp.metadata(uri.path).await)?;
+    let file = SftpFile::from_name_attrs(get_file_name(uri.path), attr);
     Ok(Json(file))
 }
 
@@ -499,12 +504,9 @@ async fn sftp_rename(
 ) -> Result<(), ApiErr> {
     info!("@sftp_rename {:?}", payload);
 
-    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
-    let _ = map_ssh_err!(
-        sftp.rename(sftp_file_uri.path, payload.new_path.as_str())
-            .await
-    )?;
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, uri.target_id).await?;
+    let _ = map_ssh_err!(sftp.rename(uri.path, payload.new_path.as_str()).await)?;
 
     debug!("@sftp_rename sftp.rename done {:?}", payload);
 
@@ -517,9 +519,9 @@ async fn sftp_rm(
 ) -> Result<(), ApiErr> {
     info!("@sftp_rm {:?}", payload);
 
-    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
-    let _ = map_ssh_err!(sftp.remove_file(sftp_file_uri.path).await)?;
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, uri.target_id).await?;
+    let _ = map_ssh_err!(sftp.remove_file(uri.path).await)?;
 
     debug!("@sftp_rm sftp.remove_file done {:?}", payload);
 
@@ -532,19 +534,16 @@ async fn sftp_rm_rf(
 ) -> Result<(), ApiErr> {
     info!("@sftp_rm_rf {:?}", payload);
 
-    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
-    let channel = map_ssh_err!(state.session_pool.get(sftp_file_uri.target_id).await)?;
-    ssh_exec(
-        channel,
-        format!(r#"rm -rf "{}""#, sftp_file_uri.path).as_str(),
-    )
-    .await?;
-    // TODO: 如果target.system 为windows，使用rd /s /q "D:\temp\test"命令， sftp_file_uri.path路径需要转换
-    // ssh_exec(
-    //     channel,
-    //     format!(r#"rmdir /s /q "{}""#, sftp_file_uri.path).as_str(),
-    // )
-    // .await?;
+    let uri: SftpFileUri<'_> = parse_file_uri(payload.uri.as_str())?;
+    let target = map_ssh_err!(get_target_by_id(&state.app_state.db, uri.target_id).await)?;
+    let channel = map_ssh_err!(state.session_pool.get(uri.target_id).await)?;
+
+    if target.system.as_deref() == Some(WINDOWS) {
+        let file_path = uri.path[1..].replace("/", "\\");
+        ssh_exec(channel, format!(r#"rd /s /q "{}""#, file_path).as_str()).await?;
+    } else {
+        ssh_exec(channel, format!(r#"rm -rf "{}""#, uri.path).as_str()).await?;
+    }
 
     debug!("@sftp_rm_rf done {:?}", payload);
 
@@ -573,15 +572,15 @@ async fn sftp_download(
 ) -> Result<impl IntoResponse, ApiErr> {
     info!("@sftp_download {:?}", payload);
 
-    let sftp_file_uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = get_sftp_session(state, sftp_file_uri.target_id).await?;
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, uri.target_id).await?;
 
     // 获取文件信息
-    let stat = map_ssh_err!(sftp.metadata(sftp_file_uri.path).await)?;
-    let file_name = sftp_file_uri.path.split('/').last().unwrap_or("download");
+    let stat = map_ssh_err!(sftp.metadata(uri.path).await)?;
+    let file_name = uri.path.split('/').last().unwrap_or("download");
 
     // 读取文件内容
-    let mut file = map_ssh_err!(sftp.open(sftp_file_uri.path).await)?;
+    let mut file = map_ssh_err!(sftp.open(uri.path).await)?;
     let mut buffer = Vec::new();
     map_ssh_err!(file.read_to_end(&mut buffer).await)?;
 

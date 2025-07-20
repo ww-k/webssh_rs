@@ -5,7 +5,7 @@ use axum::{
     extract::State,
     routing::{get, post},
 };
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait};
 use serde::Deserialize;
 
 use crate::{AppState, entities::target};
@@ -118,4 +118,20 @@ async fn target_remove(
             message: format!("Failed to remove target: {}", e),
         }),
     }
+}
+
+pub async fn get_target_by_id(
+    db: &DatabaseConnection,
+    target_id: i32,
+) -> anyhow::Result<target::Model> {
+    let result = target::Entity::find_by_id(target_id)
+        .one(db)
+        .await
+        .map_err(|db_err| anyhow::format_err!("Failed to get target {:?}", db_err))?;
+
+    if result.is_none() {
+        anyhow::bail!("no target found");
+    }
+
+    Ok(result.unwrap())
 }
