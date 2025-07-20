@@ -15,7 +15,8 @@ export default function FilesviewBase({
     style,
     files,
     cwd,
-    cwdUri,
+    history,
+    loading,
     setCwd,
     getHome,
     getDirs,
@@ -30,7 +31,8 @@ export default function FilesviewBase({
     style?: React.CSSProperties;
     files: IFile[];
     cwd: string;
-    cwdUri: string;
+    history?: string[];
+    loading: boolean;
     setCwd: (cwd: string) => void;
     getHome: () => Promise<string>;
     getDirs?: (fileUrlOrPath: string) => Promise<IFile[]>;
@@ -43,9 +45,7 @@ export default function FilesviewBase({
         evt: MouseEvent | React.MouseEvent,
     ) => void;
     onEnter?: (file: IFile) => void;
-    [key: string]: unknown;
 }) {
-    const [pathHistory, setPathHistory] = useState<string[]>([]);
     const searching = useMemo(() => isSearchUri(cwd), [cwd]);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: just init run
@@ -56,14 +56,13 @@ export default function FilesviewBase({
     // biome-ignore lint/correctness/useExhaustiveDependencies: false
     useEffect(() => {
         getCwdFiles();
-    }, [cwdUri]);
+    }, [cwd]);
 
     const onPathChange = useMemoizedFn((newFileUrl: string) => {
         if (newFileUrl === cwd) {
             return;
         }
         console.debug("FilesviewBase: newFileUrl", newFileUrl);
-        setPathHistory((history) => [newFileUrl, ...history]);
         setCwd(newFileUrl);
     });
 
@@ -74,8 +73,8 @@ export default function FilesviewBase({
                 posix={true}
                 cwd={cwd}
                 quickLinks={[]}
-                history={pathHistory}
-                enableSearch={true}
+                history={history}
+                enableSearch={false}
                 getDirs={getDirs}
                 getQuickLinks={getQuickLinks}
                 getCwdFiles={getCwdFiles}
@@ -84,10 +83,10 @@ export default function FilesviewBase({
             <Filelist
                 className="filesviewBaseFilelist"
                 posix={true}
-                fileUri={cwdUri}
+                fileUri={cwd}
                 data={files}
                 enableParentFile={!searching}
-                loading={false}
+                loading={loading}
                 onSelecteChange={onSelecteChange}
                 onFileDoubleClick={onFileDoubleClick}
                 onContextMenu={onContextMenu}

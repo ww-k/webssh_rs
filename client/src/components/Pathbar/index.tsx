@@ -21,7 +21,7 @@ import i18n from "@/i18n";
 
 import "./index.css";
 
-import { getFilePath } from "@/helpers/file_uri";
+import { getFilePath, isSftpFileUri } from "@/helpers/file_uri";
 
 import { buildSearchUri, isSearchUri, parseSearchUri } from "./search";
 
@@ -469,7 +469,12 @@ export default class Pathbar extends Component<IProps, IState> {
                             <DownOutlined />
                         </button>
                     </div>
-                    <ul className="pathbarDropdownMenu">
+                    <ul
+                        className="pathbarDropdownMenu"
+                        style={{
+                            display: historyOpen ? "block" : "none",
+                        }}
+                    >
                         {history.map((item) => (
                             <li key={item.path}>
                                 <div
@@ -789,10 +794,15 @@ export default class Pathbar extends Component<IProps, IState> {
         let fullpath = "";
         let title = "";
 
+        if (isSftpFileUri(cwd)) {
+            fullpath = arr[0];
+            arr[0] = "";
+        }
+
         routes.push({
             name: "/",
             title: "/",
-            path: "/",
+            path: `${fullpath}/`,
             link: true,
         });
 
@@ -833,13 +843,15 @@ export default class Pathbar extends Component<IProps, IState> {
 
     generateHisotory(data: string[]) {
         return data.map((item) => {
-            const name = item;
+            let name = item;
 
             if (isSearchUri(item)) {
                 return {
                     name: this.generateSearchDisplay(item),
                     path: item,
                 };
+            } else if (isSftpFileUri(item)) {
+                name = getFilePath(item);
             }
 
             return {
@@ -962,7 +974,9 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     getFileFullpath(fileUrlOrPath: string) {
-        // @TODO: fileUrl
+        if (isSftpFileUri(fileUrlOrPath)) {
+            return getFilePath(fileUrlOrPath);
+        }
         return fileUrlOrPath;
     }
 

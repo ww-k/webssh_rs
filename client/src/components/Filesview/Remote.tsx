@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemoizedFn, useRequest } from "ahooks";
+import { useState } from "react";
 
 import "./index.css";
 
-import { useMemoizedFn } from "ahooks";
-
-import { getSftpHome, getSftpLs } from "@/api/sftp";
-import { getFilePath } from "@/helpers/file_uri";
+import { getSftpHome } from "@/api/sftp";
+import { isSftpFileUri } from "@/helpers/file_uri";
+import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
 
 import { isSearchUri } from "../Pathbar/search";
 import FilesviewBase from "./Base";
@@ -62,7 +62,7 @@ const mockFiles: IFile[] = import.meta.env.DEV
       ]
     : [];
 
-const mockCwd = import.meta.env.DEV ? "/Users/test/Downloads" : "";
+const mockCwd = import.meta.env.DEV ? "sftp:1:/Users/test/Downloads" : "";
 
 export default function FilesviewRemote({
     baseUrl,
@@ -72,34 +72,88 @@ export default function FilesviewRemote({
     targetId: number;
 }) {
     const [cwd, setCwd] = useState(mockCwd);
-    const cwdUri = useMemo(() => `${baseUrl}${cwd}`, [baseUrl, cwd]);
-    const [files, setFiles] = useState<IFile[]>(mockFiles);
+    const [pathHistory, setPathHistory] = useState<string[]>([]);
 
-    const getCwdFiles = useMemoizedFn(async () => {
-        if (isSearchUri(cwdUri)) {
-            //TODO:
-            return;
-        }
-        const sftpFiles = await getSftpLs(cwdUri);
-        const files: IFile[] = sftpFiles.map((item) => ({
-            ...item,
-            mtime: item.mtime * 1000,
-            atime: item.atime * 1000,
-            isDir: item.type === "d",
-            uri: `${cwdUri}/${item.name}`,
-            sortName: item.name.toLowerCase(),
-        }));
-        setFiles(files);
+    const pushPathHistory = useMemoizedFn((newPath: string) => {
+        setPathHistory((history) => {
+            const index = history.indexOf(newPath);
+            if (index === 0) {
+                return history;
+            } else if (index > 0) {
+                history.splice(index, 1);
+            }
+            if (history.length >= 20) {
+                history.length = 19;
+            }
+            return [newPath, ...history];
+        });
     });
+    const setCwdUri = useMemoizedFn((pathOrUri: string) => {
+        let uri = pathOrUri;
+        if (!isSearchUri(pathOrUri) && !isSftpFileUri(pathOrUri)) {
+            uri = `${baseUrl}${pathOrUri}`;
+        }
+        setCwd(uri);
+        pushPathHistory(uri);
+    });
+
+    const {
+        data: files = mockFiles,
+        loading,
+        run: getCwdFiles,
+    } = useRequest(
+        async () => {
+            if (isSearchUri(cwd)) {
+                //TODO:
+                return [];
+            }
+            return await getSftpLsMapFiles(cwd);
+        },
+        {
+            manual: true,
+        },
+    );
+
     const getHome = useMemoizedFn(() => getSftpHome(targetId));
+    const getDirs = useMemoizedFn(async (fileUrl: string) => {
+        const files = await getSftpLsMapFiles(fileUrl);
+        return files.filter((file) => file.isDir);
+    });
+    const getQuickLinks = useMemoizedFn(async () => {
+        // TODO:
+        return [
+            {
+                name: "/",
+                path: "/",
+            },
+            {
+                name: "Home",
+                path: "/Users/test",
+            },
+            {
+                name: "Desktop",
+                path: "/Users/test/Desktop",
+            },
+            {
+                name: "Documents",
+                path: "/Users/test/Documents",
+            },
+            {
+                name: "Downloads",
+                path: "/Users/test/Downloads",
+            },
+        ];
+    });
     const onFileDoubleClick = useMemoizedFn((file: IFile) => {
         if (file.isDir) {
-            setCwd(getFilePath(file.uri));
+            setCwd(file.uri);
+            pushPathHistory(file.uri);
         }
     });
     const onEnter = useMemoizedFn((file: IFile) => {
         if (file.isDir) {
-            setCwd(getFilePath(file.uri));
+            setCwd(file.uri);
+            pushPathHistory(file.uri);
         }
     });
 
@@ -107,49 +161,17 @@ export default function FilesviewRemote({
         <div className="filesview">
             <FilesviewBase
                 cwd={cwd}
-                cwdUri={cwdUri}
+                history={pathHistory}
                 files={files}
-                targetId={targetId}
-                getDirs={(fileUrl) => {
-                    console.debug("FilesviewBase: getDirs", fileUrl);
-                    return new Promise((resolve) => {
-                        setTimeout(() => {
-                            resolve(
-                                mockFiles.filter((item) => item.type === "d"),
-                            );
-                        }, 1000);
-                    });
-                }}
-                getQuickLinks={async () => {
-                    return [
-                        {
-                            name: "/",
-                            path: "/",
-                        },
-                        {
-                            name: "Home",
-                            path: "/Users/test",
-                        },
-                        {
-                            name: "Desktop",
-                            path: "/Users/test/Desktop",
-                        },
-                        {
-                            name: "Documents",
-                            path: "/Users/test/Documents",
-                        },
-                        {
-                            name: "Downloads",
-                            path: "/Users/test/Downloads",
-                        },
-                    ];
-                }}
-                setCwd={setCwd}
+                loading={loading}
+                setCwd={setCwdUri}
+                getDirs={getDirs}
+                getQuickLinks={getQuickLinks}
                 getHome={getHome}
                 getCwdFiles={getCwdFiles}
                 onContextMenu={(files, evt) => {
                     handleContextmenu(files, evt, {
-                        fileUri: cwdUri,
+                        fileUri: cwd,
                         getCwdFiles,
                     });
                 }}

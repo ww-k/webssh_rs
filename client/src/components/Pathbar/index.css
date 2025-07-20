@@ -125,8 +125,6 @@
     box-shadow: none;
 }
 
-
-
 .pathbarRoute:hover {
     box-sizing: border-box;
     background-color: #e5f3ff;
@@ -171,7 +169,6 @@
     font-weight: normal;
 }
 
-
 .pathbarRouteListDisable .pathbarRouteNameLink {
     color: #333;
     text-decoration: none;
@@ -214,6 +211,7 @@
 }
 
 .pathbarDropdownMenu {
+    position: absolute;
     z-index: 1050;
     display: none;
     width: 100%;
@@ -253,7 +251,6 @@
 }
 
 .pathbarDropdownMenuDirMenu {
-    position: absolute;
     top: 29px;
     left: 0;
     width: 170px;
