@@ -118,8 +118,8 @@ export default function TargetEditor({
                                 setRequirePassword(result === 2);
                                 return result === 0
                                     ? Promise.reject(
-                                        new Error("Invalid private key"),
-                                    )
+                                          new Error("Invalid private key"),
+                                      )
                                     : Promise.resolve();
                             },
                         },
@@ -152,6 +152,21 @@ export default function TargetEditor({
                         max={65535}
                         placeholder="22"
                         style={{ width: "100%" }}
+                    />
+                </Form.Item>
+                <Form.Item name="system" label={t("target_system")}>
+                    <Select
+                        placeholder="Linux"
+                        options={[
+                            {
+                                label: "Linux",
+                                value: "",
+                            },
+                            {
+                                label: "Windows",
+                                value: "windows",
+                            },
+                        ]}
                     />
                 </Form.Item>
                 <Form.Item>

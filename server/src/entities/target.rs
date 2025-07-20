@@ -82,6 +82,7 @@ pub struct Model {
     pub user: String,
     pub key: Option<String>,
     pub password: Option<String>,
+    /// windows and other
     pub system: Option<String>,
 }
 

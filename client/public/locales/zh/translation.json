@@ -22,5 +22,6 @@
     "target_private_key": "私钥",
     "target_save_and_connect": "保存并连接",
     "target_select": "选择目标",
-    "target_user": "用户"
+    "target_user": "用户",
+    "target_system": "系统"
 }

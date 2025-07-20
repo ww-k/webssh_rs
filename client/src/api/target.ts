@@ -8,6 +8,7 @@ export interface ITarget {
     user: string;
     key?: string;
     password?: string;
+    system?: string;
 }
 
 export async function getTargetList() {

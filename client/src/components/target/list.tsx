@@ -73,6 +73,20 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 dataIndex: "port",
                 key: "port",
                 width: 80,
+                render: (text) =>
+                    text || (
+                        <div className="targetListTablePlaceholder">22</div>
+                    ),
+            },
+            {
+                title: t("target_system"),
+                dataIndex: "system",
+                key: "system",
+                width: 100,
+                render: (text) =>
+                    text || (
+                        <div className="targetListTablePlaceholder">Linux</div>
+                    ),
             },
             {
                 title: t("app_common_action"),
