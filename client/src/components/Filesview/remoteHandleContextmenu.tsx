@@ -10,17 +10,18 @@ import {
     ScissorOutlined,
     UploadOutlined,
 } from "@ant-design/icons";
-import { Modal } from "antd";
 
-import { postSftpMkdir, postSftpRename, postSftpRm, postSftpRmRf } from "@/api";
-import { getFilePath } from "@/helpers/file_uri";
 import openNativeFileSelector from "@/helpers/openNativeFileSelector";
-import { posix } from "@/helpers/path";
 import { isMac } from "@/helpers/platform";
 import transferService from "@/services/transfer";
 
 import popContextMenu from "../Contextmenu";
-import handlePaste from "./handlePaste";
+import {
+    handleDelete,
+    handleMkdir,
+    handlePaste,
+    handleRename,
+} from "./remoteActions";
 
 import type { IFile } from "@/types";
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
@@ -32,7 +33,7 @@ export default function remoteHandleContextmenu(
     context: {
         copyData?: IFileListCopyEvent;
         fileUri: string;
-        getCwdFiles: () => void;
+        getCwdFiles: () => Promise<IFile[]>;
         setCopyData: (data: IFileListCopyEvent) => void;
     },
 ) {
@@ -91,22 +92,7 @@ export default function remoteHandleContextmenu(
             label: "删除",
             disabled: !files,
             click: async () => {
-                Modal.confirm({
-                    content: "删除后将不可恢复，确认删除吗?",
-                    okText: "删除",
-                    cancelText: "取消",
-                    okType: "danger",
-                    onOk: async () => {
-                        for (const file of files) {
-                            if (file.isDir) {
-                                await postSftpRmRf(file.uri);
-                            } else {
-                                await postSftpRm(file.uri);
-                            }
-                        }
-                        context.getCwdFiles();
-                    },
-                });
+                handleDelete(files, context.getCwdFiles);
             },
             iconRender: () => <DeleteOutlined />,
             tooltip: "Delete",
@@ -115,15 +101,7 @@ export default function remoteHandleContextmenu(
             label: "重命名",
             disabled: !(Array.isArray(files) && files.length === 1),
             click: async () => {
-                const newName = window.prompt("请输入文件名", files[0].name);
-                if (!newName) {
-                    return;
-                }
-
-                const filePath = getFilePath(files[0].uri);
-                const newPath = posix.resolve(filePath, `../${newName}`);
-                await postSftpRename(files[0].uri, newPath);
-                context.getCwdFiles();
+                handleRename(files[0], context.getCwdFiles);
             },
             iconRender: () => <EditOutlined />,
             tooltip: "F2",
@@ -149,13 +127,8 @@ export default function remoteHandleContextmenu(
         });
         menus.push({
             label: "创建文件夹",
-            click: async () => {
-                const newName = window.prompt("请输入文件夹名", "");
-                if (!newName) {
-                    return;
-                }
-                await postSftpMkdir(`${context.fileUri}/${newName}`);
-                context.getCwdFiles();
+            click: () => {
+                handleMkdir(context.fileUri, context.getCwdFiles);
             },
             iconRender: () => <FolderAddOutlined />,
         });
@@ -169,8 +142,11 @@ export default function remoteHandleContextmenu(
             click: async () => {
                 if (!context.copyData) return;
 
-                await handlePaste(context.copyData, context.fileUri);
-                context.getCwdFiles();
+                await handlePaste(
+                    context.copyData,
+                    context.fileUri,
+                    context.getCwdFiles,
+                );
             },
             iconRender: () => <FileDoneOutlined />,
             tooltip: isMac ? "⌘+V" : "Ctrl+V",

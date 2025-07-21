@@ -47,7 +47,6 @@ interface IProps {
     onDelete?: (files: IFile[]) => void;
     onCopy?: (evt: IFileListCopyEvent) => void;
     onPaste?: () => void;
-    onCut?: () => void;
     onRename?: (file: IFile) => void;
     onColResize?: () => void;
 }

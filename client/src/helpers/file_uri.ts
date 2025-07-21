@@ -47,9 +47,14 @@ export function getFilePath(uri: string) {
 /**
  * uri: sftp:1:/Users/test
  * return: sftp:1:/Users
+ * 最多到根目录
  */
 export function getParentDirUri(uri: string) {
     const items = uri.split("/");
-    items.pop();
+    if (items.length === 2) {
+        items[1] = "";
+    } else if (items.length > 2) {
+        items.pop();
+    }
     return items.join("/");
 }

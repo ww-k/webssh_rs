@@ -1,6 +1,10 @@
 import axios from "axios";
 
-import type { AxiosRequestConfig, GenericAbortSignal } from "axios";
+import type {
+    AxiosProgressEvent,
+    AxiosRequestConfig,
+    GenericAbortSignal,
+} from "axios";
 
 export interface ISftpFile {
     /** 文件名 */
@@ -81,7 +85,7 @@ export async function postSftpUpload(
         /** 文件总大小, 非分片大小 */
         size?: number;
         // browser only
-        onUploadProgress?: (progressEvent: any) => void;
+        onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
         signal?: GenericAbortSignal;
     },
 ) {

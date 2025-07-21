@@ -10,6 +10,7 @@ import useAppStore from "@/store";
 
 import { isSearchUri } from "../Pathbar/search";
 import FilesviewBase from "./Base";
+import { handleDelete, handleRename } from "./remoteActions";
 import handleContextmenu from "./remoteHandleContextmenu";
 
 import type { IFile } from "@/types";
@@ -102,7 +103,7 @@ export default function FilesviewRemote({
     const {
         data: files = mockFiles,
         loading,
-        run: getCwdFiles,
+        runAsync: getCwdFiles,
     } = useRequest(
         async () => {
             if (isSearchUri(cwd)) {
@@ -158,6 +159,12 @@ export default function FilesviewRemote({
             pushPathHistory(file.uri);
         }
     });
+    const onDelete = useMemoizedFn((files: IFile[]) => {
+        handleDelete(files, getCwdFiles);
+    });
+    const onRename = useMemoizedFn((file: IFile) => {
+        handleRename(file, getCwdFiles);
+    });
 
     return (
         <div className="filesview">
@@ -166,6 +173,7 @@ export default function FilesviewRemote({
                 history={pathHistory}
                 files={files}
                 loading={loading}
+                posix={true}
                 setCwd={setCwdUri}
                 getDirs={getDirs}
                 getQuickLinks={getQuickLinks}
@@ -181,6 +189,8 @@ export default function FilesviewRemote({
                 }}
                 onFileDoubleClick={onFileDoubleClick}
                 onEnter={onEnter}
+                onDelete={onDelete}
+                onRename={onRename}
             />
         </div>
     );

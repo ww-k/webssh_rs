@@ -43,8 +43,10 @@ export interface IQuickLink {
 interface IProps {
     className?: string;
     cwd: string;
+    history: string[];
     /** 是否是posix风格路径 */
     posix?: boolean;
+    /** 是否启用家图标 */
     enableHomeIcon?: boolean;
     /** 是否允许用户交互点击路径栏，显示下拉目录等 */
     enableReact?: boolean;
@@ -52,7 +54,6 @@ interface IProps {
     enableInput?: boolean;
     /** 是否允许搜索 */
     enableSearch?: boolean;
-    history: string[];
     getDirs?: (fileUrlOrPath: string) => Promise<IFile[]>;
     getQuickLinks?: () => Promise<IQuickLink[]>;
     getCwdFiles: () => void;
@@ -111,7 +112,6 @@ export default class Pathbar extends Component<IProps, IState> {
         className: "",
         cwd: "",
         history: [],
-        quickLinks: [],
         enableHomeIcon: true,
         enableReact: true,
         enableInput: true,

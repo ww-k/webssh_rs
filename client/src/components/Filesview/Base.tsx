@@ -9,9 +9,33 @@ import "./Base.css";
 import useAppStore from "@/store";
 
 import Filelist from "../Filelist";
-import handlePaste from "./handlePaste";
+import { handlePaste } from "./remoteActions";
 
 import type { IFile } from "@/types";
+
+type IProps = {
+    className?: string;
+    style?: React.CSSProperties;
+    files: IFile[];
+    cwd: string;
+    history?: string[];
+    loading: boolean;
+    posix?: boolean;
+    setCwd: (cwd: string) => void;
+    getHome: () => Promise<string>;
+    getDirs?: (fileUrlOrPath: string) => Promise<IFile[]>;
+    getQuickLinks?: () => Promise<IQuickLink[]>;
+    getCwdFiles: () => Promise<unknown>;
+    onSelecteChange?: (files: IFile[]) => void;
+    onFileDoubleClick?: (file: IFile) => void;
+    onContextMenu?: (
+        files: IFile[] | null,
+        evt: MouseEvent | React.MouseEvent,
+    ) => void;
+    onEnter?: (file: IFile) => void;
+    onDelete?: (files: IFile[]) => void;
+    onRename?: (file: IFile) => void;
+};
 
 export default function FilesviewBase({
     className,
@@ -20,35 +44,14 @@ export default function FilesviewBase({
     cwd,
     history,
     loading,
+    posix,
     setCwd,
     getHome,
     getDirs,
     getQuickLinks,
     getCwdFiles,
-    onContextMenu,
-    onSelecteChange,
-    onFileDoubleClick,
-    onEnter,
-}: {
-    className?: string;
-    style?: React.CSSProperties;
-    files: IFile[];
-    cwd: string;
-    history?: string[];
-    loading: boolean;
-    setCwd: (cwd: string) => void;
-    getHome: () => Promise<string>;
-    getDirs?: (fileUrlOrPath: string) => Promise<IFile[]>;
-    getQuickLinks?: () => Promise<IQuickLink[]>;
-    getCwdFiles: () => void;
-    onSelecteChange?: (files: IFile[]) => void;
-    onFileDoubleClick?: (file: IFile) => void;
-    onContextMenu?: (
-        files: IFile[] | null,
-        evt: MouseEvent | React.MouseEvent,
-    ) => void;
-    onEnter?: (file: IFile) => void;
-}) {
+    ...restProps
+}: IProps) {
     const { copyData, setCopyData } = useAppStore();
     const searching = useMemo(() => isSearchUri(cwd), [cwd]);
 
@@ -72,17 +75,15 @@ export default function FilesviewBase({
     const onPaste = useMemoizedFn(async () => {
         if (!copyData) return;
 
-        await handlePaste(copyData, cwd);
-        getCwdFiles();
+        await handlePaste(copyData, cwd, getCwdFiles);
     });
 
     return (
         <div className={`filesviewBase ${className || ""}`} style={style}>
             <Pathbar
                 className="filesviewBasePathbar"
-                posix={true}
+                posix={posix}
                 cwd={cwd}
-                quickLinks={[]}
                 history={history}
                 enableSearch={false}
                 getDirs={getDirs}
@@ -92,17 +93,14 @@ export default function FilesviewBase({
             />
             <Filelist
                 className="filesviewBaseFilelist"
-                posix={true}
+                posix={posix}
                 cwd={cwd}
                 data={files}
                 enableParentFile={!searching}
                 loading={loading}
-                onSelecteChange={onSelecteChange}
-                onFileDoubleClick={onFileDoubleClick}
-                onContextMenu={onContextMenu}
-                onEnter={onEnter}
                 onCopy={setCopyData}
                 onPaste={onPaste}
+                {...restProps}
             />
         </div>
     );
