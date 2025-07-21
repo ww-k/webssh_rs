@@ -1,10 +1,20 @@
 import { Modal } from "antd";
 
-import { postSftpMkdir, postSftpRename, postSftpRm, postSftpRmRf } from "@/api";
+import {
+    getSftpLs,
+    postSftpCp,
+    postSftpMkdir,
+    postSftpRename,
+    postSftpRm,
+    postSftpRmRf,
+} from "@/api";
 import { getFilePath, parseSftpUri } from "@/helpers/file_uri";
+import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
 import { posix } from "@/helpers/path";
 
 import renderBatchTaskProgressModal from "../BatchTaskProgressModal/render";
+import filesConflictConfirm from "./filesConflictConfirm";
+import generateCopyNewName from "./generateCopyNewName";
 
 import type { IFile } from "@/types";
 import type { IFileListCopyEvent } from "../Filelist/types";
@@ -20,7 +30,7 @@ export async function handleDelete(files: IFile[], getCwdFiles: IGetCwdFiles) {
         }
     }
     return new Promise<void>((resolve, reject) => {
-        Modal.confirm({
+        const modal = Modal.confirm({
             content: "删除后将不可恢复，确认删除吗?",
             okText: "删除",
             cancelText: "取消",
@@ -30,6 +40,7 @@ export async function handleDelete(files: IFile[], getCwdFiles: IGetCwdFiles) {
                     if (files.length === 1) {
                         await deleteFile(files[0]);
                     } else {
+                        modal.destroy();
                         await renderBatchTaskProgressModal<IFile>({
                             data: files,
                             action: (file) => deleteFile(file),
@@ -83,21 +94,53 @@ export async function handlePaste(
         throw new Error("targetId is not equal");
 
     switch (true) {
-        case copyData.type === "copy" && copyUri.path === pasteUri.path:
-            //TODO: same directory, copy a new file name
+        case copyData.type === "copy" && copyUri.path === pasteUri.path: {
+            const targetList = await getSftpLsMapFiles(pasteTarget);
+            const generateCopyNewPath = (file: IFile) => {
+                const newName = generateCopyNewName(targetList, file.name);
+                return `${pasteUri.path}/${newName}`;
+            };
+            const files = copyData.files;
+            if (files.length === 1) {
+                await postSftpCp(files[0].uri, generateCopyNewPath(files[0]));
+            } else {
+                await renderBatchTaskProgressModal<IFile>({
+                    data: files,
+                    action: (file) => {
+                        return postSftpCp(file.uri, generateCopyNewPath(file));
+                    },
+                    failsRender: () => "批量操作失败",
+                });
+            }
             break;
-        case copyData.type === "copy" && copyUri.path !== pasteUri.path:
-            //TODO: copy to another directory
+        }
+        case copyData.type === "copy" && copyUri.path !== pasteUri.path: {
+            const targetList = await getSftpLsMapFiles(pasteTarget);
+            const files = await filesConflictConfirm(
+                copyData.files,
+                targetList,
+            );
+            if (files.length === 1) {
+                await postSftpCp(files[0].uri, pasteUri.path);
+            } else {
+                await renderBatchTaskProgressModal<IFile>({
+                    data: files,
+                    action: (file) => postSftpCp(file.uri, pasteUri.path),
+                    failsRender: () => "批量操作失败",
+                });
+            }
             break;
+        }
         case copyData.type === "cut" && copyUri.path !== pasteUri.path: {
-            if (copyData.files.length === 1) {
+            const files = copyData.files;
+            if (files.length === 1) {
                 await postSftpRename(
-                    copyData.files[0].uri,
-                    `${pasteUri.path}/${copyData.files[0].name}`,
+                    files[0].uri,
+                    `${pasteUri.path}/${files[0].name}`,
                 );
             } else {
                 await renderBatchTaskProgressModal<IFile>({
-                    data: copyData.files,
+                    data: files,
                     action: (file) =>
                         postSftpRename(
                             file.uri,

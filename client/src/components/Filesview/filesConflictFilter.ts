@@ -5,7 +5,7 @@ import type { IFile } from "@/types";
  */
 export default function filesConflictFilter<T = File | IFile>(
     files: T[],
-    targetList: IFile[]
+    targetList: IFile[],
 ): T[] {
     const noSame: T[] = [];
     const dirNamesMap: Record<string, boolean> = {};
@@ -18,7 +18,7 @@ export default function filesConflictFilter<T = File | IFile>(
             const dirName = relativePath.split("/")[0];
             if (dirNamesMap[dirName] === undefined) {
                 dirNamesMap[dirName] = targetList.some(
-                    (item) => dirName === item.name
+                    (item) => dirName === item.name,
                 );
             }
             if (dirNamesMap[dirName] === false) {

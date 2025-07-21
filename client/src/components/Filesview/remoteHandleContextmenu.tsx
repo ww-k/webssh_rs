@@ -77,7 +77,6 @@ export default function remoteHandleContextmenu(
         });
         menus.push({
             label: "复制",
-            disabled: true,
             click: () => {
                 context.setCopyData({
                     fileUri: context.fileUri,

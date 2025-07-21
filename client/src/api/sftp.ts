@@ -48,11 +48,21 @@ export async function postSftpMkdir(uri: string) {
     return true;
 }
 
+export async function postSftpCp(uri: string, targetPath: string) {
+    await axios.post<boolean>("/api/sftp/cp", null, {
+        params: {
+            uri,
+            target_path: targetPath,
+        },
+    });
+    return true;
+}
+
 export async function postSftpRename(uri: string, newPath: string) {
     await axios.post<boolean>("/api/sftp/rename", null, {
         params: {
             uri,
-            new_path: newPath,
+            target_path: newPath,
         },
     });
     return true;

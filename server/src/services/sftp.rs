@@ -40,6 +40,7 @@ pub(crate) fn svc_sftp_router_builder(
         .route("/mkdir", post(sftp_mkdir))
         .route("/stat", get(sftp_stat))
         .route("/home", get(sftp_home))
+        .route("/cp", post(sftp_cp))
         .route("/rename", post(sftp_rename))
         .route("/rm", post(sftp_rm))
         .route("/rm/rf", post(sftp_rm_rf))
@@ -297,7 +298,7 @@ struct SftpLsPayload {
 #[derive(Debug, Deserialize)]
 struct SftpRenamePayload {
     uri: String,
-    new_path: String,
+    target_path: String,
 }
 
 #[derive(Debug)]
@@ -498,6 +499,32 @@ async fn sftp_stat(
     Ok(Json(file))
 }
 
+async fn sftp_cp(
+    State(state): State<Arc<AppStateWrapper>>,
+    Query(payload): Query<SftpRenamePayload>,
+) -> Result<(), ApiErr> {
+    info!("@sftp_cp {:?}", payload);
+
+    let uri: SftpFileUri<'_> = parse_file_uri(payload.uri.as_str())?;
+    let target = map_ssh_err!(get_target_by_id(&state.app_state.db, uri.target_id).await)?;
+    let channel = map_ssh_err!(state.session_pool.get(uri.target_id).await)?;
+
+    if target.system.as_deref() == Some(WINDOWS) {
+        // let file_path = uri.path[1..].replace("/", "\\");
+        todo!();
+    } else {
+        ssh_exec(
+            channel,
+            format!(r#"cp -r "{}" "{}""#, uri.path, payload.target_path).as_str(),
+        )
+        .await?;
+    }
+
+    debug!("@sftp_cp done {:?}", payload);
+
+    Ok(())
+}
+
 async fn sftp_rename(
     State(state): State<Arc<AppStateWrapper>>,
     Query(payload): Query<SftpRenamePayload>,
@@ -506,7 +533,7 @@ async fn sftp_rename(
 
     let uri = parse_file_uri(payload.uri.as_str())?;
     let sftp = get_sftp_session(state, uri.target_id).await?;
-    let _ = map_ssh_err!(sftp.rename(uri.path, payload.new_path.as_str()).await)?;
+    let _ = map_ssh_err!(sftp.rename(uri.path, payload.target_path.as_str()).await)?;
 
     debug!("@sftp_rename sftp.rename done {:?}", payload);
 

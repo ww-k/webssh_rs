@@ -18,6 +18,7 @@ export type BatchTaskProgressModalProps<T> = ModalProps & {
     data: T[];
     action: (item: T) => Promise<unknown>;
     failsRender?: (failsResult: FailResult<T>[]) => React.ReactNode;
+    onOk?: () => void;
     onCancel?: () => void;
 };
 
@@ -35,10 +36,6 @@ export default function BatchTaskProgressModal<T>({
     const [failsResult, setFailsResult] = useState<FailResult<T>[]>([]);
     const [showErrMsg, setShowErrMsg] = useState(false);
     const abortControllerRef = useRef<AbortController>();
-
-    function handleOk(e: React.MouseEvent<HTMLButtonElement>) {
-        modalProps.onOk?.(e);
-    }
 
     function handleCancel() {
         if (abortControllerRef.current) {
@@ -84,6 +81,7 @@ export default function BatchTaskProgressModal<T>({
                 modalProps.onCancel?.();
             } else {
                 setLoading(false);
+                modalProps.onOk?.();
             }
         });
         return () => {
@@ -107,7 +105,7 @@ export default function BatchTaskProgressModal<T>({
                         {t("app_btn_cancel")}
                     </Button>
                 ) : (
-                    <Button type="primary" onClick={handleOk}>
+                    <Button type="primary" onClick={modalProps.onOk}>
                         {t("app_btn_ok")}
                     </Button>
                 )

@@ -1,6 +1,6 @@
 import { Modal } from "antd";
 
-import filesConflictFilter from "./files_conflict_filter";
+import filesConflictFilter from "./filesConflictFilter";
 
 import type { IFile } from "@/types";
 
