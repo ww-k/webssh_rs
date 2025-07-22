@@ -110,12 +110,14 @@ export default function remoteHandleContextmenu(
             label: "上传",
             click: async () => {
                 const files = await openNativeFileSelector();
-                files.forEach((file) => {
-                    transferService.upload({
+                const allPromises = files.map((file) => {
+                    return transferService.upload({
                         file,
-                        fileUri: context.fileUri,
+                        fileUri: `${context.fileUri}/${file.name}`,
                     });
                 });
+                await Promise.all(allPromises);
+                await context.getCwdFiles();
             },
             iconRender: () => <UploadOutlined />,
         });

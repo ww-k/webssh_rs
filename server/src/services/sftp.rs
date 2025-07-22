@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io::SeekFrom, sync::Arc};
 
 use axum::{
     Json, Router,
@@ -13,11 +13,12 @@ use axum::{
 };
 use russh::ChannelMsg;
 use russh_sftp::{
-    client::{SftpSession, fs::DirEntry},
-    protocol::{FileAttributes, FileType},
+    client::{RawSftpSession, SftpSession, fs::DirEntry},
+    protocol::{FileAttributes, FileType, OpenFlags},
 };
 use serde::{Deserialize, Serialize};
-use tokio::io::AsyncReadExt;
+use sha2::{Digest, Sha256};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tracing::{debug, info};
 
 use crate::{AppState, services::target::get_target_by_id, ssh_session_pool::SshSessionPool};
@@ -348,6 +349,16 @@ macro_rules! map_ssh_err {
     };
 }
 
+/// 将错误转换为 code 为 ERR_CODE_DB_ERR 的 ApiErr
+macro_rules! map_db_err {
+    ($expr:expr) => {
+        $expr.map_err(|err| ApiErr {
+            code: ERR_CODE_DB_ERR,
+            message: err.to_string(),
+        })
+    };
+}
+
 fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri, ApiErr> {
     let uri = SftpFileUri::from_str(file_uri_str);
     uri.ok_or(ApiErr {
@@ -375,6 +386,21 @@ async fn get_sftp_session(
     })?;
     let _ = map_ssh_err!(channel.request_subsystem(true, "sftp").await)?;
     let sftp = map_ssh_err!(SftpSession::new(channel.into_stream()).await)?;
+    // TODO: reuse SftpSession
+    Ok(sftp)
+}
+
+async fn get_raw_sftp_session(
+    state: Arc<AppStateWrapper>,
+    target_id: i32,
+) -> Result<RawSftpSession, ApiErr> {
+    let mut guard = map_ssh_err!(state.session_pool.get(target_id).await)?;
+    let channel = guard.take_channel().ok_or(ApiErr {
+        code: ERR_CODE_SSH_ERR,
+        message: "take none channel".to_string(),
+    })?;
+    let _ = map_ssh_err!(channel.request_subsystem(true, "sftp").await)?;
+    let sftp = RawSftpSession::new(channel.into_stream());
     // TODO: reuse SftpSession
     Ok(sftp)
 }
@@ -428,7 +454,7 @@ async fn sftp_home(
 ) -> Result<String, ApiErr> {
     info!("@sftp_home {:?}", payload);
 
-    let target = map_ssh_err!(get_target_by_id(&state.app_state.db, payload.target_id).await)?;
+    let target = map_db_err!(get_target_by_id(&state.app_state.db, payload.target_id).await)?;
     let channel = map_ssh_err!(state.session_pool.get(payload.target_id).await)?;
     if target.system.as_deref() == Some(WINDOWS) {
         return Ok("/C:".to_string());
@@ -505,8 +531,8 @@ async fn sftp_cp(
 ) -> Result<(), ApiErr> {
     info!("@sftp_cp {:?}", payload);
 
-    let uri: SftpFileUri<'_> = parse_file_uri(payload.uri.as_str())?;
-    let target = map_ssh_err!(get_target_by_id(&state.app_state.db, uri.target_id).await)?;
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let target = map_db_err!(get_target_by_id(&state.app_state.db, uri.target_id).await)?;
     let channel = map_ssh_err!(state.session_pool.get(uri.target_id).await)?;
 
     if target.system.as_deref() == Some(WINDOWS) {
@@ -561,8 +587,8 @@ async fn sftp_rm_rf(
 ) -> Result<(), ApiErr> {
     info!("@sftp_rm_rf {:?}", payload);
 
-    let uri: SftpFileUri<'_> = parse_file_uri(payload.uri.as_str())?;
-    let target = map_ssh_err!(get_target_by_id(&state.app_state.db, uri.target_id).await)?;
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let target = map_db_err!(get_target_by_id(&state.app_state.db, uri.target_id).await)?;
     let channel = map_ssh_err!(state.session_pool.get(uri.target_id).await)?;
 
     if target.system.as_deref() == Some(WINDOWS) {
@@ -577,20 +603,137 @@ async fn sftp_rm_rf(
     Ok(())
 }
 
+struct ContentRange {
+    start: usize,
+    end: usize,
+    total: usize,
+}
+
+impl ContentRange {
+    fn from_str(header: &str) -> Option<Self> {
+        // Content-Range: bytes 0-1023/1024
+        let header = header.trim();
+
+        // Check if it starts with "bytes "
+        if !header.starts_with("bytes ") {
+            return None;
+        }
+
+        // Remove "bytes " prefix
+        let range_part = &header[6..];
+
+        // Split by '/' to separate range from total
+        let mut parts = range_part.split('/');
+        let range_str = parts.next()?;
+        let total_str = parts.next()?;
+
+        // Parse total size
+        let total = total_str.parse::<usize>().ok()?;
+
+        // Parse range (start-end)
+        let mut range_parts = range_str.split('-');
+        let start = range_parts.next()?.parse::<usize>().ok()?;
+        let end = range_parts.next()?.parse::<usize>().ok()?;
+
+        // Validate range
+        if start > end || end >= total {
+            return None;
+        }
+
+        Some(Self { start, end, total })
+    }
+
+    fn from_header_value(header: Option<&HeaderValue>) -> Option<Self> {
+        if header.is_none() {
+            return None;
+        }
+        let result = header.unwrap().to_str();
+        if result.is_err() {
+            return None;
+        }
+        Self::from_str(result.unwrap())
+    }
+}
+
+#[derive(Serialize)]
+struct SftpUploadResponse {
+    hash: String,
+}
+
 async fn sftp_upload(
     State(state): State<Arc<AppStateWrapper>>,
     Query(payload): Query<SftpFileUriPayload>,
     headers: HeaderMap,
-    content: Bytes,
-) -> Result<Json<SftpFile>, ApiErr> {
+    body: Bytes,
+) -> Result<Json<SftpUploadResponse>, ApiErr> {
     info!("@sftp_upload {:?}", payload);
-    info!("@sftp_upload ranges {:?}", headers.get("ranges"));
-    info!(
+    debug!(
         "@sftp_upload content-range {:?}",
         headers.get("content-range")
     );
 
-    Ok(Json(SftpFile::default()))
+    let range = ContentRange::from_header_value(headers.get("content-range"));
+    let content_len = headers
+        .get("content-length")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
+    let mut file_size = content_len;
+    let mut start: usize = 0;
+    let mut range_len = content_len;
+    if range.is_some() {
+        let range = range.unwrap();
+        file_size = range.total;
+        start = range.start;
+        range_len = range.end - start + 1;
+    }
+
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let sftp = get_sftp_session(state, uri.target_id).await?;
+
+    let mut file = map_ssh_err!(
+        sftp.open_with_flags(
+            uri.path,
+            OpenFlags::WRITE | OpenFlags::READ | OpenFlags::CREATE
+        )
+        .await
+    )?;
+    debug!("@sftp_upload file opene");
+
+    // set file size
+    map_ssh_err!(
+        file.set_metadata(FileAttributes {
+            size: Some(file_size as u64),
+            ..FileAttributes::empty()
+        })
+        .await
+    )?;
+    debug!("@sftp_upload file set size {}", file_size);
+
+    // seek to start
+    map_ssh_err!(file.seek(SeekFrom::Start(start as u64)).await)?;
+    debug!("@sftp_upload file seek {}", start);
+
+    let data = body.to_vec();
+    if data.len() != range_len {
+        return Err(ApiErr {
+            code: ERR_CODE_SFTP_UPLOAD_INVALID_BODY_LEN,
+            message: "body length not equal to range length".to_string(),
+        });
+    }
+
+    let data = &data[0..range_len];
+    map_ssh_err!(file.write_all(data).await)?;
+    map_ssh_err!(file.flush().await)?;
+
+    let hash = Sha256::digest(data);
+    let hex_hash = hex::encode(hash);
+
+    info!("@sftp_upload done {:?}", payload);
+
+    Ok(Json(SftpUploadResponse { hash: hex_hash }))
 }
 
 async fn sftp_download(
@@ -864,6 +1007,54 @@ mod tests {
         assert!(
             SftpFile::from_stat_bsd(output).is_err(),
             "@test_parse_stat_bsd: invalid format fail"
+        );
+    }
+
+    #[test]
+    fn test_content_range_from_header() {
+        // Valid Content-Range header
+        let header = "bytes 0-1023/1024";
+        let range = ContentRange::from_str(header).unwrap();
+        assert_eq!(
+            range.start, 0,
+            "@test_content_range_from_header: start fail"
+        );
+        assert_eq!(range.end, 1023, "@test_content_range_from_header: end fail");
+        assert_eq!(
+            range.total, 1024,
+            "@test_content_range_from_header: total fail"
+        );
+
+        // Valid Content-Range header with whitespace
+        let header = "  bytes 200-299/1000  ";
+        let range = ContentRange::from_str(header).unwrap();
+        assert_eq!(
+            range.start, 200,
+            "@test_content_range_from_header: start with whitespace fail"
+        );
+        assert_eq!(
+            range.end, 299,
+            "@test_content_range_from_header: end with whitespace fail"
+        );
+        assert_eq!(
+            range.total, 1000,
+            "@test_content_range_from_header: total with whitespace fail"
+        );
+
+        // Valid single byte range
+        let header = "bytes 0-0/1";
+        let range = ContentRange::from_str(header).unwrap();
+        assert_eq!(
+            range.start, 0,
+            "@test_content_range_from_header: single byte start fail"
+        );
+        assert_eq!(
+            range.end, 0,
+            "@test_content_range_from_header: single byte end fail"
+        );
+        assert_eq!(
+            range.total, 1,
+            "@test_content_range_from_header: single byte total fail"
         );
     }
 }

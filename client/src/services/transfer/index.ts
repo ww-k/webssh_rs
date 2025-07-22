@@ -2,7 +2,7 @@ import upload from "./upload";
 
 class TransferService {
     upload(option: { file: File; fileUri: string }) {
-        upload(option);
+        return upload(option);
     }
 }
 

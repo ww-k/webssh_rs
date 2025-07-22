@@ -1,9 +1,9 @@
 import uploadFile from "./uploadFle";
 
-export default function upload(option: { file: File; fileUri: string }) {
+export default async function upload(option: { file: File; fileUri: string }) {
     const abortController = new AbortController();
     let _sumLoaded = 0;
-    uploadFile({
+    await uploadFile({
         ...option,
         signal: abortController.signal,
         onFlow: (newLoaded) => {

@@ -3096,6 +3096,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "hex",
  "nanoid",
  "russh",
  "russh-sftp",
@@ -3105,6 +3106,7 @@ dependencies = [
  "serde_json",
  "serde_qs",
  "serde_repr",
+ "sha2",
  "socketioxide",
  "tokio",
  "tower-http",
