@@ -1,9 +1,9 @@
 import { postSftpUpload } from "@/api";
 import calcHashHex from "@/helpers/calcHashHex";
 
-import type { ISliceLoadOption } from "../types";
+import type { ISliceUploadOption } from "../types";
 
-export default async function sliceUploader(option: ISliceLoadOption) {
+export default async function sliceUploader(option: ISliceUploadOption) {
     const { fileUri, file, start, end, totalSize, signal, onFlow, onDone } =
         option;
 

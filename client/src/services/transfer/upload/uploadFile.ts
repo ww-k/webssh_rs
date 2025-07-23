@@ -3,9 +3,9 @@ import simpleQueueRun from "@/helpers/simple_queue_run";
 import { initLoadedSize, initRanges } from "../helpers";
 import sliceUploader from "./sliceUploader";
 
-import type { IFileLoadOption } from "../types";
+import type { IFileUploadOption } from "../types";
 
-export default async function uploadFile(option: IFileLoadOption) {
+export default async function uploadFile(option: IFileUploadOption) {
     const { fileUri, file, signal, interval, onProgress, onFlow } = option;
 
     let ranges = option.ranges;

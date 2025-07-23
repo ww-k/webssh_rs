@@ -86,6 +86,15 @@ export async function postSftpRmRf(uri: string) {
     return true;
 }
 
+export async function getSftpStat(uri: string) {
+    const response = await axios.get<ISftpFile>("/api/sftp/stat", {
+        params: {
+            uri,
+        },
+    });
+    return response.data;
+}
+
 export async function postSftpUpload(
     fileUri: string,
     fileSlice: File | Blob,
@@ -127,6 +136,46 @@ export async function postSftpUpload(
     }>(
         `/api/sftp/upload?uri=${encodeURIComponent(fileUri)}`,
         fileSlice,
+        config,
+    );
+    return response.data;
+}
+
+export async function getSftpDownload(
+    fileUri: string,
+    option?: {
+        start?: number;
+        end?: number;
+        responseType?: ResponseType;
+        /** 是否静默请求。如果是，则接口报错也不弹出通知框 */
+        silence?: boolean;
+        onDownloadProgress?: (progressEvent: AxiosProgressEvent) => void;
+        signal?: GenericAbortSignal;
+    },
+) {
+    const config: AxiosRequestConfig = {
+        headers: {
+            "content-type": "application/octet-stream",
+        },
+        responseType: "blob",
+    };
+    if (option) {
+        if (
+            config.headers &&
+            typeof option.start === "number" &&
+            typeof option.end === "number"
+        ) {
+            config.headers.range = `bytes=${option.start}-${option.end}`;
+        }
+        if (option.onDownloadProgress) {
+            config.onDownloadProgress = option.onDownloadProgress;
+        }
+        if (option.signal) {
+            config.signal = option.signal;
+        }
+    }
+    const response = await axios.get<Blob>(
+        `/api/sftp/download?uri=${encodeURIComponent(fileUri)}`,
         config,
     );
     return response.data;

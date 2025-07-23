@@ -44,8 +44,13 @@ export default function remoteHandleContextmenu(
         menus.push({
             label: "下载",
             disabled: !(Array.isArray(files) && files.length > 0),
-            click: () => {
-                // TODO:
+            click: async () => {
+                const allPromises = files.map((file) => {
+                    return transferService.download({
+                        fileUri: file.uri,
+                    });
+                });
+                await Promise.all(allPromises);
             },
             iconRender: () => <DownloadOutlined />,
         });
