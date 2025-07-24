@@ -1,3 +1,4 @@
+pub mod handlers;
 pub mod sftp;
 pub mod ssh;
 pub mod target;
