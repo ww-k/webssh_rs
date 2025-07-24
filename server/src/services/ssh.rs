@@ -1,6 +1,6 @@
 use std::{env, sync::Arc};
 
-use anyhow::{Ok, Result};
+use anyhow::Result;
 use axum::Router;
 use russh::ChannelMsg;
 use serde::Deserialize;
@@ -12,7 +12,7 @@ use tracing::{debug, error, info};
 
 use crate::{
     AppState,
-    ssh_session_pool::{SshSessionPool, SshChannelGuard},
+    ssh_session_pool::{SshChannelGuard, SshSessionPool},
 };
 
 #[derive(Deserialize, Debug)]
@@ -28,21 +28,13 @@ struct Resize {
 }
 
 pub(crate) fn svc_ssh_router_builder(
-    app_state: Arc<AppState>,
+    _app_state: Arc<AppState>,
     session_pool: Arc<SshSessionPool>,
 ) -> Router {
-    let (svc, io) = SocketIo::builder().build_svc();
-    io.ns("/", async move |socket: SocketRef| {
-        let sid = socket.id;
-        let result = SshSvcSession::start(socket.clone(), app_state, session_pool).await;
-
-        if let Err(err) = result {
-            error!("sid={} start fail. {:?}", sid, err);
-            let _ = socket.disconnect();
-            return;
-        }
-    });
-    Router::new().fallback_service(svc)
+    Router::new()
+        .nest("/terminal", build_terminal_svg(session_pool.clone()))
+        .fallback(|| async { "not supported" })
+        .with_state(session_pool)
 }
 
 struct SshSvcSession {
@@ -50,11 +42,7 @@ struct SshSvcSession {
 }
 
 impl SshSvcSession {
-    async fn start(
-        socket: SocketRef,
-        _app_state: Arc<AppState>,
-        session_pool: Arc<SshSessionPool>,
-    ) -> Result<Self> {
+    async fn start(socket: SocketRef, session_pool: Arc<SshSessionPool>) -> Result<Self> {
         let query = socket.req_parts().uri.query().unwrap_or_default();
         let result: Result<QueryParams, serde_qs::Error> = serde_qs::from_str(query);
         if let Err(err) = result {
@@ -68,7 +56,12 @@ impl SshSvcSession {
         let sid = socket.id;
         let channel = result.unwrap();
 
-        info!("sid={} target {} SshChannel {}", sid, params.target_id, channel.id());
+        info!(
+            "sid={} target {} SshChannel {}",
+            sid,
+            params.target_id,
+            channel.id()
+        );
 
         let term_session = SshSvcSession { socket };
         let result = term_session
@@ -86,7 +79,7 @@ impl SshSvcSession {
         term_session.open_socket_channel_tunnel(channel).await;
         info!("sid={} tunnel closed", sid);
 
-        Ok(term_session)
+        anyhow::Ok(term_session)
     }
 
     async fn open_socket_channel_tunnel(&self, mut channel_guard: SshChannelGuard) {
@@ -171,6 +164,22 @@ impl SshSvcSession {
             .await?;
         channel.request_shell(true).await?;
 
-        Ok(channel)
+        anyhow::Ok(channel)
     }
+}
+
+fn build_terminal_svg(session_pool: Arc<SshSessionPool>) -> Router<Arc<SshSessionPool>> {
+    let state_clone = session_pool.clone();
+    let (svc, io) = SocketIo::builder().build_svc();
+    io.ns("/", async move |socket: SocketRef| {
+        let sid = socket.id;
+        let result = SshSvcSession::start(socket.clone(), session_pool).await;
+
+        if let Err(err) = result {
+            error!("sid={} start fail. {:?}", sid, err);
+            let _ = socket.disconnect();
+            return;
+        }
+    });
+    Router::new().fallback_service(svc).with_state(state_clone)
 }
