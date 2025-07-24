@@ -1,9 +1,10 @@
-pub mod target;
-pub mod ssh;
 pub mod sftp;
+pub mod ssh;
+pub mod target;
 
 use axum::{
-    extract::{rejection::JsonRejection, FromRequest}, http::StatusCode,
+    extract::{FromRequest, rejection::JsonRejection},
+    http::StatusCode,
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
@@ -48,4 +49,26 @@ impl<T: Serialize> IntoResponse for ValidJson<T> {
         let Self(value) = self;
         axum::Json(value).into_response()
     }
+}
+
+/// 将错误转换为 code 为 ERR_CODE_SSH_ERR 的 ApiErr
+#[macro_export]
+macro_rules! map_ssh_err {
+    ($expr:expr) => {
+        $expr.map_err(|err| ApiErr {
+            code: ERR_CODE_SSH_ERR,
+            message: err.to_string(),
+        })
+    };
+}
+
+/// 将错误转换为 code 为 ERR_CODE_DB_ERR 的 ApiErr
+#[macro_export]
+macro_rules! map_db_err {
+    ($expr:expr) => {
+        $expr.map_err(|err| ApiErr {
+            code: ERR_CODE_DB_ERR,
+            message: err.to_string(),
+        })
+    };
 }

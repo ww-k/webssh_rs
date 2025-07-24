@@ -1,7 +1,11 @@
 use std::{env, sync::Arc};
 
 use anyhow::Result;
-use axum::Router;
+use axum::{
+    Router,
+    extract::{Query, State},
+    routing::post,
+};
 use russh::ChannelMsg;
 use serde::Deserialize;
 use socketioxide::{
@@ -12,6 +16,9 @@ use tracing::{debug, error, info};
 
 use crate::{
     AppState,
+    consts::services_err_code::*,
+    map_ssh_err,
+    services::ApiErr,
     ssh_session_pool::{SshChannelGuard, SshSessionPool},
 };
 
@@ -33,6 +40,7 @@ pub(crate) fn svc_ssh_router_builder(
 ) -> Router {
     Router::new()
         .nest("/terminal", build_terminal_svg(session_pool.clone()))
+        .route("/exec", post(ssh_exec))
         .fallback(|| async { "not supported" })
         .with_state(session_pool)
 }
@@ -182,4 +190,61 @@ fn build_terminal_svg(session_pool: Arc<SshSessionPool>) -> Router<Arc<SshSessio
         }
     });
     Router::new().fallback_service(svc).with_state(state_clone)
+}
+
+pub async fn exec(mut channel: SshChannelGuard, command: &str) -> Result<String, ApiErr> {
+    debug!("@exec start {:?}", command);
+    map_ssh_err!(channel.exec(true, command).await)?;
+
+    let mut code = None;
+    let mut buf = Vec::<u8>::new();
+    let mut buf_e = Vec::<u8>::new();
+
+    loop {
+        // There's an event available on the session channel
+        let Some(msg) = channel.wait().await else {
+            break;
+        };
+        match msg {
+            ChannelMsg::ExtendedData { ref data, ext: _ } => {
+                buf_e.extend_from_slice(data);
+            }
+            // Write data to the terminal
+            ChannelMsg::Data { ref data } => {
+                buf.extend_from_slice(data);
+            }
+            // The command has returned an exit code
+            ChannelMsg::ExitStatus { exit_status } => {
+                code = Some(exit_status);
+                // cannot leave the loop immediately, there might still be more data to receive
+            }
+            _ => {}
+        }
+    }
+    let str = String::from_utf8_lossy(&buf);
+    let str_e = String::from_utf8_lossy(&buf_e);
+    debug!("@exec done {:?}", command);
+    debug!("exit_status {:?}. result ", code);
+    debug!("{:?}", str);
+    match code {
+        Some(0) => Ok(str.to_string()),
+        _ => Err(ApiErr {
+            code: ERR_CODE_SSH_EXEC,
+            message: format!("exit status {:?}. result\n {}", code, str_e),
+        }),
+    }
+}
+
+async fn ssh_exec(
+    State(session_pool): State<Arc<SshSessionPool>>,
+    Query(payload): Query<QueryParams>,
+    body: String,
+) -> Result<String, ApiErr> {
+    info!("@ssh_exec {:?}", body);
+
+    let channel = map_ssh_err!(session_pool.get(payload.target_id).await)?;
+    let result = exec(channel, body.as_str()).await?;
+
+    info!("@ssh_exec {:?} done", body);
+    Ok(result)
 }
