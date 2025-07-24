@@ -1,8 +1,8 @@
-use std::{io::SeekFrom, sync::Arc};
+use std::{io::SeekFrom, pin::pin, sync::Arc};
 
 use axum::{
     Json, Router,
-    body::Bytes,
+    body::{Body, Bytes},
     extract::{Query, State},
     http::{
         HeaderMap,
@@ -11,6 +11,7 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+use futures_util::TryStreamExt;
 use russh::ChannelMsg;
 use russh_sftp::{
     client::{RawSftpSession, SftpSession, fs::DirEntry},
@@ -19,6 +20,7 @@ use russh_sftp::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio_util::io::StreamReader;
 use tracing::{debug, info};
 
 use crate::{AppState, services::target::get_target_by_id, ssh_session_pool::SshSessionPool};
@@ -57,6 +59,7 @@ pub(crate) fn svc_sftp_router_builder(
 const URI_SEP: &str = ":";
 const PATH_SEP: &str = "/";
 const WINDOWS: &str = "windows";
+const CHUNK_SIZE: usize = 8192; // 8KB chunks for streaming
 
 #[derive(Serialize)]
 pub struct SftpFile {
@@ -674,7 +677,7 @@ async fn sftp_upload(
     State(state): State<Arc<AppStateWrapper>>,
     Query(payload): Query<SftpFileUriPayload>,
     headers: HeaderMap,
-    body: Bytes,
+    body: Body,
 ) -> Result<Json<SftpUploadResponse>, ApiErr> {
     info!("@sftp_upload {:?}", payload);
 
@@ -713,7 +716,7 @@ async fn sftp_upload(
         )
         .await
     )?;
-    debug!("@sftp_upload file opene");
+    debug!("@sftp_upload file opened");
 
     // set file size
     map_ssh_err!(
@@ -731,19 +734,51 @@ async fn sftp_upload(
         debug!("@sftp_upload file seek {}", start);
     }
 
-    let data = body.to_vec();
-    if data.len() != range_len {
+    // True streaming processing to avoid memory overflow
+    let mut hasher = Sha256::new();
+    let mut total_written = 0usize;
+
+    // Convert body to stream
+    let body_stream = body
+        .into_data_stream()
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
+    let mut body_reader = pin!(StreamReader::new(body_stream));
+
+    // Stream processing - read and write in chunks
+    let mut buffer = vec![0; CHUNK_SIZE];
+    loop {
+        let bytes_read = map_ssh_err!(AsyncReadExt::read(&mut body_reader, &mut buffer).await)?;
+
+        if bytes_read == 0 {
+            break; // EOF
+        }
+
+        if total_written + bytes_read > range_len {
+            return Err(ApiErr {
+                code: ERR_CODE_SFTP_UPLOAD_INVALID_REQUEST,
+                message: "body length exceeds expected range length".to_string(),
+            });
+        }
+
+        let chunk = &buffer[0..bytes_read];
+        map_ssh_err!(file.write_all(chunk).await)?;
+        hasher.update(chunk);
+        total_written += bytes_read;
+    }
+
+    if total_written != range_len {
         return Err(ApiErr {
             code: ERR_CODE_SFTP_UPLOAD_INVALID_REQUEST,
-            message: "body length not equal to range length".to_string(),
+            message: format!(
+                "body length mismatch: expected {}, got {}",
+                range_len, total_written
+            ),
         });
     }
 
-    let data = &data[0..range_len];
-    map_ssh_err!(file.write_all(data).await)?;
     map_ssh_err!(file.flush().await)?;
 
-    let hash = Sha256::digest(data);
+    let hash = hasher.finalize();
     let hex_hash = hex::encode(hash);
 
     info!("@sftp_upload done {:?}", payload);
@@ -808,6 +843,14 @@ async fn sftp_download(
     let uri = parse_file_uri(payload.uri.as_str())?;
     let sftp = get_sftp_session(state, uri.target_id).await?;
 
+    let file_name = uri.path.split('/').last().unwrap_or("");
+    if file_name == "" {
+        return Err(ApiErr {
+            code: ERR_CODE_SFTP_DOWNLOAD_INVALID_REQUEST,
+            message: "uri path can not end with /".to_string(),
+        });
+    }
+
     // read file metadata
     let attr = map_ssh_err!(sftp.metadata(uri.path).await)?;
     if attr.file_type() == FileType::Dir {
@@ -816,8 +859,6 @@ async fn sftp_download(
             message: "file is a directory".to_string(),
         });
     }
-
-    let file_name = uri.path.split('/').last().unwrap_or("");
 
     // set headers
     let mut headers = HeaderMap::new();
@@ -833,14 +874,17 @@ async fn sftp_download(
             .unwrap(),
     );
 
-    let empty_bytes = Bytes::new();
+    let file_size: usize;
+    let empty_body = Body::empty();
     if attr.size.is_none() {
-        return Ok((headers, empty_bytes));
+        file_size = 0;
+    } else {
+        file_size = attr.size.unwrap() as usize;
     }
 
-    let file_size = attr.size.unwrap() as usize;
     if file_size == 0 {
-        return Ok((headers, empty_bytes));
+        headers.insert(header::CONTENT_LENGTH, HeaderValue::from_static("0"));
+        return Ok((headers, empty_body));
     }
 
     let range = Range::from_header_value(h_range);
@@ -872,14 +916,35 @@ async fn sftp_download(
         debug!("@sftp_download file seek {}", start);
     }
 
-    let mut buffer = vec![0; range_len];
-    map_ssh_err!(file.read_exact(&mut buffer).await)?;
+    // Stream processing to avoid memory overflow - create async stream
+    let stream = async_stream::stream! {
+        let mut remaining = range_len;
+        while remaining > 0 {
+            let chunk_size = std::cmp::min(CHUNK_SIZE, remaining);
+            let mut buffer = vec![0; chunk_size];
 
-    let data = Bytes::from(buffer);
+            match file.read_exact(&mut buffer).await {
+                Ok(_) => {
+                    yield Ok(Bytes::from(buffer));
+                    remaining -= chunk_size;
+                }
+                Err(e) => {
+                    yield Err(axum::Error::new(e));
+                    break;
+                }
+            }
+        }
+    };
+
+    headers.insert(
+        header::CONTENT_LENGTH,
+        range_len.to_string().parse().unwrap(),
+    );
+    let body = Body::from_stream(stream);
 
     debug!("@sftp_download done");
 
-    Ok((headers, data))
+    Ok((headers, body))
 }
 
 #[cfg(test)]
