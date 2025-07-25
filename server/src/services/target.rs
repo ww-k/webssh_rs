@@ -8,8 +8,8 @@ use axum::{
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait};
 use serde::Deserialize;
 
-use crate::{AppState, entities::target};
-use crate::{consts::services_err_code::*, entities::target::TargetAuthMethod};
+use crate::{AppState, entities::target, map_db_err};
+use crate::{consts::services_err_code::ERR_CODE_DB_ERR, entities::target::TargetAuthMethod};
 
 use super::{ApiErr, ValidJson};
 
@@ -32,13 +32,8 @@ pub(crate) fn svc_target_router_builder(app_state: Arc<AppState>) -> Router {
 async fn target_list(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<target::Model>>, ApiErr> {
-    match target::Entity::find().all(&state.db).await {
-        Ok(targets) => Ok(Json(targets)),
-        Err(e) => Err(ApiErr {
-            code: ERR_CODE_DB_ERR,
-            message: format!("Failed to get target list: {}", e),
-        }),
-    }
+    let targets = map_db_err!(target::Entity::find().all(&state.db).await)?;
+    Ok(Json(targets))
 }
 
 async fn target_add(
@@ -48,13 +43,8 @@ async fn target_add(
     let mut active_model = target::ActiveModel::from(payload);
     active_model.id = sea_orm::ActiveValue::NotSet;
 
-    match active_model.insert(&state.db).await {
-        Ok(target) => Ok(Json(target)),
-        Err(e) => Err(ApiErr {
-            code: ERR_CODE_DB_ERR,
-            message: format!("Failed to add target: {}", e),
-        }),
-    }
+    let target = map_db_err!(active_model.insert(&state.db).await)?;
+    Ok(Json(target))
 }
 
 #[derive(Deserialize, Debug)]
@@ -90,13 +80,8 @@ async fn target_update(
 ) -> Result<Json<target::Model>, ApiErr> {
     let active_model = target::ActiveModel::from(payload);
 
-    match active_model.update(&state.db).await {
-        Ok(target) => Ok(Json(target)),
-        Err(e) => Err(ApiErr {
-            code: ERR_CODE_DB_ERR,
-            message: format!("Failed to update target: {}", e),
-        }),
-    }
+    let target = map_db_err!(active_model.update(&state.db).await)?;
+    Ok(Json(target))
 }
 
 #[derive(Deserialize)]
@@ -107,17 +92,13 @@ struct TargetRemovePayload {
 async fn target_remove(
     State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<TargetRemovePayload>,
-) -> Result<String, ApiErr> {
-    match target::Entity::delete_by_id(payload.id)
-        .exec(&state.db)
-        .await
-    {
-        Ok(_) => Ok(format!("")),
-        Err(e) => Err(ApiErr {
-            code: ERR_CODE_DB_ERR,
-            message: format!("Failed to remove target: {}", e),
-        }),
-    }
+) -> Result<(), ApiErr> {
+    map_db_err!(
+        target::Entity::delete_by_id(payload.id)
+            .exec(&state.db)
+            .await
+    )?;
+    Ok(())
 }
 
 pub async fn get_target_by_id(
