@@ -19,7 +19,7 @@ use super::{ApiErr, ValidJson};
 // 3. update a target
 // 4. remove a target
 
-pub(crate) fn svc_target_router_builder(app_state: Arc<AppState>) -> Router {
+pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route("/list", get(target_list))
         .route("/add", post(target_add))

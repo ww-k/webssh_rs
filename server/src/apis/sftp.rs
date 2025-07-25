@@ -5,10 +5,10 @@ use axum::{
     routing::{get, post},
 };
 
-use crate::services::handlers::sftp;
+use super::handlers::sftp;
 use crate::{AppState, ssh_session_pool::SshSessionPool};
 
-pub(crate) fn svc_sftp_router_builder(
+pub(crate) fn router_builder(
     app_state: Arc<AppState>,
     session_pool: Arc<SshSessionPool>,
 ) -> Router {

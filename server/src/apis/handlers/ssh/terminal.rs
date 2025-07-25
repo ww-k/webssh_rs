@@ -23,9 +23,7 @@ struct Resize {
     row: u32,
 }
 
-pub(crate) fn svc_ssh_terminal_router_builder(
-    session_pool: Arc<SshSessionPool>,
-) -> Router<Arc<SshSessionPool>> {
+pub(crate) fn router_builder(session_pool: Arc<SshSessionPool>) -> Router<Arc<SshSessionPool>> {
     let session_pool_clone = session_pool.clone();
     let (svc, io) = SocketIo::builder().build_svc();
     io.ns("/", async move |socket: SocketRef| {

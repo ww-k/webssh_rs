@@ -17,7 +17,7 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_util::io::StreamReader;
 use tracing::info;
 
-use crate::{consts::services_err_code::*, map_ssh_err, services::ApiErr};
+use crate::{consts::services_err_code::*, map_ssh_err, apis::ApiErr};
 
 use super::{AppStateWrapper, ContentRange, SftpFileUriPayload, get_sftp_session, parse_file_uri};
 

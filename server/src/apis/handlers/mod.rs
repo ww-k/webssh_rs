@@ -1,8 +1,7 @@
-use serde::Deserialize;
-
 pub mod sftp;
-pub mod ssh_exec;
-pub mod ssh_terminal;
+pub mod ssh;
+
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct QueryTargetId {

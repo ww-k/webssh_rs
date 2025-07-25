@@ -13,7 +13,7 @@ use russh_sftp::protocol::FileType;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tracing::{debug, info};
 
-use crate::{consts::services_err_code::*, map_ssh_err, services::ApiErr};
+use crate::{apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
 use super::{AppStateWrapper, Range, SftpFileUriPayload, get_sftp_session, parse_file_uri};
 

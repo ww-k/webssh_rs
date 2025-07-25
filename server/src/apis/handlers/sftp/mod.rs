@@ -19,7 +19,7 @@ use russh_sftp::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AppState, consts::services_err_code::*, map_ssh_err, services::ApiErr,
+    AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err,
     ssh_session_pool::SshSessionPool,
 };
 

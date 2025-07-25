@@ -6,7 +6,7 @@ use axum::{
 };
 use tracing::info;
 
-use crate::{consts::services_err_code::ERR_CODE_SSH_ERR, map_ssh_err, services::ApiErr};
+use crate::{apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
 use super::{
     AppStateWrapper, SftpFile, SftpFileUriPayload, get_file_name, get_sftp_session, parse_file_uri,

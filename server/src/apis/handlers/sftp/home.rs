@@ -4,13 +4,13 @@ use axum::extract::{Query, State};
 use tracing::{debug, info};
 
 use crate::{
-    consts::services_err_code::*,
-    map_db_err, map_ssh_err,
-    services::{
+    apis::{
         ApiErr,
-        handlers::{QueryTargetId, ssh_exec},
+        handlers::{QueryTargetId, ssh::exec::exec},
         target::get_target_by_id,
     },
+    consts::services_err_code::*,
+    map_db_err, map_ssh_err,
 };
 
 use super::AppStateWrapper;
@@ -29,7 +29,7 @@ pub async fn handler(
         return Ok("/C:".to_string());
     }
 
-    let home_path = ssh_exec::exec(channel, "pwd").await?;
+    let home_path = exec(channel, "pwd").await?;
     let home_path = home_path.trim().to_string();
 
     debug!("@sftp_home home_path: {}", home_path);

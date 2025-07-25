@@ -16,7 +16,7 @@ use tracing::debug;
 use crate::{
     AppState,
     entities::target::{self, TargetAuthMethod},
-    services::target::get_target_by_id,
+    apis::target::get_target_by_id,
 };
 
 struct SshClientHandler {
