@@ -6,14 +6,12 @@ use axum::{
 };
 use tracing::info;
 
-use crate::{apis::ApiErr, consts::services_err_code::*, map_ssh_err};
+use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
-use super::{
-    AppStateWrapper, SftpFile, SftpFileUriPayload, get_file_name, get_sftp_session, parse_file_uri,
-};
+use super::{SftpFile, SftpFileUriPayload, get_file_name, get_sftp_session, parse_file_uri};
 
 pub async fn handler(
-    State(state): State<Arc<AppStateWrapper>>,
+    State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,
 ) -> Result<Json<SftpFile>, ApiErr> {
     info!("@sftp_stat {:?}", payload);

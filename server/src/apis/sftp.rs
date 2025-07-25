@@ -6,12 +6,9 @@ use axum::{
 };
 
 use super::handlers::sftp;
-use crate::{AppState, ssh_session_pool::SshSessionPool};
+use crate::AppState;
 
-pub(crate) fn router_builder(
-    app_state: Arc<AppState>,
-    session_pool: Arc<SshSessionPool>,
-) -> Router {
+pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route("/ls", get(sftp::ls::handler))
         .route("/mkdir", post(sftp::mkdir::handler))
@@ -24,8 +21,5 @@ pub(crate) fn router_builder(
         .route("/upload", post(sftp::upload::handler))
         .route("/download", get(sftp::download::handler))
         .fallback(|| async { "not supported" })
-        .with_state(Arc::new(sftp::AppStateWrapper {
-            app_state,
-            session_pool,
-        }))
+        .with_state(app_state)
 }

@@ -5,7 +5,7 @@ mod entities;
 mod migrations;
 mod ssh_session_pool;
 
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use axum::{Router, http::StatusCode, routing::any};
 use config::Config;
@@ -17,9 +17,22 @@ use migrations::{Migrator, MigratorTrait};
 
 use crate::ssh_session_pool::SshSessionPool;
 
-struct AppState {
+struct AppBaseState {
     db: DatabaseConnection,
     config: Config,
+}
+
+struct AppState {
+    base_state: Arc<AppBaseState>,
+    session_pool: Arc<SshSessionPool>,
+}
+
+impl Deref for AppState {
+    type Target = AppBaseState;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base_state
+    }
 }
 
 #[tokio::main]
@@ -41,19 +54,21 @@ async fn main() {
 
     Migrator::up(&db, None).await.unwrap();
 
-    let app_state = Arc::new(AppState { db, config });
-    let session_pool = Arc::new(SshSessionPool::new(app_state.clone()));
+    let app_base_state = Arc::new(AppBaseState { db, config });
+    let session_pool = Arc::new(SshSessionPool::new(app_base_state.clone()));
+
+    let app_state = Arc::new(AppState {
+        base_state: app_base_state.clone(),
+        session_pool: session_pool.clone(),
+    });
 
     let app = Router::new()
+        .nest("/api/ssh", ssh::router_builder(session_pool.clone()))
+        .nest("/api/sftp", sftp::router_builder(app_state.clone()))
         .nest(
-            "/api/ssh",
-            ssh::router_builder(app_state.clone(), session_pool.clone()),
+            "/api/target",
+            target::router_builder(app_base_state.clone()),
         )
-        .nest(
-            "/api/sftp",
-            sftp::router_builder(app_state.clone(), session_pool.clone()),
-        )
-        .nest("/api/target", target::router_builder(app_state.clone()))
         .fallback(any(|| async { (StatusCode::NOT_FOUND, "404 Not Found") }));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")

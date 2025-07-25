@@ -18,28 +18,19 @@ use russh_sftp::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err,
-    ssh_session_pool::SshSessionPool,
-};
+use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
 const URI_SEP: &str = ":";
 const PATH_SEP: &str = "/";
 
-pub struct AppStateWrapper {
-    #[allow(dead_code)]
-    pub app_state: Arc<AppState>,
-    pub session_pool: Arc<SshSessionPool>,
-}
-
 #[derive(Serialize)]
 pub struct SftpFile {
-    pub name: String,
-    pub r#type: char,
-    pub size: Option<u64>,
-    pub atime: Option<u32>,
-    pub mtime: Option<u32>,
-    pub permissions: String,
+    name: String,
+    r#type: char,
+    size: Option<u64>,
+    atime: Option<u32>,
+    mtime: Option<u32>,
+    permissions: String,
 }
 
 impl SftpFile {
@@ -284,10 +275,7 @@ pub fn split_path(path: &str) -> Option<(&str, &str)> {
     }
 }
 
-pub async fn get_sftp_session(
-    state: Arc<AppStateWrapper>,
-    target_id: i32,
-) -> Result<SftpSession, ApiErr> {
+pub async fn get_sftp_session(state: Arc<AppState>, target_id: i32) -> Result<SftpSession, ApiErr> {
     let mut guard = map_ssh_err!(state.session_pool.get(target_id).await)?;
     let channel = guard.take_channel().ok_or(ApiErr {
         code: ERR_CODE_SSH_ERR,

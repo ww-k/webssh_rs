@@ -3,12 +3,12 @@ use std::sync::Arc;
 use axum::extract::{Query, State};
 use tracing::{debug, info};
 
-use crate::{apis::ApiErr, consts::services_err_code::*, map_ssh_err};
+use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
-use super::{AppStateWrapper, SftpFileUriPayload, get_sftp_session, parse_file_uri};
+use super::{SftpFileUriPayload, get_sftp_session, parse_file_uri};
 
 pub async fn handler(
-    State(state): State<Arc<AppStateWrapper>>,
+    State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,
 ) -> Result<(), ApiErr> {
     info!("@sftp_rm {:?}", payload);

@@ -13,14 +13,14 @@ use russh_sftp::protocol::FileType;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tracing::{debug, info};
 
-use crate::{apis::ApiErr, consts::services_err_code::*, map_ssh_err};
+use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
-use super::{AppStateWrapper, Range, SftpFileUriPayload, get_sftp_session, parse_file_uri};
+use super::{Range, SftpFileUriPayload, get_sftp_session, parse_file_uri};
 
 const CHUNK_SIZE: usize = 8192;
 
 pub async fn handler(
-    State(state): State<Arc<AppStateWrapper>>,
+    State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, ApiErr> {

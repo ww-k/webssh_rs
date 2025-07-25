@@ -17,9 +17,9 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_util::io::StreamReader;
 use tracing::info;
 
-use crate::{consts::services_err_code::*, map_ssh_err, apis::ApiErr};
+use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
-use super::{AppStateWrapper, ContentRange, SftpFileUriPayload, get_sftp_session, parse_file_uri};
+use super::{ContentRange, SftpFileUriPayload, get_sftp_session, parse_file_uri};
 
 const CHUNK_SIZE: usize = 8192;
 
@@ -38,7 +38,7 @@ pub struct SftpUploadResponse {
 }
 
 pub async fn handler(
-    State(state): State<Arc<AppStateWrapper>>,
+    State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,
     headers: HeaderMap,
     body: Body,

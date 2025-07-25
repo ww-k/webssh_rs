@@ -14,9 +14,9 @@ use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::{
-    AppState,
-    entities::target::{self, TargetAuthMethod},
+    AppBaseState,
     apis::target::get_target_by_id,
+    entities::target::{self, TargetAuthMethod},
 };
 
 struct SshClientHandler {
@@ -55,11 +55,11 @@ impl russh::client::Handler for SshClientHandler {
 struct SshClient {
     id: String,
     target_id: i32,
-    app_state: Arc<AppState>,
+    app_state: Arc<AppBaseState>,
 }
 
 impl SshClient {
-    fn new(app_state: Arc<AppState>, target_id: i32) -> Self {
+    fn new(app_state: Arc<AppBaseState>, target_id: i32) -> Self {
         let ssh_session = SshClient {
             id: nanoid::nanoid!(),
             target_id,
@@ -154,12 +154,12 @@ struct SshConnectionPool {
     id: String,
     state: Mutex<PoolState<Arc<SshChannelPool>>>,
     max_size: u8,
-    app_state: Arc<AppState>,
+    app_state: Arc<AppBaseState>,
     client: SshClient,
 }
 
 impl SshConnectionPool {
-    fn new(app_state: Arc<AppState>, target_id: i32) -> Self {
+    fn new(app_state: Arc<AppBaseState>, target_id: i32) -> Self {
         let app_state_clone = app_state.clone();
         SshConnectionPool {
             id: nanoid::nanoid!(),
@@ -409,11 +409,11 @@ impl std::ops::DerefMut for SshChannelGuard {
 
 pub struct SshSessionPool {
     session_pool_map: Mutex<HashMap<i32, Arc<SshConnectionPool>>>,
-    app_state: Arc<AppState>,
+    app_state: Arc<AppBaseState>,
 }
 
 impl SshSessionPool {
-    pub fn new(app_state: Arc<AppState>) -> Self {
+    pub fn new(app_state: Arc<AppBaseState>) -> Self {
         SshSessionPool {
             session_pool_map: Mutex::new(HashMap::new()),
             app_state,

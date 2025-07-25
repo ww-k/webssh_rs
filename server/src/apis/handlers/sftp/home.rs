@@ -4,6 +4,7 @@ use axum::extract::{Query, State};
 use tracing::{debug, info};
 
 use crate::{
+    AppState,
     apis::{
         ApiErr,
         handlers::{QueryTargetId, ssh::exec::exec},
@@ -13,17 +14,15 @@ use crate::{
     map_db_err, map_ssh_err,
 };
 
-use super::AppStateWrapper;
-
 const WINDOWS: &str = "windows";
 
 pub async fn handler(
-    State(state): State<Arc<AppStateWrapper>>,
+    State(state): State<Arc<AppState>>,
     Query(payload): Query<QueryTargetId>,
 ) -> Result<String, ApiErr> {
     info!("@sftp_home {:?}", payload);
 
-    let target = map_db_err!(get_target_by_id(&state.app_state.db, payload.target_id).await)?;
+    let target = map_db_err!(get_target_by_id(&state.base_state.db, payload.target_id).await)?;
     let channel = map_ssh_err!(state.session_pool.get(payload.target_id).await)?;
     if target.system.as_deref() == Some(WINDOWS) {
         return Ok("/C:".to_string());

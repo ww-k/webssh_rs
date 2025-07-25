@@ -3,12 +3,9 @@ use std::sync::Arc;
 use axum::{Router, routing::post};
 
 use super::handlers::ssh;
-use crate::{AppState, ssh_session_pool::SshSessionPool};
+use crate::ssh_session_pool::SshSessionPool;
 
-pub(crate) fn router_builder(
-    _app_state: Arc<AppState>,
-    session_pool: Arc<SshSessionPool>,
-) -> Router {
+pub(crate) fn router_builder(session_pool: Arc<SshSessionPool>) -> Router {
     Router::new()
         .nest(
             "/terminal",

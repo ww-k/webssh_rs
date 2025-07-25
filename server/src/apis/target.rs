@@ -8,7 +8,7 @@ use axum::{
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait};
 use serde::Deserialize;
 
-use crate::{AppState, entities::target, map_db_err};
+use crate::{AppBaseState, entities::target, map_db_err};
 use crate::{consts::services_err_code::ERR_CODE_DB_ERR, entities::target::TargetAuthMethod};
 
 use super::{ApiErr, ValidJson};
@@ -19,7 +19,7 @@ use super::{ApiErr, ValidJson};
 // 3. update a target
 // 4. remove a target
 
-pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
+pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
     Router::new()
         .route("/list", get(target_list))
         .route("/add", post(target_add))
@@ -30,14 +30,14 @@ pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
 }
 
 async fn target_list(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<AppBaseState>>,
 ) -> Result<Json<Vec<target::Model>>, ApiErr> {
     let targets = map_db_err!(target::Entity::find().all(&state.db).await)?;
     Ok(Json(targets))
 }
 
 async fn target_add(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<AppBaseState>>,
     ValidJson(payload): ValidJson<target::Model>,
 ) -> Result<Json<target::Model>, ApiErr> {
     let mut active_model = target::ActiveModel::from(payload);
@@ -75,7 +75,7 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
 }
 
 async fn target_update(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<AppBaseState>>,
     ValidJson(payload): ValidJson<TargetUpdatePayload>,
 ) -> Result<Json<target::Model>, ApiErr> {
     let active_model = target::ActiveModel::from(payload);
@@ -90,7 +90,7 @@ struct TargetRemovePayload {
 }
 
 async fn target_remove(
-    State(state): State<Arc<AppState>>,
+    State(state): State<Arc<AppBaseState>>,
     ValidJson(payload): ValidJson<TargetRemovePayload>,
 ) -> Result<(), ApiErr> {
     map_db_err!(
