@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
-    sync::Arc,
+    sync::{Arc, atomic::AtomicBool},
     time::Duration,
 };
 
@@ -44,6 +44,7 @@ impl russh::client::Handler for SshClientHandler {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         async {
             debug!("ClientHandler @disconnected: {:?}", reason);
+            // TODO: 通知SshSession, 将SshConnection标记为关闭，并回滚计数
             match reason {
                 DisconnectReason::ReceivedDisconnect(_) => Ok(()),
                 DisconnectReason::Error(e) => Err(e),
@@ -60,13 +61,13 @@ struct SshClient {
 
 impl SshClient {
     fn new(app_state: Arc<AppBaseState>, target_id: i32) -> Self {
-        let ssh_session = SshClient {
+        let ssh_client = SshClient {
             id: nanoid::nanoid!(),
             target_id,
             app_state,
         };
 
-        ssh_session
+        ssh_client
     }
 
     async fn new_connect_timeout(
@@ -96,21 +97,21 @@ impl SshClient {
         target: target::Model,
     ) -> Result<russh::client::Handle<SshClientHandler>> {
         let config = russh::client::Config::default();
-        let handler = SshClientHandler {
+        let ssh_client_handler = SshClientHandler {
             host: target.host.clone(),
         };
 
-        let mut session = russh::client::connect(
+        let mut handle = russh::client::connect(
             Arc::new(config),
             (target.host, target.port.unwrap_or(22)),
-            handler,
+            ssh_client_handler,
         )
         .await?;
         let auth_res = match target.method {
             TargetAuthMethod::Password => {
                 let username = target.user;
                 let password = target.password.unwrap_or("".to_string());
-                session.authenticate_password(username, password).await?
+                handle.authenticate_password(username, password).await?
             }
             TargetAuthMethod::PrivateKey => {
                 let username = target.user;
@@ -118,7 +119,7 @@ impl SshClient {
                 let private_key = decode_secret_key(&key_data, target.password.as_deref())?;
                 let private_key_with_hash_alg =
                     PrivateKeyWithHashAlg::new(Arc::new(private_key), Some(HashAlg::Sha256));
-                session
+                handle
                     .authenticate_publickey(username, private_key_with_hash_alg)
                     .await?
             }
@@ -131,9 +132,10 @@ impl SshClient {
             anyhow::bail!("Authentication failed");
         }
 
-        Ok(session)
+        Ok(handle)
     }
 
+    #[allow(dead_code)]
     async fn close(
         &self,
         ssh_client_handle: russh::client::Handle<SshClientHandler>,
@@ -150,20 +152,20 @@ struct PoolState<T> {
     total_count: u8,             // 已创建的资源总数
 }
 
-struct SshConnectionPool {
+struct SshSession {
     id: String,
-    state: Mutex<PoolState<Arc<SshChannelPool>>>,
+    connection_pool_state: Mutex<PoolState<Arc<SshConnection>>>,
     max_size: u8,
     app_state: Arc<AppBaseState>,
     client: SshClient,
 }
 
-impl SshConnectionPool {
+impl SshSession {
     fn new(app_state: Arc<AppBaseState>, target_id: i32) -> Self {
         let app_state_clone = app_state.clone();
-        SshConnectionPool {
+        SshSession {
             id: nanoid::nanoid!(),
-            state: Mutex::new(PoolState {
+            connection_pool_state: Mutex::new(PoolState {
                 idle_resources: VecDeque::new(),
                 total_count: 0,
             }),
@@ -173,10 +175,10 @@ impl SshConnectionPool {
         }
     }
 
-    async fn get(&self) -> Result<Arc<SshChannelPool>> {
-        let mut state = self.state.lock().await;
+    async fn get_or_make(&self) -> Result<Arc<SshConnection>> {
+        let mut state = self.connection_pool_state.lock().await;
 
-        debug!("SshConnectionPool: {} start find idle resource.", self.id);
+        debug!("SshSession: {} start find idle resource.", self.id);
         // 尝试从空闲队列获取资源
         let result = async {
             let mut iter = state.idle_resources.iter().enumerate();
@@ -187,7 +189,7 @@ impl SshConnectionPool {
                 if has_idle {
                     let resource = state.idle_resources.remove(index);
                     debug!(
-                        "SshConnectionPool: {} find idle resource. idle length {}. total_count {}",
+                        "SshSession: {} find idle resource. idle length {}. total_count {}",
                         self.id,
                         state.idle_resources.len(),
                         state.total_count
@@ -196,7 +198,7 @@ impl SshConnectionPool {
                 }
             }
             debug!(
-                "SshConnectionPool: {} no idle resource. idle length {}. total_count {}",
+                "SshSession: {} no idle resource. idle length {}. total_count {}",
                 self.id,
                 state.idle_resources.len(),
                 state.total_count
@@ -210,39 +212,37 @@ impl SshConnectionPool {
         }
 
         if state.total_count >= self.max_size {
-            anyhow::bail!(
-                "SshConnectionPool: {} Maximum resource limit reached",
-                self.id
-            );
+            anyhow::bail!("SshSession: {} Maximum resource limit reached", self.id);
         }
 
         // 增加总资源计数
         state.total_count += 1;
 
         debug!(
-            "SshConnectionPool: {} start create resource. total_count {}",
+            "SshSession: {} start create resource. total_count {}",
             self.id, state.total_count
         );
         // 创建资源前释放锁，避免长时间持有
         drop(state);
 
         let resource = async {
-            let ssh_session = self
+            let client_handle = self
                 .client
                 .new_connect_timeout(Duration::from_secs(30))
                 .await?;
 
-            let ssh_channel_pool = Arc::new(SshChannelPool {
+            let ssh_channel_pool = Arc::new(SshConnection {
                 id: nanoid::nanoid!(),
-                state: Mutex::new(PoolState {
+                channel_pool_state: Mutex::new(PoolState {
                     idle_resources: VecDeque::new(),
                     total_count: 0,
                 }),
                 max_size: self.app_state.config.max_channel_per_session,
-                ssh_session,
+                client_handle,
+                expired: AtomicBool::new(false),
             });
             debug!(
-                "SshConnectionPool {} creating SshChannelPool {}",
+                "SshSession {} creating SshConnection {}",
                 self.id, ssh_channel_pool.id
             );
             Ok(ssh_channel_pool)
@@ -250,132 +250,147 @@ impl SshConnectionPool {
         .await;
 
         if resource.is_err() {
-            debug!("SshConnectionPool: {} create resource fail.", self.id);
-            // 创建失败，释放资源
-            self.drop_resource().await;
+            debug!("SshSession: {} create resource fail.", self.id);
+            // 创建失败，回滚计数
+            self.rollback_count().await;
         } else {
-            debug!("SshConnectionPool: {} resource created.", self.id);
+            debug!("SshSession: {} resource created.", self.id);
         }
         resource
     }
 
-    async fn return_resource(&self, resource: Arc<SshChannelPool>) {
-        let mut state = self.state.lock().await;
+    async fn return_resource(&self, resource: Arc<SshConnection>) {
+        let mut state = self.connection_pool_state.lock().await;
         if (state.idle_resources.len() as u8) < self.max_size {
             state.idle_resources.push_back(resource);
             debug!(
-                "SshConnectionPool: {} push back resource. idle length {}",
+                "SshSession: {} push back resource. idle length {}",
                 self.id,
                 state.idle_resources.len()
             );
         }
     }
 
-    /// 对于不能复用的资源，比如ssh channel，调用此方法释放资源池的统计数量
-    pub async fn drop_resource(&self) {
-        let mut state = self.state.lock().await;
+    /// 创建失败，回滚计数
+    pub async fn rollback_count(&self) {
+        let mut state = self.connection_pool_state.lock().await;
         if state.total_count > 0 {
             state.total_count -= 1;
             debug!(
-                "SshConnectionPool: {} drop resource. total_count {}",
+                "SshSession: {} rollback count. total_count {}",
                 self.id, state.total_count
             );
         }
     }
+
+    #[allow(dead_code)]
+    pub async fn expire_resource(&self) {
+        todo!()
+    }
 }
 
-struct SshChannelPool {
+pub struct SshConnection {
     id: String,
-    state: Mutex<PoolState<russh::Channel<russh::client::Msg>>>,
+    channel_pool_state: Mutex<PoolState<russh::Channel<russh::client::Msg>>>,
     max_size: u8,
-    ssh_session: russh::client::Handle<SshClientHandler>,
+    client_handle: russh::client::Handle<SshClientHandler>,
+    #[allow(dead_code)]
+    /// if expired, wait for all channel to be closed, and then close the connection
+    expired: AtomicBool,
 }
 
-impl SshChannelPool {
+impl SshConnection {
     async fn get(&self) -> Result<russh::Channel<russh::client::Msg>> {
-        let mut state = self.state.lock().await;
+        let mut state = self.channel_pool_state.lock().await;
 
         if state.total_count >= self.max_size {
-            anyhow::bail!("SshChannelPool: {} Maximum resource limit reached", self.id);
+            anyhow::bail!("SshConnection: {} Maximum resource limit reached", self.id);
         }
 
         // 增加总资源计数
         state.total_count += 1;
 
         debug!(
-            "SshChannelPool: {} start create resource. total_count {}",
+            "SshConnection: {} start create resource. total_count {}",
             self.id, state.total_count
         );
         // 创建资源前释放锁，避免长时间持有
         drop(state);
 
         let resource = async {
-            let channel = self.ssh_session.channel_open_session().await?;
-            debug!("SshChannelPool: new channel {}", channel.id());
+            let channel = self.client_handle.channel_open_session().await?;
+            debug!("SshConnection: new channel {}", channel.id());
             Ok(channel)
         }
         .await;
 
         if resource.is_err() {
-            debug!("SshChannelPool: {} create resource fail.", self.id);
+            debug!("SshConnection: {} create resource fail.", self.id);
             // 创建失败，释放资源
             self.drop_resource().await;
         } else {
-            debug!("SshChannelPool: {} resource created.", self.id);
+            debug!("SshConnection: {} resource created.", self.id);
         }
         resource
     }
 
+    async fn return_resource(&self, resource: russh::Channel<russh::client::Msg>) {
+        let mut state = self.channel_pool_state.lock().await;
+        if (state.idle_resources.len() as u8) < self.max_size {
+            state.idle_resources.push_back(resource);
+            debug!(
+                "SshConnection: {} push back resource. idle length {}",
+                self.id,
+                state.idle_resources.len()
+            );
+        }
+    }
+
     async fn drop_resource(&self) {
-        let mut state = self.state.lock().await;
+        let mut state = self.channel_pool_state.lock().await;
         if state.total_count > 0 {
             state.total_count -= 1;
             debug!(
-                "SshChannelPool: {} drop resource. total_count {}",
+                "SshConnection: {} drop resource. total_count {}",
                 self.id, state.total_count
             );
         }
     }
 
     async fn has_idle(&self) -> bool {
-        let state = self.state.lock().await;
+        let state = self.channel_pool_state.lock().await;
         state.total_count < self.max_size
     }
 }
 
 /// 资源守卫，使用 RAII 确保资源归还
-struct SshSessionGuard {
-    resource: Option<Arc<SshChannelPool>>,
-    pool: Arc<SshConnectionPool>,
+pub struct SshConnectionGuard {
+    resource: Arc<SshConnection>,
+    pool: Arc<SshSession>,
 }
 
-impl Drop for SshSessionGuard {
+impl Drop for SshConnectionGuard {
     fn drop(&mut self) {
         let pool = self.pool.clone();
-        let resource = self.resource.take().unwrap();
+        let resource = self.resource.clone();
         tokio::spawn(async move {
             pool.return_resource(resource).await;
         });
     }
 }
 
-impl std::ops::Deref for SshSessionGuard {
-    type Target = Arc<SshChannelPool>;
+impl std::ops::Deref for SshConnectionGuard {
+    type Target = Arc<SshConnection>;
 
     fn deref(&self) -> &Self::Target {
-        self.resource.as_ref().unwrap()
-    }
-}
-
-impl std::ops::DerefMut for SshSessionGuard {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.resource.as_mut().unwrap()
+        &self.resource
     }
 }
 
 pub struct SshChannelGuard {
     channel: Option<russh::Channel<russh::client::Msg>>,
-    pool: SshSessionGuard,
+    pool: SshConnectionGuard,
+    is_borrow: bool,
 }
 
 impl SshChannelGuard {
@@ -387,8 +402,15 @@ impl SshChannelGuard {
 impl Drop for SshChannelGuard {
     fn drop(&mut self) {
         let pool = self.pool.clone();
+        let resource = self.take_channel();
+        let is_borrow = self.is_borrow;
         tokio::spawn(async move {
-            pool.drop_resource().await;
+            if !is_borrow || resource.is_none() {
+                pool.drop_resource().await;
+            } else {
+                let resource = resource.unwrap();
+                pool.return_resource(resource).await;
+            }
         });
     }
 }
@@ -408,7 +430,7 @@ impl std::ops::DerefMut for SshChannelGuard {
 }
 
 pub struct SshSessionPool {
-    session_pool_map: Mutex<HashMap<i32, Arc<SshConnectionPool>>>,
+    session_pool_map: Mutex<HashMap<i32, Arc<SshSession>>>,
     app_state: Arc<AppBaseState>,
 }
 
@@ -420,20 +442,19 @@ impl SshSessionPool {
         }
     }
 
-    pub async fn get(&self, target_id: i32) -> Result<SshChannelGuard> {
-        let ssh_session_pool = {
+    async fn get_session(&self, target_id: i32) -> Result<Arc<SshSession>> {
+        let ssh_session = {
             let mut guard = self.session_pool_map.lock().await;
 
             let arc_pool = guard
                 .entry(target_id)
                 .or_insert_with(|| {
-                    let ssh_session_pool =
-                        Arc::new(SshConnectionPool::new(self.app_state.clone(), target_id));
+                    let ssh_session = Arc::new(SshSession::new(self.app_state.clone(), target_id));
                     debug!(
-                        "SshSessionPool: target {} creating SshConnectionPool {}",
-                        target_id, ssh_session_pool.id
+                        "SshSessionPool: target {} creating SshSession {}",
+                        target_id, ssh_session.id
                     );
-                    ssh_session_pool
+                    ssh_session
                 })
                 .clone();
 
@@ -441,22 +462,36 @@ impl SshSessionPool {
         };
 
         debug!(
-            "SshSessionPool: target {} get SshConnectionPool {}",
-            target_id, ssh_session_pool.id
+            "SshSessionPool: target {} get SshSession {}",
+            target_id, ssh_session.id
         );
 
-        let ssh_channel_pool = ssh_session_pool.get().await?;
-        let ssh_session_guard = SshSessionGuard {
-            resource: Some(ssh_channel_pool),
-            pool: ssh_session_pool.clone(),
+        Ok(ssh_session)
+    }
+
+    /// 借用一个SshConnection, 用完后自动回收待复用
+    pub async fn borrow_connection(&self, target_id: i32) -> Result<SshConnectionGuard> {
+        let ssh_session = self.get_session(target_id).await?;
+
+        let ssh_connection = ssh_session.get_or_make().await?;
+        let ssh_connection_guard = SshConnectionGuard {
+            resource: ssh_connection,
+            pool: ssh_session,
         };
 
         debug!(
-            "SshSessionPool: target {} get SshChannelPool {}",
-            target_id, ssh_session_guard.id
+            "SshSessionPool: target {} get SshConnection {}",
+            target_id, ssh_connection_guard.id
         );
 
-        let ssh_channel: russh::Channel<russh::client::Msg> = ssh_session_guard.get().await?;
+        Ok(ssh_connection_guard)
+    }
+
+    /// 借用一个SshChannel, 用完后自动回收待复用
+    pub async fn borrow_channel(&self, target_id: i32) -> Result<SshChannelGuard> {
+        let connection = self.borrow_connection(target_id).await?;
+
+        let ssh_channel = connection.get().await?;
         debug!(
             "SshSessionPool: target {} get SshChannel {}",
             target_id,
@@ -465,7 +500,32 @@ impl SshSessionPool {
 
         Ok(SshChannelGuard {
             channel: Some(ssh_channel),
-            pool: ssh_session_guard,
+            pool: connection,
+            is_borrow: true,
         })
+    }
+
+    /// 获取一个SshChannel, 用完后不会放回资源池，需要手动关闭
+    pub async fn get_channel(&self, target_id: i32) -> Result<SshChannelGuard> {
+        let ssh_connection_guard = self.borrow_connection(target_id).await?;
+
+        let ssh_channel = ssh_connection_guard.get().await?;
+        debug!(
+            "SshSessionPool: target {} get SshChannel {}",
+            target_id,
+            ssh_channel.id()
+        );
+
+        Ok(SshChannelGuard {
+            channel: Some(ssh_channel),
+            pool: ssh_connection_guard,
+            is_borrow: false,
+        })
+    }
+
+    #[allow(dead_code)]
+    // 将指定的SshConnection标记为过期，将等待没有消费的时候，自动关闭
+    pub async fn expire_connection(&self /*target_id: i32, id: &str*/) {
+        todo!()
     }
 }

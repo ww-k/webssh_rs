@@ -28,7 +28,7 @@ pub(crate) fn router_builder(session_pool: Arc<SshSessionPool>) -> Router<Arc<Ss
     let (svc, io) = SocketIo::builder().build_svc();
     io.ns("/", async move |socket: SocketRef| {
         let sid = socket.id;
-        let result = SshSvcSession::start(socket.clone(), session_pool).await;
+        let result = SshTerminalSession::start(socket.clone(), session_pool).await;
 
         if let Err(err) = result {
             error!("sid={} start fail. {:?}", sid, err);
@@ -41,11 +41,11 @@ pub(crate) fn router_builder(session_pool: Arc<SshSessionPool>) -> Router<Arc<Ss
         .with_state(session_pool_clone)
 }
 
-struct SshSvcSession {
+struct SshTerminalSession {
     socket: SocketRef,
 }
 
-impl SshSvcSession {
+impl SshTerminalSession {
     async fn start(socket: SocketRef, session_pool: Arc<SshSessionPool>) -> Result<Self> {
         let query = socket.req_parts().uri.query().unwrap_or_default();
         let result: Result<QueryParams, serde_qs::Error> = serde_qs::from_str(query);
@@ -53,7 +53,7 @@ impl SshSvcSession {
             anyhow::bail!("Failed to parse query parameters: {:?}", err);
         }
         let params = result.unwrap();
-        let result = session_pool.get(params.target_id).await;
+        let result = session_pool.get_channel(params.target_id).await;
         if let Err(err) = result {
             anyhow::bail!("Failed to get channel: {:?}", err);
         }
@@ -67,7 +67,7 @@ impl SshSvcSession {
             channel.id()
         );
 
-        let term_session = SshSvcSession { socket };
+        let term_session = SshTerminalSession { socket };
         let result = term_session
             .open_session_channel_request_pty_shell(channel)
             .await;

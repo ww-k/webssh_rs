@@ -23,7 +23,7 @@ pub async fn handler(
     info!("@sftp_home {:?}", payload);
 
     let target = map_db_err!(get_target_by_id(&state.base_state.db, payload.target_id).await)?;
-    let channel = map_ssh_err!(state.session_pool.get(payload.target_id).await)?;
+    let channel = map_ssh_err!(state.session_pool.borrow_channel(payload.target_id).await)?;
     if target.system.as_deref() == Some(WINDOWS) {
         return Ok("/C:".to_string());
     }
