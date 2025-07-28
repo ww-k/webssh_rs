@@ -22,7 +22,7 @@ pub async fn handler(
 
     let uri = parse_file_uri(payload.uri.as_str())?;
     let target = map_db_err!(get_target_by_id(&state.base_state.db, uri.target_id).await)?;
-    let channel = map_ssh_err!(state.session_pool.borrow_channel(uri.target_id).await)?;
+    let channel = map_ssh_err!(state.session_pool.get_channel(uri.target_id).await)?;
 
     if target.system.as_deref() == Some(WINDOWS) {
         todo!();

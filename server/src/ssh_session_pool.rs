@@ -390,7 +390,6 @@ impl std::ops::Deref for SshConnectionGuard {
 pub struct SshChannelGuard {
     channel: Option<russh::Channel<russh::client::Msg>>,
     pool: SshConnectionGuard,
-    is_borrow: bool,
 }
 
 impl SshChannelGuard {
@@ -403,9 +402,8 @@ impl Drop for SshChannelGuard {
     fn drop(&mut self) {
         let pool = self.pool.clone();
         let resource = self.take_channel();
-        let is_borrow = self.is_borrow;
         tokio::spawn(async move {
-            if !is_borrow || resource.is_none() {
+            if resource.is_none() {
                 pool.drop_resource().await;
             } else {
                 let resource = resource.unwrap();
@@ -470,7 +468,7 @@ impl SshSessionPool {
     }
 
     /// 借用一个SshConnection, 用完后自动回收待复用
-    pub async fn borrow_connection(&self, target_id: i32) -> Result<SshConnectionGuard> {
+    pub async fn get_connection(&self, target_id: i32) -> Result<SshConnectionGuard> {
         let ssh_session = self.get_session(target_id).await?;
 
         let ssh_connection = ssh_session.get_or_make().await?;
@@ -487,27 +485,9 @@ impl SshSessionPool {
         Ok(ssh_connection_guard)
     }
 
-    /// 借用一个SshChannel, 用完后自动回收待复用
-    pub async fn borrow_channel(&self, target_id: i32) -> Result<SshChannelGuard> {
-        let connection = self.borrow_connection(target_id).await?;
-
-        let ssh_channel = connection.get().await?;
-        debug!(
-            "SshSessionPool: target {} get SshChannel {}",
-            target_id,
-            ssh_channel.id()
-        );
-
-        Ok(SshChannelGuard {
-            channel: Some(ssh_channel),
-            pool: connection,
-            is_borrow: true,
-        })
-    }
-
-    /// 获取一个SshChannel, 用完后不会放回资源池，需要手动关闭
+    /// 获取一个SshChannel
     pub async fn get_channel(&self, target_id: i32) -> Result<SshChannelGuard> {
-        let ssh_connection_guard = self.borrow_connection(target_id).await?;
+        let ssh_connection_guard = self.get_connection(target_id).await?;
 
         let ssh_channel = ssh_connection_guard.get().await?;
         debug!(
@@ -519,7 +499,6 @@ impl SshSessionPool {
         Ok(SshChannelGuard {
             channel: Some(ssh_channel),
             pool: ssh_connection_guard,
-            is_borrow: false,
         })
     }
 

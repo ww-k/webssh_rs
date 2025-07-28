@@ -276,7 +276,7 @@ pub fn split_path(path: &str) -> Option<(&str, &str)> {
 }
 
 pub async fn get_sftp_session(state: Arc<AppState>, target_id: i32) -> Result<SftpSession, ApiErr> {
-    let mut guard = map_ssh_err!(state.session_pool.borrow_channel(target_id).await)?;
+    let mut guard = map_ssh_err!(state.session_pool.get_channel(target_id).await)?;
     let channel = guard.take_channel().ok_or(ApiErr {
         code: ERR_CODE_SSH_ERR,
         message: "take none channel".to_string(),

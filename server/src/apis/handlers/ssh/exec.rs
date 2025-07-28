@@ -62,7 +62,7 @@ pub async fn handler(
 ) -> Result<String, ApiErr> {
     info!("@ssh_exec {:?}", body);
 
-    let channel = map_ssh_err!(session_pool.borrow_channel(payload.target_id).await)?;
+    let channel = map_ssh_err!(session_pool.get_channel(payload.target_id).await)?;
     let result = exec(channel, body.as_str()).await?;
 
     info!("@ssh_exec {:?} done", body);
