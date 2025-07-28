@@ -485,7 +485,8 @@ impl SshSessionPool {
         Ok(ssh_connection_guard)
     }
 
-    /// 获取一个SshChannel
+    /// 借用一个SshChannel, 用完自动回收待复用，
+    /// 如果通过SshChannelGuard::take_channel()获取所有权，则不会回收，需要手动关闭channel
     pub async fn get_channel(&self, target_id: i32) -> Result<SshChannelGuard> {
         let ssh_connection_guard = self.get_connection(target_id).await?;
 
