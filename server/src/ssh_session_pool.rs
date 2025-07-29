@@ -10,6 +10,7 @@ use russh::{
     client::DisconnectReason,
     keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, decode_secret_key, ssh_key},
 };
+use russh_sftp::client::SftpSession;
 use tokio::sync::Mutex;
 use tracing::debug;
 
@@ -427,8 +428,85 @@ impl std::ops::DerefMut for SshChannelGuard {
     }
 }
 
+pub struct SshSftpSession {
+    target_id: i32,
+    sftp_session: SftpSession,
+}
+
+impl std::ops::Deref for SshSftpSession {
+    type Target = SftpSession;
+
+    fn deref(&self) -> &Self::Target {
+        &self.sftp_session
+    }
+}
+
+struct SshSftpSessionPool {
+    pool_state: Mutex<PoolState<Arc<SshSftpSession>>>,
+}
+
+impl SshSftpSessionPool {
+    fn new() -> Self {
+        SshSftpSessionPool {
+            pool_state: Mutex::new(PoolState {
+                idle_resources: VecDeque::new(),
+                total_count: 0,
+            }),
+        }
+    }
+
+    async fn get(&self, target_id: i32) -> Option<Arc<SshSftpSession>> {
+        let mut state = self.pool_state.lock().await;
+        let position = state
+            .idle_resources
+            .iter()
+            .position(|item| item.target_id == target_id);
+
+        match position {
+            Some(position) => state.idle_resources.remove(position),
+            None => None,
+        }
+    }
+    async fn return_resource(&self, resource: Arc<SshSftpSession>) {
+        let mut state = self.pool_state.lock().await;
+        state.idle_resources.push_back(resource);
+
+        debug!(
+            "SshSftpSessionPool: push back resource. idle length {}",
+            state.idle_resources.len()
+        );
+    }
+}
+
+pub struct SftpSessionGuard {
+    sftp_session: Arc<SshSftpSession>,
+    // ssh_connection_guard: SshConnectionGuard,
+    pool: Arc<SshSftpSessionPool>,
+}
+
+impl Drop for SftpSessionGuard {
+    fn drop(&mut self) {
+        // let channel_pool = self.ssh_connection_guard.clone();
+        let sftp_session = self.sftp_session.clone();
+        let pool = self.pool.clone();
+        tokio::spawn(async move {
+            let _ = pool.return_resource(sftp_session).await;
+            //TODO: 回滚channel的计数
+        });
+    }
+}
+
+impl std::ops::Deref for SftpSessionGuard {
+    type Target = Arc<SshSftpSession>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.sftp_session
+    }
+}
+
 pub struct SshSessionPool {
     session_pool_map: Mutex<HashMap<i32, Arc<SshSession>>>,
+    sftp_session_pool: Arc<SshSftpSessionPool>,
     app_state: Arc<AppBaseState>,
 }
 
@@ -436,6 +514,7 @@ impl SshSessionPool {
     pub fn new(app_state: Arc<AppBaseState>) -> Self {
         SshSessionPool {
             session_pool_map: Mutex::new(HashMap::new()),
+            sftp_session_pool: Arc::new(SshSftpSessionPool::new()),
             app_state,
         }
     }
@@ -499,7 +578,38 @@ impl SshSessionPool {
 
         Ok(SshChannelGuard {
             channel: Some(ssh_channel),
+            //TODO: ssh_channel没释放，connetion也不会释放
             pool: ssh_connection_guard,
+        })
+    }
+
+    pub async fn get_sftp_session(&self, target_id: i32) -> Result<SftpSessionGuard> {
+        let sftp = self.sftp_session_pool.get(target_id).await;
+        if sftp.is_some() {
+            return Ok(SftpSessionGuard {
+                sftp_session: sftp.unwrap(),
+                pool: self.sftp_session_pool.clone(),
+            });
+        }
+
+        let ssh_connection_guard = self.get_connection(target_id).await?;
+        let channel = ssh_connection_guard.get().await?;
+        channel.request_subsystem(true, "sftp").await?;
+        let channel_id = channel.id();
+        let sftp = SftpSession::new(channel.into_stream()).await?;
+
+        debug!(
+            "SshSessionPool: target {} get SftpSession on SshChannel {}",
+            target_id, channel_id
+        );
+
+        // TODO: channel没有释放计数
+        Ok(SftpSessionGuard {
+            sftp_session: Arc::new(SshSftpSession {
+                target_id,
+                sftp_session: sftp,
+            }),
+            pool: self.sftp_session_pool.clone(),
         })
     }
 

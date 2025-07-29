@@ -19,7 +19,7 @@ use tracing::info;
 
 use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
-use super::{ContentRange, SftpFileUriPayload, get_sftp_session, parse_file_uri};
+use super::{ContentRange, SftpFileUriPayload, parse_file_uri};
 
 const CHUNK_SIZE: usize = 8192;
 
@@ -69,7 +69,7 @@ pub async fn handler(
     }
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = get_sftp_session(state, uri.target_id).await?;
+    let sftp = map_ssh_err!(state.session_pool.get_sftp_session(uri.target_id).await)?;
 
     let mut file = map_ssh_err!(
         sftp.open_with_flags(

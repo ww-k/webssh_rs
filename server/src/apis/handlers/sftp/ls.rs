@@ -9,7 +9,7 @@ use tracing::{debug, info};
 
 use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
-use super::{SftpFile, get_sftp_session, parse_file_uri};
+use super::{SftpFile, parse_file_uri};
 
 #[derive(Debug, Deserialize)]
 pub struct SftpLsPayload {
@@ -24,7 +24,7 @@ pub async fn handler(
     info!("@sftp_ls {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = get_sftp_session(state, uri.target_id).await?;
+    let sftp = map_ssh_err!(state.session_pool.get_sftp_session(uri.target_id).await)?;
     let read_dir = map_ssh_err!(sftp.read_dir(uri.path).await)?;
 
     debug!("@sftp_ls sftp.read_dir {:?}", payload);

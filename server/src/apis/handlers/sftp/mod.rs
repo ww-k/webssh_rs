@@ -9,16 +9,14 @@ pub mod rm_rf;
 pub mod stat;
 pub mod upload;
 
-use std::sync::Arc;
-
 use axum::http::HeaderValue;
 use russh_sftp::{
-    client::{SftpSession, fs::DirEntry},
+    client::fs::DirEntry,
     protocol::{FileAttributes, FileType},
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
+use crate::{apis::ApiErr, consts::services_err_code::*};
 
 const URI_SEP: &str = ":";
 const PATH_SEP: &str = "/";
@@ -34,12 +32,12 @@ pub struct SftpFile {
 }
 
 impl SftpFile {
-    pub fn from_dir_entry(dir_entry: DirEntry) -> Self {
+    fn from_dir_entry(dir_entry: DirEntry) -> Self {
         let attrs = dir_entry.metadata();
         Self::from_name_attrs(dir_entry.file_name(), attrs)
     }
 
-    pub fn from_name_attrs(name: String, attrs: FileAttributes) -> Self {
+    fn from_name_attrs(name: String, attrs: FileAttributes) -> Self {
         let permissions = attrs.permissions();
         SftpFile {
             name,
@@ -72,23 +70,23 @@ impl Default for SftpFile {
 
 #[derive(Debug, Deserialize)]
 pub struct SftpFileUriPayload {
-    pub uri: String,
+    uri: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SftpRenamePayload {
-    pub uri: String,
-    pub target_path: String,
+    uri: String,
+    target_path: String,
 }
 
 #[derive(Debug)]
-pub struct SftpFileUri<'a> {
-    pub target_id: i32,
-    pub path: &'a str,
+struct SftpFileUri<'a> {
+    target_id: i32,
+    path: &'a str,
 }
 
 impl<'a> SftpFileUri<'a> {
-    pub fn from_str(str: &'a str) -> Option<Self> {
+    fn from_str(str: &'a str) -> Option<Self> {
         let mut split = str.split(URI_SEP);
         if Some("sftp") != split.next() {
             return None;
@@ -211,7 +209,7 @@ impl Range {
     }
 }
 
-pub fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri, ApiErr> {
+fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri, ApiErr> {
     let uri = SftpFileUri::from_str(file_uri_str);
     uri.ok_or(ApiErr {
         code: ERR_CODE_SFTP_INVALID_URI,
@@ -219,7 +217,7 @@ pub fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri, ApiErr> {
     })
 }
 
-pub fn get_file_name(path: &str) -> String {
+fn get_file_name(path: &str) -> String {
     let split = path.split(PATH_SEP);
     let Some(name) = split.last() else {
         return "".to_string();
@@ -228,7 +226,7 @@ pub fn get_file_name(path: &str) -> String {
 }
 
 #[allow(dead_code)]
-pub fn mode_to_permissions(mode: u32) -> String {
+fn mode_to_permissions(mode: u32) -> String {
     let mut s = String::with_capacity(9);
     let perms = ['r', 'w', 'x'];
 
@@ -247,7 +245,7 @@ pub fn mode_to_permissions(mode: u32) -> String {
 }
 
 #[allow(dead_code)]
-pub fn split_path(path: &str) -> Option<(&str, &str)> {
+fn split_path(path: &str) -> Option<(&str, &str)> {
     if path == PATH_SEP {
         return None;
     }
@@ -273,17 +271,6 @@ pub fn split_path(path: &str) -> Option<(&str, &str)> {
         }
         None => None,
     }
-}
-
-pub async fn get_sftp_session(state: Arc<AppState>, target_id: i32) -> Result<SftpSession, ApiErr> {
-    let mut guard = map_ssh_err!(state.session_pool.get_channel(target_id).await)?;
-    let channel = guard.take_channel().ok_or(ApiErr {
-        code: ERR_CODE_SSH_ERR,
-        message: "take none channel".to_string(),
-    })?;
-    let _ = map_ssh_err!(channel.request_subsystem(true, "sftp").await)?;
-    let sftp = map_ssh_err!(SftpSession::new(channel.into_stream()).await)?;
-    Ok(sftp)
 }
 
 #[cfg(test)]
