@@ -1,5 +1,4 @@
 import { defineConfig } from "@rsbuild/core";
-import { pluginLess } from "@rsbuild/plugin-less";
 import { pluginReact } from "@rsbuild/plugin-react";
 
 export default defineConfig({
@@ -33,16 +32,7 @@ export default defineConfig({
     output: {
         assetPrefix: ".",
     },
-    plugins: [
-        pluginReact(),
-        pluginLess({
-            lessLoaderOptions: {
-                lessOptions: {
-                    math: "always",
-                },
-            },
-        }),
-    ],
+    plugins: [pluginReact()],
     resolve: {
         alias: {
             "@": "./src",
