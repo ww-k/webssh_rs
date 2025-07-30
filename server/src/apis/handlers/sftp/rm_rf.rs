@@ -14,6 +14,7 @@ use super::{SftpFileUriPayload, parse_file_uri};
 
 const WINDOWS: &str = "windows";
 
+/// TODO: 优化, 接收多个文件路径，一次删除
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,
