@@ -446,20 +446,24 @@ impl SshSftpSessionPool {
                 idle_resources: VecDeque::new(),
                 total_count: 0,
             }),
-            max_size: app_state.config.max_channel_per_session / 2,
+            max_size: app_state.config.max_channel_per_session / 2
+                * (app_state.config.max_session_per_target / 2),
         }
     }
 
+    /// 创建或获取一个sftp会话
     async fn get_or_make(
         &self,
         target_id: i32,
         ssh_session: Arc<SshSession>,
     ) -> Result<Arc<SshSftpSession>> {
         let mut state = self.pool_state.lock().await;
-        let position = state
+        let mut sessions = state
             .idle_resources
             .iter()
-            .position(|item| item.target_id == target_id);
+            .filter(|item| item.target_id == target_id);
+
+        let position = sessions.position(|item| item.target_id == target_id);
 
         if position.is_some() {
             debug!(
@@ -470,24 +474,17 @@ impl SshSftpSessionPool {
             return Ok(state.idle_resources.remove(position.unwrap()).unwrap());
         }
 
-        if state.total_count >= self.max_size {
-            anyhow::bail!("SshSessionPool: Maximum SshSftpSession limit reached");
-        }
-
-        state.total_count += 1;
+        let count = sessions.count() as u8;
         drop(state);
 
-        let result = self.make(target_id, ssh_session).await;
-        if result.is_err() {
-            let mut state = self.pool_state.lock().await;
-            state.total_count -= 1;
-            drop(state);
-            return result;
+        if count >= self.max_size {
+            anyhow::bail!("SshSftpSessionPool: Maximum SshSftpSession limit reached");
         }
 
-        Ok(result.unwrap())
+        self.make(target_id, ssh_session).await
     }
 
+    /// 创建一个sftp会话
     async fn make(
         &self,
         target_id: i32,
