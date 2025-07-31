@@ -38,4 +38,7 @@ export default defineConfig({
             "@": "./src",
         },
     },
+    performance: {
+        removeMomentLocale: true,
+    },
 });
