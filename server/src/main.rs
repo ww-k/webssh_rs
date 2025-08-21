@@ -4,6 +4,8 @@ mod consts;
 mod entities;
 mod migrations;
 mod ssh_session_pool;
+#[cfg(test)]
+mod tests;
 
 use std::{ops::Deref, sync::Arc};
 

@@ -135,7 +135,7 @@ impl SshClient {
                     .await?
             }
             TargetAuthMethod::None => {
-                todo!();
+                anyhow::bail!("Unsupported auth method None");
             }
         };
 
@@ -430,6 +430,12 @@ impl SshConnection {
     }
 }
 
+impl Drop for SshConnection {
+    fn drop(&mut self) {
+        debug!("SshConnection: {} drop", self.id);
+    }
+}
+
 pub struct SshChannelGuard {
     channel: Option<russh::Channel<russh::client::Msg>>,
     pool: Arc<SshConnection>,
@@ -666,13 +672,13 @@ impl SshSessionPool {
 
     #[allow(dead_code)]
     // 将指定的SshConnection标记为过期，将等待没有消费的时候，自动关闭
-    pub async fn expire_connection(&self, target_id: i32, channel_id: &str) {
+    pub async fn expire_connection(&self, target_id: i32, connection_id: &str) {
         let ssh_session_o = self.session_pool_map.lock().await.get(&target_id).cloned();
         if ssh_session_o.is_none() {
             return;
         }
         let ssh_session = ssh_session_o.unwrap();
-        let ssh_connection_o = ssh_session.get_by_id(channel_id).await;
+        let ssh_connection_o = ssh_session.get_by_id(connection_id).await;
         if let Some(ssh_connection) = ssh_connection_o {
             ssh_connection.expired.store(true, Ordering::Release);
             ssh_session.remove_resource(&ssh_connection.id).await;
@@ -708,5 +714,149 @@ fn drop_connection_received_msg(
                 ),
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{config::Config, migrations::Migrator, tests::sftp_server};
+    use russh::ChannelMsg;
+    use sea_orm::{ActiveModelTrait, Database};
+    use sea_orm_migration::MigratorTrait;
+    use tokio::{
+        sync::{OnceCell, broadcast},
+        time::sleep,
+    };
+    use tracing::info;
+    use tracing_subscriber::fmt;
+
+    static INIT_ONCE_CELL: OnceCell<(Arc<SshSessionPool>, broadcast::Sender<String>)> =
+        OnceCell::const_new();
+    async fn init() -> &'static (Arc<SshSessionPool>, broadcast::Sender<String>) {
+        INIT_ONCE_CELL
+            .get_or_init(|| async {
+                let _ = fmt().with_env_filter("server=debug,off").init();
+
+                let config = Config {
+                    max_session_per_target: 2,
+                    max_channel_per_session: 2,
+                };
+
+                let db = Database::connect("sqlite::memory:")
+                    .await
+                    .expect("Database connection failed");
+
+                Migrator::up(&db, None).await.unwrap();
+
+                let active_model = target::ActiveModel::from(target::Model {
+                    id: 1,
+                    host: "127.0.0.1".to_string(),
+                    port: Some(2222),
+                    method: target::TargetAuthMethod::Password,
+                    user: "root".to_string(),
+                    key: None,
+                    password: Some("123456".to_string()),
+                    system: Some("windows".to_string()),
+                });
+                let _ = active_model.insert(&db).await.unwrap();
+                let app_state = Arc::new(AppBaseState { db, config });
+                let session_pool = Arc::new(SshSessionPool::new(app_state.clone()));
+
+                let disconnect_tx = sftp_server::run_server().await.unwrap();
+
+                (session_pool, disconnect_tx)
+            })
+            .await
+    }
+
+    #[tokio::test]
+    /// 测试将一个连接设置为过期，过期的连接已经不在连接池中，该连接下的channel仍可用，等channel都关闭后，连接会自动销毁
+    async fn test_ssh_session_pool_expire_connection() {
+        let (session_pool, _) = init().await;
+
+        let sftp_guard = session_pool.get_sftp_session(1).await.unwrap();
+        let read_dir = sftp_guard.read_dir("/").await.unwrap();
+
+        let file_names: Vec<String> = read_dir.map(|dir_entry| dir_entry.file_name()).collect();
+        assert_eq!(
+            file_names,
+            vec!["foo", "bar"],
+            "sftp read_dir unexpected result"
+        );
+
+        let session = session_pool.get_session(1).await.unwrap();
+        let (ssh_connection, _) = session.get_or_make().await.unwrap();
+        let connection_id = ssh_connection.id.clone();
+        session.return_resource(ssh_connection.clone()).await;
+
+        let _ = session_pool
+            .expire_connection(1, connection_id.as_str())
+            .await;
+
+        let result = session.get_by_id(connection_id.as_str()).await;
+        assert!(result.is_none());
+
+        // 过期的连接下的channel仍然可用
+        let read_dir = sftp_guard.read_dir("/").await.unwrap();
+        let file_names: Vec<String> = read_dir.map(|dir_entry| dir_entry.file_name()).collect();
+        assert_eq!(
+            file_names,
+            vec!["foo", "bar"],
+            "sftp read_dir unexpected result"
+        );
+
+        let mut channel = session_pool.get_channel(1).await.unwrap();
+        let _ = channel.exec(true, "hello").await;
+        let mut buf = Vec::<u8>::new();
+        if let Some(msg) = channel.wait().await {
+            match msg {
+                ChannelMsg::Data { ref data } => {
+                    buf.extend_from_slice(data);
+                }
+                _ => {}
+            }
+            let msg_str = String::from_utf8_lossy(&buf);
+            info!("channel message: {:?}", msg_str);
+        } else {
+            info!("channel message: None");
+        }
+
+        // TODO: 测试所有channel回收后，连接会自动销毁
+        // 销毁channel
+        // drop(sftp_guard);
+        // ssh_connection.close().await;
+        // sleep(Duration::from_secs(1)).await;
+        // let state = ssh_connection.channel_pool_state.lock().await;
+        // assert_eq!(state.total_count, 1);
+        // drop(state);
+    }
+
+    #[tokio::test]
+    /// 测试ssh server断开连接后，断开的连接已经不在连接池中
+    async fn test_ssh_session_pool_disconnect_connection() {
+        let (session_pool, disconnect_tx) = init().await;
+
+        let sftp_guard = session_pool.get_sftp_session(1).await.unwrap();
+        let read_dir = sftp_guard.read_dir("/").await.unwrap();
+
+        let file_names: Vec<String> = read_dir.map(|dir_entry| dir_entry.file_name()).collect();
+        assert_eq!(
+            file_names,
+            vec!["foo", "bar"],
+            "sftp read_dir unexpected result"
+        );
+
+        // 获取已创建的connection_id
+        let session = session_pool.get_session(1).await.unwrap();
+        let (ssh_connection, _) = session.get_or_make().await.unwrap();
+        let connection_id = ssh_connection.id.clone();
+        session.return_resource(ssh_connection).await;
+
+        let _ = disconnect_tx.send("disconnect".to_string()).unwrap();
+
+        sleep(Duration::from_secs(1)).await;
+        let result = session.get_by_id(connection_id.as_str()).await;
+        assert!(result.is_none());
     }
 }

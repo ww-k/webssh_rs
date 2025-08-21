@@ -6,22 +6,33 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.98"
 async-stream = "0.3.6"
-axum = { version = "0.8.3", features = [ "macros" ] }
+axum = { version = "0.8.3", features = ["macros"] }
 futures-util = "0.3.31"
 hex = "0.4.3"
 nanoid = "0.4.0"
-russh = "0.52.1"
+russh = "0.54.1"
 russh-sftp = "2.1.1"
-sea-orm = { version = "1.1.10", features = [ "sqlx-sqlite", "runtime-tokio-native-tls", "macros" ] }
+sea-orm = { version = "1.1.10", features = [
+    "sqlx-sqlite",
+    "runtime-tokio-native-tls",
+    "macros",
+] }
 sea-orm-migration = "1.1.10"
 serde = "1.0.219"
 serde_json = "1.0.140"
 serde_qs = "0.15.0"
 serde_repr = "0.1.20"
 sha2 = "0.10.9"
-socketioxide = { version = "0.17.0", features = ["tracing", "state", "extensions"] }
+socketioxide = { version = "0.17.0", features = [
+    "tracing",
+    "state",
+    "extensions",
+] }
 tokio = { version = "1.44.2", features = ["full"] }
 tokio-util = { version = "0.7.13", features = ["io"] }
 tower-http = { version = "0.6.2", features = ["fs"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+[dev-dependencies]
+rand_core = "0.6.4"
