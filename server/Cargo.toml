@@ -10,7 +10,11 @@ axum = { version = "0.8.3", features = ["macros"] }
 futures-util = "0.3.31"
 hex = "0.4.3"
 nanoid = "0.4.0"
-russh = "0.54.1"
+russh = { version = "0.54", default-features = false, features = [
+    "flate2",
+    "rsa",
+    "ring",
+] }
 russh-sftp = "2.1.1"
 sea-orm = { version = "1.1.10", features = [
     "sqlx-sqlite",
