@@ -186,7 +186,9 @@ impl SshSession {
     }
 
     // 获取或创建一个 SshConnection
-    async fn get_or_make(&self) -> Result<(Arc<SshConnection>, Option<oneshot::Receiver<bool>>)> {
+    async fn get_or_make_connection(
+        &self,
+    ) -> Result<(Arc<SshConnection>, Option<oneshot::Receiver<bool>>)> {
         let mut state = self.connection_pool_state.lock().await;
 
         debug!("SshSession: {} start find idle SshConnection.", self.id);
@@ -271,15 +273,15 @@ impl SshSession {
         russh::Channel<russh::client::Msg>,
         Option<oneshot::Receiver<bool>>,
     )> {
-        let (ssh_connection, option_rx) = self.get_or_make().await?;
+        let (ssh_connection, option_rx) = self.get_or_make_connection().await?;
         let ssh_connection_clone = ssh_connection.clone();
-        let channel = match ssh_connection.get_or_make().await {
+        let channel = match ssh_connection.get_or_make_channel().await {
             std::result::Result::Ok(channel) => {
-                self.return_resource(ssh_connection).await;
+                self.return_connnection(ssh_connection).await;
                 Ok(channel)
             }
             Err(err) => {
-                self.return_resource(ssh_connection).await;
+                self.return_connnection(ssh_connection).await;
                 Err(err)
             }
         }?;
@@ -287,8 +289,32 @@ impl SshSession {
         Ok((ssh_connection_clone, channel, option_rx))
     }
 
+    // 获取或创建一个 SftpSession, 并自动回收 SshConnection
+    async fn get_or_make_sftp_session(
+        &self,
+    ) -> Result<(
+        Arc<SshConnection>,
+        SftpSession,
+        Option<oneshot::Receiver<bool>>,
+    )> {
+        let (ssh_connection, option_rx) = self.get_or_make_connection().await?;
+        let ssh_connection_clone = ssh_connection.clone();
+        let sftp = match ssh_connection.get_or_make_sftp_session().await {
+            std::result::Result::Ok(channel) => {
+                self.return_connnection(ssh_connection).await;
+                Ok(channel)
+            }
+            Err(err) => {
+                self.return_connnection(ssh_connection).await;
+                Err(err)
+            }
+        }?;
+
+        Ok((ssh_connection_clone, sftp, option_rx))
+    }
+
     // 回收 SshConnection
-    async fn return_resource(&self, resource: Arc<SshConnection>) {
+    async fn return_connnection(&self, resource: Arc<SshConnection>) {
         let mut state = self.connection_pool_state.lock().await;
         if (state.idle_resources.len() as u8) < self.max_size {
             state.idle_resources.push_back(resource);
@@ -301,7 +327,7 @@ impl SshSession {
     }
 
     // 删除 SshConnection
-    async fn remove_resource(&self, channel_id: &str) {
+    async fn remove_connection(&self, channel_id: &str) {
         let mut state = self.connection_pool_state.lock().await;
         let position = state
             .idle_resources
@@ -335,9 +361,10 @@ impl SshSession {
 pub struct SshConnection {
     id: String,
     channel_pool_state: Mutex<PoolState<russh::Channel<russh::client::Msg>>>,
-    max_size: u8,
+    channel_max_size: u8,
+    sftp_pool_state: Mutex<PoolState<SftpSession>>,
+    sftp_max_size: u8,
     client_handle: russh::client::Handle<SshClientHandler>,
-    #[allow(dead_code)]
     /// if expired, wait for all channel to be closed, and then close the connection
     expired: AtomicBool,
 }
@@ -353,13 +380,19 @@ impl SshConnection {
                 idle_resources: VecDeque::new(),
                 total_count: 0,
             }),
-            max_size: app_state.config.max_channel_per_session,
+            sftp_pool_state: Mutex::new(PoolState {
+                idle_resources: VecDeque::new(),
+                total_count: 0,
+            }),
+            channel_max_size: app_state.config.max_channel_per_session,
+            sftp_max_size: app_state.config.max_channel_per_session / 2
+                * (app_state.config.max_session_per_target / 2),
             client_handle,
             expired: AtomicBool::new(false),
         }
     }
 
-    async fn get_or_make(&self) -> Result<russh::Channel<russh::client::Msg>> {
+    async fn get_or_make_channel(&self) -> Result<russh::Channel<russh::client::Msg>> {
         let mut state = self.channel_pool_state.lock().await;
         let expired = self.expired.load(Ordering::Acquire);
 
@@ -367,7 +400,7 @@ impl SshConnection {
             anyhow::bail!("SshConnection: {} expired", self.id);
         }
 
-        if state.total_count >= self.max_size {
+        if state.total_count >= self.channel_max_size {
             anyhow::bail!("SshConnection: {} Maximum Channel limit reached", self.id);
         }
 
@@ -391,15 +424,98 @@ impl SshConnection {
         if resource.is_err() {
             debug!("SshConnection: {} create Channel fail.", self.id);
             // 创建失败，回滚计数
-            self.rollback_count().await;
+            self.rollback_count_channel().await;
         } else {
             debug!("SshConnection: {} Channel created.", self.id);
         }
         resource
     }
 
+    async fn get_or_make_sftp_session(&self) -> Result<SftpSession> {
+        let mut state = self.sftp_pool_state.lock().await;
+        let expired = self.expired.load(Ordering::Acquire);
+
+        if expired {
+            anyhow::bail!("SshConnection: {} expired", self.id);
+        }
+
+        if state.total_count >= self.sftp_max_size {
+            anyhow::bail!(
+                "SshConnection: {} Maximum SftpSession limit reached",
+                self.id
+            );
+        }
+
+        // 增加总资源计数
+        state.total_count += 1;
+
+        debug!(
+            "SshConnection: {} start create SftpSession. total_count {}.",
+            self.id, state.total_count
+        );
+        // 创建资源前释放锁，避免长时间持有
+        drop(state);
+
+        let resource = self.make_sftp_session().await;
+
+        if resource.is_err() {
+            debug!("SshConnection: {} create SftpSession fail.", self.id);
+            // 创建失败，回滚计数
+            self.rollback_count_channel().await;
+        } else {
+            debug!("SshConnection: {} SftpSession created.", self.id);
+        }
+        resource
+    }
+
+    /// 创建一个sftp会话
+    async fn make_sftp_session(&self) -> Result<SftpSession> {
+        let channel = self.get_or_make_channel().await?;
+        let channel_id = channel.id();
+
+        // request subsystem sftp
+        channel.request_subsystem(true, "sftp").await?;
+        // create SftpSession
+        let sftp = SftpSession::new(channel.into_stream()).await?;
+
+        debug!(
+            "SshConnection: {} create SftpSession on SshChannel {}",
+            self.id, channel_id
+        );
+
+        Ok(sftp)
+    }
+
+    /// 回收 SshChannel
+    async fn return_channel(&self, resource: russh::Channel<russh::client::Msg>) {
+        let mut state = self.channel_pool_state.lock().await;
+        if state.total_count > 0 {
+            state.idle_resources.push_back(resource);
+            debug!(
+                "SshConnection: {}  push back Channel. total_count {}",
+                self.id, state.total_count
+            );
+        } else {
+            self.close_when_exxpired().await;
+        }
+    }
+
+    /// 回收 SftpSession
+    async fn return_sftp_session(&self, resource: SftpSession) {
+        let mut state = self.sftp_pool_state.lock().await;
+        if state.total_count > 0 {
+            state.idle_resources.push_back(resource);
+            debug!(
+                "SshConnection: {}  push back Channel. total_count {}",
+                self.id, state.total_count
+            );
+        } else {
+            self.close_when_exxpired().await;
+        }
+    }
+
     /// 回滚计数
-    async fn rollback_count(&self) {
+    async fn rollback_count_channel(&self) {
         let mut state = self.channel_pool_state.lock().await;
         if state.total_count > 0 {
             state.total_count -= 1;
@@ -408,18 +524,22 @@ impl SshConnection {
                 self.id, state.total_count
             );
         } else {
-            let expired = self.expired.load(Ordering::Acquire);
-            if expired {
-                // 关闭没有channel的过期的SshConnection
-                self.close().await;
-            }
+            self.close_when_exxpired().await;
         }
     }
 
     async fn has_idle(&self) -> bool {
         let state = self.channel_pool_state.lock().await;
         let expired = self.expired.load(Ordering::Acquire);
-        expired == false && state.total_count < self.max_size
+        expired == false && state.total_count < self.channel_max_size
+    }
+
+    async fn close_when_exxpired(&self) {
+        let expired = self.expired.load(Ordering::Acquire);
+        if expired {
+            // 关闭没有channel的过期的SshConnection
+            self.close().await;
+        }
     }
 
     async fn close(&self) {
@@ -449,9 +569,15 @@ impl SshChannelGuard {
 
 impl Drop for SshChannelGuard {
     fn drop(&mut self) {
+        let channel_o = self.channel.take();
         let pool = self.pool.clone();
         tokio::spawn(async move {
-            pool.rollback_count().await;
+            if let Some(channel) = channel_o {
+                // TODO: 需要测试channel是否还能复用
+                pool.return_channel(channel).await;
+            } else {
+                pool.rollback_count_channel().await;
+            }
         });
     }
 }
@@ -470,132 +596,31 @@ impl std::ops::DerefMut for SshChannelGuard {
     }
 }
 
-pub struct SshSftpSession {
-    target_id: i32,
-    sftp_session: SftpSession,
-}
-
-impl std::ops::Deref for SshSftpSession {
-    type Target = SftpSession;
-
-    fn deref(&self) -> &Self::Target {
-        &self.sftp_session
-    }
-}
-
-struct SshSftpSessionPool {
-    pool_state: Mutex<PoolState<Arc<SshSftpSession>>>,
-    max_size: u8,
-}
-
-impl SshSftpSessionPool {
-    fn new(app_state: Arc<AppBaseState>) -> Self {
-        SshSftpSessionPool {
-            pool_state: Mutex::new(PoolState {
-                idle_resources: VecDeque::new(),
-                total_count: 0,
-            }),
-            max_size: app_state.config.max_channel_per_session / 2
-                * (app_state.config.max_session_per_target / 2),
-        }
-    }
-
-    /// 创建或获取一个sftp会话
-    async fn get_or_make(
-        &self,
-        target_id: i32,
-        ssh_session: Arc<SshSession>,
-    ) -> Result<Arc<SshSftpSession>> {
-        let mut state = self.pool_state.lock().await;
-        let mut sessions = state
-            .idle_resources
-            .iter()
-            .filter(|item| item.target_id == target_id);
-
-        let position = sessions.position(|item| item.target_id == target_id);
-
-        if position.is_some() {
-            debug!(
-                "SshSftpSessionPool: target {} find idle SftpSession",
-                target_id
-            );
-
-            return Ok(state.idle_resources.remove(position.unwrap()).unwrap());
-        }
-
-        let count = sessions.count() as u8;
-        drop(state);
-
-        if count >= self.max_size {
-            anyhow::bail!("SshSftpSessionPool: Maximum SshSftpSession limit reached");
-        }
-
-        self.make(target_id, ssh_session).await
-    }
-
-    /// 创建一个sftp会话
-    async fn make(
-        &self,
-        target_id: i32,
-        ssh_session: Arc<SshSession>,
-    ) -> Result<Arc<SshSftpSession>> {
-        let (ssh_connection, channel, rx_option) = ssh_session.get_or_make_channel().await?;
-        let channel_id = channel.id();
-        drop_connection_received_msg(ssh_session, &ssh_connection, rx_option);
-
-        // request subsystem sftp
-        channel.request_subsystem(true, "sftp").await?;
-        // create SftpSession
-        let sftp = SftpSession::new(channel.into_stream()).await?;
-
-        debug!(
-            "SshSftpSessionPool: target {} create SftpSession on SshChannel {}",
-            target_id, channel_id
-        );
-
-        Ok(Arc::new(SshSftpSession {
-            target_id,
-            sftp_session: sftp,
-        }))
-    }
-
-    async fn return_resource(&self, resource: Arc<SshSftpSession>) {
-        let mut state = self.pool_state.lock().await;
-        state.idle_resources.push_back(resource);
-
-        debug!(
-            "SshSftpSessionPool: push back SshSftpSession. idle length {}",
-            state.idle_resources.len()
-        );
-    }
-}
-
 pub struct SftpSessionGuard {
-    sftp_session: Arc<SshSftpSession>,
-    pool: Arc<SshSftpSessionPool>,
+    sftp_session: Option<SftpSession>,
+    pool: Arc<SshConnection>,
 }
 
 impl Drop for SftpSessionGuard {
     fn drop(&mut self) {
-        let sftp_session = self.sftp_session.clone();
+        let sftp_session = self.sftp_session.take().unwrap();
         let pool = self.pool.clone();
         tokio::spawn(async move {
-            let _ = pool.return_resource(sftp_session).await;
+            let _ = pool.return_sftp_session(sftp_session).await;
         });
     }
 }
 
 impl std::ops::Deref for SftpSessionGuard {
-    type Target = Arc<SshSftpSession>;
+    type Target = SftpSession;
 
     fn deref(&self) -> &Self::Target {
-        &self.sftp_session
+        &self.sftp_session.as_ref().unwrap()
     }
 }
 
 pub struct SshSessionPool {
     session_pool_map: Mutex<HashMap<i32, Arc<SshSession>>>,
-    sftp_session_pool: Arc<SshSftpSessionPool>,
     app_state: Arc<AppBaseState>,
 }
 
@@ -603,7 +628,6 @@ impl SshSessionPool {
     pub fn new(app_state: Arc<AppBaseState>) -> Self {
         SshSessionPool {
             session_pool_map: Mutex::new(HashMap::new()),
-            sftp_session_pool: Arc::new(SshSftpSessionPool::new(app_state.clone())),
             app_state,
         }
     }
@@ -657,16 +681,16 @@ impl SshSessionPool {
 
     pub async fn get_sftp_session(&self, target_id: i32) -> Result<SftpSessionGuard> {
         let ssh_session = self.get_session(target_id).await?;
-        let ssh_sftp_session = self
-            .sftp_session_pool
-            .get_or_make(target_id, ssh_session)
-            .await?;
+        let (ssh_connection, sftp_session, rx_option) =
+            ssh_session.get_or_make_sftp_session().await?;
+
+        drop_connection_received_msg(ssh_session, &ssh_connection, rx_option);
 
         debug!("SshSessionPool: target {} get SftpSession", target_id);
 
         Ok(SftpSessionGuard {
-            sftp_session: ssh_sftp_session,
-            pool: self.sftp_session_pool.clone(),
+            sftp_session: Some(sftp_session),
+            pool: ssh_connection,
         })
     }
 
@@ -681,7 +705,7 @@ impl SshSessionPool {
         let ssh_connection_o = ssh_session.get_by_id(connection_id).await;
         if let Some(ssh_connection) = ssh_connection_o {
             ssh_connection.expired.store(true, Ordering::Release);
-            ssh_session.remove_resource(&ssh_connection.id).await;
+            ssh_session.remove_connection(&ssh_connection.id).await;
         }
     }
 }
@@ -705,7 +729,7 @@ fn drop_connection_received_msg(
                     );
                     connection_clone.close().await;
                     ssh_session_clone
-                        .remove_resource(&connection_clone.id)
+                        .remove_connection(&connection_clone.id)
                         .await;
                 }
                 Err(_) => debug!(
@@ -786,9 +810,9 @@ mod tests {
         );
 
         let session = session_pool.get_session(1).await.unwrap();
-        let (ssh_connection, _) = session.get_or_make().await.unwrap();
+        let (ssh_connection, _) = session.get_or_make_connection().await.unwrap();
         let connection_id = ssh_connection.id.clone();
-        session.return_resource(ssh_connection.clone()).await;
+        session.return_connnection(ssh_connection.clone()).await;
 
         let _ = session_pool
             .expire_connection(1, connection_id.as_str())
@@ -849,9 +873,9 @@ mod tests {
 
         // 获取已创建的connection_id
         let session = session_pool.get_session(1).await.unwrap();
-        let (ssh_connection, _) = session.get_or_make().await.unwrap();
+        let (ssh_connection, _) = session.get_or_make_connection().await.unwrap();
         let connection_id = ssh_connection.id.clone();
-        session.return_resource(ssh_connection).await;
+        session.return_connnection(ssh_connection).await;
 
         let _ = disconnect_tx.send("disconnect".to_string()).unwrap();
 
