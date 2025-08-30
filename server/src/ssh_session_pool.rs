@@ -257,7 +257,7 @@ impl SshSession {
         if resource.is_err() {
             debug!("SshSession: {} create SshConnection fail.", self.id);
             // 创建失败，回滚计数
-            self.rollback_count().await;
+            self.rollback_count_connection().await;
         } else {
             debug!("SshSession: {} SshConnection created.", self.id);
         }
@@ -346,7 +346,7 @@ impl SshSession {
     }
 
     /// 回滚计数
-    pub async fn rollback_count(&self) {
+    pub async fn rollback_count_connection(&self) {
         let mut state = self.connection_pool_state.lock().await;
         if state.total_count > 0 {
             state.total_count -= 1;
