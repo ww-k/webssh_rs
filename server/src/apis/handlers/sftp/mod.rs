@@ -209,7 +209,7 @@ impl Range {
     }
 }
 
-fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri, ApiErr> {
+fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri<'_>, ApiErr> {
     let uri = SftpFileUri::from_str(file_uri_str);
     uri.ok_or(ApiErr {
         code: ERR_CODE_SFTP_INVALID_URI,
