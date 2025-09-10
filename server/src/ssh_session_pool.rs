@@ -577,6 +577,7 @@ impl SshConnection {
     }
 
     /// 回收 Channel
+    #[allow(dead_code)]
     async fn return_channel(&self, resource: Channel<russh::client::Msg>) {
         let state = self.channel_pool_state.lock().await;
         self.inner_return_channel(state, resource).await;
@@ -698,9 +699,10 @@ impl Drop for SshChannelGuard {
         let channel_o = self.channel.take();
         let pool = self.pool.clone();
         tokio::spawn(async move {
-            if let Some(channel) = channel_o {
-                // TODO: 需要测试channel是否还能复用
-                pool.return_channel(channel).await;
+            if let Some(_channel) = channel_o {
+                // TODO: 用于terminal和exec的channel，都不可回收，测试其他用途的channel是否可回收
+                // pool.return_channel(channel).await;
+                pool.rollback_count_channel().await;
             } else {
                 pool.rollback_count_channel().await;
             }
@@ -951,21 +953,19 @@ mod tests {
         }
     }
 
-    // TODO: 支持多个异步测试用例并发
     #[tokio::test]
-    /// 测试将一个连接设置为过期，过期的连接已经不在连接池中，该连接下的channel仍可用，等channel都关闭后，连接会自动销毁
-    async fn test_ssh_session_pool_expire_connection() {
-        let (session_pool, _) = init().await;
+    async fn test_ssh_session_pool() {
+        test_ssh_session_pool_expire_connection().await;
+        test_ssh_session_pool_expire_sftp_connection().await;
+        test_ssh_session_pool_disconnect_connection().await;
+    }
 
-        let channel = session_pool.get_channel(1).await.unwrap();
-        let (channel, result_msg) = exec(channel, "hello").await;
-        assert_eq!(result_msg, "exec hello done");
-
-        // 获取上面创建的connection id
-        let session = session_pool.get_session(1).await.unwrap();
+    // 测试连接池状态
+    async fn test_ssh_session_pool_connection_pool_state(
+        session: Arc<SshSession>,
+    ) -> Arc<SshConnection> {
         let connection_pool_state = session.connection_pool_state.lock().await;
         let ssh_connection = connection_pool_state.idle_resources.get(0).unwrap().clone();
-        let connection_id = ssh_connection.id.clone();
         assert_eq!(
             connection_pool_state.total_count, 1,
             "expeceted 1 connection"
@@ -977,6 +977,22 @@ mod tests {
         );
         drop(connection_pool_state);
 
+        ssh_connection
+    }
+
+    /// 测试将一个连接设置为过期，过期的连接已经不在连接池中，该连接下的channel仍可用，等channel都关闭后，连接会自动销毁
+    async fn test_ssh_session_pool_expire_connection() {
+        let (session_pool, _) = init().await;
+
+        let channel = session_pool.get_channel(1).await.unwrap();
+        let (channel, result_msg) = exec(channel, "hello").await;
+        assert_eq!(result_msg, "exec hello done");
+
+        // 获取上面创建的connection id,测试连接池状态
+        let session = session_pool.get_session(1).await.unwrap();
+        let connection = test_ssh_session_pool_connection_pool_state(session.clone()).await;
+        let connection_id = connection.id.clone();
+
         let _ = session_pool
             .expire_connection(1, connection_id.as_str(), false)
             .await;
@@ -984,17 +1000,13 @@ mod tests {
         let result = session.get_by_id(connection_id.as_str()).await;
         assert!(result.is_none());
 
-        let (channel, result_msg) = exec(channel, "hello").await;
-        assert_eq!(result_msg, "exec hello done");
-
         // 销毁channel
         drop(channel);
         sleep(Duration::from_secs(1)).await;
-        let state = ssh_connection.channel_pool_state.lock().await;
-        assert_eq!(state.total_count, 1);
+        let state = connection.channel_pool_state.lock().await;
+        assert_eq!(state.total_count, 0);
     }
 
-    #[tokio::test]
     /// 测试将一个连接设置为过期，过期的连接已经不在连接池中，该连接下的channel仍可用，等channel都关闭后，连接会自动销毁
     async fn test_ssh_session_pool_expire_sftp_connection() {
         let (session_pool, _) = init().await;
@@ -1009,11 +1021,11 @@ mod tests {
             "sftp read_dir unexpected result"
         );
 
-        // 获取上面创建的connection id
+        // 获取上面创建的connection id,测试连接池状态
         let session = session_pool.get_session(1).await.unwrap();
         let connection_pool_state = session.sftp_connection_pool_state.lock().await;
-        let ssh_connection = connection_pool_state.idle_resources.get(0).unwrap().clone();
-        let connection_id = ssh_connection.id.clone();
+        let connection = connection_pool_state.idle_resources.get(0).unwrap().clone();
+        let connection_id = connection.id.clone();
         assert_eq!(
             connection_pool_state.total_count, 1,
             "expeceted 1 connection"
@@ -1032,7 +1044,7 @@ mod tests {
         let result = session.get_by_id_sftp(connection_id.as_str()).await;
         assert!(result.is_none());
 
-        // 过期的连接下的channel仍然可用
+        // 过期的连接下的SftpSessionGuard仍然可用
         let read_dir = sftp_guard.read_dir("/").await.unwrap();
         let file_names: Vec<String> = read_dir.map(|dir_entry| dir_entry.file_name()).collect();
         assert_eq!(
@@ -1044,11 +1056,10 @@ mod tests {
         // 销毁channel
         drop(sftp_guard);
         sleep(Duration::from_secs(1)).await;
-        let state = ssh_connection.sftp_pool_state.lock().await;
+        let state = connection.sftp_pool_state.lock().await;
         assert_eq!(state.total_count, 1);
     }
 
-    #[tokio::test]
     /// 测试ssh server断开连接后，断开的连接已经不在连接池中
     async fn test_ssh_session_pool_disconnect_connection() {
         let (session_pool, disconnect_tx) = init().await;
@@ -1057,12 +1068,10 @@ mod tests {
         let (_, result_msg) = exec(channel, "hello").await;
         assert_eq!(result_msg, "exec hello done");
 
-        // 获取上面创建的connection id
+        // 获取上面创建的connection id,测试连接池状态
         let session = session_pool.get_session(1).await.unwrap();
-        let connection_pool_state = session.connection_pool_state.lock().await;
-        let ssh_connection = connection_pool_state.idle_resources.get(0).unwrap().clone();
-        let connection_id = ssh_connection.id.clone();
-        drop(connection_pool_state);
+        let connection = test_ssh_session_pool_connection_pool_state(session.clone()).await;
+        let connection_id = connection.id.clone();
 
         let _ = disconnect_tx.send("disconnect".to_string()).unwrap();
 

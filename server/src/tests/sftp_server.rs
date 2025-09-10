@@ -150,6 +150,9 @@ impl russh::server::Handler for SshServerSession {
                 let done = " done".as_bytes();
                 let combined = [exec, cmd, done].concat();
                 let _ = channel.data(combined.as_slice()).await;
+                channel.exit_status(0).await?;
+                channel.eof().await?;
+                channel.close().await?;
                 Ok(())
             } else {
                 anyhow::bail!("channel not found")
