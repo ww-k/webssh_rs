@@ -146,13 +146,16 @@ impl russh::server::Handler for SshServerSession {
         async move {
             let channels = self.channels.lock().await;
             if let Some(channel) = channels.get(&channel) {
+                let cmd_str = String::from_utf8_lossy(cmd);
                 let exec = "exec ".as_bytes();
                 let done = " done".as_bytes();
                 let combined = [exec, cmd, done].concat();
                 let _ = channel.data(combined.as_slice()).await;
                 channel.exit_status(0).await?;
                 channel.eof().await?;
-                channel.close().await?;
+                if cmd_str == "close_channel" {
+                    channel.close().await?;
+                }
                 Ok(())
             } else {
                 anyhow::bail!("channel not found")
@@ -275,3 +278,19 @@ pub async fn run_server() -> Result<broadcast::Sender<String>, std::io::Error> {
 
     Ok(disconnect_tx)
 }
+
+// #[tokio::test]
+// async fn start_sftp_server() {
+//     let config = Arc::new(russh::server::Config {
+//         keys: vec![
+//             russh::keys::PrivateKey::random(&mut OsRng, ssh_key::Algorithm::Ed25519).unwrap(),
+//         ],
+//         ..Default::default()
+//     });
+
+//     let socket = TcpListener::bind(("127.0.0.1", 2222)).await.unwrap();
+//     info!("SftpServer: run on 127.0.0.1 2222");
+
+//     let (disconnect_tx, _) = broadcast::channel(1);
+//     run_on_socket(config, &socket, disconnect_tx).await;
+// }

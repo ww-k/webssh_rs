@@ -86,11 +86,10 @@ impl SshTerminalSession {
         anyhow::Ok(term_session)
     }
 
-    async fn open_socket_channel_tunnel(&self, mut channel_guard: SshChannelGuard) {
+    async fn open_socket_channel_tunnel(&self, channel_guard: SshChannelGuard) {
         let socket = self.socket.clone();
         let sid = socket.id;
-        let channel = channel_guard.take_channel().unwrap();
-        let (mut read_half, write_half) = channel.split();
+        let (mut read_half, write_half) = channel_guard.split().unwrap();
         let write_half_arc = Arc::new(write_half);
 
         socket.on_disconnect({

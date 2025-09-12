@@ -9,7 +9,7 @@ use std::{
 
 use anyhow::{Ok, Result};
 use russh::{
-    Channel, Disconnect,
+    Channel, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, Disconnect,
     client::DisconnectReason,
     keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, decode_secret_key, ssh_key},
 };
@@ -278,6 +278,16 @@ where
                 self.id,
                 T::TYPE_NAME
             );
+        }
+
+        if let Some(resource) = state.idle_resources.pop_front() {
+            debug!(
+                "SshConnection: {} find idle {}. total_count {}.",
+                self.id,
+                T::TYPE_NAME,
+                state.total_count
+            );
+            return Ok(resource);
         }
 
         state.total_count += 1;
@@ -650,11 +660,30 @@ impl SshSession {
 pub struct SshChannelGuard {
     channel: Option<Channel<russh::client::Msg>>,
     pool: Arc<SshConnection<SshConnectionType>>,
+    closed: bool,
 }
 
 impl SshChannelGuard {
-    pub fn take_channel(&mut self) -> Option<Channel<russh::client::Msg>> {
-        self.channel.take()
+    // 代理Channel的wait方法，如果接收到Close消息，则将guard标记为已关闭不可复用
+    pub async fn wait(&mut self) -> Option<ChannelMsg> {
+        if let Some(channel) = self.channel.as_mut() {
+            let msg = channel.wait().await;
+            debug!("SshChannelGuard: {} @wait msg {:?}", self.pool.id, msg);
+            if msg.is_none() {
+                self.closed = true;
+            }
+            msg
+        } else {
+            None
+        }
+    }
+
+    pub fn split(mut self) -> Option<(ChannelReadHalf, ChannelWriteHalf<russh::client::Msg>)> {
+        if let Some(channel) = self.channel.take() {
+            Some(channel.split())
+        } else {
+            None
+        }
     }
 }
 
@@ -662,9 +691,10 @@ impl Drop for SshChannelGuard {
     fn drop(&mut self) {
         let channel_o = self.channel.take();
         let pool = self.pool.clone();
+        let closed = self.closed;
         tokio::spawn(async move {
-            if let Some(_channel) = channel_o {
-                pool.rollback_count().await;
+            if !closed && let Some(channel) = channel_o {
+                pool.return_resource(channel).await;
             } else {
                 pool.rollback_count().await;
             }
@@ -764,6 +794,7 @@ impl SshSessionPool {
         Ok(SshChannelGuard {
             channel: Some(channel),
             pool: ssh_connection,
+            closed: false,
         })
     }
 
@@ -783,24 +814,29 @@ impl SshSessionPool {
     }
 
     #[allow(dead_code)]
-    pub async fn expire_connection(&self, target_id: i32, connection_id: &str, is_sftp: bool) {
+    pub async fn expire_connection(&self, target_id: i32, connection_id: &str) {
         let ssh_session_o = self.session_pool_map.lock().await.get(&target_id).cloned();
         if ssh_session_o.is_none() {
             return;
         }
-        let ssh_session = ssh_session_o.unwrap();
 
-        if is_sftp {
-            let ssh_connection_o = ssh_session.get_by_id_sftp(connection_id).await;
-            if let Some(ssh_connection) = ssh_connection_o {
-                ssh_connection.expired.store(true, Ordering::Release);
-                ssh_session.remove_connection_sftp(&ssh_connection.id).await;
+        let ssh_session = ssh_session_o.unwrap();
+        let (sftp_conn_o, ssh_conn_o) = tokio::join!(
+            ssh_session.get_by_id_sftp(connection_id),
+            ssh_session.get_by_id(connection_id)
+        );
+
+        match (sftp_conn_o, ssh_conn_o) {
+            (None, None) => {}
+            (Some(sftp_conn), _) => {
+                sftp_conn.expired.store(true, Ordering::Release);
+                ssh_session.remove_connection_sftp(&sftp_conn.id).await;
+                // TODO: 放入过期的连接列表中，等待超时
             }
-        } else {
-            let ssh_connection_o = ssh_session.get_by_id(connection_id).await;
-            if let Some(ssh_connection) = ssh_connection_o {
-                ssh_connection.expired.store(true, Ordering::Release);
-                ssh_session.remove_connection(&ssh_connection.id).await;
+            (_, Some(ssh_conn)) => {
+                ssh_conn.expired.store(true, Ordering::Release);
+                ssh_session.remove_connection(&ssh_conn.id).await;
+                // TODO: 放入过期的连接列表中，等待超时
             }
         }
     }
@@ -871,7 +907,6 @@ fn drop_connection_received_msg_sftp(
 mod tests {
     use super::*;
     use crate::{config::Config, migrations::Migrator, tests::sftp_server};
-    use russh::ChannelMsg;
     use sea_orm::{ActiveModelTrait, Database};
     use sea_orm_migration::MigratorTrait;
     use tokio::{
@@ -922,21 +957,29 @@ mod tests {
     async fn exec(mut channel: SshChannelGuard, cmd: &str) -> (SshChannelGuard, String) {
         let _ = channel.exec(true, cmd).await;
         let mut buf = Vec::<u8>::new();
-        if let Some(msg) = channel.wait().await {
-            match msg {
-                ChannelMsg::Data { ref data } => {
-                    buf.extend_from_slice(data);
-                }
-                _ => {}
-            }
-            (channel, String::from_utf8(buf).unwrap())
-        } else {
-            (channel, String::from(""))
+        loop {
+            tokio::select! {
+                _   = tokio::time::sleep(Duration::from_secs(1)) => break,
+                result = channel.wait() => {
+                    let Some(msg) = result else {
+                        break;
+                    };
+                    match msg {
+                        // Write data to the terminal
+                        ChannelMsg::Data { ref data } => {
+                            buf.extend_from_slice(data);
+                        }
+                        _ => {}
+                    }
+                },
+            };
         }
+        (channel, String::from_utf8(buf).unwrap())
     }
 
     #[tokio::test]
     async fn test_ssh_session_pool() {
+        test_ssh_session_pool_channel_guard().await;
         test_ssh_session_pool_expire_connection().await;
         test_ssh_session_pool_expire_sftp_connection().await;
         test_ssh_session_pool_disconnect_connection().await;
@@ -962,13 +1005,38 @@ mod tests {
         ssh_connection
     }
 
+    async fn test_ssh_session_pool_channel_guard() {
+        let (session_pool, _) = init().await;
+        let channel_guard = session_pool.get_channel(1).await.unwrap();
+        let session = session_pool.get_session(1).await.unwrap();
+        let connection = test_ssh_session_pool_connection_pool_state(session.clone()).await;
+
+        // guard销毁，关闭的channel 自动 roll back
+        let (channel_guard, result_msg) = exec(channel_guard, "close_channel").await;
+        assert_eq!(result_msg, "exec close_channel done");
+        drop(channel_guard);
+        sleep(Duration::from_secs(1)).await;
+        let state = connection.resource_pool_state.lock().await;
+        assert_eq!(state.total_count, 0);
+        drop(state);
+
+        // guard销毁，未关闭的channel 自动 push back
+        let channel_guard = session_pool.get_channel(1).await.unwrap();
+        let connection = test_ssh_session_pool_connection_pool_state(session.clone()).await;
+        let (channel_guard, result_msg) = exec(channel_guard, "hello").await;
+        assert_eq!(result_msg, "exec hello done");
+        drop(channel_guard);
+        sleep(Duration::from_secs(1)).await;
+        let state = connection.resource_pool_state.lock().await;
+        assert_eq!(state.total_count, 1);
+        drop(state);
+    }
+
     /// 测试将一个连接设置为过期，过期的连接已经不在连接池中，该连接下的channel仍可用，等channel都关闭后，连接会自动销毁
     async fn test_ssh_session_pool_expire_connection() {
         let (session_pool, _) = init().await;
 
         let channel = session_pool.get_channel(1).await.unwrap();
-        let (channel, result_msg) = exec(channel, "hello").await;
-        assert_eq!(result_msg, "exec hello done");
 
         // 获取上面创建的connection id,测试连接池状态
         let session = session_pool.get_session(1).await.unwrap();
@@ -976,17 +1044,20 @@ mod tests {
         let connection_id = connection.id.clone();
 
         let _ = session_pool
-            .expire_connection(1, connection_id.as_str(), false)
+            .expire_connection(1, connection_id.as_str())
             .await;
 
+        // 已过期的连接，在session中找不到了
         let result = session.get_by_id(connection_id.as_str()).await;
         assert!(result.is_none());
 
-        // 销毁channel
+        // 过期的连接下所有channel都回收了，连接自动销毁
         drop(channel);
         sleep(Duration::from_secs(1)).await;
-        let state = connection.resource_pool_state.lock().await;
+        let state = session.connection_pool_state.lock().await;
+        assert!(state.idle_resources.is_empty());
         assert_eq!(state.total_count, 0);
+        drop(state);
     }
 
     /// 测试将一个连接设置为过期，过期的连接已经不在连接池中，该连接下的channel仍可用，等channel都关闭后，连接会自动销毁
@@ -1020,9 +1091,10 @@ mod tests {
         drop(connection_pool_state);
 
         let _ = session_pool
-            .expire_connection(1, connection_id.as_str(), true)
+            .expire_connection(1, connection_id.as_str())
             .await;
 
+        // 已过期的连接，在session中找不到了
         let result = session.get_by_id_sftp(connection_id.as_str()).await;
         assert!(result.is_none());
 
@@ -1035,7 +1107,7 @@ mod tests {
             "sftp read_dir unexpected result"
         );
 
-        // 销毁channel
+        // 过期的连接下所有channel都回收了，连接自动销毁
         drop(sftp_guard);
         sleep(Duration::from_secs(1)).await;
         let state = connection.resource_pool_state.lock().await;
@@ -1055,10 +1127,9 @@ mod tests {
         let connection = test_ssh_session_pool_connection_pool_state(session.clone()).await;
         let connection_id = connection.id.clone();
 
+        // 被动断开的连接，在session中找不到了
         let _ = disconnect_tx.send("disconnect".to_string()).unwrap();
-
         sleep(Duration::from_secs(1)).await;
-
         let result = session.get_by_id(connection_id.as_str()).await;
         assert!(result.is_none());
     }
