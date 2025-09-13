@@ -185,6 +185,7 @@ struct SshConnection<T: ConnectionType> {
     client_handle: russh::client::Handle<SshClientHandler>,
     /// if expired, wait for all resources to be closed, and then close the connection
     expired: AtomicBool,
+    closed: AtomicBool,
 }
 
 impl<T: ConnectionType> SshConnection<T> {
@@ -198,6 +199,7 @@ impl<T: ConnectionType> SshConnection<T> {
             max_size,
             client_handle,
             expired: AtomicBool::new(false),
+            closed: AtomicBool::new(false),
         }
     }
 
@@ -224,6 +226,7 @@ impl<T: ConnectionType> SshConnection<T> {
             .client_handle
             .disconnect(Disconnect::ByApplication, "", "English")
             .await;
+        self.closed.store(true, Ordering::Release);
     }
 
     async fn rollback_count(&self) {
@@ -357,6 +360,8 @@ struct SshSession {
     max_size: u8,
     app_state: Arc<AppBaseState>,
     client: SshClient,
+    expired_ssh_connections: Mutex<Vec<Arc<SshConnection<SshConnectionType>>>>,
+    expired_sftp_connections: Mutex<Vec<Arc<SshConnection<SftpConnectionType>>>>,
 }
 
 impl SshSession {
@@ -376,6 +381,8 @@ impl SshSession {
             max_size: app_state.config.max_session_per_target,
             app_state,
             client: SshClient::new(app_state_clone, target_id),
+            expired_ssh_connections: Mutex::new(Vec::new()),
+            expired_sftp_connections: Mutex::new(Vec::new()),
         }
     }
 
@@ -423,11 +430,11 @@ impl SshSession {
         let ssh_connection_clone = ssh_connection.clone();
         let channel = match ssh_connection.get_or_make_channel().await {
             std::result::Result::Ok(channel) => {
-                self.return_connnection(ssh_connection).await;
+                self.return_connnection_ssh(ssh_connection).await;
                 Ok(channel)
             }
             Err(err) => {
-                self.return_connnection(ssh_connection).await;
+                self.return_connnection_ssh(ssh_connection).await;
                 Err(err)
             }
         }?;
@@ -459,20 +466,35 @@ impl SshSession {
         Ok((ssh_connection_clone, sftp, option_rx))
     }
 
+    // 删除 SshConnection
+    async fn remove_connection(&self, connection_id: &str) {
+        let future1 = self.remove_connection_ssh(connection_id);
+        let future2 = self.remove_connection_sftp(connection_id);
+        let future3 = self.remove_expired_connection_ssh(connection_id);
+        let future4 = self.remove_expired_connection_sftp(connection_id);
+        tokio::join!(future1, future2, future3, future4);
+    }
+
     // 回收 SshConnection
-    async fn return_connnection(&self, resource: Arc<SshConnection<SshConnectionType>>) {
+    async fn return_connnection_ssh(&self, resource: Arc<SshConnection<SshConnectionType>>) {
         let state = self.connection_pool_state.lock().await;
         self.inner_return_connnection(state, resource, false);
     }
 
     // 删除 SshConnection
-    async fn remove_connection(&self, connection_id: &str) {
+    async fn remove_connection_ssh(&self, connection_id: &str) {
         let state = self.connection_pool_state.lock().await;
         self.inner_remove_connection(state, connection_id, false);
     }
 
+    // 删除已过期的 SshConnection
+    async fn remove_expired_connection_ssh(&self, connection_id: &str) {
+        let state = self.expired_ssh_connections.lock().await;
+        self.inner_remove_expired_connection(state, connection_id);
+    }
+
     /// 回滚 SshConnection 计数
-    async fn rollback_count_connection(&self) {
+    async fn rollback_count_connection_ssh(&self) {
         let state = self.connection_pool_state.lock().await;
         self.inner_rollback_count_connection(state, false);
     }
@@ -489,10 +511,50 @@ impl SshSession {
         self.inner_remove_connection(state, connection_id, true);
     }
 
+    // 删除已过期的 SshConnection sftp
+    async fn remove_expired_connection_sftp(&self, connection_id: &str) {
+        let state = self.expired_sftp_connections.lock().await;
+        self.inner_remove_expired_connection(state, connection_id);
+    }
+
     /// 回滚 SshConnection sftp 计数
     async fn rollback_count_connection_sftp(&self) {
         let state = self.sftp_connection_pool_state.lock().await;
         self.inner_rollback_count_connection(state, true);
+    }
+
+    /// 将指定连接设置为过期，从资源池移除并放入过期连接列表
+    async fn expire_connection(&self, connection_id: &str) {
+        // 检查是否为普通 SSH 连接
+        let ssh_conn_o = self.get_by_id(connection_id).await;
+        if let Some(ssh_conn) = ssh_conn_o {
+            ssh_conn.expired.store(true, Ordering::Release);
+            self.remove_connection_ssh(&ssh_conn.id).await;
+            let closed = ssh_conn.closed.load(Ordering::Acquire);
+            if !closed {
+                self.expired_ssh_connections.lock().await.push(ssh_conn);
+            }
+            debug!(
+                "SshSession: {} SSH connection {} expired",
+                self.id, connection_id
+            );
+            return;
+        }
+
+        // 检查是否为 SFTP 连接
+        let sftp_conn_o = self.get_by_id_sftp(connection_id).await;
+        if let Some(sftp_conn) = sftp_conn_o {
+            sftp_conn.expired.store(true, Ordering::Release);
+            self.remove_connection_sftp(&sftp_conn.id).await;
+            let closed = sftp_conn.closed.load(Ordering::Acquire);
+            if !closed {
+                self.expired_sftp_connections.lock().await.push(sftp_conn);
+            }
+            debug!(
+                "SshSession: {} SFTP connection {} expired",
+                self.id, connection_id
+            );
+        }
     }
 
     async fn inner_get_or_make_connection<T: ConnectionType>(
@@ -577,7 +639,7 @@ impl SshSession {
             if is_sftp {
                 self.rollback_count_connection_sftp().await;
             } else {
-                self.rollback_count_connection().await;
+                self.rollback_count_connection_ssh().await;
             }
         }
 
@@ -654,6 +716,20 @@ impl SshSession {
             );
         }
     }
+
+    // 从过期的连接列表中删除连接
+    fn inner_remove_expired_connection<T: ConnectionType>(
+        &self,
+        mut state: MutexGuard<'_, Vec<Arc<SshConnection<T>>>>,
+        channel_id: &str,
+    ) {
+        let position = state.iter().position(|item| item.id == channel_id);
+
+        if let Some(position) = position {
+            state.remove(position);
+            debug!("SshSession: {} remove expired SshConnection.", self.id);
+        }
+    }
 }
 
 // 类型安全的守护结构
@@ -692,6 +768,10 @@ impl Drop for SshChannelGuard {
         let channel_o = self.channel.take();
         let pool = self.pool.clone();
         let closed = self.closed;
+        let connection_closed = pool.closed.load(Ordering::Acquire);
+        if connection_closed {
+            return;
+        }
         tokio::spawn(async move {
             if !closed && let Some(channel) = channel_o {
                 pool.return_resource(channel).await;
@@ -725,6 +805,10 @@ impl Drop for SftpSessionGuard {
     fn drop(&mut self) {
         let sftp_session = self.sftp_session.take().unwrap();
         let pool = self.pool.clone();
+        let connection_closed = pool.closed.load(Ordering::Acquire);
+        if connection_closed {
+            return;
+        }
         tokio::spawn(async move {
             let _ = pool.return_resource(sftp_session).await;
         });
@@ -783,7 +867,7 @@ impl SshSessionPool {
         let ssh_session = self.get_session(target_id).await?;
         let (ssh_connection, channel, rx_option) = ssh_session.get_or_make_channel().await?;
 
-        drop_connection_received_msg(ssh_session, &ssh_connection, rx_option, false);
+        drop_connection_received_msg(ssh_session, &ssh_connection, rx_option);
 
         debug!(
             "SshSessionPool: target {} get SshChannel {}",
@@ -803,7 +887,7 @@ impl SshSessionPool {
         let (ssh_connection, sftp_session, rx_option) =
             ssh_session.get_or_make_sftp_session().await?;
 
-        drop_connection_received_msg_sftp(ssh_session, &ssh_connection, rx_option);
+        drop_connection_received_msg(ssh_session, &ssh_connection, rx_option);
 
         debug!("SshSessionPool: target {} get SftpSession", target_id);
 
@@ -816,37 +900,16 @@ impl SshSessionPool {
     #[allow(dead_code)]
     pub async fn expire_connection(&self, target_id: i32, connection_id: &str) {
         let ssh_session_o = self.session_pool_map.lock().await.get(&target_id).cloned();
-        if ssh_session_o.is_none() {
-            return;
-        }
-
-        let ssh_session = ssh_session_o.unwrap();
-        let (sftp_conn_o, ssh_conn_o) = tokio::join!(
-            ssh_session.get_by_id_sftp(connection_id),
-            ssh_session.get_by_id(connection_id)
-        );
-
-        match (sftp_conn_o, ssh_conn_o) {
-            (None, None) => {}
-            (Some(sftp_conn), _) => {
-                sftp_conn.expired.store(true, Ordering::Release);
-                ssh_session.remove_connection_sftp(&sftp_conn.id).await;
-                // TODO: 放入过期的连接列表中，等待超时
-            }
-            (_, Some(ssh_conn)) => {
-                ssh_conn.expired.store(true, Ordering::Release);
-                ssh_session.remove_connection(&ssh_conn.id).await;
-                // TODO: 放入过期的连接列表中，等待超时
-            }
+        if let Some(ssh_session) = ssh_session_o {
+            ssh_session.expire_connection(connection_id).await;
         }
     }
 }
 
-fn drop_connection_received_msg(
+fn drop_connection_received_msg<T: ConnectionType>(
     ssh_session: Arc<SshSession>,
-    ssh_connection: &Arc<SshConnection<SshConnectionType>>,
+    ssh_connection: &Arc<SshConnection<T>>,
     rx_option: Option<oneshot::Receiver<bool>>,
-    _is_sftp: bool,
 ) {
     if rx_option.is_some() {
         let connection_clone = ssh_connection.clone();
@@ -866,36 +929,6 @@ fn drop_connection_received_msg(
                 }
                 Err(_) => debug!(
                     "SshSessionPool: SSH SshConnection {} the sender dropped",
-                    connection_clone.id
-                ),
-            }
-        });
-    }
-}
-
-fn drop_connection_received_msg_sftp(
-    ssh_session: Arc<SshSession>,
-    ssh_connection: &Arc<SshConnection<SftpConnectionType>>,
-    rx_option: Option<oneshot::Receiver<bool>>,
-) {
-    if rx_option.is_some() {
-        let connection_clone = ssh_connection.clone();
-        let ssh_session_clone = ssh_session.clone();
-        let rx = rx_option.unwrap();
-        tokio::spawn(async move {
-            match rx.await {
-                std::result::Result::Ok(v) => {
-                    debug!(
-                        "SshSessionPool: SFTP SshConnection {} disconnected, signal: {:?}",
-                        connection_clone.id, v
-                    );
-                    connection_clone.close().await;
-                    ssh_session_clone
-                        .remove_connection_sftp(&connection_clone.id)
-                        .await;
-                }
-                Err(_) => debug!(
-                    "SshSessionPool: SFTP SshConnection {} the sender dropped",
                     connection_clone.id
                 ),
             }
