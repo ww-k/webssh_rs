@@ -17,7 +17,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use apis::{sftp, ssh, target};
 use migrations::{Migrator, MigratorTrait};
 
-use crate::ssh_session_pool::SshSessionPool;
+use crate::{apis::ssh_connection, ssh_session_pool::SshSessionPool};
 
 struct AppBaseState {
     db: DatabaseConnection,
@@ -65,6 +65,10 @@ async fn main() {
     });
 
     let app = Router::new()
+        .nest(
+            "/api/ssh_connection",
+            ssh_connection::router_builder(session_pool.clone()),
+        )
         .nest("/api/ssh", ssh::router_builder(session_pool.clone()))
         .nest("/api/sftp", sftp::router_builder(app_state.clone()))
         .nest(

@@ -1,5 +1,6 @@
 pub mod sftp;
 pub mod ssh;
+pub mod ssh_connection;
 
 use serde::Deserialize;
 

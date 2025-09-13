@@ -1,6 +1,7 @@
 mod handlers;
 pub mod sftp;
 pub mod ssh;
+pub mod ssh_connection;
 pub mod target;
 
 use axum::{

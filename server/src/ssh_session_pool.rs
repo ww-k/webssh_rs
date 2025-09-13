@@ -14,6 +14,7 @@ use russh::{
     keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, decode_secret_key, ssh_key},
 };
 use russh_sftp::client::SftpSession;
+use serde::Serialize;
 use tokio::sync::{Mutex, MutexGuard, oneshot};
 use tracing::debug;
 
@@ -167,14 +168,14 @@ trait ResourceMaker<T: ConnectionType> {
 struct SshConnectionType;
 impl ConnectionType for SshConnectionType {
     type Resource = Channel<russh::client::Msg>;
-    const TYPE_NAME: &'static str = "Channel";
+    const TYPE_NAME: &'static str = "SSH";
 }
 
 // SFTP连接类型
 struct SftpConnectionType;
 impl ConnectionType for SftpConnectionType {
     type Resource = SftpSession;
-    const TYPE_NAME: &'static str = "SftpSession";
+    const TYPE_NAME: &'static str = "SFTP";
 }
 
 // 泛型SSH连接，专门用于特定类型的操作
@@ -823,6 +824,16 @@ impl std::ops::Deref for SftpSessionGuard {
     }
 }
 
+/// 连接信息汇总，用于 list_all_connections 返回
+#[derive(Debug, Clone, Serialize)]
+pub struct ConnectionInfo {
+    pub id: String,
+    pub expired: bool,
+    pub closed: bool,
+    pub type_name: String,
+    pub target_id: i32,
+}
+
 pub struct SshSessionPool {
     session_pool_map: Mutex<HashMap<i32, Arc<SshSession>>>,
     app_state: Arc<AppBaseState>,
@@ -903,6 +914,71 @@ impl SshSessionPool {
         if let Some(ssh_session) = ssh_session_o {
             ssh_session.expire_connection(connection_id).await;
         }
+    }
+
+    pub async fn list_all_connections(&self, target_filter: Option<i32>) -> Vec<ConnectionInfo> {
+        let guard = self.session_pool_map.lock().await;
+        let mut result: Vec<ConnectionInfo> = Vec::new();
+
+        for (target_id, session) in guard.iter() {
+            if target_filter.is_some() && target_filter.unwrap() != *target_id {
+                continue;
+            }
+
+            // active ssh connections
+            let conn_state = session.connection_pool_state.lock().await;
+            for conn in conn_state.idle_resources.iter() {
+                result.push(ConnectionInfo {
+                    id: conn.id.clone(),
+                    expired: conn.expired.load(Ordering::Acquire),
+                    closed: conn.closed.load(Ordering::Acquire),
+                    type_name: <SshConnectionType as ConnectionType>::TYPE_NAME.to_string(),
+                    target_id: *target_id,
+                });
+            }
+            drop(conn_state);
+
+            // active sftp connections
+            let sftp_state = session.sftp_connection_pool_state.lock().await;
+            for conn in sftp_state.idle_resources.iter() {
+                result.push(ConnectionInfo {
+                    id: conn.id.clone(),
+                    expired: conn.expired.load(Ordering::Acquire),
+                    closed: conn.closed.load(Ordering::Acquire),
+                    type_name: <SftpConnectionType as ConnectionType>::TYPE_NAME.to_string(),
+                    target_id: *target_id,
+                });
+            }
+            drop(sftp_state);
+
+            // expired ssh connections
+            let expired_ssh = session.expired_ssh_connections.lock().await;
+            for conn in expired_ssh.iter() {
+                result.push(ConnectionInfo {
+                    id: conn.id.clone(),
+                    expired: conn.expired.load(Ordering::Acquire),
+                    closed: conn.closed.load(Ordering::Acquire),
+                    type_name: <SshConnectionType as ConnectionType>::TYPE_NAME.to_string(),
+                    target_id: *target_id,
+                });
+            }
+            drop(expired_ssh);
+
+            // expired sftp connections
+            let expired_sftp = session.expired_sftp_connections.lock().await;
+            for conn in expired_sftp.iter() {
+                result.push(ConnectionInfo {
+                    id: conn.id.clone(),
+                    expired: conn.expired.load(Ordering::Acquire),
+                    closed: conn.closed.load(Ordering::Acquire),
+                    type_name: <SftpConnectionType as ConnectionType>::TYPE_NAME.to_string(),
+                    target_id: *target_id,
+                });
+            }
+            drop(expired_sftp);
+        }
+
+        result
     }
 }
 
