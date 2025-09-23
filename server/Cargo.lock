@@ -3103,34 +3103,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-stream",
- "axum",
- "futures-util",
- "hex",
- "nanoid",
- "rand_core 0.6.4",
- "russh",
- "russh-sftp",
- "sea-orm",
- "sea-orm-migration",
- "serde",
- "serde_json",
- "serde_qs",
- "serde_repr",
- "sha2",
- "socketioxide",
- "tokio",
- "tokio-util",
- "tower-http",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4178,6 +4150,34 @@ checksum = "33b6dd2ef9186f1f2072e409e99cd22a975331a6b3591b12c764e0e55c60d5d2"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webssh_rs_server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "axum",
+ "futures-util",
+ "hex",
+ "nanoid",
+ "rand_core 0.6.4",
+ "russh",
+ "russh-sftp",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "serde_qs",
+ "serde_repr",
+ "sha2",
+ "socketioxide",
+ "tokio",
+ "tokio-util",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
