@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +11,16 @@ const env = {
     COLOR: "1",
     NPM_CONFIG_COLOR: "always",
 };
+
+// 确保安装依赖
+try {
+    lstatSync(resolve(projectRoot, "./client/node_modules"));
+} catch (_err) {
+    spawnSync("pnpm", ["install"], {
+        cwd: resolve(projectRoot, "./client"),
+        env,
+    });
+}
 
 // 启动接口服务
 const serverChild = spawn("cargo", ["run"], {

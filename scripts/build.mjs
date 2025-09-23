@@ -1,4 +1,5 @@
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,18 +12,26 @@ const env = {
     NPM_CONFIG_COLOR: "always",
 };
 
-console.log("Building client...");
+// 确保安装依赖
+try {
+    lstatSync(resolve(projectRoot, "./client/node_modules"));
+} catch (_err) {
+    spawnSync("pnpm i", {
+        cwd: resolve(projectRoot, "./client"),
+        env,
+    });
+}
+
 // 构建Web前端
-const result1 = execSync("npm run build", {
+spawnSync("npm", ["run", "build"], {
     cwd: resolve(projectRoot, "./client"),
     env,
+    stdio: "inherit",
 });
-console.log(result1.toString());
 
-console.log("Building tauri...");
-// 启动tauri
-const result2 = execSync("tauri build", {
+// 构建tauri;
+spawnSync("tauri", ["build"], {
     cwd: projectRoot,
     env,
+    stdio: "inherit",
 });
-console.log(result2.toString());

@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WebSSH RS is a web-based SSH client with file management capabilities, built with a React frontend and Rust backend. The application provides terminal access and SFTP file operations through a tabbed web interface.
+WebSSH RS is a web-based SSH client with file management capabilities, built with a React frontend and Rust backend. The application provides terminal access and SFTP file operations through a tabbed web interface. It can be deployed as a web application or as a desktop application using Tauri.
 
 ## Architecture
 
-The project is split into two main components:
+The project is split into three main components:
 
 ### Client (`/client/`)
 - **Framework**: React 18 with TypeScript
@@ -27,6 +27,13 @@ The project is split into two main components:
 - **Real-time**: Socket.IO integration via socketioxide
 - **Session Management**: Custom SSH session pooling
 
+### Desktop App (`/src-tauri/`)
+- **Framework**: Tauri v2 for cross-platform desktop applications
+- **Language**: Rust
+- **Frontend Integration**: Serves the React client in a native window
+- **Build**: Uses the client's dist output as frontend distribution
+- **Configuration**: Window settings, bundling, and app metadata in `tauri.conf.json`
+
 ## Key Components
 
 ### Client Architecture
@@ -44,9 +51,29 @@ The project is split into two main components:
 - **Database**: SQLite with Sea-ORM migrations for target storage
 - **WebSocket**: Socket.IO integration for real-time terminal communication
 
+### Desktop Architecture
+- **Tauri Core**: Rust-based native application wrapper
+- **Window Management**: Native window with configurable dimensions and properties
+- **Security**: CSP configuration and secure frontend-backend communication
+- **Distribution**: Cross-platform bundling for macOS, Windows, and Linux
+
 ## Common Development Commands
 
-### Client Development
+### Unified Development (Recommended)
+```bash
+# Install dependencies (run once)
+npm install
+
+# Start all services (server + client + desktop app)
+npm run dev
+
+# Build production version (client + desktop app)
+npm run build
+```
+
+### Component-Specific Development
+
+#### Client Development
 ```bash
 # Navigate to client directory
 cd client
@@ -68,7 +95,7 @@ pnpm format  # Biome formatter
 pnpm check   # Biome linter with auto-fix
 ```
 
-### Server Development
+#### Server Development
 ```bash
 # Navigate to server directory
 cd server
@@ -83,11 +110,41 @@ cargo build --release
 cargo test
 ```
 
+#### Desktop Development
+```bash
+# Navigate to Tauri directory
+cd src-tauri
+
+# Run desktop app in development mode (requires server to be running)
+cargo tauri dev
+
+# Build desktop app for production
+cargo tauri build
+
+# Build desktop app with specific target
+cargo tauri build --target universal-apple-darwin
+```
+
 ## Development Workflow
 
+### Unified Development (Recommended)
+1. **Install Dependencies**: Run `npm install` in the project root
+2. **Start Development**: Run `npm run dev` to start all services simultaneously
+   - Starts the Rust server on port 8080
+   - Starts the React development server with proxy
+   - Launches the Tauri desktop application
+3. **Build Production**: Run `npm run build` to build both web and desktop versions
+
+### Manual Component Development
+#### Web Application
 1. **Backend First**: Start the Rust server on port 8080
 2. **Frontend Development**: Use `pnpm dev` which proxies API calls to the backend
 3. **Database**: SQLite database is auto-created in `server/target/db.sqlite`
+
+#### Desktop Application
+1. **Backend First**: Start the Rust server on port 8080
+2. **Build Frontend**: Run `pnpm build` in the client directory
+3. **Desktop Development**: Use `cargo tauri dev` for development or `cargo tauri build` for production
 
 ## Code Style and Standards
 
@@ -98,9 +155,14 @@ cargo test
 
 ## Key Configuration Files
 
+- `package.json`: Root package file with unified development and build scripts
+- `scripts/dev.mjs`: Development orchestration script (starts all services)
+- `scripts/build.mjs`: Production build orchestration script
 - `client/rsbuild.config.ts`: Frontend build configuration with proxy setup
 - `biome.json`: Code formatting and linting rules
 - `server/Cargo.toml`: Rust dependencies and build configuration
+- `src-tauri/tauri.conf.json`: Tauri desktop app configuration
+- `src-tauri/Cargo.toml`: Desktop app dependencies and metadata
 
 ## API Structure
 
