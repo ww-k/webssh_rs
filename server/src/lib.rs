@@ -38,9 +38,11 @@ impl Deref for AppState {
 }
 
 pub async fn run_server() {
+    let env_log =
+        std::env::var("RUST_LOG").unwrap_or_else(|_| "webssh_rs_server=debug,off".to_string());
     let subscriber = FmtSubscriber::builder()
-        // "engineioxide=debug,socketioxide=debug,info"
-        .with_env_filter(EnvFilter::from_default_env())
+        // 优先使用RUST_LOG环境变量，没有则用默认
+        .with_env_filter(EnvFilter::new(env_log))
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).unwrap();
