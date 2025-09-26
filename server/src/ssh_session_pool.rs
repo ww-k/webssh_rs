@@ -36,6 +36,7 @@ impl russh::client::Handler for SshClientHandler {
         &mut self,
         server_public_key: &ssh_key::PublicKey,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
+        // TODO: verify server key
         debug!(
             "ClientHandler @check_server_key {} {:?}",
             self.host,
@@ -579,6 +580,7 @@ impl SshSession {
                         state.idle_resources.len(),
                         state.total_count
                     );
+                    // TODO: 可能不需要从资源池中拿出来，因为存的是Arc，可以直接clone
                     return state.idle_resources.remove(index);
                 }
             }
