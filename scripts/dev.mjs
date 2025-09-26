@@ -11,6 +11,7 @@ const env = {
     COLOR: "1",
     NPM_CONFIG_COLOR: "always",
 };
+const isWin32 = process.platform === "win32";
 
 // 确保安装依赖
 try {
@@ -33,6 +34,7 @@ processStdio("server", serverChild);
 const clientChild = spawn("npm", ["run", "dev"], {
     cwd: resolve(projectRoot, "./client"),
     env,
+    shell: isWin32,
 });
 processStdio("client", clientChild);
 
@@ -40,6 +42,7 @@ processStdio("client", clientChild);
 const tauriChild = spawn("tauri", ["dev"], {
     cwd: projectRoot,
     env,
+    shell: isWin32,
 });
 processStdio("tauri", tauriChild);
 
