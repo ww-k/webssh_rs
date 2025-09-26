@@ -1,4 +1,4 @@
-import simpleQueueRun from "@/helpers/simple_queue_run";
+import simpleQueueRun from "simple-queue-run";
 
 import { initLoadedSize, initRanges } from "../helpers";
 import sliceUploader from "./sliceUploader";

@@ -1,4 +1,4 @@
-import simpleQueueRun from "src/helpers/simple_queue_run";
+import simpleQueueRun from "simple-queue-run";
 
 import { getSftpStat } from "@/api";
 

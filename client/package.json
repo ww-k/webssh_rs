@@ -28,6 +28,7 @@
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
         "react-i18next": "^15.6.0",
+        "simple-queue-run": "^1.0.2",
         "socket.io-client": "^4.8.1",
         "zustand": "^5.0.3"
     },
