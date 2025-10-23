@@ -48,6 +48,7 @@ export default function remoteHandleContextmenu(
                 const allPromises = files.map((file) => {
                     return transferService.download({
                         fileUri: file.uri,
+                        size: file.size,
                     });
                 });
                 await Promise.all(allPromises);

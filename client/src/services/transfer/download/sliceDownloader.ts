@@ -7,8 +7,6 @@ export default async function sliceDownloader(option: ISliceDownloadOption) {
 
     console.debug(`Transfer/download: sliceDownloader start`, start);
 
-    if (signal.aborted) return false;
-
     let preLoaded = 0;
 
     const response = await getSftpDownload(fileUri, {
@@ -22,7 +20,9 @@ export default async function sliceDownloader(option: ISliceDownloadOption) {
         },
     });
 
-    if (signal.aborted) return false;
+    if (signal.aborted) {
+        throw new Error("Aborted");
+    }
 
     onDone?.(response);
 

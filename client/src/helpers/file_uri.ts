@@ -58,3 +58,12 @@ export function getParentDirUri(uri: string) {
     }
     return items.join("/");
 }
+
+/**
+ * uri: sftp:1:/Users/test
+ * return: test
+ */
+
+export function getFileName(uri: string) {
+    return uri.split("/").pop() as string;
+}

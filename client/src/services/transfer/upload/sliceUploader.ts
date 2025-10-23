@@ -4,10 +4,7 @@ import calcHashHex from "@/helpers/calcHashHex";
 import type { ISliceUploadOption } from "../types";
 
 export default async function sliceUploader(option: ISliceUploadOption) {
-    const { fileUri, file, start, end, totalSize, signal, onFlow, onDone } =
-        option;
-
-    if (!file) return;
+    const { fileUri, file, start, end, signal, onFlow, onDone } = option;
 
     console.debug(`Transfer/upload: sliceUploader start`, start);
 
@@ -19,7 +16,7 @@ export default async function sliceUploader(option: ISliceUploadOption) {
         postSftpUpload(fileUri, fileSlice, {
             start,
             end,
-            size: totalSize,
+            size: file.size,
             signal,
             onUploadProgress: (progressEvent) => {
                 onFlow?.(progressEvent.loaded - preLoaded);
@@ -27,6 +24,10 @@ export default async function sliceUploader(option: ISliceUploadOption) {
             },
         }).then((response) => response.hash),
     ]);
+
+    if (signal.aborted) {
+        throw new Error("Aborted");
+    }
 
     if (expectHash !== responseHash) {
         throw new Error(
@@ -38,5 +39,5 @@ export default async function sliceUploader(option: ISliceUploadOption) {
 
     console.debug(`Transfer/upload: sliceUploader end`, option.start);
 
-    return;
+    return true;
 }

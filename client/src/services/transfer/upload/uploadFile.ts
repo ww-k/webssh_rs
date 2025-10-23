@@ -8,16 +8,20 @@ import type { IFileUploadOption } from "../types";
 export default async function uploadFile(option: IFileUploadOption) {
     const { fileUri, file, signal, interval, onProgress, onFlow } = option;
 
+    if (!file) {
+        throw new Error("missing file");
+    }
+
     let ranges = option.ranges;
     let loaded = 0;
-    const _totalSize = file.size;
+    const fileSize = file.size;
 
     const sliceSize = 1048576;
 
-    if (ranges && _totalSize) {
-        loaded = initLoadedSize(ranges, _totalSize);
+    if (ranges && fileSize) {
+        loaded = initLoadedSize(ranges, fileSize);
     } else {
-        ranges = [[0, _totalSize - 1]];
+        ranges = [[0, fileSize - 1]];
     }
 
     ranges = initRanges(ranges, sliceSize);
@@ -28,8 +32,8 @@ export default async function uploadFile(option: IFileUploadOption) {
         loaded += end - start + 1;
         onProgress?.({
             range: [start, end],
-            percent: (loaded * 100) / _totalSize,
-            total: _totalSize,
+            percent: (loaded * 100) / fileSize,
+            total: fileSize,
             loaded,
         });
     }
@@ -40,7 +44,7 @@ export default async function uploadFile(option: IFileUploadOption) {
             fileUri,
             start,
             end,
-            totalSize: _totalSize,
+            fileSize,
             file,
             signal,
             onFlow,
