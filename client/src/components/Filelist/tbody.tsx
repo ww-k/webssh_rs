@@ -2,10 +2,10 @@ import { Component, createRef } from "react";
 
 import DragFilesReader from "@/helpers/DragFilesReader";
 
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 import type { IFileListColumn, IFileListDragDropEvent } from "./types";
 
-const EMPTY_FILE_ARR: IFile[] = [];
+const EMPTY_FILE_ARR: IViewFileStat[] = [];
 const MOUSE_SELECTION_ELID = "__filelist_mouse_selection__";
 
 function addClass(elem: HTMLElement, value: string) {
@@ -29,29 +29,29 @@ interface IProps {
     layoutColCheckboxWidth?: number;
     tbodyScrollOffset?: number;
     draggable?: boolean;
-    parentFile?: IFile;
+    parentFile?: IViewFileStat;
     columns: IFileListColumn[];
-    data: IFile[];
+    data: IViewFileStat[];
     cwd?: string;
-    selected?: IFile[];
+    selected?: IViewFileStat[];
     activeKey?: string | null;
     enableCheckbox?: boolean;
     enableDragFromOS?: boolean;
-    onSelected?: (files: IFile[]) => void;
-    onFileClick?: (file: IFile) => void;
-    onFileDoubleClick?: (file: IFile, evt: MouseEvent) => void;
-    onContextMenu?: (files: IFile[] | null, evt: MouseEvent) => void;
+    onSelected?: (files: IViewFileStat[]) => void;
+    onFileClick?: (file: IViewFileStat) => void;
+    onFileDoubleClick?: (file: IViewFileStat, evt: MouseEvent) => void;
+    onContextMenu?: (files: IViewFileStat[] | null, evt: MouseEvent) => void;
     onActive?: (activeIndex: number) => void;
     onDrop?: (evt: IFileListDragDropEvent) => void;
 }
 
 interface IState {
-    data: IFile[];
-    selected: IFile[];
+    data: IViewFileStat[];
+    selected: IViewFileStat[];
     activeKey?: string | null;
-    dragFiles?: IFile[] | null;
-    dropDir?: IFile | null;
-    lasterSelected?: IFile | null;
+    dragFiles?: IViewFileStat[] | null;
+    dropDir?: IViewFileStat | null;
+    lasterSelected?: IViewFileStat | null;
     // 拖拽文件时移入区域的文件路劲，用于显示hover效果
     dropFileHover?: string | null;
     tbodyScrollOffset?: number;
@@ -90,12 +90,12 @@ export default class Tbody extends Component<IProps, IState> {
     //记录虚拟滚动的开始数据索引
     _startRenderDataIndex: number = 0;
     _lastKeyword: string = "";
-    _lastFilteredCache: IFile[] | null = null;
+    _lastFilteredCache: IViewFileStat[] | null = null;
     _lastFilteredIndex: number = -1;
     _startMouseDownInBlank: boolean = false;
     _dragTarget: IFileListDragDropEvent["dragTarget"] | null = null;
     _dragLeaveTimer: number | undefined;
-    _lastRenderData?: IFile[];
+    _lastRenderData?: IViewFileStat[];
 
     constructor(props: IProps) {
         super(props);
@@ -515,7 +515,7 @@ export default class Tbody extends Component<IProps, IState> {
                 }
             }
 
-            let newSelected: IFile[] = EMPTY_FILE_ARR;
+            let newSelected: IViewFileStat[] = EMPTY_FILE_ARR;
             if (
                 this._startSelectDataIndex > -1 &&
                 _endSelectDataIndex > -1 &&
@@ -623,7 +623,7 @@ export default class Tbody extends Component<IProps, IState> {
      * 文件项点击处理函数
      */
     fileClickHandle(
-        file: IFile,
+        file: IViewFileStat,
         index: number,
         e: MouseEvent | React.MouseEvent,
     ) {
@@ -695,7 +695,7 @@ export default class Tbody extends Component<IProps, IState> {
     /**
      * 文件项双击处理函数
      */
-    fileDoubleClickHandle(file: IFile, e: MouseEvent) {
+    fileDoubleClickHandle(file: IViewFileStat, e: MouseEvent) {
         const { onFileDoubleClick } = this.props;
         onFileDoubleClick?.(file, e);
     }
@@ -703,7 +703,7 @@ export default class Tbody extends Component<IProps, IState> {
     /**
      * 右键菜单处理函数
      */
-    contextMenuHandle(file: IFile, e: MouseEvent) {
+    contextMenuHandle(file: IViewFileStat, e: MouseEvent) {
         e.stopPropagation();
         e.preventDefault();
         const { onContextMenu } = this.props;
@@ -743,7 +743,7 @@ export default class Tbody extends Component<IProps, IState> {
     /**
      * 选中键盘上下箭头键指向的下一个文件项
      */
-    dragStartHandle(file: IFile, e: DragEvent) {
+    dragStartHandle(file: IViewFileStat, e: DragEvent) {
         this._isUp = false;
         this._isMove = false;
         if (e.dataTransfer) {
@@ -777,7 +777,7 @@ export default class Tbody extends Component<IProps, IState> {
         }
     }
 
-    dragEnterHandle(file: IFile | null, e: DragEvent) {
+    dragEnterHandle(file: IViewFileStat | null, e: DragEvent) {
         e.stopPropagation();
 
         if (e.dataTransfer) {
@@ -836,7 +836,7 @@ export default class Tbody extends Component<IProps, IState> {
         });
     }
 
-    dropHandle(file: IFile | null, e: DragEvent) {
+    dropHandle(file: IViewFileStat | null, e: DragEvent) {
         e.stopPropagation();
         e.preventDefault();
         const { onDrop, enableDragFromOS, cwd: fileUri } = this.props;
@@ -947,7 +947,7 @@ export default class Tbody extends Component<IProps, IState> {
     selectNext(isUp: boolean) {
         let selected = this.state.selected;
         const last = selected[selected.length - 1];
-        let next: IFile | undefined;
+        let next: IViewFileStat | undefined;
         const data = this.props.data;
         if (data.length === 0) {
             return;
@@ -1039,8 +1039,8 @@ export default class Tbody extends Component<IProps, IState> {
             return;
         }
 
-        let selected: IFile[];
-        let filterdData: IFile[];
+        let selected: IViewFileStat[];
+        let filterdData: IViewFileStat[];
         let index = 0;
         if (this._lastKeyword === keyword) {
             filterdData = this._lastFilteredCache || EMPTY_FILE_ARR;
@@ -1280,7 +1280,7 @@ export default class Tbody extends Component<IProps, IState> {
             displayColumns.forEach((column, colIndex: number) => {
                 // eslint-disable-next-line no-param-reassign
                 enableCheckbox && colIndex++;
-                const itemKey = column.dataIndex as keyof IFile;
+                const itemKey = column.dataIndex as keyof IViewFileStat;
                 const value = `${rowData[itemKey] as number | string}`;
                 const length = value.length;
                 if (!maxCols[itemKey]) {
@@ -1308,7 +1308,7 @@ export default class Tbody extends Component<IProps, IState> {
         scrollOffset,
         layoutRowHeight,
     }: {
-        data: IFile[];
+        data: IViewFileStat[];
         layoutContainerHeight: number;
         scrollOffset: number;
         layoutRowHeight: number;

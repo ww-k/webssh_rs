@@ -13,9 +13,9 @@ import FilesviewBase from "./Base";
 import { handleDelete, handleRename } from "./remoteActions";
 import handleContextmenu from "./remoteHandleContextmenu";
 
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 
-const mockFiles: IFile[] = import.meta.env.DEV
+const mockFiles: IViewFileStat[] = import.meta.env.DEV
     ? [
           {
               name: "file1.txt",
@@ -147,22 +147,22 @@ export default function FilesviewRemote({
             },
         ];
     });
-    const onFileDoubleClick = useMemoizedFn((file: IFile) => {
+    const onFileDoubleClick = useMemoizedFn((file: IViewFileStat) => {
         if (file.isDir) {
             setCwd(file.uri);
             pushPathHistory(file.uri);
         }
     });
-    const onEnter = useMemoizedFn((file: IFile) => {
+    const onEnter = useMemoizedFn((file: IViewFileStat) => {
         if (file.isDir) {
             setCwd(file.uri);
             pushPathHistory(file.uri);
         }
     });
-    const onDelete = useMemoizedFn((files: IFile[]) => {
+    const onDelete = useMemoizedFn((files: IViewFileStat[]) => {
         handleDelete(files, getCwdFiles);
     });
-    const onRename = useMemoizedFn((file: IFile) => {
+    const onRename = useMemoizedFn((file: IViewFileStat) => {
         handleRename(file, getCwdFiles);
     });
 

@@ -1,11 +1,11 @@
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 
 /**
  * 过滤掉同名冲突的文件
  */
-export default function filesConflictFilter<T = File | IFile>(
+export default function filesConflictFilter<T = File | IViewFileStat>(
     files: T[],
-    targetList: IFile[],
+    targetList: IViewFileStat[],
 ): T[] {
     const noSame: T[] = [];
     const dirNamesMap: Record<string, boolean> = {};

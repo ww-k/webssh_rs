@@ -11,30 +11,30 @@ import useAppStore from "@/store";
 import Filelist from "../Filelist";
 import { handlePaste } from "./remoteActions";
 
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 
 type IProps = {
     className?: string;
     style?: React.CSSProperties;
-    files: IFile[];
+    files: IViewFileStat[];
     cwd: string;
     history?: string[];
     loading: boolean;
     posix?: boolean;
     setCwd: (cwd: string) => void;
     getHome: () => Promise<string>;
-    getDirs?: (fileUrlOrPath: string) => Promise<IFile[]>;
+    getDirs?: (fileUrlOrPath: string) => Promise<IViewFileStat[]>;
     getQuickLinks?: () => Promise<IQuickLink[]>;
     getCwdFiles: () => Promise<unknown>;
-    onSelecteChange?: (files: IFile[]) => void;
-    onFileDoubleClick?: (file: IFile) => void;
+    onSelecteChange?: (files: IViewFileStat[]) => void;
+    onFileDoubleClick?: (file: IViewFileStat) => void;
     onContextMenu?: (
-        files: IFile[] | null,
+        files: IViewFileStat[] | null,
         evt: MouseEvent | React.MouseEvent,
     ) => void;
-    onEnter?: (file: IFile) => void;
-    onDelete?: (files: IFile[]) => void;
-    onRename?: (file: IFile) => void;
+    onEnter?: (file: IViewFileStat) => void;
+    onDelete?: (files: IViewFileStat[]) => void;
+    onRename?: (file: IViewFileStat) => void;
 };
 
 export default function FilesviewBase({

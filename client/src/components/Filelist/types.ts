@@ -1,4 +1,4 @@
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 
 export interface IFileListColumn {
     title: string;
@@ -9,10 +9,11 @@ export interface IFileListColumn {
     sorter?: boolean;
     display?: boolean;
     align?: React.CSSProperties["textAlign"];
-    render?: (text: unknown, record: IFile, index: number) => string;
+    render?: (text: unknown, record: IViewFileStat, index: number) => string;
 }
 
-export interface IFileListDragDropEvent<T = File | IFile> extends Event {
+export interface IFileListDragDropEvent<T = File | IViewFileStat>
+    extends Event {
     dragTarget: {
         fileUri?: string;
         files: T[];
@@ -24,6 +25,6 @@ export interface IFileListDragDropEvent<T = File | IFile> extends Event {
 
 export interface IFileListCopyEvent {
     fileUri: string;
-    files: IFile[];
+    files: IViewFileStat[];
     type: "cut" | "copy";
 }

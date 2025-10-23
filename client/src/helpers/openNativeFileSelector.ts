@@ -1,13 +1,11 @@
 var fileEl: HTMLInputElement;
 /**
  * 打开原生的文件选择器
- * @param {object} [option]
- * @param {boolean} [option.directory=false] 是否选择目录, 默认为false
- * @param {boolean} [option.multiple=false] 是否多选, 默认为false
- * @returns {Promise<File[]>}
  */
 export default function openNativeFileSelector(option?: {
+    /** 是否选择目录, 默认为false */
     directory?: boolean;
+    /** 是否多选, 默认为false */
     multiple?: boolean;
 }): Promise<File[]> {
     let directory = false;

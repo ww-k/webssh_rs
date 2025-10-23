@@ -26,7 +26,7 @@ import { getFilePath, isSftpFileUri } from "@/helpers/file_uri";
 import { buildSearchUri, isSearchUri, parseSearchUri } from "./search";
 
 import type { DebouncedFuncLeading } from "lodash";
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 
 interface IRouteItem {
     name: string;
@@ -54,7 +54,7 @@ interface IProps {
     enableInput?: boolean;
     /** 是否允许搜索 */
     enableSearch?: boolean;
-    getDirs?: (fileUrlOrPath: string) => Promise<IFile[]>;
+    getDirs?: (fileUrlOrPath: string) => Promise<IViewFileStat[]>;
     getQuickLinks?: () => Promise<IQuickLink[]>;
     getCwdFiles: () => void;
     onChange?: (newPath: string) => void;
@@ -83,7 +83,7 @@ interface IState {
     /** 快速预览子目录模式下, 激活的路径项的路径 */
     activedPath: string;
     /** 快速预览子目录模式下, 显示的目录列表 */
-    dirList: IFile[];
+    dirList: IViewFileStat[];
     /** 快速预览子目录模式下, 显示的目录列表距离路径栏左边的距离 */
     dirListLeft: number | null;
     /** 快速预览子目录模式下, 显示的目录列表加载状态 */
@@ -100,7 +100,7 @@ export default class Pathbar extends Component<IProps, IState> {
     /** nodejs path 模块 */
     path: typeof path;
     /** 快速预览子目录模式下, 显示的目录列表的缓存 */
-    dirListCache: Record<string, IFile[]>;
+    dirListCache: Record<string, IViewFileStat[]>;
     resizeViewThrottle: DebouncedFuncLeading<() => void>;
     rootElRef: React.RefObject<HTMLDivElement>;
     breadcrumbBoxRef: React.RefObject<HTMLDivElement>;
@@ -699,10 +699,10 @@ export default class Pathbar extends Component<IProps, IState> {
             );
         }
 
-        return new Promise<IFile[]>((resolve, reject) => {
+        return new Promise<IViewFileStat[]>((resolve, reject) => {
             getDirs(path)
                 .then((response) => {
-                    const newDirList: IFile[] = [];
+                    const newDirList: IViewFileStat[] = [];
                     response.forEach((item) => {
                         if (item.type === "d") {
                             newDirList.push(item);
@@ -762,7 +762,7 @@ export default class Pathbar extends Component<IProps, IState> {
         this.props.onChange?.(route.path);
     }
 
-    handleClickDir(dir: IFile) {
+    handleClickDir(dir: IViewFileStat) {
         if (dir.name === this.state.activedPath) {
             return;
         }

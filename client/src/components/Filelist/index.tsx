@@ -11,20 +11,20 @@ import getColumns from "./getColumns";
 import Tbody from "./tbody";
 import Theader from "./theader";
 
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 import type {
     IFileListColumn,
     IFileListCopyEvent,
     IFileListDragDropEvent,
 } from "./types";
 
-const EMPTY_FILE_ARR: IFile[] = [];
+const EMPTY_FILE_ARR: IViewFileStat[] = [];
 const LAYOUT_COL_CHECKBOX_WIDTH = 26;
 const LAYOUT_ROW_HEIGHT = 24;
 
 interface IProps {
     className?: string;
-    data: IFile[];
+    data: IViewFileStat[];
     cwd: string;
     loading?: boolean;
     draggable?: boolean;
@@ -34,26 +34,26 @@ interface IProps {
     sortByDefault?: string;
     sortOrderDefault?: "ascend" | "descend";
     posix?: boolean;
-    onSelecteChange?: (files: IFile[]) => void;
-    onFileClick?: (file: IFile) => void;
-    onFileDoubleClick?: (file: IFile) => void;
+    onSelecteChange?: (files: IViewFileStat[]) => void;
+    onFileClick?: (file: IViewFileStat) => void;
+    onFileDoubleClick?: (file: IViewFileStat) => void;
     onContextMenu?: (
-        files: IFile[] | null,
+        files: IViewFileStat[] | null,
         evt: MouseEvent | React.MouseEvent,
     ) => void;
     onTheaderContextMenu?: (evt: React.MouseEvent) => void;
     onDrop?: (evt: IFileListDragDropEvent) => void;
-    onEnter?: (file: IFile) => void;
-    onDelete?: (files: IFile[]) => void;
+    onEnter?: (file: IViewFileStat) => void;
+    onDelete?: (files: IViewFileStat[]) => void;
     onCopy?: (evt: IFileListCopyEvent) => void;
     onPaste?: () => void;
-    onRename?: (file: IFile) => void;
+    onRename?: (file: IViewFileStat) => void;
     onColResize?: () => void;
 }
 
 interface IState {
     columns: IFileListColumn[];
-    data: IFile[];
+    data: IViewFileStat[];
     sortBy: string;
     sortByDefault: string;
     sortOrderDefault: "ascend" | "descend";
@@ -62,7 +62,7 @@ interface IState {
     layoutContainerHeight: number;
     layoutTableWidth: number;
     layoutColCheckboxWidth: number;
-    selected: IFile[];
+    selected: IViewFileStat[];
     activeKey: string | null;
     scrollOffset: number;
 }
@@ -79,7 +79,7 @@ export default class Filelist extends Component<IProps, IState> {
     rootElRef: React.RefObject<HTMLDivElement> = createRef();
     listTbodyRef: React.RefObject<Tbody> = createRef();
     listTheaderRef: React.RefObject<Theader> = createRef();
-    parentFile: IFile;
+    parentFile: IViewFileStat;
     guessKeybordInput: (keyCode: number) => string;
     _active_path: string | null = null;
     _resizeObserver?: ResizeObserver;
@@ -145,8 +145,8 @@ export default class Filelist extends Component<IProps, IState> {
         }
 
         if (prevProps.data !== nextProps.data) {
-            let activeItem: IFile | undefined;
-            let selected: IFile[] = EMPTY_FILE_ARR;
+            let activeItem: IViewFileStat | undefined;
+            let selected: IViewFileStat[] = EMPTY_FILE_ARR;
             const data = this._prepareData(
                 nextProps.data,
                 ["isDir", this.state.sortBy],
@@ -363,7 +363,7 @@ export default class Filelist extends Component<IProps, IState> {
      * 处理data，增加一些组件需要的数据
      */
     _prepareData(
-        data: IFile[],
+        data: IViewFileStat[],
         iteratees: string[],
         orders: ("asc" | "desc")[],
         cwd: string,
@@ -495,7 +495,7 @@ export default class Filelist extends Component<IProps, IState> {
         this.rootElRef.current?.focus({ preventScroll: true });
     }
 
-    filesSelectedChange(selected: IFile[]) {
+    filesSelectedChange(selected: IViewFileStat[]) {
         // console.debug("Filelist/index: filesSelectedChange", selected);
         if (selected.length > 1) {
             selected = this._removeParentFile(selected);
@@ -511,7 +511,7 @@ export default class Filelist extends Component<IProps, IState> {
         onSelecteChange?.(selected);
     }
 
-    fileClickHandle(file: IFile) {
+    fileClickHandle(file: IViewFileStat) {
         if (file.name !== "..") {
             const { onFileClick } = this.props;
             onFileClick?.(file);
@@ -521,7 +521,7 @@ export default class Filelist extends Component<IProps, IState> {
     /**
      * 文件项双击处理函数
      */
-    fileDoubleClickHandle(file: IFile) {
+    fileDoubleClickHandle(file: IViewFileStat) {
         if (file.name === "..") {
             this._active_path = this.props.cwd;
         }
@@ -532,7 +532,10 @@ export default class Filelist extends Component<IProps, IState> {
     /**
      * 右键菜单处理函数
      */
-    contextMenuHandle(files: IFile[] | null, e: MouseEvent | React.MouseEvent) {
+    contextMenuHandle(
+        files: IViewFileStat[] | null,
+        e: MouseEvent | React.MouseEvent,
+    ) {
         const { loading } = this.props;
         e.stopPropagation();
         e.preventDefault();
@@ -563,7 +566,7 @@ export default class Filelist extends Component<IProps, IState> {
         onDelete?.(selected);
     }
 
-    onEnterHandle(file?: IFile) {
+    onEnterHandle(file?: IViewFileStat) {
         let selected = this.state.selected;
 
         if (file) {
@@ -731,7 +734,7 @@ export default class Filelist extends Component<IProps, IState> {
         }
     }
 
-    _removeParentFile(selected: IFile[]) {
+    _removeParentFile(selected: IViewFileStat[]) {
         const index = selected.indexOf(this.parentFile);
         if (index !== -1) {
             selected = [...selected];

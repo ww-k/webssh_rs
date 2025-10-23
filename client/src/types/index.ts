@@ -1,9 +1,19 @@
-import type { ISftpFile } from "@/api/sftp";
+import type { ISftpFileStat } from "@/api/sftp";
+
+export interface IApiError {
+    code: number;
+    message: string;
+}
+
+export interface IError {
+    code: string;
+    message: string;
+}
 
 /**
  * 文件属性模型 file
  */
-export interface IFile extends ISftpFile {
+export interface IViewFileStat extends ISftpFileStat {
     /** 文件uri */
     uri: string;
     /** 用于排序的名称，将name属性转换为小写 */

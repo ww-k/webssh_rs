@@ -16,13 +16,16 @@ import renderBatchTaskProgressModal from "../BatchTaskProgressModal/render";
 import filesConflictConfirm from "./filesConflictConfirm";
 import generateCopyNewName from "./generateCopyNewName";
 
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 import type { IFileListCopyEvent } from "../Filelist/types";
 
-type IGetCwdFiles = () => Promise<IFile[]>;
+type IGetCwdFiles = () => Promise<IViewFileStat[]>;
 
-export async function handleDelete(files: IFile[], getCwdFiles: IGetCwdFiles) {
-    async function deleteFile(file: IFile) {
+export async function handleDelete(
+    files: IViewFileStat[],
+    getCwdFiles: IGetCwdFiles,
+) {
+    async function deleteFile(file: IViewFileStat) {
         if (file.isDir) {
             await postSftpRmRf(file.uri);
         } else {
@@ -41,7 +44,7 @@ export async function handleDelete(files: IFile[], getCwdFiles: IGetCwdFiles) {
                         await deleteFile(files[0]);
                     } else {
                         modal.destroy();
-                        await renderBatchTaskProgressModal<IFile>({
+                        await renderBatchTaskProgressModal<IViewFileStat>({
                             data: files,
                             action: (file) => deleteFile(file),
                             failsRender: () => "批量操作失败",
@@ -58,7 +61,10 @@ export async function handleDelete(files: IFile[], getCwdFiles: IGetCwdFiles) {
     });
 }
 
-export async function handleRename(file: IFile, getCwdFiles: IGetCwdFiles) {
+export async function handleRename(
+    file: IViewFileStat,
+    getCwdFiles: IGetCwdFiles,
+) {
     const newName = window.prompt("请输入文件名", file.name);
     if (!newName) {
         return;
@@ -96,7 +102,7 @@ export async function handlePaste(
     switch (true) {
         case copyData.type === "copy" && copyUri.path === pasteUri.path: {
             const targetList = await getSftpLsMapFiles(pasteTarget);
-            const generateCopyNewPath = (file: IFile) => {
+            const generateCopyNewPath = (file: IViewFileStat) => {
                 const newName = generateCopyNewName(targetList, file.name);
                 return `${pasteUri.path}/${newName}`;
             };
@@ -104,7 +110,7 @@ export async function handlePaste(
             if (files.length === 1) {
                 await postSftpCp(files[0].uri, generateCopyNewPath(files[0]));
             } else {
-                await renderBatchTaskProgressModal<IFile>({
+                await renderBatchTaskProgressModal<IViewFileStat>({
                     data: files,
                     action: (file) => {
                         return postSftpCp(file.uri, generateCopyNewPath(file));
@@ -123,7 +129,7 @@ export async function handlePaste(
             if (files.length === 1) {
                 await postSftpCp(files[0].uri, pasteUri.path);
             } else {
-                await renderBatchTaskProgressModal<IFile>({
+                await renderBatchTaskProgressModal<IViewFileStat>({
                     data: files,
                     action: (file) => postSftpCp(file.uri, pasteUri.path),
                     failsRender: () => "批量操作失败",
@@ -139,7 +145,7 @@ export async function handlePaste(
                     `${pasteUri.path}/${files[0].name}`,
                 );
             } else {
-                await renderBatchTaskProgressModal<IFile>({
+                await renderBatchTaskProgressModal<IViewFileStat>({
                     data: files,
                     action: (file) =>
                         postSftpRename(

@@ -2,11 +2,11 @@ import { Modal } from "antd";
 
 import filesConflictFilter from "./filesConflictFilter";
 
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 
-export default function filesConflictConfirm<T = File | IFile>(
+export default function filesConflictConfirm<T = File | IViewFileStat>(
     files: T[],
-    targetList: IFile[],
+    targetList: IViewFileStat[],
 ) {
     return new Promise<T[]>((resolve) => {
         const noSame = filesConflictFilter<T>(files, targetList);

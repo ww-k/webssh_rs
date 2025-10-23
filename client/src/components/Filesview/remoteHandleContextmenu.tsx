@@ -23,17 +23,17 @@ import {
     handleRename,
 } from "./remoteActions";
 
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
 import type { IFileListCopyEvent } from "../Filelist/types";
 
 export default function remoteHandleContextmenu(
-    files: IFile[] | null,
+    files: IViewFileStat[] | null,
     evt: MouseEvent | React.MouseEvent,
     context: {
         copyData?: IFileListCopyEvent;
         fileUri: string;
-        getCwdFiles: () => Promise<IFile[]>;
+        getCwdFiles: () => Promise<IViewFileStat[]>;
         setCopyData: (data: IFileListCopyEvent) => void;
     },
 ) {

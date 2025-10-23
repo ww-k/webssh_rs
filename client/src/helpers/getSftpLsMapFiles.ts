@@ -1,10 +1,10 @@
 import { getSftpLs } from "@/api";
 
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 
 export default async function getSftpLsMapFiles(fileUri: string) {
     const sftpFiles = await getSftpLs(fileUri);
-    const files: IFile[] = sftpFiles.map((item) => ({
+    const files: IViewFileStat[] = sftpFiles.map((item) => ({
         ...item,
         mtime: item.mtime * 1000,
         atime: item.atime * 1000,

@@ -6,7 +6,7 @@ import type {
     GenericAbortSignal,
 } from "axios";
 
-export interface ISftpFile {
+export interface ISftpFileStat {
     /** 文件名 */
     name: string;
     /** 文件所在目录路径 */
@@ -22,7 +22,7 @@ export interface ISftpFile {
 }
 
 export async function getSftpLs(uri: string) {
-    const response = await axios.get<ISftpFile[]>("/api/sftp/ls", {
+    const response = await axios.get<ISftpFileStat[]>("/api/sftp/ls", {
         params: {
             uri,
         },
@@ -87,7 +87,7 @@ export async function postSftpRmRf(uri: string) {
 }
 
 export async function getSftpStat(uri: string) {
-    const response = await axios.get<ISftpFile>("/api/sftp/stat", {
+    const response = await axios.get<ISftpFileStat>("/api/sftp/stat", {
         params: {
             uri,
         },
@@ -97,7 +97,7 @@ export async function getSftpStat(uri: string) {
 
 export async function postSftpUpload(
     fileUri: string,
-    fileSlice: File | Blob,
+    fileSlice: File | Blob | string,
     option?: {
         start?: number;
         end?: number;

@@ -1,10 +1,17 @@
-import type { IFile } from "@/types";
+import type { IViewFileStat } from "@/types";
 
-export default function generateCopyNewName(list: IFile[], name: string) {
+export default function generateCopyNewName(
+    list: IViewFileStat[],
+    name: string,
+) {
     return generateCopyNewNameLoop(list, name, 0);
 }
 
-function generateCopyNewNameLoop(list: IFile[], name: string, index: number) {
+function generateCopyNewNameLoop(
+    list: IViewFileStat[],
+    name: string,
+    index: number,
+) {
     let basename = name;
     if (index > 0) {
         const arr = name.split(".");
