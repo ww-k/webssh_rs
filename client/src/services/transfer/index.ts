@@ -29,7 +29,9 @@ interface IPrivateDownloadOption {
 
 class TransferService {
     /** 传输任务队列服务 */
-    #queue = new QueueService();
+    #queue = new QueueService({
+        concurrency: 1,
+    });
     /** 传输任务函数 */
     #queueTaskMap = new Map<string, () => Promise<void>>();
     /** 运行中的传输任务的AbortController */
@@ -38,6 +40,15 @@ class TransferService {
     #fileMap = new Map<string, File>();
     /** 缓存下载文件内容 */
     #blobsMap = new Map<string, Blob[]>();
+
+    setConfig(option: {
+        /** 并发任务数 */
+        concurrency?: number;
+        /** 每个任务执行间的间隔 */
+        interval?: number;
+    }) {
+        this.#queue.setConfig(option);
+    }
 
     async upload(option: IUploadOption) {
         const id = nanoid();
@@ -154,6 +165,7 @@ class TransferService {
         try {
             await download({
                 ...option,
+                blobs,
                 signal: abortController.signal,
                 onProgress: (progress) => {
                     useTransferStore.getState().updateProgress(id, progress);
