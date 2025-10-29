@@ -3,7 +3,7 @@ export default function fileSave(
     options = { fileName: "" },
 ) {
     const a = document.createElement("a");
-    // @ts-ignore
+    // @ts-expect-error
     a.download = options.fileName || data.name || "Untitled";
     a.href = URL.createObjectURL(data);
     a.type = data.type;

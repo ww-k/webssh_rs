@@ -53,7 +53,7 @@ export default function SpeedCounter(
         }
         /** 两次计算间的间隔毫秒数 */
         const now = new Date();
-        // @ts-ignore
+        // @ts-expect-error
         const _interval = now - lastTime;
         lastTime = now;
 

@@ -3,7 +3,7 @@ import PromiseWithResolvers from "@/helpers/PromiseWithResolvers";
 import { updateMissedRange } from "@/helpers/ranges";
 import SpeedCounter from "@/helpers/speed_counter";
 
-import { sumRangesSize } from "../helpers";
+import { sumeBlobsSize, sumRangesSize } from "../helpers";
 import TransferError from "../TransferError";
 import downloadFile from "./downloadFile";
 
@@ -78,10 +78,7 @@ export default async function download({
 
         if (unLoaded === 0) {
             if (blobs.length > 0) {
-                const totalBlobSize = blobs.reduce(
-                    (sum, blob) => sum + blob.size,
-                    0,
-                );
+                const totalBlobSize = sumeBlobsSize(blobs);
                 if (totalBlobSize === fileSize) {
                     handleDone();
                     return;
@@ -94,14 +91,13 @@ export default async function download({
             return;
         }
 
-        let _sumLoaded = 0;
+        let sumLoaded = 0;
 
         speedCounter.onRecordTimeup((record) => {
             if (isEnd()) return;
 
-            const speed = record(_sumLoaded);
-            _sumLoaded = 0;
-            progress.speed = speed;
+            record(sumLoaded);
+            sumLoaded = 0;
             handleProgress(progress);
         });
 
@@ -112,10 +108,10 @@ export default async function download({
                 signal: abortController.signal,
                 blobs,
                 onFlow: (newLoaded) => {
-                    _sumLoaded += newLoaded;
+                    sumLoaded += newLoaded;
                 },
                 onProgress: (progress1) => {
-                    console.debug("Transfer/upload onProgress", progress1);
+                    console.debug("Transfer/download onProgress", progress1);
                     handleProgress(progress1);
                 },
             });
@@ -157,7 +153,9 @@ export default async function download({
         unLoaded = fileSize - lastLoaded;
 
         const speed = speedCounter.get();
-        progress.estimatedTime = Math.round(unLoaded / speed);
+        progress.speed = speed || 0;
+        progress.estimatedTime =
+            speed > 0 ? Math.round(unLoaded / speed) : Infinity;
 
         if (progress1.range) {
             progress.percent = progress1.percent;
@@ -190,7 +188,7 @@ export default async function download({
         if (isEnd()) return;
 
         let err = error as TransferError;
-        if (error instanceof TransferError) {
+        if (!(error instanceof TransferError)) {
             err = new TransferError(error);
         }
         if (canRetry(err)) {
@@ -214,10 +212,10 @@ export default async function download({
 
     function canRetry(error: TransferError) {
         switch (error.code) {
-            case "services_transfer_size_ranges":
-                return false;
-            default:
+            case "NetworkError":
                 return true;
+            default:
+                return false;
         }
     }
 

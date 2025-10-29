@@ -5,7 +5,7 @@ axios.interceptors.response.use(
     (err) => {
         if (axios.isCancel(err) === true) {
             // 主动取消的请求, 抛出原异常
-            // @ts-ignore
+            // @ts-expect-error
             err.code = "Aborted";
             throw err;
         }

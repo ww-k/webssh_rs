@@ -17,7 +17,7 @@ interface IUploadTaskOption {
     onProgress?: (progress: ITransferProgressEvent) => void;
 }
 
-export async function upload({
+export default async function upload({
     file,
     fileUri,
     signal,
@@ -132,8 +132,9 @@ export async function upload({
         unLoaded = fileSize - lastLoaded;
 
         const speed = speedCounter.get();
-        progress.speed = speed;
-        progress.estimatedTime = Math.round(unLoaded / speed);
+        progress.speed = speed || 0;
+        progress.estimatedTime =
+            speed > 0 ? Math.round(unLoaded / speed) : Infinity;
 
         if (progress1.range) {
             progress.percent = progress1.percent;
@@ -166,7 +167,7 @@ export async function upload({
         if (isEnd()) return;
 
         let err = error as TransferError;
-        if (error instanceof TransferError) {
+        if (!(error instanceof TransferError)) {
             err = new TransferError(error);
         }
         if (canRetry(err)) {
@@ -190,10 +191,10 @@ export async function upload({
 
     function canRetry(error: TransferError) {
         switch (error.code) {
-            case "services_transfer_size_ranges": //续传的文件, size发生变化
-                return false;
-            default:
+            case "NetworkError":
                 return true;
+            default:
+                return false;
         }
     }
 

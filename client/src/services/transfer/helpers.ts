@@ -43,6 +43,12 @@ export function initRanges(ranges: ITransferRange[], sliceSize: number) {
         }
     }
 
-    // @ts-ignore
     return newRanges;
+}
+
+/**
+ * 统计blobs中所有blob的总大小
+ */
+export function sumeBlobsSize(blobs: Blob[]) {
+    return blobs.reduce((sum, blob) => sum + blob.size, 0);
 }

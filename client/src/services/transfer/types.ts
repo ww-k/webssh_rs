@@ -9,7 +9,7 @@ export interface ITransferProgressEvent {
     estimatedTime?: number;
 }
 
-export interface ISliceLoadOption {
+interface ISliceLoadOption {
     /** 文件远端uri */
     fileUri: string;
     /** 分片开始点 */
@@ -24,7 +24,7 @@ export interface ISliceLoadOption {
     onFlow?: (loaded: number) => void;
 }
 
-export interface IFileLoadOption {
+interface IFileLoadOption {
     /** 文件远端uri */
     fileUri: string;
     /** AbortSignal, 用于终止传输 */
@@ -43,7 +43,7 @@ export interface IFileLoadOption {
         loaded: number;
     }) => void;
     /** 流量更新事件，距离上次通知的时间段内，新增的流量 */
-    onFlow?: ISliceUploadOption["onFlow"];
+    onFlow?: ISliceLoadOption["onFlow"];
 }
 
 export type ISliceUploadOption = ISliceLoadOption & {

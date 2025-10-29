@@ -8,7 +8,7 @@ import openNativeFileSelector from "@/helpers/openNativeFileSelector";
 import download from "./download";
 import useTransferStore from "./store";
 import TransferError from "./TransferError";
-import { upload } from "./upload";
+import upload from "./upload";
 
 import type { ITransferRange } from "./types";
 

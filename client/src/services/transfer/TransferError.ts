@@ -9,15 +9,15 @@ export default class TransferError extends Error {
         if (
             typeof message === "object" &&
             message &&
-            // @ts-ignore
+            // @ts-expect-error
             typeof message.code === "string" &&
-            // @ts-ignore
-            message.message
+            // @ts-expect-error
+            typeof message.message === "string"
         ) {
             // IError
-            // @ts-ignore
+            // @ts-expect-error
             this.code = message.code;
-            // @ts-ignore
+            // @ts-expect-error
             this.message = message.message;
         } else if (isAxiosError(message)) {
             if (
@@ -38,9 +38,9 @@ export default class TransferError extends Error {
         } else {
             this.message = "unknown error";
         }
-        // @ts-ignore
+        // @ts-expect-error
         if (typeof Error.captureStackTrace === "function") {
-            // @ts-ignore
+            // @ts-expect-error
             Error.captureStackTrace(this, TransferError);
         }
     }
