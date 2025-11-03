@@ -91,6 +91,15 @@ class TransferService {
         const abortController = new AbortController();
         this.#abortCtrlMap.set(id, abortController);
 
+        abortController.signal.addEventListener("abort", () => {
+            reject(
+                new TransferError({
+                    code: "Aborted",
+                    message: "Aborted",
+                }),
+            );
+        });
+
         try {
             await upload({
                 ...option,
@@ -161,6 +170,15 @@ class TransferService {
 
         const abortController = new AbortController();
         this.#abortCtrlMap.set(id, abortController);
+
+        abortController.signal.addEventListener("abort", () => {
+            reject(
+                new TransferError({
+                    code: "Aborted",
+                    message: "Aborted",
+                }),
+            );
+        });
 
         try {
             await download({
