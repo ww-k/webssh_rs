@@ -54,6 +54,21 @@ export default function App() {
                 }${evt.key} ${evt.code}`,
             );
         };
+
+        const preventDefault = (evt: DragEvent) => {
+            evt.preventDefault();
+            if (evt.dataTransfer) {
+                evt.dataTransfer.dropEffect = "none";
+            }
+        };
+
+        document.body.addEventListener("dragover", preventDefault, false);
+        document.body.addEventListener("drop", preventDefault, false);
+
+        return () => {
+            document.body.removeEventListener("dragover", preventDefault);
+            document.body.removeEventListener("drop", preventDefault);
+        };
     }, []);
 
     const onEdit = (

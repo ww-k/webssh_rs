@@ -15,6 +15,16 @@ var sizeCache;
 var maxDisconnectionDuration = 5 * 60000;
 
 function init() {
+    const preventDefault = (evt) => {
+        evt.preventDefault();
+        if (evt.dataTransfer) {
+            evt.dataTransfer.dropEffect = "none";
+        }
+    };
+
+    document.body.addEventListener("dragover", preventDefault, false);
+    document.body.addEventListener("drop", preventDefault, false);
+
     initTerm();
 }
 
