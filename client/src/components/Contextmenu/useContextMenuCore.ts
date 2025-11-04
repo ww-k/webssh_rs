@@ -41,7 +41,7 @@ export default function useContextMenuCore({
     useEffect(() => {
         function destroy1(evt: Event) {
             if (
-                // @ts-ignore KeyboardEvent
+                // @ts-expect-error KeyboardEvent
                 evt.key === "Escape" ||
                 evt.type === "contextmenu" ||
                 evt.type === "click"

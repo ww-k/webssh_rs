@@ -12,14 +12,14 @@ export function popupCreator(
         x: number;
         y: number;
         destroy: () => void;
-        [key: string]: any;
+        [key: string]: unknown;
     }>,
 ) {
     return function popup(
         data: IContextmenuDataItem[],
         x: number,
         y: number,
-        otherProps?: { container?: HTMLElement; [key: string]: any },
+        otherProps?: { container?: HTMLElement; [key: string]: unknown },
     ) {
         let container: HTMLElement;
         if (otherProps?.container) {
