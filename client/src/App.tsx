@@ -73,7 +73,10 @@ export default function App() {
                 activeKey={activeTabKey}
                 className="WebSSH-Root-Tabs"
                 items={tabsItems}
-                onChange={setActiveTabKey}
+                onChange={(key) => {
+                    setActiveTabKey(key);
+                    document.body.click();
+                }}
                 onEdit={onEdit}
                 type="editable-card"
             />
