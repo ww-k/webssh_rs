@@ -199,7 +199,7 @@ export default class Filelist extends Component<IProps, IState> {
             const theader = this.listTheaderRef.current?.getRootDom();
             if (!theader) return;
             const theaderRect = theader.getBoundingClientRect();
-            // @ts-ignore
+            // @ts-expect-error
             const scrollTop = rootEl.scrollTop;
             const { scrollOffset } = this.state;
             if (scrollTop !== scrollOffset) {
@@ -227,7 +227,7 @@ export default class Filelist extends Component<IProps, IState> {
 
         const rootEl = this.rootElRef.current;
         this._resizeObserver.observe(rootEl as Element);
-        // @ts-ignore
+        // @ts-expect-error
         update(rootEl.getBoundingClientRect());
     }
 

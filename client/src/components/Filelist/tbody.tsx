@@ -210,7 +210,7 @@ export default class Tbody extends Component<IProps, IState> {
     }
 
     componentWillUnmount() {
-        // @ts-ignore
+        // @ts-expect-error
         this._refs = null;
 
         document.removeEventListener(
@@ -339,7 +339,6 @@ export default class Tbody extends Component<IProps, IState> {
                 tr.appendChild(td0);
             }
 
-            // @ts-ignore
             columns.forEach((column) => {
                 if (!column.display) return;
 
@@ -347,13 +346,13 @@ export default class Tbody extends Component<IProps, IState> {
                 td.className = column.className || "";
                 if (typeof column.render === "function") {
                     td.innerHTML = column.render(
-                        // @ts-ignore
+                        // @ts-expect-error
                         item[column.dataIndex],
                         item,
                         i,
                     );
                 } else {
-                    // @ts-ignore
+                    // @ts-expect-error
                     td.innerHTML = item[column.dataIndex];
                 }
                 td.style.textAlign = column.align || "left";
@@ -634,10 +633,10 @@ export default class Tbody extends Component<IProps, IState> {
         const data = this.props.data;
         const evtTarget = e.target as Element;
         const isAppendClick =
-            // @ts-ignore
+            // @ts-expect-error
             evtTarget.type === "checkbox" ||
             (evtTarget.children[0] &&
-                // @ts-ignore
+                // @ts-expect-error
                 evtTarget.children[0].type === "checkbox") ||
             e.metaKey ||
             e.ctrlKey;
@@ -651,12 +650,12 @@ export default class Tbody extends Component<IProps, IState> {
             }
             // 如果当前点击的文件已经包含在selected中, 则取消选择该文件
             // 否则就将该文件加入到selected中
-            const _index = selected.findIndex((_file) => _file === file);
+            const _index = selected.indexOf(file);
             if (_index === -1) {
-                // @ts-ignore
+                // @ts-expect-error
                 selected = [].concat(selected, file);
             } else {
-                // @ts-ignore
+                // @ts-expect-error
                 selected = [].concat(selected);
                 selected.splice(_index, 1);
             }
@@ -717,7 +716,7 @@ export default class Tbody extends Component<IProps, IState> {
 
         //判断菜单是否需要拼接前面
         if (
-            // @ts-ignore
+            // @ts-expect-error
             e.target.nodeName !== "TD" ||
             isSelect
         ) {
@@ -759,7 +758,7 @@ export default class Tbody extends Component<IProps, IState> {
             //TODO: 拖动多个文件时的界面视觉效果
         } else {
             newState.dragFiles = [file];
-            // @ts-ignore
+            // @ts-expect-error
             newState.selected = [file];
         }
 
@@ -1000,7 +999,7 @@ export default class Tbody extends Component<IProps, IState> {
                 nextIndex <= data.length - 1 &&
                 data[nextIndex] !== selected[selected.length - 1]
             ) {
-                // @ts-ignore
+                // @ts-expect-error
                 selected = [].concat(selected, data[nextIndex]);
             }
         }
@@ -1023,7 +1022,7 @@ export default class Tbody extends Component<IProps, IState> {
         if (data.length === 0) {
             return;
         }
-        // @ts-ignore
+        // @ts-expect-error
         selected = [].concat(data);
         this.setState({ activeKey: null, selected });
     }
@@ -1132,14 +1131,14 @@ export default class Tbody extends Component<IProps, IState> {
 
         if (dragFiles !== nextState.dragFiles) {
             if (dragFiles) {
-                dragFiles.forEach((item) =>
-                    removeClass(refs[item.uri], "dragging"),
-                );
+                dragFiles.forEach((item) => {
+                    removeClass(refs[item.uri], "dragging");
+                });
             }
             if (nextState.dragFiles) {
-                nextState.dragFiles.forEach((item) =>
-                    addClass(refs[item.uri], "dragging"),
-                );
+                nextState.dragFiles.forEach((item) => {
+                    addClass(refs[item.uri], "dragging");
+                });
             }
         }
 
@@ -1203,7 +1202,7 @@ export default class Tbody extends Component<IProps, IState> {
             el.style.position = "absolute";
             el.style.border = "1px solid #666";
             el.style.background = "rgba(0,0,0, 0.3)";
-            // @ts-ignore 类型定义错误
+            // @ts-expect-error 类型定义错误
             el.style.zIndex = 9999;
             el.addEventListener("mousemove", (e) => {
                 this.mouseMoveHandle(e);
