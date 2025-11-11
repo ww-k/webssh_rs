@@ -14,17 +14,17 @@ const env = {
 
 // 确保安装依赖
 try {
-    lstatSync(resolve(projectRoot, "./client/node_modules"));
+    lstatSync(resolve(projectRoot, "./src-client/node_modules"));
 } catch (_err) {
     spawnSync("pnpm i", {
-        cwd: resolve(projectRoot, "./client"),
+        cwd: resolve(projectRoot, "./src-client"),
         env,
     });
 }
 
 // 构建Web前端
 spawnSync("npm", ["run", "build"], {
-    cwd: resolve(projectRoot, "./client"),
+    cwd: resolve(projectRoot, "./src-client"),
     env,
     stdio: "inherit",
 });

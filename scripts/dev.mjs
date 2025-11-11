@@ -15,24 +15,24 @@ const isWin32 = process.platform === "win32";
 
 // 确保安装依赖
 try {
-    lstatSync(resolve(projectRoot, "./client/node_modules"));
+    lstatSync(resolve(projectRoot, "./src-client/node_modules"));
 } catch (_err) {
     spawnSync("pnpm", ["install"], {
-        cwd: resolve(projectRoot, "./client"),
+        cwd: resolve(projectRoot, "./src-client"),
         env,
     });
 }
 
 // 启动接口服务
 const serverChild = spawn("cargo", ["run"], {
-    cwd: resolve(projectRoot, "./server"),
+    cwd: resolve(projectRoot, "./src-server"),
     env,
 });
 processStdio("server", serverChild);
 
 // 启动前端服务
 const clientChild = spawn("npm", ["run", "dev"], {
-    cwd: resolve(projectRoot, "./client"),
+    cwd: resolve(projectRoot, "./src-client"),
     env,
     shell: isWin32,
 });
@@ -45,6 +45,10 @@ const tauriChild = spawn("tauri", ["dev"], {
     shell: isWin32,
 });
 processStdio("tauri", tauriChild);
+
+tauriChild.on("exit", (code) => {
+    process.exit(code);
+});
 
 function processStdio(name, child) {
     child.stdout.on("data", (data) => {

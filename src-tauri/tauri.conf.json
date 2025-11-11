@@ -4,7 +4,7 @@
     "version": "0.1.0",
     "identifier": "io.github.ww-k.webssh-rs",
     "build": {
-        "frontendDist": "../client/dist",
+        "frontendDist": "../src-client/dist",
         "devUrl": "http://localhost:3000",
         "beforeDevCommand": "",
         "beforeBuildCommand": ""

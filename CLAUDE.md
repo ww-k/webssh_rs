@@ -10,7 +10,7 @@ WebSSH RS is a web-based SSH client with file management capabilities, built wit
 
 The project is split into three main components:
 
-### Client (`/client/`)
+### Client (`/src-client/`)
 - **Framework**: React 18 with TypeScript
 - **Build Tool**: Rsbuild with Less support
 - **State Management**: Zustand store
@@ -19,7 +19,7 @@ The project is split into three main components:
 - **File Management**: Custom SFTP file browser with drag-and-drop support
 - **Internationalization**: i18next with English and Chinese translations
 
-### Server (`/server/`)
+### Server (`/src-server/`)
 - **Language**: Rust
 - **Framework**: Axum web framework
 - **Database**: SQLite with Sea-ORM
@@ -76,7 +76,7 @@ npm run build
 #### Client Development
 ```bash
 # Navigate to client directory
-cd client
+cd src-client
 
 # Install dependencies
 pnpm install
@@ -98,7 +98,7 @@ pnpm check   # Biome linter with auto-fix
 #### Server Development
 ```bash
 # Navigate to server directory
-cd server
+cd src-server
 
 # Run development server
 cargo run
@@ -139,7 +139,7 @@ cargo tauri build --target universal-apple-darwin
 #### Web Application
 1. **Backend First**: Start the Rust server on port 8080
 2. **Frontend Development**: Use `pnpm dev` which proxies API calls to the backend
-3. **Database**: SQLite database is auto-created in `server/target/db.sqlite`
+3. **Database**: SQLite database is auto-created in `src-server/target/db.sqlite`
 
 #### Desktop Application
 1. **Backend First**: Start the Rust server on port 8080
@@ -158,9 +158,9 @@ cargo tauri build --target universal-apple-darwin
 - `package.json`: Root package file with unified development and build scripts
 - `scripts/dev.mjs`: Development orchestration script (starts all services)
 - `scripts/build.mjs`: Production build orchestration script
-- `client/rsbuild.config.ts`: Frontend build configuration with proxy setup
+- `src-client/rsbuild.config.ts`: Frontend build configuration with proxy setup
 - `biome.json`: Code formatting and linting rules
-- `server/Cargo.toml`: Rust dependencies and build configuration
+- `src-server/Cargo.toml`: Rust dependencies and build configuration
 - `src-tauri/tauri.conf.json`: Tauri desktop app configuration
 - `src-tauri/Cargo.toml`: Desktop app dependencies and metadata
 
