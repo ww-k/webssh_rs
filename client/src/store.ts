@@ -14,6 +14,12 @@ export interface ITab
 }
 
 type AppStore = {
+    theme: "light" | "dark";
+    setTheme: (theme: "light" | "dark") => void;
+
+    activeMenuKey: string;
+    setMenuKey: (key: string) => void;
+
     activeTabKey: string;
     tabs: ITab[];
     setActiveTabKey: (key: string) => void;
@@ -28,6 +34,12 @@ type AppStore = {
 const useAppStore = create<AppStore>((set) => {
     const firstTabKey = nanoid();
     return {
+        theme: "light",
+        setTheme: (theme: "light" | "dark") => set({ theme }),
+
+        activeMenuKey: "home",
+        setMenuKey: (key: string) => set({ activeMenuKey: key }),
+
         activeTabKey: firstTabKey,
         tabs: [
             {
@@ -80,8 +92,7 @@ const useAppStore = create<AppStore>((set) => {
             }),
 
         copyData: undefined,
-        setCopyData: (data: IFileListCopyEvent) =>
-            set({ copyData: data }),
+        setCopyData: (data: IFileListCopyEvent) => set({ copyData: data }),
     };
 });
 

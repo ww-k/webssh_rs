@@ -1,0 +1,12 @@
+.WebSSH-Home-Tabs,
+.WebSSH-Home-Tabs > .ant-tabs-content-holder > .ant-tabs-content,
+.WebSSH-Home-Tabs
+    > .ant-tabs-content-holder
+    > .ant-tabs-content
+    > .ant-tabs-tabpane-active {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+}

@@ -2,19 +2,23 @@ import { create } from "zustand";
 
 import type { ITransferProgressEvent, ITransferRange } from "./types";
 
-interface ITransferListItem {
+export interface ITransferListItem {
     /** id  */
     id: string;
     /** 传输类型 */
     type: "UPLOAD" | "DOWNLOAD";
     /** 任务状态 */
     status: "WAIT" | "RUN" | "SUCCESS" | "FAIL" | "PAUSE";
-    /** 本地文件路径。Web端，是文件名。客户端，是本地文件路径。 */
-    local: string;
-    /** 远端文件uri */
-    remote: string;
     /** 文件名 */
     name: string;
+    /** 本地文件路径。Web端，是文件名。客户端，是本地文件路径。 */
+    localPath: string;
+    /** 远端目标Id */
+    targetId: number;
+    /** 远端文件uri */
+    targetUri: string;
+    /** 远端文件Path */
+    targetPath: string;
     /** 结束时间 */
     endDate?: number;
     /** 预估剩余时间 */

@@ -1,52 +1,50 @@
-import { ConfigProvider, Tabs } from "antd";
-import { useEffect, useMemo } from "react";
+import { Badge, ConfigProvider, Layout, Menu, theme } from "antd";
+import { useCallback, useEffect, useMemo } from "react";
 
 import "./App.css";
 
+import { HomeOutlined, SwapOutlined } from "@ant-design/icons";
+
 import useAppStore from "@/store";
 
-import Filesview from "./components/Filesview";
-import TargetSelector from "./components/Target/Selector";
-import Terminal from "./components/Terminal";
+import Home from "./components/Home";
+import Transfer from "./components/Transfer";
+import useTransferStore from "./services/transfer/store";
+
+import type { MenuProps } from "antd";
+
+const { darkAlgorithm, defaultAlgorithm } = theme;
+const { Content, Sider } = Layout;
 
 export default function App() {
-    const { activeTabKey, tabs, setActiveTabKey, addTab, removeTab } =
-        useAppStore();
-    const tabsItems = useMemo(
-        () =>
-            tabs.map((tab) => {
-                let children: JSX.Element;
-                switch (true) {
-                    case tab.path.startsWith("/terminal/"):
-                        children = (
-                            <Terminal
-                                active={activeTabKey === tab.key}
-                                tab={tab}
-                            />
-                        );
-                        break;
-                    case tab.path.startsWith("/filesview/"):
-                        children = (
-                            <Filesview
-                                active={activeTabKey === tab.key}
-                                tab={tab}
-                            />
-                        );
-                        break;
-                    default:
-                        children = <TargetSelector tab={tab} />;
-                        break;
-                }
+    const transferListLen = useTransferStore((state) => state.list.length);
+    const menusItems = useMemo<Required<MenuProps>["items"]>(() => {
+        return [
+            {
+                key: "home",
+                icon: <HomeOutlined />,
+                label: "主页",
+            },
+            {
+                key: "transfer",
+                icon: <SwapOutlined style={{ transform: "rotate(90deg)" }} />,
+                label: "传输",
+                extra: <Badge count={transferListLen}></Badge>,
+            },
+        ];
+    }, [transferListLen]);
 
-                return {
-                    ...tab,
-                    children,
-                };
-            }),
-        [tabs, activeTabKey],
-    );
+    const {
+        theme,
+        setTheme,
 
+        activeMenuKey,
+        setMenuKey,
+    } = useAppStore();
+
+    // biome-ignore lint/correctness/useExhaustiveDependencies: setTheme不用加
     useEffect(() => {
+        console.log("App init");
         window.onkeydown = (evt) => {
             console.log(
                 `${evt.ctrlKey ? "Ctrl + " : ""}${evt.altKey ? "Alt + " : ""}${evt.shiftKey ? "Shift + " : ""}${
@@ -62,39 +60,71 @@ export default function App() {
             }
         };
 
+        // 禁用拖入文件
         document.body.addEventListener("dragover", preventDefault, false);
         document.body.addEventListener("drop", preventDefault, false);
+
+        // 获取系统的主体偏好设置
+        const systemPrefersDark = window.matchMedia(
+            "(prefers-color-scheme: dark)",
+        );
+        // 处理系统偏好变化的回调函数
+        const handleSystemThemeChange = (event: MediaQueryListEvent) => {
+            setTheme(event.matches ? "dark" : "light");
+        };
+
+        // 初始化设置主题
+        setTheme(systemPrefersDark.matches ? "dark" : "light");
+        systemPrefersDark.addEventListener("change", handleSystemThemeChange);
 
         return () => {
             document.body.removeEventListener("dragover", preventDefault);
             document.body.removeEventListener("drop", preventDefault);
+            systemPrefersDark.removeEventListener(
+                "change",
+                handleSystemThemeChange,
+            );
         };
     }, []);
 
-    const onEdit = (
-        targetKey: React.MouseEvent | React.KeyboardEvent | string,
-        action: "add" | "remove",
-    ) => {
-        if (action === "add") {
-            addTab();
-        } else {
-            removeTab(targetKey as string);
-        }
-    };
+    const handleMenuClick = useCallback(
+        (evt: { key: string }) => {
+            setMenuKey(evt.key);
+        },
+        [setMenuKey],
+    );
 
     return (
-        <ConfigProvider theme={{ cssVar: true, hashed: false }}>
-            <Tabs
-                activeKey={activeTabKey}
-                className="WebSSH-Root-Tabs"
-                items={tabsItems}
-                onChange={(key) => {
-                    setActiveTabKey(key);
-                    document.body.click();
-                }}
-                onEdit={onEdit}
-                type="editable-card"
-            />
+        <ConfigProvider
+            theme={{
+                cssVar: true,
+                hashed: false,
+                algorithm: theme === "dark" ? darkAlgorithm : defaultAlgorithm,
+            }}
+        >
+            <Layout style={{ height: "100vh" }}>
+                <Sider
+                    className="WebSSH-Root-Sider"
+                    theme={theme}
+                    collapsible={true}
+                    defaultCollapsed={true}
+                    collapsedWidth={60}
+                >
+                    <Menu
+                        className="WebSSH-Root-Menu"
+                        theme={theme}
+                        mode="inline"
+                        defaultSelectedKeys={["home"]}
+                        selectedKeys={[activeMenuKey]}
+                        items={menusItems}
+                        onClick={handleMenuClick}
+                    />
+                </Sider>
+                <Content className="WebSSH-Root-Content">
+                    <Home />
+                    {activeMenuKey === "transfer" && <Transfer />}
+                </Content>
+            </Layout>
         </ConfigProvider>
     );
 }

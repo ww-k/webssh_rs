@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import QueueService from "simple-queue-serve";
 
-import { getFileName } from "@/helpers/file_uri";
+import { getFileName, parseSftpUri } from "@/helpers/file_uri";
 import fileSave from "@/helpers/fileSave";
 import openNativeFileSelector from "@/helpers/openNativeFileSelector";
 
@@ -51,13 +51,22 @@ class TransferService {
     }
 
     async upload(option: IUploadOption) {
+        const uri = parseSftpUri(option.fileUri);
+        if (!uri) {
+            throw new TransferError({
+                code: "InvalidUri",
+                message: "InvalidUri",
+            });
+        }
         const id = nanoid();
         useTransferStore.getState().add({
             id,
             type: "UPLOAD",
             status: "WAIT",
-            local: option.file.name,
-            remote: option.fileUri,
+            targetId: uri.targetId,
+            targetUri: option.fileUri,
+            targetPath: uri.path,
+            localPath: option.file.name,
             name: option.file.name,
             size: option.file.size,
             loaded: 0,
@@ -124,14 +133,23 @@ class TransferService {
     }
 
     async download(option: { fileUri: string; size?: number }) {
+        const uri = parseSftpUri(option.fileUri);
+        if (!uri) {
+            throw new TransferError({
+                code: "InvalidUri",
+                message: "InvalidUri",
+            });
+        }
         const name = getFileName(option.fileUri);
         const id = nanoid();
         useTransferStore.getState().add({
             id,
             type: "DOWNLOAD",
             status: "WAIT",
-            local: name,
-            remote: option.fileUri,
+            targetId: uri.targetId,
+            targetUri: option.fileUri,
+            targetPath: uri.path,
+            localPath: name,
             name,
             loaded: 0,
             size: option.size,
@@ -231,7 +249,7 @@ class TransferService {
             throw new TransferError("Record not found");
         }
 
-        const fileUri = record.remote;
+        const fileUri = record.targetUri;
         if (record.type === "UPLOAD") {
             let file = this.#fileMap.get(id);
             if (!file) {
