@@ -35,7 +35,7 @@ export default function openNativeFileSelector(option?: {
         }
 
         fileEl.onchange = function fileElOnChange(evt) {
-            // @ts-ignore
+            // @ts-expect-error
             const files: File[] = Array.from(evt.target.files);
             if (files.length > 0) {
                 resolve(files);

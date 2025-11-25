@@ -12,7 +12,7 @@ export default class DragFilesReader {
         return new Promise((resolve, reject) => {
             this._resolve = resolve;
             this._reject = reject;
-            // @ts-ignore
+            // @ts-expect-error
             const items = e.dataTransfer.items;
             for (let i = 0; i < items.length; i++) {
                 const item = items[i].webkitGetAsEntry();
@@ -20,7 +20,7 @@ export default class DragFilesReader {
                     this.traverseFileTree(
                         item,
                         "",
-                        // @ts-ignore
+                        // @ts-expect-error
                         item.isFile && items[i].getAsFile(),
                     );
                 }
@@ -105,7 +105,7 @@ export default class DragFilesReader {
         if (file) {
             if (path) {
                 // 新增 _relativePath 属性
-                // @ts-ignore
+                // @ts-expect-error
                 file._relativePath = path + file.name;
             }
             this.filedrag_u.push(file);

@@ -10,7 +10,7 @@ export default function filesConflictFilter<T = File | IViewFileStat>(
     const noSame: T[] = [];
     const dirNamesMap: Record<string, boolean> = {};
     Array.prototype.map.call(files, (file: T) => {
-        // @ts-ignore
+        // @ts-expect-error
         const relativePath = file._relativePath || file.webkitRelativePath;
         if (relativePath) {
             // 使用原生文件选择框和拖入的如果是目录，文件列表是深度遍历铺平的结果列表
@@ -25,7 +25,7 @@ export default function filesConflictFilter<T = File | IViewFileStat>(
                 noSame.push(file);
             }
         } else {
-            // @ts-ignore
+            // @ts-expect-error
             if (targetList.every((item) => file.name !== item.name)) {
                 noSame.push(file);
             }

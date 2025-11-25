@@ -28,7 +28,7 @@ export function buildSearchUri(
         params = parseSearchUri(searchLocation);
         params.searchValue = searchValue;
     } else {
-        // @ts-ignore
+        // @ts-expect-error
         params.dirName = searchLocation.split(pathSep).pop();
     }
     return `${SearchSftpProtocal}dirName=${params.dirName}&searchValue=${encodeURIComponent(params.searchValue)}&searchLocation=${encodeURIComponent(params.searchLocation)}`;

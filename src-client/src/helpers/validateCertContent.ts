@@ -18,8 +18,8 @@ export function validateCertContent(fileContent: string): 0 | 1 | 2 {
     }
     result = fileContent.match(openSshKeyReg);
     if (result?.[1]) {
-        const item = atob(result[1].split('\n')[0]);
-        if (item.indexOf('bcrypt') !== -1) {
+        const item = atob(result[1].split("\n")[0]);
+        if (item.indexOf("bcrypt") !== -1) {
             return 2;
         }
         return 1;

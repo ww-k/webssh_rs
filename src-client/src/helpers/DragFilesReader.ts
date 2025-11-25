@@ -11,10 +11,10 @@ export default class DragFilesReader {
         return new Promise((resolve, reject) => {
             this._resolve = resolve;
             this._reject = reject;
-            // @ts-ignore
+            // @ts-expect-error
             const items = e.dataTransfer.items;
             for (let i = 0; i < items.length; i++) {
-                // @ts-ignore
+                // @ts-expect-error
                 if (items[i].webkitGetAsEntry) {
                     const item = items[i].webkitGetAsEntry();
                     if (item) {
@@ -106,7 +106,7 @@ export default class DragFilesReader {
         if (file) {
             if (path) {
                 // 新增 _relativePath 属性
-                // @ts-ignore
+                // @ts-expect-error
                 file._relativePath = path + file.name;
             }
             this.filedrag_u.push(file);

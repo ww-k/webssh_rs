@@ -4,6 +4,6 @@ export default function PromiseWithResolvers<value = unknown>() {
         resolve = res;
         reject = rej;
     });
-    // @ts-ignore
+    // @ts-expect-error
     return { promise, resolve, reject };
 }
