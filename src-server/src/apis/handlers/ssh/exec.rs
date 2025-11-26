@@ -55,6 +55,26 @@ pub async fn exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/ssh/exec",
+    tag = "ssh",
+    summary = "执行 SSH 命令",
+    description = "在指定的 SSH 目标上执行命令并返回输出结果",
+    operation_id = "ssh_exec",
+    params(
+        ("target_id" = i32, description = "SSH 目标 ID", example = 1)
+    ),
+    request_body(
+        content = String,
+        description = "要执行的命令",
+        example = "ls -la"
+    ),
+    responses(
+        (status = 200, description = "成功执行命令", body = String),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 pub async fn handler(
     State(session_pool): State<Arc<SshSessionPool>>,
     Query(payload): Query<QueryTargetId>,

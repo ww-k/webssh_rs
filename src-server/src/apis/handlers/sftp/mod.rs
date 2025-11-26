@@ -15,20 +15,27 @@ use russh_sftp::{
     protocol::{FileAttributes, FileType},
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{apis::ApiErr, consts::services_err_code::*};
 
 const URI_SEP: &str = ":";
 const PATH_SEP: &str = "/";
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct SftpFile {
-    name: String,
-    r#type: char,
-    size: Option<u64>,
-    atime: Option<u32>,
-    mtime: Option<u32>,
-    permissions: String,
+    /// 文件名
+    pub name: String,
+    /// 文件类型：f-文件，d-目录，l-符号链接，?-未知
+    pub r#type: char,
+    /// 文件大小（字节）
+    pub size: Option<u64>,
+    /// 最后访问时间
+    pub atime: Option<u32>,
+    /// 最后修改时间
+    pub mtime: Option<u32>,
+    /// 权限字符串
+    pub permissions: String,
 }
 
 impl SftpFile {
@@ -68,15 +75,18 @@ impl Default for SftpFile {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct SftpFileUriPayload {
-    uri: String,
+    /// SFTP 文件 URI，格式：sftp://target_id/path
+    pub uri: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct SftpRenamePayload {
-    uri: String,
-    target_path: String,
+    /// 源文件 URI
+    pub uri: String,
+    /// 目标路径
+    pub target_path: String,
 }
 
 #[derive(Debug)]

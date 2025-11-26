@@ -7,6 +7,8 @@ edition = "2024"
 anyhow = "1.0.98"
 async-stream = "0.3.6"
 axum = { version = "0.8.3", features = ["macros"] }
+utoipa = { version = "5.4.0", features = ["axum_extras"] }
+utoipa-axum = "0.2.0"
 futures-util = "0.3.31"
 hex = "0.4.3"
 nanoid = "0.4.0"

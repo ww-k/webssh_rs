@@ -15,6 +15,7 @@ use russh::{
 };
 use russh_sftp::client::SftpSession;
 use serde::Serialize;
+use utoipa::ToSchema;
 use tokio::sync::{Mutex, MutexGuard, oneshot};
 use tracing::debug;
 
@@ -827,12 +828,17 @@ impl std::ops::Deref for SftpSessionGuard {
 }
 
 /// 连接信息汇总，用于 list_all_connections 返回
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ConnectionInfo {
+    /// SSH 连接 ID
     pub id: String,
+    /// 连接是否已过期
     pub expired: bool,
+    /// 连接是否已关闭
     pub closed: bool,
+    /// 连接类型名称
     pub type_name: String,
+    /// 关联的 SSH 目标 ID
     pub target_id: i32,
 }
 

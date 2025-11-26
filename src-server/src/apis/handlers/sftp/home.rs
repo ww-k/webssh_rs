@@ -16,6 +16,21 @@ use crate::{
 
 const WINDOWS: &str = "windows";
 
+#[utoipa::path(
+    get,
+    path = "/api/sftp/home",
+    tag = "sftp",
+    summary = "获取主目录路径",
+    description = "获取指定 SSH 目标的主目录路径",
+    operation_id = "sftp_home",
+    params(
+        ("target_id" = i32, description = "SSH 目标 ID", example = 1)
+    ),
+    responses(
+        (status = 200, description = "成功获取主目录路径", body = String),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<QueryTargetId>,

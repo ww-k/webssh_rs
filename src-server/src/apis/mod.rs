@@ -1,4 +1,4 @@
-mod handlers;
+pub mod handlers;
 pub mod sftp;
 pub mod ssh;
 pub mod ssh_connection;
@@ -14,7 +14,7 @@ use serde_json::json;
 
 use crate::consts::services_err_code::*;
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct ApiErr {
     pub code: u32,
     pub message: String,

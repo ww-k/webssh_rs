@@ -14,6 +14,22 @@ use super::{SftpRenamePayload, parse_file_uri};
 
 const WINDOWS: &str = "windows";
 
+#[utoipa::path(
+    post,
+    path = "/api/sftp/cp",
+    tag = "sftp",
+    summary = "复制文件",
+    description = "复制文件或目录到指定位置，支持递归复制",
+    operation_id = "sftp_cp",
+    params(
+        ("uri" = String, description = "源文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/source.txt"),
+        ("target_path" = String, description = "目标路径", example = "/home/user/destination.txt")
+    ),
+    responses(
+        (status = 200, description = "成功复制文件"),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpRenamePayload>,

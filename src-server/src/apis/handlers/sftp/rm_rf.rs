@@ -15,6 +15,21 @@ use super::{SftpFileUriPayload, parse_file_uri};
 const WINDOWS: &str = "windows";
 
 /// TODO: 优化, 接收多个文件路径，一次删除
+#[utoipa::path(
+    post,
+    path = "/api/sftp/rm_rf",
+    tag = "sftp",
+    summary = "递归删除文件或目录",
+    description = "递归删除指定的文件或目录及其所有子内容",
+    operation_id = "sftp_rm_rf",
+    params(
+        ("uri" = String, description = "文件或目录路径，格式: sftp://target_id/path", example = "sftp://1/home/user/directory")
+    ),
+    responses(
+        (status = 200, description = "成功递归删除文件或目录"),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,

@@ -11,12 +11,30 @@ use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
 use super::{SftpFile, parse_file_uri};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SftpLsPayload {
-    uri: String,
-    all: Option<bool>,
+    /// SFTP 文件 URI，格式：sftp://target_id/path
+    pub uri: String,
+    /// 是否显示所有文件（包括隐藏文件）
+    pub all: Option<bool>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/sftp/ls",
+    tag = "sftp",
+    summary = "列出目录文件",
+    description = "获取指定目录下的文件和文件夹列表，可选择是否显示隐藏文件",
+    operation_id = "sftp_ls",
+    params(
+        ("uri" = String, description = "目录路径，格式: sftp://target_id/path", example = "sftp://1/home/user"),
+        ("all" = Option<bool>, description = "是否显示所有文件（包括隐藏文件）", example = false)
+    ),
+    responses(
+        (status = 200, description = "成功获取目录文件列表", body = [SftpFile]),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpLsPayload>,

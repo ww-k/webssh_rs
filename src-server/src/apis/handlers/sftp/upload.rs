@@ -32,11 +32,31 @@ macro_rules! default_up_inv_req_err_op {
     };
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct SftpUploadResponse {
     hash: String,
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/sftp/upload",
+    tag = "sftp",
+    summary = "上传文件",
+    description = "向远程服务器上传文件，支持分块上传和完整性校验",
+    operation_id = "sftp_upload",
+    params(
+        ("uri" = String, description = "目标文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/upload.txt")
+    ),
+    request_body(
+        content = Vec<u8>,
+        description = "文件内容",
+        content_type = "application/octet-stream"
+    ),
+    responses(
+        (status = 200, description = "成功上传文件", body = SftpUploadResponse),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,

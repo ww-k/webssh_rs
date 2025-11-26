@@ -7,6 +7,21 @@ use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
 use super::{SftpFileUriPayload, parse_file_uri};
 
+#[utoipa::path(
+    post,
+    path = "/api/sftp/mkdir",
+    tag = "sftp",
+    summary = "创建目录",
+    description = "在指定路径创建新目录",
+    operation_id = "sftp_mkdir",
+    params(
+        ("uri" = String, description = "文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/newdir")
+    ),
+    responses(
+        (status = 200, description = "成功创建目录"),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,

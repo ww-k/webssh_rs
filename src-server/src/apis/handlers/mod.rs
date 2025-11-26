@@ -4,7 +4,7 @@ pub mod ssh_connection;
 
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, utoipa::ToSchema)]
 pub struct QueryTargetId {
     target_id: i32,
 }

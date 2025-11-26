@@ -19,6 +19,22 @@ use super::{Range, SftpFileUriPayload, parse_file_uri};
 
 const CHUNK_SIZE: usize = 8192;
 
+#[utoipa::path(
+    get,
+    path = "/api/sftp/download",
+    tag = "sftp",
+    summary = "下载文件",
+    description = "从远程服务器下载文件，支持断点续传和范围下载",
+    operation_id = "sftp_download",
+    params(
+        ("uri" = String, description = "文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/file.txt")
+    ),
+    responses(
+        (status = 200, description = "成功下载文件", body = Vec<u8>),
+        (status = 416, description = "请求范围不满足"),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,

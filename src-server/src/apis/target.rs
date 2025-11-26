@@ -29,6 +29,17 @@ pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
         .with_state(app_state)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/target/list",
+    tag = "target",
+    summary = "获取 SSH 目标列表",
+    operation_id = "target_list",
+    responses(
+        (status = 200, description = "成功获取 SSH 目标列表", body = [target::Model]),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 async fn target_list(
     State(state): State<Arc<AppBaseState>>,
 ) -> Result<Json<Vec<target::Model>>, ApiErr> {
@@ -36,6 +47,18 @@ async fn target_list(
     Ok(Json(targets))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/target/add",
+    tag = "target",
+    summary = "添加新的 SSH 目标",
+    operation_id = "target_add",
+    request_body = target::Model,
+    responses(
+        (status = 200, description = "成功添加 SSH 目标", body = target::Model),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 async fn target_add(
     State(state): State<Arc<AppBaseState>>,
     ValidJson(payload): ValidJson<target::Model>,
@@ -47,16 +70,24 @@ async fn target_add(
     Ok(Json(target))
 }
 
-#[derive(Deserialize, Debug)]
-struct TargetUpdatePayload {
-    id: i32,
-    host: String,
-    port: Option<u16>,
-    method: TargetAuthMethod,
-    user: String,
-    key: Option<String>,
-    password: Option<String>,
-    system: Option<String>,
+#[derive(Deserialize, Debug, utoipa::ToSchema)]
+pub struct TargetUpdatePayload {
+    /// 目标 ID
+    pub id: i32,
+    /// SSH 目标主机地址
+    pub host: String,
+    /// SSH 端口号
+    pub port: Option<u16>,
+    /// 认证方式
+    pub method: TargetAuthMethod,
+    /// SSH 用户名
+    pub user: String,
+    /// 私钥内容
+    pub key: Option<String>,
+    /// 密码
+    pub password: Option<String>,
+    /// 操作系统类型
+    pub system: Option<String>,
 }
 
 impl From<TargetUpdatePayload> for target::ActiveModel {
@@ -74,6 +105,18 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/target/update",
+    tag = "target",
+    summary = "更新 SSH 目标",
+    operation_id = "target_update",
+    request_body = TargetUpdatePayload,
+    responses(
+        (status = 200, description = "成功更新 SSH 目标", body = target::Model),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 async fn target_update(
     State(state): State<Arc<AppBaseState>>,
     ValidJson(payload): ValidJson<TargetUpdatePayload>,
@@ -84,11 +127,24 @@ async fn target_update(
     Ok(Json(target))
 }
 
-#[derive(Deserialize)]
-struct TargetRemovePayload {
-    id: i32,
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct TargetRemovePayload {
+    /// 要删除的目标 ID
+    pub id: i32,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/target/remove",
+    tag = "target",
+    summary = "删除 SSH 目标",
+    operation_id = "target_remove",
+    request_body = TargetRemovePayload,
+    responses(
+        (status = 200, description = "成功删除 SSH 目标"),
+        (status = 500, description = "服务器内部错误")
+    )
+)]
 async fn target_remove(
     State(state): State<Arc<AppBaseState>>,
     ValidJson(payload): ValidJson<TargetRemovePayload>,

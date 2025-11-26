@@ -5,12 +5,16 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use utoipa::ToSchema;
 
-#[derive(Deserialize_repr, Serialize_repr, Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug, PartialEq, Eq, ToSchema)]
 #[repr(i32)]
 pub enum TargetAuthMethod {
+    #[serde(rename = "password")]
     Password = 1,
+    #[serde(rename = "private_key")]
     PrivateKey = 2,
+    #[serde(rename = "none")]
     None = 3,
     // HostBased,
     // HostBased,
@@ -69,20 +73,27 @@ impl TryGetable for TargetAuthMethod {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, DeriveEntityModel)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, DeriveEntityModel, ToSchema)]
 #[sea_orm(table_name = "target")]
+#[schema(title = "TargetModel")]
 pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
     pub id: i32,
+    /// SSH 目标主机地址
     pub host: String,
+    /// SSH 端口号，默认为 22
     pub port: Option<u16>,
+    /// 认证方式：密码、私钥或无认证
     #[sea_orm(from = "i32")]
     pub method: TargetAuthMethod,
+    /// SSH 用户名
     pub user: String,
+    /// 私钥内容（当 method 为 private_key 时使用）
     pub key: Option<String>,
+    /// 密码（当 method 为 password 时使用）
     pub password: Option<String>,
-    /// windows and other
+    /// 操作系统类型（如 windows、linux 等）
     pub system: Option<String>,
 }
 
