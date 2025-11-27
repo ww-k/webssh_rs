@@ -19,7 +19,7 @@ model: sonnet
 - **框架**：React 18 with TypeScript
 - **构建工具**：Rsbuild with Less 支持
 - **状态管理**：Zustand (store.ts)
-- **UI 库**：Ant Design 5
+- **UI 库**：Ant Design 6, 文档 @./antd-llms-full.txt
 - **样式**：CSS Modules（4空格缩进）
 - **国际化**：i18next（支持中英文）
 - **代码规范**：Biome（双引号、4空格缩进）

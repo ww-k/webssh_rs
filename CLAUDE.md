@@ -14,7 +14,7 @@ The project is split into three main components:
 - **Framework**: React 18 with TypeScript
 - **Build Tool**: Rsbuild with Less support
 - **State Management**: Zustand store
-- **UI Library**: Ant Design 5
+- **UI Library**: Ant Design 6
 - **Terminal**: xterm.js with Socket.IO for real-time communication
 - **File Management**: Custom SFTP file browser with drag-and-drop support
 - **Internationalization**: i18next with English and Chinese translations
