@@ -97,7 +97,7 @@ export default function App() {
     return (
         <ConfigProvider
             theme={{
-                cssVar: true,
+                cssVar: {},
                 hashed: false,
                 algorithm: theme === "dark" ? darkAlgorithm : defaultAlgorithm,
             }}
@@ -121,7 +121,7 @@ export default function App() {
                     />
                 </Sider>
                 <Content className="WebSSH-Root-Content">
-                    <Home />
+                    <Home active={activeMenuKey === "home"} />
                     {activeMenuKey === "transfer" && <Transfer />}
                 </Content>
             </Layout>

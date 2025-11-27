@@ -8,7 +8,7 @@ import useAppStore from "@/store";
 import Filesview from "../Filesview";
 import TargetSelector from "../Target/Selector";
 import Terminal from "../Terminal";
-export default function Home() {
+export default function Home({ active }: { active: boolean }) {
     const { activeTabKey, tabs, setActiveTabKey, addTab, removeTab } =
         useAppStore();
 
@@ -61,6 +61,7 @@ export default function Home() {
     );
     return (
         <Tabs
+            style={{ visibility: active ? "visible" : "hidden" }}
             activeKey={activeTabKey}
             className="WebSSH-Home-Tabs"
             items={tabsItems}
