@@ -6,4 +6,60 @@
     bottom: 0;
     overflow: hidden;
     background: var(--ant-color-bg-container);
+    padding: 8px;
+}
+
+.WebSSH-Transfer .ant-tabs-content-holder {
+    height: calc(100% - 46px);
+    overflow: hidden;
+}
+
+.WebSSH-Transfer .ant-tabs-tabpane {
+    height: 100%;
+    overflow: hidden;
+}
+
+.WebSSH-Transfer .ant-table-wrapper {
+    height: 100%;
+}
+
+.WebSSH-Transfer .ant-table {
+    height: 100%;
+}
+
+.WebSSH-Transfer .ant-table-container {
+    height: calc(100% - 55px);
+}
+
+.WebSSH-Transfer .ant-table-body {
+    height: 100% !important;
+    overflow-y: auto !important;
+}
+
+/* 进度条样式优化 */
+.WebSSH-Transfer .ant-progress {
+    margin: 0;
+}
+
+.WebSSH-Transfer .ant-progress-text {
+    font-size: 12px;
+}
+
+/* 操作按钮样式 */
+.WebSSH-Transfer .ant-btn-text {
+    padding: 4px 8px;
+    min-height: auto;
+}
+
+/* 表格行间距优化 */
+.WebSSH-Transfer .ant-table-tbody > tr > td {
+    padding: 8px 12px;
+    vertical-align: middle;
+}
+
+/* 状态标签样式 */
+.WebSSH-Transfer .ant-tag {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
 }
