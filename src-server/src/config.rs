@@ -1,4 +1,4 @@
-use anyhow::{Result, Ok};
+use anyhow::{Ok, Result};
 
 pub struct Config {
     pub max_session_per_target: u8,
