@@ -18,6 +18,7 @@ struct QueryParams {
 }
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct Resize {
     col: u32,
     row: u32,
