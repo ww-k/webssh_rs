@@ -1,2 +1,2 @@
-pub mod exec;
-pub mod terminal;
+pub(crate) mod exec;
+pub(crate) mod terminal;

@@ -842,7 +842,7 @@ pub struct ConnectionInfo {
     pub target_id: i32,
 }
 
-pub struct SshSessionPool {
+pub(crate) struct SshSessionPool {
     session_pool_map: Mutex<HashMap<i32, Arc<SshSession>>>,
     app_state: Arc<AppBaseState>,
 }

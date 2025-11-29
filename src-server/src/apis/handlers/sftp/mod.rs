@@ -1,13 +1,13 @@
-pub mod cp;
-pub mod download;
-pub mod home;
-pub mod ls;
-pub mod mkdir;
-pub mod rename;
-pub mod rm;
-pub mod rm_rf;
-pub mod stat;
-pub mod upload;
+pub(crate) mod cp;
+pub(crate) mod download;
+pub(crate) mod home;
+pub(crate) mod ls;
+pub(crate) mod mkdir;
+pub(crate) mod rename;
+pub(crate) mod rm;
+pub(crate) mod rm_rf;
+pub(crate) mod stat;
+pub(crate) mod upload;
 
 use axum::http::HeaderValue;
 use russh_sftp::{
