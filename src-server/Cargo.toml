@@ -3,6 +3,14 @@ name = "webssh_rs_server"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "webssh_rs_server"
+path = "src/main.rs"
+
+[[bin]]
+name = "gen-docs"
+path = "src/bin/gen_docs.rs"
+
 [dependencies]
 anyhow = "1.0.98"
 async-stream = "0.3.6"

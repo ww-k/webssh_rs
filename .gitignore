@@ -6,6 +6,9 @@ dist/*
 build/*
 server/target
 
+# generated docs
+src-server/docs
+
 # npm
 npm-debug.log*
 

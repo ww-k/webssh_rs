@@ -1,9 +1,10 @@
-mod apis;
+pub mod api_doc;
+pub mod apis;
 mod config;
 mod consts;
-mod entities;
+pub mod entities;
 mod migrations;
-mod ssh_session_pool;
+pub mod ssh_session_pool;
 #[cfg(test)]
 mod tests;
 
@@ -18,61 +19,7 @@ use apis::{sftp, ssh, ssh_connection, target};
 use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
 
-use crate::ssh_session_pool::SshSessionPool;
-
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        target::target_list,
-        target::target_add,
-        target::target_update,
-        target::target_remove,
-        apis::handlers::ssh_connection::list::handler,
-        apis::handlers::ssh_connection::expire::handler,
-        apis::handlers::ssh::exec::handler,
-        apis::handlers::sftp::ls::handler,
-        apis::handlers::sftp::mkdir::handler,
-        apis::handlers::sftp::stat::handler,
-        apis::handlers::sftp::home::handler,
-        apis::handlers::sftp::cp::handler,
-        apis::handlers::sftp::rename::handler,
-        apis::handlers::sftp::rm::handler,
-        apis::handlers::sftp::rm_rf::handler,
-        apis::handlers::sftp::upload::handler,
-        apis::handlers::sftp::download::handler,
-    ),
-    components(
-        schemas(
-            entities::target::Model,
-            entities::target::TargetAuthMethod,
-            target::TargetUpdatePayload,
-            target::TargetRemovePayload,
-            ssh_session_pool::ConnectionInfo,
-            apis::ApiErr,
-            apis::handlers::QueryTargetId,
-            apis::handlers::sftp::SftpFile,
-            apis::handlers::sftp::ls::SftpLsPayload,
-            apis::handlers::ssh_connection::expire::SshSessionExpirePayload,
-            apis::handlers::sftp::upload::SftpUploadResponse,
-        )
-    ),
-    tags(
-        (name = "target", description = "SSH 目标管理 API"),
-        (name = "ssh_connection", description = "SSH 连接管理 API"),
-        (name = "ssh", description = "SSH 命令执行 API"),
-        (name = "sftp", description = "SFTP 文件管理 API")
-    ),
-    info(
-        title = "WebSSH RS API",
-        description = "WebSSH RS 后端 API 文档",
-        version = "0.1.0",
-        contact(
-            name = "API Support",
-            //email = "support@example.com"
-        )
-    )
-)]
-struct ApiDoc;
+use crate::{api_doc::ApiDoc, ssh_session_pool::SshSessionPool};
 
 struct AppBaseState {
     db: DatabaseConnection,

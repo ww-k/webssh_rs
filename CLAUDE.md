@@ -69,7 +69,31 @@ npm run dev
 
 # Build production version (client + desktop app)
 npm run build
+
+# Generate API documentation
+npm run gen-docs
 ```
+
+### API Documentation Generation
+
+The project includes a command to generate static OpenAPI and ReDoc documentation:
+
+```bash
+# From project root
+npm run gen-docs
+
+# Or directly from server directory
+cd src-server && cargo run --bin gen-docs
+
+# Or with custom output directory
+cd src-server && cargo run --bin gen-docs -- /path/to/output
+```
+
+This generates:
+- `src-server/docs/openapi.json` - OpenAPI 3.1 specification
+- `src-server/docs/index.html` - ReDoc documentation viewer
+
+The documentation includes all API endpoints for target management, SSH connections, SSH command execution, and SFTP file operations.
 
 ### Component-Specific Development
 
