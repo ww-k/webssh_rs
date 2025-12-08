@@ -45,7 +45,7 @@ pub struct SftpUploadResponse {
     description = "向远程服务器上传文件，支持分块上传和完整性校验",
     operation_id = "sftp_upload",
     params(
-        ("uri" = String, description = "目标文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/upload.txt")
+        SftpFileUriPayload
     ),
     request_body(
         content = Vec<u8>,

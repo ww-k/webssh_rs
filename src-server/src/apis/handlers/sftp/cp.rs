@@ -22,8 +22,7 @@ const WINDOWS: &str = "windows";
     description = "复制文件或目录到指定位置，支持递归复制",
     operation_id = "sftp_cp",
     params(
-        ("uri" = String, description = "源文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/source.txt"),
-        ("target_path" = String, description = "目标路径", example = "/home/user/destination.txt")
+        SftpRenamePayload
     ),
     responses(
         (status = 200, description = "成功复制文件"),

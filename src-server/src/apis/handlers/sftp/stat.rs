@@ -18,7 +18,7 @@ use super::{SftpFile, SftpFileUriPayload, get_file_name, parse_file_uri};
     description = "获取指定文件的详细元数据信息，包括大小、权限、修改时间等",
     operation_id = "sftp_stat",
     params(
-        ("uri" = String, description = "文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/file.txt")
+        SftpFileUriPayload
     ),
     responses(
         (status = 200, description = "成功获取文件信息", body = SftpFile),

@@ -23,7 +23,7 @@ const WINDOWS: &str = "windows";
     description = "递归删除指定的文件或目录及其所有子内容",
     operation_id = "sftp_rm_rf",
     params(
-        ("uri" = String, description = "文件或目录路径，格式: sftp://target_id/path", example = "sftp://1/home/user/directory")
+        SftpFileUriPayload
     ),
     responses(
         (status = 200, description = "成功递归删除文件或目录"),

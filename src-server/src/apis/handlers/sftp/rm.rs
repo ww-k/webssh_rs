@@ -15,7 +15,7 @@ use super::{SftpFileUriPayload, parse_file_uri};
     description = "删除指定的文件",
     operation_id = "sftp_rm",
     params(
-        ("uri" = String, description = "文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/file.txt")
+        SftpFileUriPayload
     ),
     responses(
         (status = 200, description = "成功删除文件"),

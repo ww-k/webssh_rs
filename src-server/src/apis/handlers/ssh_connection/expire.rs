@@ -6,7 +6,7 @@ use tracing::{debug, info};
 
 use crate::{apis::ApiErr, ssh_session_pool::SshSessionPool};
 
-#[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct SshSessionExpirePayload {
     /// SSH 目标 ID
     pub target_id: i32,
@@ -22,8 +22,7 @@ pub struct SshSessionExpirePayload {
     description = "强制断开指定的 SSH 连接，使其过期并清理相关资源",
     operation_id = "ssh_connection_expire",
     params(
-        ("target_id" = i32, description = "SSH 目标 ID", example = 1),
-        ("connection_id" = String, description = "连接 ID", example = "abc123")
+        SshSessionExpirePayload
     ),
     responses(
         (status = 200, description = "成功使连接过期"),

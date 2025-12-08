@@ -11,7 +11,7 @@ use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
 
 use super::{SftpFile, parse_file_uri};
 
-#[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct SftpLsPayload {
     /// SFTP 文件 URI，格式：sftp://target_id/path
     pub uri: String,
@@ -27,8 +27,7 @@ pub struct SftpLsPayload {
     description = "获取指定目录下的文件和文件夹列表，可选择是否显示隐藏文件",
     operation_id = "sftp_ls",
     params(
-        ("uri" = String, description = "目录路径，格式: sftp://target_id/path", example = "sftp://1/home/user"),
-        ("all" = Option<bool>, description = "是否显示所有文件（包括隐藏文件）", example = false)
+        SftpLsPayload
     ),
     responses(
         (status = 200, description = "成功获取目录文件列表", body = [SftpFile]),

@@ -15,8 +15,7 @@ use super::{SftpRenamePayload, parse_file_uri};
     description = "重命名文件或将文件移动到新位置",
     operation_id = "sftp_rename",
     params(
-        ("uri" = String, description = "源文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/oldname.txt"),
-        ("target_path" = String, description = "目标路径", example = "/home/user/newname.txt")
+        SftpRenamePayload
     ),
     responses(
         (status = 200, description = "成功重命名文件"),

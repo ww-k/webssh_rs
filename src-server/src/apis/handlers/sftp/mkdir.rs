@@ -15,7 +15,7 @@ use super::{SftpFileUriPayload, parse_file_uri};
     description = "在指定路径创建新目录",
     operation_id = "sftp_mkdir",
     params(
-        ("uri" = String, description = "文件路径，格式: sftp://target_id/path", example = "sftp://1/home/user/newdir")
+        SftpFileUriPayload
     ),
     responses(
         (status = 200, description = "成功创建目录"),

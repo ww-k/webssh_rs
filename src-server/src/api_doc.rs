@@ -29,10 +29,7 @@ use utoipa::OpenApi;
             crate::apis::target::TargetRemovePayload,
             crate::ssh_session_pool::ConnectionInfo,
             crate::apis::ApiErr,
-            crate::apis::handlers::QueryTargetId,
             crate::apis::handlers::sftp::SftpFile,
-            crate::apis::handlers::sftp::ls::SftpLsPayload,
-            crate::apis::handlers::ssh_connection::expire::SshSessionExpirePayload,
             crate::apis::handlers::sftp::upload::SftpUploadResponse,
         )
     ),

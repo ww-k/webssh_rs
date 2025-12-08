@@ -15,7 +15,7 @@ use russh_sftp::{
     protocol::{FileAttributes, FileType},
 };
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 use crate::{apis::ApiErr, consts::services_err_code::*};
 
@@ -75,13 +75,13 @@ impl Default for SftpFile {
     }
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct SftpFileUriPayload {
     /// SFTP 文件 URI，格式：sftp://target_id/path
     pub uri: String,
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct SftpRenamePayload {
     /// 源文件 URI
     pub uri: String,

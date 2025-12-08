@@ -63,7 +63,7 @@ pub async fn exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
     description = "在指定的 SSH 目标上执行命令并返回输出结果",
     operation_id = "ssh_exec",
     params(
-        ("target_id" = i32, description = "SSH 目标 ID", example = 1)
+        QueryTargetId
     ),
     request_body(
         content = String,
