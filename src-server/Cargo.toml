@@ -2,6 +2,7 @@
 name = "webssh_rs_server"
 version = "0.1.0"
 edition = "2024"
+default-run = "webssh_rs_server"
 
 [[bin]]
 name = "webssh_rs_server"
