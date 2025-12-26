@@ -14,12 +14,13 @@
     },
     "dependencies": {
         "@ant-design/icons": "^6.1.0",
-        "@xterm/addon-fit": "^0.10.0",
-        "@xterm/xterm": "^5.5.0",
+        "@xterm/addon-clipboard": "^0.2.0",
+        "@xterm/addon-fit": "^0.11.0",
+        "@xterm/xterm": "^6.0.0",
         "ahooks": "^3.9.0",
-        "antd": "^6.0.0",
-        "axios": "^1.8.4",
-        "classnames": "^2.5.1",
+        "antd": "^6.1.2",
+        "axios": "^1.13.2",
+        "clsx": "^2.1.1",
         "i18next": "^25.3.0",
         "i18next-browser-languagedetector": "^8.2.0",
         "i18next-http-backend": "^3.0.2",
@@ -35,13 +36,18 @@
         "zustand": "^5.0.3"
     },
     "devDependencies": {
-        "@biomejs/biome": "^2.3.1",
-        "@rsbuild/core": "^1.6.9",
+        "@biomejs/biome": "^2.3.10",
+        "@rsbuild/core": "^1.6.15",
         "@rsbuild/plugin-react": "^1.4.1",
-        "@rstest/core": "^0.6.0",
+        "@rstest/core": "^0.7.6",
         "@types/lodash": "^4.17.20",
         "@types/react": "^18.3.23",
         "@types/react-dom": "^18.3.7",
         "typescript": "^5.9.3"
+    },
+    "pnpm": {
+        "overrides": {
+            "classnames": "npm:clsx@^2.1.1"
+        }
     }
 }

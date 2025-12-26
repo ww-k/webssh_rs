@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import classNames from "clsx";
 import { useCallback, useEffect, useRef } from "react";
 
 import "./index.css";

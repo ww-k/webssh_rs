@@ -1,3 +1,4 @@
+import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { io } from "socket.io-client";
@@ -11,6 +12,8 @@ var SSH_BASEPATH = location.origin;
 var term;
 /** @type {import('@xterm/addon-fit').FitAddon} */
 var fitAddon;
+/** @type {import('@xterm/addon-clipboard').ClipboardAddon} */
+var clipboardAddon;
 var sizeCache;
 var maxDisconnectionDuration = 5 * 60000;
 
@@ -102,7 +105,9 @@ function createTerminal(socket) {
 
     term = new Terminal();
     fitAddon = new FitAddon();
+    clipboardAddon = new ClipboardAddon();
     term.loadAddon(fitAddon);
+    term.loadAddon(clipboardAddon);
 
     term.open(terminalContainer);
 
@@ -259,106 +264,29 @@ var manuallyRetryPlugin = {
     },
 };
 
-function contains(arr, el) {
-    return arr.indexOf(el) >= 0;
-}
-
-/**
- * Adds a disposable listener to a node in the DOM, returning the disposable.
- * @param {Element | Window | Document} node The node to add a listener to.
- * @param {string} type The event type.
- * @param  {(e: any) => void} handler The handler for the listener.
- * @param {boolean | AddEventListenerOptions} [options] The boolean or options object to pass on to the event
- * listener.
- */
-function addDisposableDomListener(node, type, handler, options) {
-    node.addEventListener(type, handler, options);
-    var disposed = false;
-    return {
-        dispose: () => {
-            if (disposed) {
-                return;
-            }
-            disposed = true;
-            node.removeEventListener(type, handler, options);
-        },
-    };
-}
-
 /**
  * 增强鼠标复制粘贴功能
- * - 在浏览器中，实现鼠标中键和右键粘贴当前terminal中选中的文本
- * - 在nwjs中，实现复制选中文本
- * - 在nwjs中，实现鼠标中键和右键粘贴剪贴板中的文本
+ * - 实现自动复制选中文本
+ * - 实现鼠标中键和右键粘贴当前terminal中选中的文本
+ * @param {import('@xterm/xterm').Terminal} term
  */
-function enhanceMouseCopyPaste(terminal) {
-    const isNwjs = !!(typeof nw === "object" && typeof nw.App === "object");
-    const isMSWindows = contains(
-        ["Windows", "Win16", "Win32", "WinCE", "win32"],
-        navigator.platform,
-    );
+function enhanceMouseCopyPaste(term) {
     term.onSelectionChange((_evt) => {
-        if (!isNwjs) return;
-
-        console.log(`selection and copy: ${term.getSelection()}`);
-        const clipboard = nw.Clipboard.get();
-        clipboard.set(term.getSelection(), "text");
+        const text = term.getSelection() || "";
+        console.log(`selection and copy: ${text}`);
+        if (text !== "") {
+            navigator.clipboard.writeText(text);
+        }
     });
 
-    const _termCore = terminal._core;
-    _termCore.register(
-        addDisposableDomListener(_termCore.element, "mousedown", (event) => {
-            if (event.button !== 2 && event.button !== 1) return;
-            if (terminal.getSelection() === "") return;
-
-            if (isNwjs) {
-                clipboard.set(term.getSelection(), "text");
-            } else {
-                paste(
-                    terminal.getSelection(),
-                    _termCore.textarea,
-                    _termCore.coreService,
-                );
-            }
-        }),
-    );
-
-    _termCore.register(
-        addDisposableDomListener(_termCore.element, "contextmenu", (event) => {
-            if (isNwjs || !isMSWindows) {
-                event.preventDefault();
-            }
-        }),
-    );
-}
-
-/**
- * Prepares text to be pasted into the terminal by normalizing the line endings
- * @param text The pasted text that needs processing before inserting into the terminal
- */
-function prepareTextForTerminal(text) {
-    return text.replace(/\r?\n/g, "\r");
-}
-
-/**
- * Bracket text for paste, if necessary, as per https://cirw.in/blog/bracketed-paste
- * @param text The pasted text to bracket
- */
-function bracketTextForPaste(text, bracketedPasteMode) {
-    if (bracketedPasteMode) {
-        return `\x1b[200~${text}\x1b[201~`;
-    }
-    return text;
-}
-
-function paste(text, textarea, coreService) {
-    text = prepareTextForTerminal(text);
-    text = bracketTextForPaste(
-        text,
-        coreService.decPrivateModes.bracketedPasteMode,
-    );
-    coreService.triggerDataEvent(text, true);
-    textarea.value = "";
+    document.addEventListener("pointerdown", (evt) => {
+        if (evt.button === 1 || evt.button === 2) {
+            navigator.clipboard.readText().then((text) => {
+                console.log(`paste: ${text}`);
+                term.paste(text);
+            });
+        }
+    });
 }
 
 init();

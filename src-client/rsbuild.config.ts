@@ -36,6 +36,7 @@ export default defineConfig({
     resolve: {
         alias: {
             "@": "./src",
+            classnames: "clsx",
         },
     },
     performance: {

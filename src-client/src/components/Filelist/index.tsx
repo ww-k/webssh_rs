@@ -1,5 +1,5 @@
 import { Spin } from "antd";
-import classNames from "classnames";
+import classNames from "clsx";
 import orderBy from "lodash/orderBy";
 import { Component, createRef } from "react";
 

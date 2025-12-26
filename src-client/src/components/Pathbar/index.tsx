@@ -12,7 +12,7 @@ import {
     SearchOutlined,
 } from "@ant-design/icons";
 import { Spin } from "antd";
-import classNames from "classnames";
+import classNames from "clsx";
 import throttle from "lodash/throttle";
 import { Component, createRef } from "react";
 
