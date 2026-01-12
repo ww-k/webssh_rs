@@ -6,6 +6,7 @@ use axum::{
     http::{
         HeaderMap,
         header::{self, HeaderValue},
+        StatusCode,
     },
     response::IntoResponse,
 };
@@ -30,7 +31,8 @@ const CHUNK_SIZE: usize = 8192;
         SftpFileUriPayload
     ),
     responses(
-        (status = 200, description = "成功下载文件", body = Vec<u8>),
+        (status = 200, description = "成功下载完整文件", body = Vec<u8>),
+        (status = 206, description = "成功下载部分文件", body = Vec<u8>),
         (status = 416, description = "请求范围不满足"),
         (status = 500, description = "服务器内部错误")
     )
@@ -39,7 +41,7 @@ pub async fn handler(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<SftpFileUriPayload>,
     headers: HeaderMap,
-) -> Result<impl IntoResponse, ApiErr> {
+) -> Result<axum::response::Response<Body>, ApiErr> {
     info!("@sftp_download {:?}", payload);
 
     let h_range = headers.get(header::RANGE);
@@ -87,17 +89,19 @@ pub async fn handler(
 
     if file_size == 0 {
         headers.insert(header::CONTENT_LENGTH, HeaderValue::from_static("0"));
-        return Ok((headers, empty_body));
+        return Ok((headers, empty_body).into_response());
     }
 
     let range = Range::from_header_value(h_range);
     let start: usize;
     let range_len;
+    let is_partial_content: bool;
 
     if range.is_some() {
         let range = range.unwrap();
         start = range.start;
         range_len = range.end - start + 1;
+        is_partial_content = true;
 
         if file_size <= range.end {
             return Err(ApiErr {
@@ -105,9 +109,18 @@ pub async fn handler(
                 message: "range end exceed file size".to_string(),
             });
         }
+
+        // 设置部分内容的相关头部
+        headers.insert(
+            header::CONTENT_RANGE,
+            format!("bytes {}-{}/{}", start, range.end, file_size)
+                .parse()
+                .unwrap(),
+        );
     } else {
         start = 0;
         range_len = attr.size.unwrap() as usize;
+        is_partial_content = false;
     }
 
     let mut file = map_ssh_err!(sftp.open(uri.path).await)?;
@@ -144,5 +157,12 @@ pub async fn handler(
 
     debug!("@sftp_download done");
 
-    Ok((headers, body))
+    // 根据是否为部分下载返回相应状态码
+    let response = if is_partial_content {
+        (StatusCode::PARTIAL_CONTENT, headers, body).into_response()
+    } else {
+        (headers, body).into_response()
+    };
+
+    Ok(response)
 }
