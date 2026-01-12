@@ -47,6 +47,9 @@ const tauriChild = spawn("tauri", ["dev"], {
 processStdio("tauri", tauriChild);
 
 tauriChild.on("exit", (code) => {
+    clientChild.kill();
+    serverChild.kill();
+    tauriChild.kill();
     process.exit(code);
 });
 
