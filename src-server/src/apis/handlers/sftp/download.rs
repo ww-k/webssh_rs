@@ -4,9 +4,8 @@ use axum::{
     body::{Body, Bytes},
     extract::{Query, State},
     http::{
-        HeaderMap,
+        HeaderMap, StatusCode,
         header::{self, HeaderValue},
-        StatusCode,
     },
     response::IntoResponse,
 };
@@ -71,6 +70,10 @@ pub async fn handler(
     headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/octet-stream"),
+    );
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
     );
     headers.insert(
         header::CONTENT_DISPOSITION,
