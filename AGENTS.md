@@ -26,16 +26,16 @@ WebSSH RS is a web-based SSH client with file management capabilities, consistin
 ### Unified Development (Recommended)
 ```bash
 # Install dependencies (run once)
-npm install
+pnpm install
 
 # Start all services (server + client + desktop app)
-npm run dev
+pnpm run dev
 
 # Build production version (client + desktop app)  
-npm run build
+pnpm run build
 
 # Generate API documentation
-npm run gen-docs
+pnpm run gen-docs
 ```
 
 ### Component-Specific Commands
@@ -244,7 +244,7 @@ export default create<AppStore>((set) => ({
 ## Important Notes
 
 - Always run backend before frontend for development
-- Use unified `npm run dev` command for full stack development
+- Use unified `pnpm run dev` command for full stack development
 - Follow existing code patterns - consistency is key
 - Add appropriate OpenAPI documentation for new endpoints
 - Include error handling for all external operations
