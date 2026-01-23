@@ -4,3 +4,4 @@
     OSC 1337 ; CurrentDir=[current directory] ST
     "\u001b]1337;CurrentDir=/Users/root\u0007"
     ```
+- [] 文件列表组件样式优化亮色主题，适配暗黑模式
