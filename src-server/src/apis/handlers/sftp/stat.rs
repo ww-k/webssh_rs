@@ -22,7 +22,7 @@ use super::{SftpFile, SftpFileUriPayload, get_file_name, parse_file_uri};
     ),
     responses(
         (status = 200, description = "成功获取文件信息", body = SftpFile),
-        (status = 500, description = "服务器内部错误")
+        (status = 500, description = "服务器内部错误", body = ApiErr)
     )
 )]
 pub async fn handler(

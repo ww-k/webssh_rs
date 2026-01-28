@@ -72,7 +72,7 @@ pub async fn exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
     ),
     responses(
         (status = 200, description = "成功执行命令", body = String),
-        (status = 500, description = "服务器内部错误")
+        (status = 500, description = "服务器内部错误", body = ApiErr)
     )
 )]
 pub async fn handler(

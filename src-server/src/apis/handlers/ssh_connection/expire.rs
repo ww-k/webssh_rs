@@ -26,7 +26,7 @@ pub struct SshSessionExpirePayload {
     ),
     responses(
         (status = 200, description = "成功使连接过期"),
-        (status = 500, description = "服务器内部错误")
+        (status = 500, description = "服务器内部错误", body = ApiErr)
     )
 )]
 pub async fn handler(

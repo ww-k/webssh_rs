@@ -19,7 +19,7 @@ use super::{SftpFileUriPayload, parse_file_uri};
     ),
     responses(
         (status = 200, description = "成功删除文件"),
-        (status = 500, description = "服务器内部错误")
+        (status = 500, description = "服务器内部错误", body = ApiErr)
     )
 )]
 pub async fn handler(

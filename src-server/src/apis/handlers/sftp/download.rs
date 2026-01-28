@@ -32,8 +32,8 @@ const CHUNK_SIZE: usize = 8192;
     responses(
         (status = 200, description = "成功下载完整文件", body = Vec<u8>),
         (status = 206, description = "成功下载部分文件", body = Vec<u8>),
-        (status = 416, description = "请求范围不满足"),
-        (status = 500, description = "服务器内部错误")
+        (status = 416, description = "请求范围不满足", body = ApiErr),
+        (status = 500, description = "服务器内部错误", body = ApiErr)
     )
 )]
 pub async fn handler(

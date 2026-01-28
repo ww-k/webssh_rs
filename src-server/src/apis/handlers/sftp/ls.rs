@@ -31,7 +31,7 @@ pub struct SftpLsPayload {
     ),
     responses(
         (status = 200, description = "成功获取目录文件列表", body = [SftpFile]),
-        (status = 500, description = "服务器内部错误")
+        (status = 500, description = "服务器内部错误", body = ApiErr)
     )
 )]
 pub async fn handler(
