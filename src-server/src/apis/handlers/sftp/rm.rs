@@ -3,7 +3,12 @@ use std::sync::Arc;
 use axum::extract::{Query, State};
 use tracing::{debug, info};
 
-use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
+use crate::{
+    AppState,
+    apis::{ApiErr, InternalErrorResponse},
+    consts::services_err_code::*,
+    map_ssh_err,
+};
 
 use super::{SftpFileUriPayload, parse_file_uri};
 
@@ -19,7 +24,7 @@ use super::{SftpFileUriPayload, parse_file_uri};
     ),
     responses(
         (status = 200, description = "成功删除文件"),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn handler(

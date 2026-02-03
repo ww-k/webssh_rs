@@ -17,7 +17,12 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio_util::io::StreamReader;
 use tracing::info;
 
-use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
+use crate::{
+    AppState,
+    apis::{ApiErr, InternalErrorResponse},
+    consts::services_err_code::*,
+    map_ssh_err,
+};
 
 use super::{ContentRange, SftpFileUriPayload, parse_file_uri};
 
@@ -54,7 +59,7 @@ pub struct SftpUploadResponse {
     ),
     responses(
         (status = 200, description = "成功上传文件", body = SftpUploadResponse),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn handler(

@@ -6,7 +6,10 @@ use axum::{
 };
 use tracing::{debug, info};
 
-use crate::{apis::ApiErr, ssh_session_pool::SshSessionPool};
+use crate::{
+    apis::{ApiErr, InternalErrorResponse},
+    ssh_session_pool::SshSessionPool,
+};
 
 #[utoipa::path(
     get,
@@ -20,7 +23,7 @@ use crate::{apis::ApiErr, ssh_session_pool::SshSessionPool};
     ),
     responses(
         (status = 200, description = "成功获取连接列表", body = [crate::ssh_session_pool::ConnectionInfo]),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn handler(

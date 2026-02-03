@@ -7,7 +7,12 @@ use axum::{
 use serde::Deserialize;
 use tracing::{debug, info};
 
-use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
+use crate::{
+    AppState,
+    apis::{ApiErr, InternalErrorResponse},
+    consts::services_err_code::*,
+    map_ssh_err,
+};
 
 use super::{SftpFile, parse_file_uri};
 
@@ -31,7 +36,7 @@ pub struct SftpLsPayload {
     ),
     responses(
         (status = 200, description = "成功获取目录文件列表", body = [SftpFile]),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn handler(

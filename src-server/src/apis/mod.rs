@@ -53,6 +53,12 @@ impl<T: Serialize> IntoResponse for ValidJson<T> {
     }
 }
 
+/// 服务器内部错误响应
+#[derive(utoipa::ToResponse)]
+#[response(description = "服务器内部错误")]
+#[allow(unused)]
+pub struct InternalErrorResponse(ApiErr);
+
 /// 将错误转换为 code 为 ERR_CODE_SSH_ERR 的 ApiErr
 #[macro_export]
 macro_rules! map_ssh_err {

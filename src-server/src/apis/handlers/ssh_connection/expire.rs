@@ -4,7 +4,10 @@ use axum::extract::{Query, State};
 use serde::Deserialize;
 use tracing::{debug, info};
 
-use crate::{apis::ApiErr, ssh_session_pool::SshSessionPool};
+use crate::{
+    apis::{ApiErr, InternalErrorResponse},
+    ssh_session_pool::SshSessionPool,
+};
 
 #[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct SshSessionExpirePayload {
@@ -26,7 +29,7 @@ pub struct SshSessionExpirePayload {
     ),
     responses(
         (status = 200, description = "成功使连接过期"),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn handler(

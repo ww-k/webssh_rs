@@ -5,7 +5,7 @@ use tracing::{debug, info};
 
 use crate::{
     AppState,
-    apis::{ApiErr, handlers::ssh::exec::exec, target::get_target_by_id},
+    apis::{ApiErr, InternalErrorResponse, handlers::ssh::exec::exec, target::get_target_by_id},
     consts::services_err_code::*,
     map_db_err, map_ssh_err,
 };
@@ -26,7 +26,7 @@ const WINDOWS: &str = "windows";
     ),
     responses(
         (status = 200, description = "成功复制文件"),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn handler(

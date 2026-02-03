@@ -8,7 +8,7 @@ use axum::{
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait};
 use serde::Deserialize;
 
-use crate::{AppBaseState, entities::target, map_db_err};
+use crate::{AppBaseState, apis::InternalErrorResponse, entities::target, map_db_err};
 use crate::{consts::services_err_code::ERR_CODE_DB_ERR, entities::target::TargetAuthMethod};
 
 use super::{ApiErr, ValidJson};
@@ -37,7 +37,7 @@ pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
     operation_id = "target_list",
     responses(
         (status = 200, description = "成功获取 SSH 目标列表", body = [target::Model]),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 async fn target_list(
@@ -56,7 +56,7 @@ async fn target_list(
     request_body = target::Model,
     responses(
         (status = 200, description = "成功添加 SSH 目标", body = target::Model),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 async fn target_add(
@@ -114,7 +114,7 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
     request_body = TargetUpdatePayload,
     responses(
         (status = 200, description = "成功更新 SSH 目标", body = target::Model),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 async fn target_update(
@@ -142,7 +142,7 @@ pub struct TargetRemovePayload {
     request_body = TargetRemovePayload,
     responses(
         (status = 200, description = "成功删除 SSH 目标"),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 async fn target_remove(

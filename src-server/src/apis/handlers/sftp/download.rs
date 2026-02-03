@@ -13,7 +13,12 @@ use russh_sftp::protocol::FileType;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tracing::{debug, info};
 
-use crate::{AppState, apis::ApiErr, consts::services_err_code::*, map_ssh_err};
+use crate::{
+    AppState,
+    apis::{ApiErr, InternalErrorResponse},
+    consts::services_err_code::*,
+    map_ssh_err,
+};
 
 use super::{Range, SftpFileUriPayload, parse_file_uri};
 
@@ -32,7 +37,7 @@ const CHUNK_SIZE: usize = 8192;
     responses(
         (status = 200, description = "成功下载完整文件", body = Vec<u8>),
         (status = 206, description = "成功下载部分文件", body = Vec<u8>),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn handler(

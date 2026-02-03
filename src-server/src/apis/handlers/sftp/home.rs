@@ -6,7 +6,7 @@ use tracing::{debug, info};
 use crate::{
     AppState,
     apis::{
-        ApiErr,
+        ApiErr, InternalErrorResponse,
         handlers::{QueryTargetId, ssh::exec::exec},
         target::get_target_by_id,
     },
@@ -24,11 +24,11 @@ const WINDOWS: &str = "windows";
     description = "获取指定 SSH 目标的主目录路径",
     operation_id = "sftp_home",
     params(
-        ("target_id" = i32, description = "SSH 目标 ID", example = 1)
+        QueryTargetId
     ),
     responses(
         (status = 200, description = "成功获取主目录路径", body = String),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn handler(

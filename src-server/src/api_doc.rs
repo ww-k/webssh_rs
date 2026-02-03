@@ -23,14 +23,10 @@ use utoipa::OpenApi;
     ),
     components(
         schemas(
-            crate::entities::target::Model,
-            crate::entities::target::TargetAuthMethod,
-            crate::apis::target::TargetUpdatePayload,
-            crate::apis::target::TargetRemovePayload,
-            crate::ssh_session_pool::ConnectionInfo,
             crate::apis::ApiErr,
-            crate::apis::handlers::sftp::SftpFile,
-            crate::apis::handlers::sftp::upload::SftpUploadResponse,
+        ),
+        responses(
+            crate::apis::InternalErrorResponse
         )
     ),
     tags(

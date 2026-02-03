@@ -6,7 +6,7 @@ use russh::ChannelMsg;
 use tracing::{debug, info};
 
 use crate::{
-    apis::{ApiErr, handlers::QueryTargetId},
+    apis::{ApiErr, InternalErrorResponse, handlers::QueryTargetId},
     consts::services_err_code::*,
     map_ssh_err,
     ssh_session_pool::{SshChannelGuard, SshSessionPool},
@@ -72,7 +72,7 @@ pub async fn exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
     ),
     responses(
         (status = 200, description = "成功执行命令", body = String),
-        (status = 500, description = "服务器内部错误", body = ApiErr)
+        (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn handler(
