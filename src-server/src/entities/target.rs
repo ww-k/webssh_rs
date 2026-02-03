@@ -75,7 +75,7 @@ impl TryGetable for TargetAuthMethod {
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq, DeriveEntityModel, ToSchema)]
 #[sea_orm(table_name = "target")]
-#[schema(title = "TargetModel")]
+#[schema(as = Target)]
 pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
