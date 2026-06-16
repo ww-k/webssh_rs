@@ -14,6 +14,7 @@ use russh::{
     keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, decode_secret_key, ssh_key},
 };
 use russh_sftp::client::SftpSession;
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use serde::Serialize;
 use tokio::sync::{Mutex, MutexGuard, oneshot};
 use tracing::debug;
@@ -22,11 +23,23 @@ use utoipa::ToSchema;
 use crate::{
     AppBaseState,
     apis::target::get_target_by_id,
-    entities::target::{self, TargetAuthMethod},
+    entities::{
+        ssh_known_host,
+        target::{self, TargetAuthMethod},
+    },
 };
+
+#[derive(Clone)]
+struct ServerPublicKey {
+    key_algorithm: String,
+    public_key: String,
+    fingerprint: String,
+}
 
 struct SshClientHandler {
     host: String,
+    pinned_server_public_keys: Vec<ServerPublicKey>,
+    observed_server_public_key: Arc<Mutex<Option<ServerPublicKey>>>,
     tx: Option<oneshot::Sender<bool>>,
 }
 
@@ -37,13 +50,28 @@ impl russh::client::Handler for SshClientHandler {
         &mut self,
         server_public_key: &ssh_key::PublicKey,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
-        // TODO: verify server key
+        let observed_key = ServerPublicKey {
+            key_algorithm: server_public_key.algorithm().as_str().to_string(),
+            public_key: server_public_key.public_key_base64(),
+            fingerprint: server_public_key.fingerprint(HashAlg::Sha256).to_string(),
+        };
         debug!(
-            "ClientHandler @check_server_key {} {:?}",
-            self.host,
-            server_public_key.public_key_base64()
+            "ClientHandler @check_server_key host {} {} {}",
+            self.host, observed_key.key_algorithm, observed_key.fingerprint
         );
-        async { Ok(true) }
+        let observed_server_public_key = self.observed_server_public_key.clone();
+        let pinned_server_public_keys = self.pinned_server_public_keys.clone();
+        async move {
+            *observed_server_public_key.lock().await = Some(observed_key.clone());
+            if pinned_server_public_keys.is_empty() {
+                Ok(true)
+            } else {
+                Ok(pinned_server_public_keys.iter().any(|pinned_key| {
+                    pinned_key.key_algorithm == observed_key.key_algorithm
+                        && pinned_key.public_key == observed_key.public_key
+                }))
+            }
+        }
     }
 
     fn disconnected(
@@ -110,17 +138,20 @@ impl SshClient {
         tx: oneshot::Sender<bool>,
     ) -> Result<russh::client::Handle<SshClientHandler>> {
         let config = russh::client::Config::default();
+        let host = target.host.as_str();
+        let port = target.port.unwrap_or(22);
+        let pinned_server_public_keys =
+            get_known_hosts_by_host_and_port(&self.app_state, host, port).await?;
+        let observed_server_public_key = Arc::new(Mutex::new(None));
         let ssh_client_handler = SshClientHandler {
-            host: target.host.clone(),
+            host: host.to_string(),
+            pinned_server_public_keys,
+            observed_server_public_key: observed_server_public_key.clone(),
             tx: Some(tx),
         };
 
-        let mut handle = russh::client::connect(
-            Arc::new(config),
-            (target.host, target.port.unwrap_or(22)),
-            ssh_client_handler,
-        )
-        .await?;
+        let mut handle =
+            russh::client::connect(Arc::new(config), (host, port), ssh_client_handler).await?;
         let auth_res = match target.method {
             TargetAuthMethod::Password => {
                 let username = target.user;
@@ -146,8 +177,64 @@ impl SshClient {
             anyhow::bail!("Authentication failed");
         }
 
+        let observed_server_public_key = observed_server_public_key.lock().await.clone();
+        if let Some(observed_server_public_key) = observed_server_public_key {
+            insert_known_host_if_missing(&self.app_state, host, port, observed_server_public_key)
+                .await?;
+        }
+
         Ok(handle)
     }
+}
+
+async fn get_known_hosts_by_host_and_port(
+    app_state: &AppBaseState,
+    host: &str,
+    port: u16,
+) -> Result<Vec<ServerPublicKey>> {
+    let known_hosts = ssh_known_host::Entity::find()
+        .filter(ssh_known_host::Column::Host.eq(host))
+        .filter(ssh_known_host::Column::Port.eq(port))
+        .all(&app_state.db)
+        .await?;
+
+    Ok(known_hosts
+        .into_iter()
+        .map(|known_host| ServerPublicKey {
+            key_algorithm: known_host.key_algorithm,
+            public_key: known_host.public_key,
+            fingerprint: known_host.fingerprint,
+        })
+        .collect())
+}
+
+async fn insert_known_host_if_missing(
+    app_state: &AppBaseState,
+    host: &str,
+    port: u16,
+    server_public_key: ServerPublicKey,
+) -> Result<()> {
+    let exists = ssh_known_host::Entity::find()
+        .filter(ssh_known_host::Column::Host.eq(host))
+        .filter(ssh_known_host::Column::Port.eq(port))
+        .filter(ssh_known_host::Column::KeyAlgorithm.eq(server_public_key.key_algorithm.as_str()))
+        .one(&app_state.db)
+        .await?
+        .is_some();
+
+    if !exists {
+        let active_model = ssh_known_host::ActiveModel {
+            id: sea_orm::ActiveValue::NotSet,
+            host: Set(host.to_string()),
+            port: Set(port),
+            key_algorithm: Set(server_public_key.key_algorithm),
+            public_key: Set(server_public_key.public_key),
+            fingerprint: Set(server_public_key.fingerprint),
+        };
+        active_model.insert(&app_state.db).await?;
+    }
+
+    Ok(())
 }
 
 struct PoolState<T> {
@@ -1024,7 +1111,7 @@ fn drop_connection_received_msg<T: ConnectionType>(
 mod tests {
     use super::*;
     use crate::{config::Config, migrations::Migrator, tests::sftp_server};
-    use sea_orm::{ActiveModelTrait, Database};
+    use sea_orm::{ActiveModelTrait, Database, EntityTrait};
     use sea_orm_migration::MigratorTrait;
     use tokio::{
         sync::{OnceCell, broadcast},
@@ -1125,6 +1212,11 @@ mod tests {
     async fn test_ssh_session_pool_channel_guard() {
         let (session_pool, _) = init().await;
         let channel_guard = session_pool.get_channel(1).await.unwrap();
+        let known_hosts = ssh_known_host::Entity::find()
+            .all(&session_pool.app_state.db)
+            .await
+            .unwrap();
+        assert_eq!(known_hosts.len(), 1, "expected 1 known host");
         let session = session_pool.get_session(1).await.unwrap();
         let connection = test_ssh_session_pool_connection_pool_state(session.clone()).await;
 

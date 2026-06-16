@@ -2,6 +2,7 @@ pub use sea_orm_migration::prelude::*;
 
 mod m000001_init_db;
 mod m000002_win_target;
+mod m000003_ssh_known_host;
 
 pub struct Migrator;
 
@@ -11,6 +12,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m000001_init_db::Migration),
             Box::new(m000002_win_target::Migration),
+            Box::new(m000003_ssh_known_host::Migration),
         ]
     }
 }
@@ -79,7 +81,7 @@ mod tests {
                 target1
             );
 
-            Migrator::down(&db, Some(1)).await.unwrap();
+            Migrator::down(&db, Some(2)).await.unwrap();
             let result = active_model3.insert(&db).await;
             assert!(result.is_err(), "Expecte Insert failed");
 
