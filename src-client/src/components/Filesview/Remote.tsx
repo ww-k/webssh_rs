@@ -167,31 +167,29 @@ export default function FilesviewRemote({
     });
 
     return (
-        <div className="filesview">
-            <FilesviewBase
-                cwd={cwd}
-                history={pathHistory}
-                files={files}
-                loading={loading}
-                posix={true}
-                setCwd={setCwdUri}
-                getDirs={getDirs}
-                getQuickLinks={getQuickLinks}
-                getHome={getHome}
-                getCwdFiles={getCwdFiles}
-                onContextMenu={(files, evt) => {
-                    handleContextmenu(files, evt, {
-                        fileUri: cwd,
-                        copyData,
-                        getCwdFiles,
-                        setCopyData,
-                    });
-                }}
-                onFileDoubleClick={onFileDoubleClick}
-                onEnter={onEnter}
-                onDelete={onDelete}
-                onRename={onRename}
-            />
-        </div>
+        <FilesviewBase
+            cwd={cwd}
+            history={pathHistory}
+            files={files}
+            loading={loading}
+            posix={true}
+            setCwd={setCwdUri}
+            getDirs={getDirs}
+            getQuickLinks={getQuickLinks}
+            getHome={getHome}
+            getCwdFiles={getCwdFiles}
+            onContextMenu={(files, evt) => {
+                handleContextmenu(files, evt, {
+                    fileUri: cwd,
+                    copyData,
+                    getCwdFiles,
+                    setCopyData,
+                });
+            }}
+            onFileDoubleClick={onFileDoubleClick}
+            onEnter={onEnter}
+            onDelete={onDelete}
+            onRename={onRename}
+        />
     );
 }

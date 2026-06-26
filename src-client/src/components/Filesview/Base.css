@@ -1,13 +1,14 @@
 .filesviewBase {
-    border: 1px solid #dfdfdf;
+    border: 1px solid var(--ant-color-border);
     border-radius: 6px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    background-color: var(--ant-color-bg-container);
 }
 
 .filesviewBase:focus-within {
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
 }
 
 .filesviewBaseFilelist {

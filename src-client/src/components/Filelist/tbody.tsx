@@ -1198,10 +1198,19 @@ export default class Tbody extends Component<IProps, IState> {
         const el = document.getElementById(MOUSE_SELECTION_ELID);
         if (!el) {
             const el = document.createElement("div");
+            const tokenStyle = getComputedStyle(
+                this.rootElRef.current || document.documentElement,
+            );
+            const primary =
+                tokenStyle.getPropertyValue("--ant-color-primary").trim() ||
+                "#1677ff";
+            const primaryBg =
+                tokenStyle.getPropertyValue("--ant-color-primary-bg").trim() ||
+                "rgba(22, 119, 255, 0.16)";
             el.id = MOUSE_SELECTION_ELID;
             el.style.position = "absolute";
-            el.style.border = "1px solid #666";
-            el.style.background = "rgba(0,0,0, 0.3)";
+            el.style.border = `1px solid ${primary}`;
+            el.style.background = primaryBg;
             // @ts-expect-error 类型定义错误
             el.style.zIndex = 9999;
             el.addEventListener("mousemove", (e) => {
