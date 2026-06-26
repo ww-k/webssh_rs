@@ -1,3 +1,3 @@
 - [x] [server] [security] implement check_server_key for ssh client connection
-- [ ] [server] [feature] make check_server_key configable
+- [x] [server] [feature] make check_server_key configable
 - [ ] [server] [optimization] May be, take and push back Arc<Connection> from pool is not necessary, just find and clone.

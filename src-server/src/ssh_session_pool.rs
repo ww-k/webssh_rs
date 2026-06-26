@@ -23,6 +23,7 @@ use utoipa::ToSchema;
 use crate::{
     AppBaseState,
     apis::target::get_target_by_id,
+    config::CheckServerKey,
     entities::{
         ssh_known_host,
         target::{self, TargetAuthMethod},
@@ -38,9 +39,38 @@ struct ServerPublicKey {
 
 struct SshClientHandler {
     host: String,
+    check_server_key: CheckServerKey,
     pinned_server_public_keys: Vec<ServerPublicKey>,
     observed_server_public_key: Arc<Mutex<Option<ServerPublicKey>>>,
     tx: Option<oneshot::Sender<bool>>,
+}
+
+impl SshClientHandler {
+    fn verify_server_key(
+        check_server_key: CheckServerKey,
+        pinned_server_public_keys: &[ServerPublicKey],
+        observed_key: &ServerPublicKey,
+    ) -> bool {
+        match check_server_key {
+            CheckServerKey::Disabled => true,
+            CheckServerKey::AcceptNew => {
+                pinned_server_public_keys.is_empty()
+                    || pinned_server_public_keys
+                        .iter()
+                        .any(|pinned_key| pinned_key.matches(observed_key))
+            }
+            CheckServerKey::Strict => pinned_server_public_keys
+                .iter()
+                .any(|pinned_key| pinned_key.matches(observed_key)),
+        }
+    }
+}
+
+impl ServerPublicKey {
+    fn matches(&self, observed_key: &ServerPublicKey) -> bool {
+        self.key_algorithm == observed_key.key_algorithm
+            && self.public_key == observed_key.public_key
+    }
 }
 
 impl russh::client::Handler for SshClientHandler {
@@ -61,16 +91,16 @@ impl russh::client::Handler for SshClientHandler {
         );
         let observed_server_public_key = self.observed_server_public_key.clone();
         let pinned_server_public_keys = self.pinned_server_public_keys.clone();
+        let check_server_key = self.check_server_key;
         async move {
-            *observed_server_public_key.lock().await = Some(observed_key.clone());
-            if pinned_server_public_keys.is_empty() {
-                Ok(true)
-            } else {
-                Ok(pinned_server_public_keys.iter().any(|pinned_key| {
-                    pinned_key.key_algorithm == observed_key.key_algorithm
-                        && pinned_key.public_key == observed_key.public_key
-                }))
+            if check_server_key != CheckServerKey::Disabled {
+                *observed_server_public_key.lock().await = Some(observed_key.clone());
             }
+            Ok(SshClientHandler::verify_server_key(
+                check_server_key,
+                &pinned_server_public_keys,
+                &observed_key,
+            ))
         }
     }
 
@@ -145,6 +175,7 @@ impl SshClient {
         let observed_server_public_key = Arc::new(Mutex::new(None));
         let ssh_client_handler = SshClientHandler {
             host: host.to_string(),
+            check_server_key: self.app_state.config.check_server_key,
             pinned_server_public_keys,
             observed_server_public_key: observed_server_public_key.clone(),
             tx: Some(tx),
@@ -1129,6 +1160,7 @@ mod tests {
                 let config = Config {
                     max_session_per_target: 2,
                     max_channel_per_session: 3,
+                    check_server_key: CheckServerKey::AcceptNew,
                 };
 
                 let db = Database::connect("sqlite::memory:")
@@ -1179,6 +1211,47 @@ mod tests {
             };
         }
         (channel, String::from_utf8(buf).unwrap())
+    }
+
+    #[test]
+    fn test_verify_server_key_config() {
+        let observed_key = ServerPublicKey {
+            key_algorithm: "ssh-ed25519".to_string(),
+            public_key: "observed".to_string(),
+            fingerprint: "SHA256:observed".to_string(),
+        };
+        let pinned_key = observed_key.clone();
+        let changed_key = ServerPublicKey {
+            key_algorithm: "ssh-ed25519".to_string(),
+            public_key: "changed".to_string(),
+            fingerprint: "SHA256:changed".to_string(),
+        };
+
+        assert!(SshClientHandler::verify_server_key(
+            CheckServerKey::AcceptNew,
+            &[],
+            &observed_key
+        ));
+        assert!(!SshClientHandler::verify_server_key(
+            CheckServerKey::Strict,
+            &[],
+            &observed_key
+        ));
+        assert!(SshClientHandler::verify_server_key(
+            CheckServerKey::Disabled,
+            &[],
+            &observed_key
+        ));
+        assert!(SshClientHandler::verify_server_key(
+            CheckServerKey::Strict,
+            &[pinned_key],
+            &observed_key
+        ));
+        assert!(!SshClientHandler::verify_server_key(
+            CheckServerKey::AcceptNew,
+            &[changed_key],
+            &observed_key
+        ));
     }
 
     #[tokio::test]
