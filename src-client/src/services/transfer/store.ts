@@ -11,6 +11,8 @@ export interface ITransferListItem {
     status: "WAIT" | "RUN" | "SUCCESS" | "FAIL" | "PAUSE";
     /** 文件名 */
     name: string;
+    /** 创建时间 */
+    createdAt?: number;
     /** 本地文件路径。Web端，是文件名。客户端，是本地文件路径。 */
     localPath: string;
     /** 远端目标Id */

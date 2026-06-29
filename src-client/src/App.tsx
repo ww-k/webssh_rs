@@ -1,5 +1,5 @@
 import { Badge, ConfigProvider, Layout, Menu, theme } from "antd";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import "./App.css";
 
@@ -17,7 +17,15 @@ const { darkAlgorithm, defaultAlgorithm } = theme;
 const { Content, Sider } = Layout;
 
 export default function App() {
-    const transferListLen = useTransferStore((state) => state.list.length);
+    const [siderCollapsed, setSiderCollapsed] = useState(true);
+    const [lastTransferMenuClickAt, setLastTransferMenuClickAt] = useState(0);
+    const newTransferCount = useTransferStore(
+        (state) =>
+            state.list.filter(
+                (item) =>
+                    item.createdAt && item.createdAt > lastTransferMenuClickAt,
+            ).length,
+    );
     const menusItems = useMemo<Required<MenuProps>["items"]>(() => {
         return [
             {
@@ -27,12 +35,30 @@ export default function App() {
             },
             {
                 key: "transfer",
-                icon: <SwapOutlined style={{ transform: "rotate(90deg)" }} />,
+                icon: siderCollapsed ? (
+                    <span className="WebSSH-Root-TransferMenuIcon">
+                        <SwapOutlined
+                            className="ant-menu-item-icon"
+                            style={{ transform: "rotate(90deg)" }}
+                        />
+                        {newTransferCount > 0 && (
+                            <span className="WebSSH-Root-TransferMenuCount">
+                                {newTransferCount > 99
+                                    ? "99+"
+                                    : newTransferCount}
+                            </span>
+                        )}
+                    </span>
+                ) : (
+                    <SwapOutlined style={{ transform: "rotate(90deg)" }} />
+                ),
                 label: "传输",
-                extra: <Badge count={transferListLen}></Badge>,
+                extra: !siderCollapsed ? (
+                    <Badge count={newTransferCount}></Badge>
+                ) : undefined,
             },
         ];
-    }, [transferListLen]);
+    }, [newTransferCount, siderCollapsed]);
 
     const {
         theme,
@@ -89,6 +115,9 @@ export default function App() {
 
     const handleMenuClick = useCallback(
         (evt: { key: string }) => {
+            if (evt.key === "transfer") {
+                setLastTransferMenuClickAt(Date.now());
+            }
             setMenuKey(evt.key);
         },
         [setMenuKey],
@@ -107,8 +136,9 @@ export default function App() {
                     className="WebSSH-Root-Sider"
                     theme={theme}
                     collapsible={true}
-                    defaultCollapsed={true}
+                    collapsed={siderCollapsed}
                     collapsedWidth={60}
+                    onCollapse={setSiderCollapsed}
                 >
                     <Menu
                         className="WebSSH-Root-Menu"

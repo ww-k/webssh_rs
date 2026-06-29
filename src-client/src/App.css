@@ -13,6 +13,41 @@ body,
     border-inline-end: none;
 }
 
+.WebSSH-Root-TransferMenuIcon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    line-height: 1;
+}
+
+.WebSSH-Root-TransferMenuCount {
+    position: absolute;
+    top: -7px;
+    right: -9px;
+    z-index: 1;
+    display: inline-block;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 4px;
+    color: #fff;
+    font-size: 11px;
+    line-height: 14px;
+    text-align: center;
+    background: var(--ant-color-error);
+    border-radius: 7px;
+    box-shadow: 0 0 0 1px var(--ant-color-bg-container);
+    pointer-events: none;
+}
+
+.WebSSH-Root-Menu.ant-menu-inline-collapsed
+    > .ant-menu-item
+    .WebSSH-Root-TransferMenuCount {
+    opacity: 1;
+}
+
 .WebSSH-Root-Content {
     position: relative;
     overflow: hidden;
