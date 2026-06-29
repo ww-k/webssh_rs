@@ -1,8 +1,10 @@
+pub mod fs;
 pub mod handlers;
 pub mod sftp;
 pub mod ssh;
 pub mod ssh_connection;
 pub mod target;
+pub mod transfer;
 
 use axum::{
     extract::{FromRequest, rejection::JsonRejection},

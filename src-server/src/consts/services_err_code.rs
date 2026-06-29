@@ -15,3 +15,18 @@ pub const ERR_CODE_SFTP_UPLOAD_INVALID_REQUEST: u32 = 2001;
 
 /// SFTP 下载请求不合法
 pub const ERR_CODE_SFTP_DOWNLOAD_INVALID_REQUEST: u32 = 2002;
+
+/// 本机文件操作请求不合法
+pub const ERR_CODE_FS_INVALID_REQUEST: u32 = 3000;
+
+/// 本机文件操作错误
+pub const ERR_CODE_FS_IO_ERR: u32 = 3001;
+
+/// 文件传输任务请求不合法
+pub const ERR_CODE_TRANSFER_INVALID_REQUEST: u32 = 4000;
+
+/// 文件传输任务不存在
+pub const ERR_CODE_TRANSFER_NOT_FOUND: u32 = 4001;
+
+/// 文件传输任务执行失败
+pub const ERR_CODE_TRANSFER_ERR: u32 = 4002;

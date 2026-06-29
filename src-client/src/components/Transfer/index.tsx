@@ -18,6 +18,7 @@ import {
     Tooltip,
     Typography,
 } from "antd";
+import { useEffect } from "react";
 
 import "./index.css";
 
@@ -39,6 +40,7 @@ const STATUS_CONFIG: Record<
     PAUSE: { color: "warning", text: "已暂停" },
     SUCCESS: { color: "success", text: "已完成" },
     FAIL: { color: "error", text: "失败" },
+    CANCEL: { color: "default", text: "已取消" },
 };
 
 // 格式化文件大小
@@ -118,6 +120,9 @@ const getActionMenuItems = (
                 onClick: onResume,
             });
             break;
+        case "CANCEL":
+        case "SUCCESS":
+            break;
     }
 
     items.push({
@@ -148,14 +153,16 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
     const filteredList = list.filter((item) => item.type === type);
 
     const handlePause = (record: ITransferListItem) => {
-        setPause(record.id);
+        transferService.pause(record.id);
     };
 
     const handleResume = (record: ITransferListItem) => {
         if (record.status === "FAIL") {
             setSuccess(record.id); // 重置状态以便重新开始
         }
-        setResume(record.id);
+        transferService.resume(record.id).catch(() => {
+            setResume(record.id);
+        });
     };
 
     const handleCancel = (record: ITransferListItem) => {
@@ -250,6 +257,25 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
                     );
                 }
 
+                if (record.status === "CANCEL") {
+                    return (
+                        <Space
+                            size="small"
+                            style={{ width: "100%" }}
+                            orientation="vertical"
+                        >
+                            <Progress
+                                percent={Number((percent || 0).toFixed(2))}
+                                size="small"
+                                status="normal"
+                            />
+                            <Text type="secondary" style={{ fontSize: "12px" }}>
+                                已取消
+                            </Text>
+                        </Space>
+                    );
+                }
+
                 return (
                     <Space
                         size="small"
@@ -290,6 +316,7 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
                 if (record.status === "SUCCESS") return "-";
                 if (record.status === "FAIL") return "-";
                 if (record.status === "PAUSE") return "已暂停";
+                if (record.status === "CANCEL") return "-";
                 return formatTime(estimatedTime);
             },
         },
@@ -337,6 +364,10 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
 };
 
 export default function Transfer() {
+    useEffect(() => {
+        transferService.syncTasks();
+    }, []);
+
     return (
         <Tabs
             className="WebSSH-Transfer"

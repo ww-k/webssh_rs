@@ -1,289 +1,101 @@
-import { nanoid } from "nanoid";
-import QueueService from "simple-queue-serve";
-
+import {
+    deleteTransferTask,
+    getTransferTask,
+    getTransferTasks,
+    postTransferCancel,
+    postTransferDownload,
+    postTransferPause,
+    postTransferResume,
+    postTransferUpload,
+} from "@/api";
 import { getFileName, parseSftpUri } from "@/helpers/file_uri";
-import fileSave from "@/helpers/fileSave";
-import openNativeFileSelector from "@/helpers/openNativeFileSelector";
 
-import download from "./download";
-import useTransferStore from "./store";
+import useTransferStore, { type ITransferListItem } from "./store";
 import TransferError from "./TransferError";
-import upload from "./upload";
 
-import type { ITransferRange } from "./types";
+import type { ITransferTask } from "@/api";
 
 interface IUploadOption {
-    file: File;
+    localPath: string;
     fileUri: string;
 }
 
-interface IPrivateUploadOption extends IUploadOption {
-    ranges?: ITransferRange[];
-}
-
-interface IPrivateDownloadOption {
+interface IDownloadOption {
     fileUri: string;
+    localPath?: string;
+    localDir?: string;
     size?: number;
-    ranges?: ITransferRange[];
 }
 
 class TransferService {
-    /** 传输任务队列服务 */
-    #queue = new QueueService({
-        concurrency: 1,
-    });
-    /** 传输任务函数 */
-    #queueTaskMap = new Map<string, () => Promise<void>>();
-    /** 运行中的传输任务的AbortController */
-    #abortCtrlMap = new Map<string, AbortController>();
-    /** 缓存上传文件 */
-    #fileMap = new Map<string, File>();
-    /** 缓存下载文件内容 */
-    #blobsMap = new Map<string, Blob[]>();
+    #pollTimerMap = new Map<string, number>();
 
-    setConfig(option: {
+    setConfig(_option: {
         /** 并发任务数 */
         concurrency?: number;
         /** 每个任务执行间的间隔 */
         interval?: number;
-    }) {
-        this.#queue.setConfig(option);
-    }
+    }) {}
 
     async upload(option: IUploadOption) {
-        const uri = parseSftpUri(option.fileUri);
-        if (!uri) {
-            throw new TransferError({
-                code: "InvalidUri",
-                message: "InvalidUri",
-            });
-        }
-        const id = nanoid();
-        useTransferStore.getState().add({
-            id,
-            type: "UPLOAD",
-            status: "WAIT",
-            createdAt: Date.now(),
-            targetId: uri.targetId,
-            targetUri: option.fileUri,
-            targetPath: uri.path,
-            localPath: option.file.name,
-            name: option.file.name,
-            size: option.file.size,
-            loaded: 0,
+        const task = await postTransferUpload({
+            local_path: option.localPath,
+            target_uri: option.fileUri,
         });
-        await this.#upload(id, option);
+        this.#upsertTask(task);
+        this.#poll(task.id);
+        return task;
     }
 
-    async #upload(id: string, option: IPrivateUploadOption) {
-        return await new Promise<void>((resolve, reject) => {
-            const queueTask = this.#uploadTaskFn.bind(
-                this,
-                id,
-                option,
-                resolve,
-                reject,
-            );
-            this.#queueTaskMap.set(id, queueTask);
-            this.#fileMap.set(id, option.file);
-            this.#queue.push(queueTask);
+    async download(option: IDownloadOption) {
+        const task = await postTransferDownload({
+            source_uri: option.fileUri,
+            local_path: option.localPath,
+            local_dir: option.localDir,
+        });
+        this.#upsertTask({
+            ...task,
+            total: task.total || option.size || 0,
+        });
+        this.#poll(task.id);
+        return task;
+    }
+
+    async syncTasks() {
+        const tasks = await getTransferTasks();
+        tasks.forEach((task) => {
+            this.#upsertTask(task);
+            if (["WAIT", "RUN"].includes(task.status)) {
+                this.#poll(task.id);
+            }
         });
     }
 
-    async #uploadTaskFn(
-        id: string,
-        option: IPrivateUploadOption,
-        resolve: () => void,
-        reject: (reason?: unknown) => void,
-    ) {
-        useTransferStore.getState().setRun(id);
-
-        const abortController = new AbortController();
-        this.#abortCtrlMap.set(id, abortController);
-
-        abortController.signal.addEventListener("abort", () => {
-            reject(
-                new TransferError({
-                    code: "Aborted",
-                    message: "Aborted",
-                }),
-            );
-        });
-
-        try {
-            await upload({
-                ...option,
-                signal: abortController.signal,
-                onProgress: (progress) => {
-                    useTransferStore.getState().updateProgress(id, progress);
-                },
-            });
-
-            useTransferStore.getState().setSuccess(id);
-            resolve();
-        } catch (err) {
-            const failReason =
-                err instanceof TransferError ? err.message : "Unknown";
-            useTransferStore.getState().setFail(id, failReason);
-            reject(err);
-        }
-
-        this.#abortCtrlMap.delete(id);
-        this.#fileMap.delete(id);
-        this.#queueTaskMap.delete(id);
-    }
-
-    async download(option: { fileUri: string; size?: number }) {
-        const uri = parseSftpUri(option.fileUri);
-        if (!uri) {
-            throw new TransferError({
-                code: "InvalidUri",
-                message: "InvalidUri",
-            });
-        }
-        const name = getFileName(option.fileUri);
-        const id = nanoid();
-        useTransferStore.getState().add({
-            id,
-            type: "DOWNLOAD",
-            status: "WAIT",
-            createdAt: Date.now(),
-            targetId: uri.targetId,
-            targetUri: option.fileUri,
-            targetPath: uri.path,
-            localPath: name,
-            name,
-            loaded: 0,
-            size: option.size,
-        });
-        return await this.#download(id, name, option);
-    }
-
-    async #download(id: string, name: string, option: IPrivateDownloadOption) {
-        return await new Promise<void>((resolve, reject) => {
-            const queueTask = this.#downloadTaskFn.bind(
-                this,
-                id,
-                name,
-                option,
-                resolve,
-                reject,
-            );
-            this.#queueTaskMap.set(id, queueTask);
-            this.#queue.push(queueTask);
-        });
-    }
-
-    async #downloadTaskFn(
-        id: string,
-        name: string,
-        option: IPrivateDownloadOption,
-        resolve: () => void,
-        reject: (reason?: unknown) => void,
-    ) {
-        let blobs = this.#blobsMap.get(id);
-        if (!blobs) {
-            blobs = [];
-            this.#blobsMap.set(id, blobs);
-        }
-        useTransferStore.getState().setRun(id);
-
-        const abortController = new AbortController();
-        this.#abortCtrlMap.set(id, abortController);
-
-        abortController.signal.addEventListener("abort", () => {
-            reject(
-                new TransferError({
-                    code: "Aborted",
-                    message: "Aborted",
-                }),
-            );
-        });
-
-        try {
-            await download({
-                ...option,
-                blobs,
-                signal: abortController.signal,
-                onProgress: (progress) => {
-                    useTransferStore.getState().updateProgress(id, progress);
-                },
-            });
-
-            useTransferStore.getState().setSuccess(id);
-
-            fileSave(
-                new File(blobs, name, {
-                    type: "application/octet-stream",
-                }),
-            );
-            resolve();
-        } catch (err) {
-            const failReason =
-                err instanceof TransferError ? err.message : "Unknown";
-            useTransferStore.getState().setFail(id, failReason);
-            reject(err);
-        }
-
-        this.#abortCtrlMap.delete(id);
-        this.#blobsMap.delete(id);
-        this.#queueTaskMap.delete(id);
-    }
-
-    #abort(id: string) {
-        this.#abortCtrlMap.get(id)?.abort();
-        this.#abortCtrlMap.delete(id);
-        this.#queueTaskMap.delete(id);
-    }
-
-    pause(id: string) {
-        const queueTask = this.#queueTaskMap.get(id);
-        if (queueTask) {
-            useTransferStore.getState().setPause(id);
-            this.#queue.remove(queueTask);
-        }
-        this.#abort(id);
+    async pause(id: string) {
+        const task = await postTransferPause(id);
+        this.#clearPoll(id);
+        this.#upsertTask(task);
     }
 
     async resume(id: string) {
-        const record = useTransferStore.getState().get(id);
-        if (!record) {
-            throw new TransferError("Record not found");
-        }
-
-        const fileUri = record.targetUri;
-        if (record.type === "UPLOAD") {
-            let file = this.#fileMap.get(id);
-            if (!file) {
-                const files = await openNativeFileSelector();
-                file = files[0];
-            }
-            if (record.size !== file.size) {
-                throw new TransferError("File size changed");
-            }
-            await this.#upload(id, {
-                file,
-                fileUri,
-                ranges: record.missedRanges,
-            });
-        } else {
-            return await this.#download(id, record.name, {
-                fileUri,
-                size: record.size,
-                ranges: record.missedRanges,
-            });
-        }
+        const task = await postTransferResume(id);
+        this.#upsertTask(task);
+        this.#poll(id);
     }
 
-    remove(id: string) {
-        const queueTask = this.#queueTaskMap.get(id);
-        if (queueTask) {
-            useTransferStore.getState().delete(id);
-            this.#queue.remove(queueTask);
+    async remove(id: string) {
+        const record = useTransferStore.getState().get(id);
+        this.#clearPoll(id);
+        if (record && ["WAIT", "RUN", "PAUSE"].includes(record.status)) {
+            try {
+                const task = await postTransferCancel(id);
+                this.#upsertTask(task);
+            } catch (err) {
+                console.warn("TransferService.remove cancel failed", err);
+            }
         }
-        this.#abort(id);
-        this.#fileMap.delete(id);
-        this.#blobsMap.delete(id);
+        await deleteTransferTask(id);
+        useTransferStore.getState().delete(id);
     }
 
     pauseAll() {}
@@ -291,6 +103,73 @@ class TransferService {
     resumeAll() {}
 
     removeAll() {}
+
+    #poll(id: string) {
+        this.#clearPoll(id);
+
+        const pollOnce = async () => {
+            try {
+                const task = await getTransferTask(id);
+                this.#upsertTask(task);
+                if (["SUCCESS", "FAIL", "CANCEL", "PAUSE"].includes(task.status)) {
+                    this.#clearPoll(id);
+                }
+            } catch (err) {
+                this.#clearPoll(id);
+                const failReason =
+                    err instanceof TransferError ? err.message : "Unknown";
+                useTransferStore.getState().setFail(id, failReason);
+            }
+        };
+
+        const timer = window.setInterval(pollOnce, 1000);
+        this.#pollTimerMap.set(id, timer);
+        pollOnce();
+    }
+
+    #clearPoll(id: string) {
+        const timer = this.#pollTimerMap.get(id);
+        if (timer) {
+            window.clearInterval(timer);
+            this.#pollTimerMap.delete(id);
+        }
+    }
+
+    #upsertTask(task: ITransferTask) {
+        const item = this.#toStoreItem(task);
+        const store = useTransferStore.getState();
+        if (store.get(item.id)) {
+            store.update(item.id, item);
+        } else {
+            store.add(item);
+        }
+    }
+
+    #toStoreItem(task: ITransferTask): ITransferListItem {
+        const targetUri = task.target_uri || task.source_uri || "";
+        const uri = parseSftpUri(targetUri);
+        const targetPath = uri?.path || "";
+
+        return {
+            id: task.id,
+            type: task.type,
+            status: task.status,
+            createdAt: task.created_at,
+            targetId: task.target_id || uri?.targetId || 0,
+            targetUri,
+            targetPath,
+            localPath: task.local_path || "",
+            name: task.name || getFileName(targetUri),
+            loaded: task.loaded,
+            size: task.total,
+            percent: task.percent,
+            missedRanges: task.ranges,
+            speed: task.speed,
+            estimatedTime: task.estimated_time,
+            failReason: task.fail_reason,
+            endDate: task.ended_at,
+        };
+    }
 }
 
 export default new TransferService();

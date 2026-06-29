@@ -15,20 +15,21 @@ use config::Config;
 use sea_orm::{Database, DatabaseConnection};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use apis::{sftp, ssh, ssh_connection, target};
+use apis::{fs, sftp, ssh, ssh_connection, target, transfer};
 use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
 
 use crate::{api_doc::ApiDoc, ssh_session_pool::SshSessionPool};
 
-struct AppBaseState {
+pub struct AppBaseState {
     db: DatabaseConnection,
     config: Config,
 }
 
-struct AppState {
+pub struct AppState {
     base_state: Arc<AppBaseState>,
     session_pool: Arc<SshSessionPool>,
+    transfer_service: transfer::TransferService,
 }
 
 impl Deref for AppState {
@@ -61,10 +62,14 @@ pub async fn run_server() {
 
     let app_base_state = Arc::new(AppBaseState { db, config });
     let session_pool = Arc::new(SshSessionPool::new(app_base_state.clone()));
+    let transfer_service =
+        transfer::TransferService::new(app_base_state.clone(), session_pool.clone());
+    transfer_service.init_pending_tasks().await.unwrap();
 
     let app_state = Arc::new(AppState {
         base_state: app_base_state.clone(),
         session_pool: session_pool.clone(),
+        transfer_service,
     });
 
     let app = Router::new()
@@ -74,6 +79,8 @@ pub async fn run_server() {
         )
         .nest("/api/ssh", ssh::router_builder(session_pool.clone()))
         .nest("/api/sftp", sftp::router_builder(app_state.clone()))
+        .nest("/api/fs", fs::router_builder(app_base_state.clone()))
+        .nest("/api/transfer", transfer::router_builder(app_state.clone()))
         .nest(
             "/api/target",
             target::router_builder(app_base_state.clone()),

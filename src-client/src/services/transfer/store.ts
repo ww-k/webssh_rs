@@ -8,7 +8,7 @@ export interface ITransferListItem {
     /** 传输类型 */
     type: "UPLOAD" | "DOWNLOAD";
     /** 任务状态 */
-    status: "WAIT" | "RUN" | "SUCCESS" | "FAIL" | "PAUSE";
+    status: "WAIT" | "RUN" | "SUCCESS" | "FAIL" | "PAUSE" | "CANCEL";
     /** 文件名 */
     name: string;
     /** 创建时间 */
@@ -43,6 +43,7 @@ type ITransferStore = {
     list: ITransferListItem[];
     get: (id: string) => ITransferListItem | undefined;
     add: (task: ITransferListItem) => void;
+    update: (id: string, patch: Partial<ITransferListItem>) => void;
     delete: (id: string) => void;
     updateProgress: (id: string, progress: ITransferProgressEvent) => void;
     setRun: (id: string) => void;
@@ -79,6 +80,7 @@ const useTransferStore = create<ITransferStore>((set, get) => {
                 return { list: newList };
             });
         },
+        update: updateStateById,
         delete: (id) => {
             set((state) => {
                 const newList = state.list.filter((item) => item.id !== id);

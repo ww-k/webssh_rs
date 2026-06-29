@@ -11,11 +11,11 @@ import {
     UploadOutlined,
 } from "@ant-design/icons";
 
-import openNativeFileSelector from "@/helpers/openNativeFileSelector";
 import { isMac } from "@/helpers/platform";
 import transferService from "@/services/transfer";
 
 import popContextMenu from "../Contextmenu";
+import renderFsSelector from "../FsSelector/render";
 import {
     handleDelete,
     handleMkdir,
@@ -45,9 +45,14 @@ export default function remoteHandleContextmenu(
             label: "下载",
             disabled: !(Array.isArray(files) && files.length > 0),
             click: async () => {
+                const [localDir] = await renderFsSelector({
+                    mode: "directory",
+                    title: "选择下载目录",
+                });
                 const allPromises = files.map((file) => {
                     return transferService.download({
                         fileUri: file.uri,
+                        localDir,
                         size: file.size,
                     });
                 });
@@ -115,11 +120,16 @@ export default function remoteHandleContextmenu(
         menus.push({
             label: "上传",
             click: async () => {
-                const files = await openNativeFileSelector();
-                const allPromises = files.map((file) => {
+                const localPaths = await renderFsSelector({
+                    mode: "file",
+                    multiple: true,
+                    title: "选择上传文件",
+                });
+                const allPromises = localPaths.map((localPath) => {
+                    const fileName = localPath.split(/[\\/]/).pop() || "Untitled";
                     return transferService.upload({
-                        file,
-                        fileUri: `${context.fileUri}/${file.name}`,
+                        localPath,
+                        fileUri: joinUri(context.fileUri, fileName),
                     });
                 });
                 await Promise.all(allPromises);
@@ -163,4 +173,8 @@ export default function remoteHandleContextmenu(
     if (menus.length > 0) {
         popContextMenu(menus, evt.clientX, evt.clientY);
     }
+}
+
+function joinUri(dirUri: string, fileName: string) {
+    return `${dirUri.replace(/\/+$/, "")}/${fileName}`;
 }

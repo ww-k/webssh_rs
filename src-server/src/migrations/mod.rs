@@ -3,6 +3,7 @@ pub use sea_orm_migration::prelude::*;
 mod m000001_init_db;
 mod m000002_win_target;
 mod m000003_ssh_known_host;
+mod m000004_transfer_task;
 
 pub struct Migrator;
 
@@ -13,6 +14,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000001_init_db::Migration),
             Box::new(m000002_win_target::Migration),
             Box::new(m000003_ssh_known_host::Migration),
+            Box::new(m000004_transfer_task::Migration),
         ]
     }
 }
