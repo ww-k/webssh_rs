@@ -114,7 +114,7 @@ impl<'a> SftpFileUri<'a> {
             return None;
         }
 
-        if path.split(PATH_SEP).last() == Some("") {
+        if path.len() > PATH_SEP.len() && path.ends_with(PATH_SEP) {
             path = &path[..path.len() - 1];
         }
 
@@ -303,6 +303,30 @@ mod tests {
         assert_eq!(
             sftp_uri.path, "/path/to/file",
             "@test_sftp_file_uri_from_str: parse path fail. {uri}"
+        );
+
+        let uri = "sftp:123:/";
+        let result = SftpFileUri::from_str(uri);
+        assert!(
+            result.is_some(),
+            "@test_sftp_file_uri_from_str: parse root path fail. {uri}"
+        );
+        let sftp_uri = result.unwrap();
+        assert_eq!(
+            sftp_uri.path, "/",
+            "@test_sftp_file_uri_from_str: parse root path fail. {uri}"
+        );
+
+        let uri = "sftp:123:/path/to/dir/";
+        let result = SftpFileUri::from_str(uri);
+        assert!(
+            result.is_some(),
+            "@test_sftp_file_uri_from_str: parse trailing slash fail. {uri}"
+        );
+        let sftp_uri = result.unwrap();
+        assert_eq!(
+            sftp_uri.path, "/path/to/dir",
+            "@test_sftp_file_uri_from_str: trim trailing slash fail. {uri}"
         );
 
         let uri = "ftp:123:/path/to/file";
