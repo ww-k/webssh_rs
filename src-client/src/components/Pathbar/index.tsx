@@ -10,6 +10,7 @@ import {
     LaptopOutlined,
     ReloadOutlined,
     SearchOutlined,
+    StarOutlined,
 } from "@ant-design/icons";
 import { Spin } from "antd";
 import classNames from "clsx";
@@ -47,7 +48,7 @@ interface IProps {
     /** 是否是posix风格路径 */
     posix?: boolean;
     /** 是否启用家图标 */
-    enableHomeIcon?: boolean;
+    enableStarIcon?: boolean;
     /** 是否允许用户交互点击路径栏，显示下拉目录等 */
     enableReact?: boolean;
     /** 是否允许手动输入路径 */
@@ -112,7 +113,7 @@ export default class Pathbar extends Component<IProps, IState> {
         className: "",
         cwd: "",
         history: [],
-        enableHomeIcon: true,
+        enableStarIcon: true,
         enableReact: true,
         enableInput: true,
         enableSearch: false,
@@ -199,7 +200,7 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     render() {
-        const { className, enableHomeIcon, enableReact, enableSearch } =
+        const { className, enableStarIcon, enableReact, enableSearch } =
             this.props;
         const {
             historyOpen,
@@ -231,7 +232,7 @@ export default class Pathbar extends Component<IProps, IState> {
                 className={rootCls}
                 onClick={this.handleClickOutside.bind(this)}
             >
-                {enableHomeIcon || hiddenRoutes.length > 0 ? (
+                {enableStarIcon || hiddenRoutes.length > 0 ? (
                     <div className="pathbarHomeBox">
                         <button
                             className={classNames({
@@ -244,7 +245,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                 breadcrumbLeft < 5 ? (
                                     <DoubleLeftOutlined />
                                 ) : (
-                                    <HomeOutlined />
+                                    <StarOutlined />
                                 )
                             ) : (
                                 <DownOutlined />
