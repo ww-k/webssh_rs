@@ -54,8 +54,8 @@ test("[TransferService] download one file", async () => {
     expect(state.list[0]).toMatchObject({
         type: "DOWNLOAD",
         status: "SUCCESS",
-        local: fileName,
-        remote: fileUri,
+        localPath: fileName,
+        targetUri: fileUri,
         name: fileName,
         size: undefined,
     });
@@ -73,8 +73,8 @@ test("[TransferService] download one file", async () => {
     expect(state.list[1]).toMatchObject({
         type: "DOWNLOAD",
         status: "SUCCESS",
-        local: fileName,
-        remote: fileUri,
+        localPath: fileName,
+        targetUri: fileUri,
         name: fileName,
         size: mockFileStat[fileUri].size,
     });
