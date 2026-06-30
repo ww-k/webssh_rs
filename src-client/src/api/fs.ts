@@ -10,10 +10,11 @@ export interface IFsFileStat {
     permissions: string;
 }
 
-export async function getFsLs(path: string) {
+export async function getFsLs(path: string, all?: boolean) {
     const response = await axios.get<IFsFileStat[]>("/api/fs/ls", {
         params: {
             path,
+            all,
         },
     });
     return response.data;

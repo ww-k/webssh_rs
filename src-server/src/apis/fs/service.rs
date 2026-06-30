@@ -12,20 +12,24 @@ use crate::{
 
 use super::dto::{FsFile, FsRenamePayload};
 
-pub async fn list(path: &str) -> Result<Vec<FsFile>, ApiErr> {
+pub async fn list(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> {
     if should_list_roots(path) {
         return list_roots().await;
     }
 
-    list_dir(path).await
+    list_dir(path, all).await
 }
 
-async fn list_dir(path: &str) -> Result<Vec<FsFile>, ApiErr> {
+async fn list_dir(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> {
     let mut entries = fs::read_dir(path).await.map_err(map_fs_io_err)?;
     let mut files = Vec::new();
 
     while let Some(entry) = entries.next_entry().await.map_err(map_fs_io_err)? {
         let path = entry.path();
+        if !all.unwrap_or(false) && is_hidden_path(&path) {
+            continue;
+        }
+
         let metadata = entry.metadata().await.map_err(map_fs_io_err)?;
         files.push(fs_file_from_metadata(path, metadata));
     }
@@ -152,6 +156,12 @@ fn file_name(path: &Path) -> String {
         .unwrap_or_else(|| path.to_string_lossy().to_string())
 }
 
+fn is_hidden_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with('.'))
+}
+
 #[cfg(unix)]
 fn permissions_to_string(metadata: &std::fs::Metadata) -> String {
     use std::os::unix::fs::PermissionsExt;
@@ -176,14 +186,61 @@ fn map_fs_io_err(err: std::io::Error) -> ApiErr {
 
 #[cfg(test)]
 mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     use super::list;
+    use tokio::fs;
 
     #[cfg(unix)]
     #[tokio::test]
     async fn list_root_returns_root_directory_entries() {
-        let files = list("/").await.unwrap();
+        let files = list("/", None).await.unwrap();
 
         assert!(files.iter().all(|file| file.path != "/"));
         assert!(files.iter().any(|file| file.path == "/tmp"));
+    }
+
+    #[tokio::test]
+    async fn list_filters_hidden_files_by_default() {
+        let dir = create_test_dir("list_filters_hidden_files_by_default").await;
+        let visible_path = dir.join("visible.txt");
+        let hidden_path = dir.join(".hidden.txt");
+
+        fs::write(&visible_path, "").await.unwrap();
+        fs::write(&hidden_path, "").await.unwrap();
+
+        let files = list(dir.to_str().unwrap(), None).await.unwrap();
+
+        assert!(files.iter().any(|file| file.name == "visible.txt"));
+        assert!(!files.iter().any(|file| file.name == ".hidden.txt"));
+
+        fs::remove_dir_all(dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn list_returns_hidden_files_when_all_is_true() {
+        let dir = create_test_dir("list_returns_hidden_files_when_all_is_true").await;
+        let visible_path = dir.join("visible.txt");
+        let hidden_path = dir.join(".hidden.txt");
+
+        fs::write(&visible_path, "").await.unwrap();
+        fs::write(&hidden_path, "").await.unwrap();
+
+        let files = list(dir.to_str().unwrap(), Some(true)).await.unwrap();
+
+        assert!(files.iter().any(|file| file.name == "visible.txt"));
+        assert!(files.iter().any(|file| file.name == ".hidden.txt"));
+
+        fs::remove_dir_all(dir).await.unwrap();
+    }
+
+    async fn create_test_dir(name: &str) -> std::path::PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("webssh_rs_{name}_{nanos}"));
+        fs::create_dir_all(&dir).await.unwrap();
+        dir
     }
 }

@@ -8,6 +8,14 @@ pub struct FsPathPayload {
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
+pub struct FsLsPayload {
+    /// 本机文件路径。传 / 时返回本机根目录/盘符入口。
+    pub path: String,
+    /// 是否显示所有文件（包括隐藏文件）
+    pub all: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct FsRenamePayload {
     /// 源路径
     pub path: String,

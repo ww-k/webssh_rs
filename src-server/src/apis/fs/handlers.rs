@@ -3,7 +3,7 @@ use axum::{Json, extract::Query};
 use crate::apis::{ApiErr, InternalErrorResponse};
 
 use super::{
-    dto::{FsFile, FsPathPayload, FsRenamePayload},
+    dto::{FsFile, FsLsPayload, FsPathPayload, FsRenamePayload},
     service,
 };
 
@@ -12,14 +12,15 @@ use super::{
     path = "/api/fs/ls",
     tag = "fs",
     summary = "列出本机文件",
-    params(FsPathPayload),
+    description = "获取指定目录下的本机文件和文件夹列表，可选择是否显示隐藏文件",
+    params(FsLsPayload),
     responses(
         (status = 200, description = "成功获取本机文件列表", body = Vec<FsFile>),
         (status = 500, response = InternalErrorResponse)
     )
 )]
-pub async fn ls(Query(payload): Query<FsPathPayload>) -> Result<Json<Vec<FsFile>>, ApiErr> {
-    Ok(Json(service::list(&payload.path).await?))
+pub async fn ls(Query(payload): Query<FsLsPayload>) -> Result<Json<Vec<FsFile>>, ApiErr> {
+    Ok(Json(service::list(&payload.path, payload.all).await?))
 }
 
 #[utoipa::path(
