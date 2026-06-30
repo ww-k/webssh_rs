@@ -3,7 +3,6 @@ pub mod handlers;
 mod ranges;
 mod runner;
 mod service;
-mod sftp_uri;
 
 use std::sync::Arc;
 

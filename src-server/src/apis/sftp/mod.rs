@@ -13,6 +13,7 @@ use crate::AppState;
 
 pub use dto::SftpFile;
 pub use handlers::{cp, download, home, ls, mkdir, rename, rm, rm_rf, stat, upload};
+pub(crate) use service::{get_file_name, parse_file_uri};
 
 pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
     Router::new()

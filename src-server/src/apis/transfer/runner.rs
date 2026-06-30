@@ -12,12 +12,15 @@ use tokio::{
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 
-use crate::{apis::ApiErr, consts::services_err_code::ERR_CODE_SSH_ERR, map_ssh_err};
+use crate::{
+    apis::{ApiErr, sftp::parse_file_uri},
+    consts::services_err_code::ERR_CODE_SSH_ERR,
+    map_ssh_err,
+};
 
 use super::{
     ranges::{invalid_task, ranges_from_json},
     service::{TransferService, map_transfer_io_err},
-    sftp_uri::parse_sftp_uri,
 };
 
 const CHUNK_SIZE: usize = 1024 * 1024;
@@ -33,7 +36,7 @@ impl TransferService {
             .target_uri
             .clone()
             .ok_or_else(|| invalid_task("missing target_uri"))?;
-        let uri = parse_sftp_uri(&target_uri)?;
+        let uri = parse_file_uri(&target_uri)?;
         let ranges = ranges_from_json(&task.ranges)?;
 
         let mut local_file = File::open(local_path).await.map_err(map_transfer_io_err)?;
@@ -101,7 +104,7 @@ impl TransferService {
             .local_path
             .clone()
             .ok_or_else(|| invalid_task("missing local_path"))?;
-        let uri = parse_sftp_uri(&source_uri)?;
+        let uri = parse_file_uri(&source_uri)?;
         let ranges = ranges_from_json(&task.ranges)?;
 
         let sftp = map_ssh_err!(self.session_pool.get_sftp_session(uri.target_id).await)?;

@@ -18,7 +18,10 @@ use tokio::{fs, sync::Mutex, task::JoinHandle};
 
 use crate::{
     AppBaseState,
-    apis::ApiErr,
+    apis::{
+        ApiErr,
+        sftp::{get_file_name, parse_file_uri},
+    },
     consts::services_err_code::{
         ERR_CODE_DB_ERR, ERR_CODE_SSH_ERR, ERR_CODE_TRANSFER_ERR,
         ERR_CODE_TRANSFER_INVALID_REQUEST, ERR_CODE_TRANSFER_NOT_FOUND,
@@ -37,7 +40,6 @@ use super::{
         TransferRange, initial_ranges, ranges_from_json, ranges_size, ranges_to_json,
         subtract_range,
     },
-    sftp_uri::{file_name_from_path, parse_sftp_uri},
 };
 
 #[derive(Clone)]
@@ -101,7 +103,7 @@ impl TransferService {
             });
         }
 
-        let target_id = parse_sftp_uri(&payload.target_uri)?.target_id;
+        let target_id = parse_file_uri(&payload.target_uri)?.target_id;
         let total = local_metadata.len() as i64;
         let now = now_ms();
         let name = Path::new(&payload.local_path)
@@ -139,10 +141,10 @@ impl TransferService {
         &self,
         payload: CreateDownloadTaskPayload,
     ) -> Result<TransferTaskModel, ApiErr> {
-        let parsed_uri = parse_sftp_uri(&payload.source_uri)?;
+        let parsed_uri = parse_file_uri(&payload.source_uri)?;
         let target_id = parsed_uri.target_id;
         let source_path = parsed_uri.path.to_string();
-        let name = file_name_from_path(parsed_uri.path);
+        let name = get_file_name(parsed_uri.path);
         if name.is_empty() {
             return Err(ApiErr {
                 code: ERR_CODE_TRANSFER_INVALID_REQUEST,
