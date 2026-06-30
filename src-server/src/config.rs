@@ -24,6 +24,7 @@ impl CheckServerKey {
 pub struct Config {
     pub max_session_per_target: u8,
     pub max_channel_per_session: u8,
+    pub transfer_task_concurrency: usize,
     pub check_server_key: CheckServerKey,
 }
 
@@ -32,6 +33,7 @@ impl Default for Config {
         Config {
             max_session_per_target: 10,
             max_channel_per_session: 10,
+            transfer_task_concurrency: 3,
             check_server_key: CheckServerKey::AcceptNew,
         }
     }
@@ -48,8 +50,24 @@ impl Config {
                     )
                 })?;
         }
+        if let Ok(value) = std::env::var("WEBSSH_RS_TRANSFER_TASK_CONCURRENCY") {
+            config.transfer_task_concurrency =
+                Config::parse_transfer_task_concurrency(value.as_str())?;
+        }
 
         Ok(config)
+    }
+
+    fn parse_transfer_task_concurrency(value: &str) -> Result<usize> {
+        let concurrency = value.parse::<usize>().map_err(|err| {
+            anyhow::anyhow!("invalid WEBSSH_RS_TRANSFER_TASK_CONCURRENCY value: {value}: {err}")
+        })?;
+        if concurrency == 0 {
+            return Err(anyhow::anyhow!(
+                "invalid WEBSSH_RS_TRANSFER_TASK_CONCURRENCY value: {value}; expected positive integer"
+            ));
+        }
+        Ok(concurrency)
     }
 }
 
@@ -72,5 +90,13 @@ mod tests {
             Some(CheckServerKey::Disabled)
         );
         assert_eq!(CheckServerKey::from_env_value("unknown"), None);
+    }
+
+    #[test]
+    fn parse_transfer_task_concurrency() {
+        assert_eq!(Config::parse_transfer_task_concurrency("1").unwrap(), 1);
+        assert_eq!(Config::parse_transfer_task_concurrency("8").unwrap(), 8);
+        assert!(Config::parse_transfer_task_concurrency("0").is_err());
+        assert!(Config::parse_transfer_task_concurrency("abc").is_err());
     }
 }

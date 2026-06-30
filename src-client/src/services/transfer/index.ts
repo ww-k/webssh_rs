@@ -1,6 +1,5 @@
 import {
     deleteTransferTask,
-    getTransferTask,
     getTransferTasks,
     postTransferCancel,
     postTransferDownload,
@@ -8,12 +7,13 @@ import {
     postTransferResume,
     postTransferUpload,
 } from "@/api";
-import { getFileName, parseSftpUri } from "@/helpers/file_uri";
-
-import useTransferStore, { type ITransferListItem } from "./store";
-import TransferError from "./TransferError";
 
 import type { ITransferTask } from "@/api";
+
+const ACTIVE_STATUSES = new Set(["WAIT", "RUN"]);
+const SYNC_INTERVAL = 1000;
+
+type TransferTasksListener = (tasks: ITransferTask[]) => void;
 
 interface IUploadOption {
     localPath: string;
@@ -28,7 +28,10 @@ interface IDownloadOption {
 }
 
 class TransferService {
-    #pollTimerMap = new Map<string, number>();
+    #syncTimer?: number;
+    #syncing = false;
+    #tasks: ITransferTask[] = [];
+    #listeners = new Set<TransferTasksListener>();
 
     setConfig(_option: {
         /** 并发任务数 */
@@ -37,13 +40,32 @@ class TransferService {
         interval?: number;
     }) {}
 
+    getTasks() {
+        return this.#tasks;
+    }
+
+    subscribe(listener: TransferTasksListener) {
+        this.#listeners.add(listener);
+        listener(this.#tasks);
+        this.syncTasks().catch((err) => {
+            console.warn("TransferService.syncTasks failed", err);
+        });
+
+        return () => {
+            this.#listeners.delete(listener);
+            if (this.#listeners.size === 0) {
+                this.#clearSyncTimer();
+            }
+        };
+    }
+
     async upload(option: IUploadOption) {
         const task = await postTransferUpload({
             local_path: option.localPath,
             target_uri: option.fileUri,
         });
         this.#upsertTask(task);
-        this.#poll(task.id);
+        this.#ensureSyncTimer(task);
         return task;
     }
 
@@ -57,35 +79,45 @@ class TransferService {
             ...task,
             total: task.total || option.size || 0,
         });
-        this.#poll(task.id);
+        this.#ensureSyncTimer(task);
         return task;
     }
 
     async syncTasks() {
-        const tasks = await getTransferTasks();
-        tasks.forEach((task) => {
-            this.#upsertTask(task);
-            if (["WAIT", "RUN"].includes(task.status)) {
-                this.#poll(task.id);
+        if (this.#syncing) {
+            return this.#tasks;
+        }
+
+        this.#syncing = true;
+        try {
+            const tasks = await getTransferTasks();
+            this.#setTasks(tasks);
+            if (tasks.some((task) => ACTIVE_STATUSES.has(task.status))) {
+                this.#ensureSyncTimer();
+            } else {
+                this.#clearSyncTimer();
             }
-        });
+            return tasks;
+        } finally {
+            this.#syncing = false;
+        }
     }
 
     async pause(id: string) {
         const task = await postTransferPause(id);
-        this.#clearPoll(id);
         this.#upsertTask(task);
+        return task;
     }
 
     async resume(id: string) {
         const task = await postTransferResume(id);
         this.#upsertTask(task);
-        this.#poll(id);
+        this.#ensureSyncTimer(task);
+        return task;
     }
 
     async remove(id: string) {
-        const record = useTransferStore.getState().get(id);
-        this.#clearPoll(id);
+        const record = this.#tasks.find((task) => task.id === id);
         if (record && ["WAIT", "RUN", "PAUSE"].includes(record.status)) {
             try {
                 const task = await postTransferCancel(id);
@@ -95,7 +127,7 @@ class TransferService {
             }
         }
         await deleteTransferTask(id);
-        useTransferStore.getState().delete(id);
+        this.#deleteTask(id);
     }
 
     pauseAll() {}
@@ -104,71 +136,54 @@ class TransferService {
 
     removeAll() {}
 
-    #poll(id: string) {
-        this.#clearPoll(id);
+    #ensureSyncTimer(task?: ITransferTask) {
+        if (task && !ACTIVE_STATUSES.has(task.status)) {
+            return;
+        }
+        if (this.#syncTimer !== undefined) {
+            return;
+        }
 
-        const pollOnce = async () => {
-            try {
-                const task = await getTransferTask(id);
-                this.#upsertTask(task);
-                if (["SUCCESS", "FAIL", "CANCEL", "PAUSE"].includes(task.status)) {
-                    this.#clearPoll(id);
-                }
-            } catch (err) {
-                this.#clearPoll(id);
-                const failReason =
-                    err instanceof TransferError ? err.message : "Unknown";
-                useTransferStore.getState().setFail(id, failReason);
-            }
-        };
-
-        const timer = window.setInterval(pollOnce, 1000);
-        this.#pollTimerMap.set(id, timer);
-        pollOnce();
+        this.#syncTimer = window.setInterval(() => {
+            this.syncTasks().catch((err) => {
+                console.warn("TransferService.syncTasks failed", err);
+            });
+        }, SYNC_INTERVAL);
     }
 
-    #clearPoll(id: string) {
-        const timer = this.#pollTimerMap.get(id);
-        if (timer) {
-            window.clearInterval(timer);
-            this.#pollTimerMap.delete(id);
+    #clearSyncTimer() {
+        if (this.#syncTimer !== undefined) {
+            window.clearInterval(this.#syncTimer);
+            this.#syncTimer = undefined;
         }
+    }
+
+    #setTasks(tasks: ITransferTask[]) {
+        this.#tasks = tasks;
+        this.#emitTasks();
     }
 
     #upsertTask(task: ITransferTask) {
-        const item = this.#toStoreItem(task);
-        const store = useTransferStore.getState();
-        if (store.get(item.id)) {
-            store.update(item.id, item);
+        const index = this.#tasks.findIndex((item) => item.id === task.id);
+        if (index === -1) {
+            this.#tasks = [task, ...this.#tasks];
         } else {
-            store.add(item);
+            const tasks = [...this.#tasks];
+            tasks[index] = task;
+            this.#tasks = tasks;
         }
+        this.#emitTasks();
     }
 
-    #toStoreItem(task: ITransferTask): ITransferListItem {
-        const targetUri = task.target_uri || task.source_uri || "";
-        const uri = parseSftpUri(targetUri);
-        const targetPath = uri?.path || "";
+    #deleteTask(id: string) {
+        this.#tasks = this.#tasks.filter((task) => task.id !== id);
+        this.#emitTasks();
+    }
 
-        return {
-            id: task.id,
-            type: task.type,
-            status: task.status,
-            createdAt: task.created_at,
-            targetId: task.target_id || uri?.targetId || 0,
-            targetUri,
-            targetPath,
-            localPath: task.local_path || "",
-            name: task.name || getFileName(targetUri),
-            loaded: task.loaded,
-            size: task.total,
-            percent: task.percent,
-            missedRanges: task.ranges,
-            speed: task.speed,
-            estimatedTime: task.estimated_time,
-            failReason: task.fail_reason,
-            endDate: task.ended_at,
-        };
+    #emitTasks() {
+        for (const listener of this.#listeners) {
+            listener(this.#tasks);
+        }
     }
 }
 

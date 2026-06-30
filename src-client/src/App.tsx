@@ -9,9 +9,10 @@ import useAppStore from "@/store";
 
 import Home from "./components/Home";
 import Transfer from "./components/Transfer";
-import useTransferStore from "./services/transfer/store";
+import transferService from "./services/transfer";
 
 import type { MenuProps } from "antd";
+import type { ITransferTask } from "./api";
 
 const { darkAlgorithm, defaultAlgorithm } = theme;
 const { Content, Sider } = Layout;
@@ -19,12 +20,17 @@ const { Content, Sider } = Layout;
 export default function App() {
     const [siderCollapsed, setSiderCollapsed] = useState(true);
     const [lastTransferMenuClickAt, setLastTransferMenuClickAt] = useState(0);
-    const newTransferCount = useTransferStore(
-        (state) =>
-            state.list.filter(
+    const [transferTasks, setTransferTasks] = useState<ITransferTask[]>(() =>
+        transferService.getTasks(),
+    );
+    const newTransferCount = useMemo(
+        () =>
+            transferTasks.filter(
                 (item) =>
-                    item.createdAt && item.createdAt > lastTransferMenuClickAt,
+                    item.created_at &&
+                    item.created_at > lastTransferMenuClickAt,
             ).length,
+        [lastTransferMenuClickAt, transferTasks],
     );
     const menusItems = useMemo<Required<MenuProps>["items"]>(() => {
         return [
@@ -59,6 +65,10 @@ export default function App() {
             },
         ];
     }, [newTransferCount, siderCollapsed]);
+
+    useEffect(() => {
+        return transferService.subscribe(setTransferTasks);
+    }, []);
 
     const {
         theme,

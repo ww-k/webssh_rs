@@ -1,7 +1,6 @@
 import { expect, rs, test } from "@rstest/core";
 
 import transferService from "./index";
-import useTransferStore from "./store";
 
 import type { ITransferTask } from "@/api";
 
@@ -60,14 +59,15 @@ test("[TransferService] upload creates server task", async () => {
         fileUri: "sftp:1:/tmp/a.txt",
     });
 
-    const state = useTransferStore.getState();
-    expect(state.get("upload-1")).toMatchObject({
+    expect(
+        transferService.getTasks().find((task) => task.id === "upload-1"),
+    ).toMatchObject({
         id: "upload-1",
         type: "UPLOAD",
         status: "SUCCESS",
-        localPath: "/tmp/a.txt",
-        targetUri: "sftp:1:/tmp/a.txt",
-        targetId: 1,
+        local_path: "/tmp/a.txt",
+        target_uri: "sftp:1:/tmp/a.txt",
+        target_id: 1,
     });
 });
 
@@ -77,14 +77,15 @@ test("[TransferService] download creates server task", async () => {
         localDir: "/tmp",
     });
 
-    const state = useTransferStore.getState();
-    expect(state.get("download-1")).toMatchObject({
+    expect(
+        transferService.getTasks().find((task) => task.id === "download-1"),
+    ).toMatchObject({
         id: "download-1",
         type: "DOWNLOAD",
         status: "SUCCESS",
-        localPath: "/tmp",
-        targetUri: "sftp:1:/tmp/b.txt",
-        targetId: 1,
+        local_path: "/tmp",
+        source_uri: "sftp:1:/tmp/b.txt",
+        target_id: 1,
     });
 });
 

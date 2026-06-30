@@ -1140,6 +1140,7 @@ mod tests {
                 let config = Config {
                     max_session_per_target: 2,
                     max_channel_per_session: 3,
+                    transfer_task_concurrency: 3,
                     check_server_key: CheckServerKey::AcceptNew,
                 };
 

@@ -12,9 +12,13 @@ use nanoid::nanoid;
 use russh_sftp::protocol::FileType;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder,
+    QueryOrder, QuerySelect,
 };
-use tokio::{fs, sync::Mutex, task::JoinHandle};
+use tokio::{
+    fs,
+    sync::{Mutex, Notify},
+    task::JoinHandle,
+};
 
 use crate::{
     AppBaseState,
@@ -47,11 +51,14 @@ pub struct TransferService {
     pub(super) db: DatabaseConnection,
     pub(super) session_pool: Arc<SshSessionPool>,
     running_tasks: Arc<Mutex<HashMap<String, RunningTask>>>,
+    scheduler_notify: Arc<Notify>,
+    scheduler_started: Arc<AtomicBool>,
+    max_concurrent_tasks: usize,
 }
 
 struct RunningTask {
     abort: Arc<AtomicBool>,
-    handle: JoinHandle<()>,
+    handle: Option<JoinHandle<()>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -62,11 +69,15 @@ enum AbortKind {
 
 impl TransferService {
     pub(crate) fn new(app_state: Arc<AppBaseState>, session_pool: Arc<SshSessionPool>) -> Self {
-        Self {
+        let service = Self {
             db: app_state.db.clone(),
             session_pool,
             running_tasks: Arc::new(Mutex::new(HashMap::new())),
-        }
+            scheduler_notify: Arc::new(Notify::new()),
+            scheduler_started: Arc::new(AtomicBool::new(false)),
+            max_concurrent_tasks: app_state.config.transfer_task_concurrency,
+        };
+        service
     }
 
     pub async fn init_pending_tasks(&self) -> Result<(), ApiErr> {
@@ -86,6 +97,7 @@ impl TransferService {
             map_db_err!(active.update(&self.db).await)?;
         }
 
+        self.start_scheduler();
         Ok(())
     }
 
@@ -133,7 +145,7 @@ impl TransferService {
             ended_at: Set(None),
         };
         let task = map_db_err!(task.insert(&self.db).await)?;
-        self.start_task(task.id.clone()).await?;
+        self.queue_task(task.id.clone()).await?;
         self.get_task_model(&task.id).await
     }
 
@@ -208,7 +220,7 @@ impl TransferService {
             ended_at: Set(None),
         };
         let task = map_db_err!(task.insert(&self.db).await)?;
-        self.start_task(task.id.clone()).await?;
+        self.queue_task(task.id.clone()).await?;
         self.get_task_model(&task.id).await
     }
 
@@ -261,7 +273,7 @@ impl TransferService {
         let task = self.get_task_model(id).await?;
         match task.status {
             TransferTaskStatus::Pause | TransferTaskStatus::Fail => {
-                self.start_task(id.to_string()).await?;
+                self.queue_task(id.to_string()).await?;
                 self.get_task_model(id).await
             }
             _ => Err(ApiErr {
@@ -302,10 +314,11 @@ impl TransferService {
             active.ended_at = Set(Some(now));
         }
         map_db_err!(active.update(&self.db).await)?;
+        self.scheduler_notify.notify_one();
         self.get_task_model(id).await
     }
 
-    async fn start_task(&self, id: String) -> Result<(), ApiErr> {
+    async fn queue_task(&self, id: String) -> Result<(), ApiErr> {
         {
             let running_tasks = self.running_tasks.lock().await;
             if running_tasks.contains_key(&id) {
@@ -330,26 +343,129 @@ impl TransferService {
         active.updated_at = Set(now_ms());
         map_db_err!(active.update(&self.db).await)?;
 
+        self.start_scheduler();
+        self.scheduler_notify.notify_one();
+        Ok(())
+    }
+
+    fn start_scheduler(&self) {
+        if self
+            .scheduler_started
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return;
+        }
+
+        let scheduler_service = self.clone();
+        tokio::spawn(async move {
+            scheduler_service.run_scheduler().await;
+        });
+    }
+
+    async fn run_scheduler(&self) {
+        loop {
+            self.dispatch_pending_tasks().await;
+            self.scheduler_notify.notified().await;
+        }
+    }
+
+    async fn dispatch_pending_tasks(&self) {
+        loop {
+            let running_count = self.running_tasks.lock().await.len();
+            if running_count >= self.max_concurrent_tasks {
+                return;
+            }
+
+            let capacity = self.max_concurrent_tasks - running_count;
+            let tasks = TransferTaskEntity::find()
+                .filter(Column::Status.eq(TransferTaskStatus::Wait))
+                .order_by_asc(Column::CreatedAt)
+                .limit(self.max_concurrent_tasks as u64)
+                .all(&self.db)
+                .await;
+            let tasks = match tasks {
+                Ok(tasks) => tasks,
+                Err(err) => {
+                    tracing::warn!("transfer scheduler query failed: {err}");
+                    return;
+                }
+            };
+            if tasks.is_empty() {
+                return;
+            }
+
+            let mut started = 0;
+            for task in tasks {
+                if started >= capacity {
+                    break;
+                }
+                if self.try_start_task(task.id).await {
+                    started += 1;
+                }
+            }
+
+            if started == 0 {
+                return;
+            }
+        }
+    }
+
+    async fn try_start_task(&self, id: String) -> bool {
+        {
+            let running_tasks = self.running_tasks.lock().await;
+            if running_tasks.contains_key(&id) {
+                return false;
+            }
+        }
+
+        let task = match self.get_task_model(&id).await {
+            Ok(task) => task,
+            Err(err) => {
+                tracing::warn!("transfer scheduler get task failed: {}", err.message);
+                return false;
+            }
+        };
+        if task.status != TransferTaskStatus::Wait {
+            return false;
+        }
+        if let Err(err) = self.set_status(&id, TransferTaskStatus::Run).await {
+            tracing::warn!("transfer scheduler set task run failed: {}", err.message);
+            return false;
+        }
+
         let abort = Arc::new(AtomicBool::new(false));
         let handle_service = self.clone();
         let handle_abort = abort.clone();
         let handle_id = id.clone();
+        self.running_tasks.lock().await.insert(
+            id.clone(),
+            RunningTask {
+                abort: abort.clone(),
+                handle: None,
+            },
+        );
+
         let handle = tokio::spawn(async move {
             handle_service.run_task(handle_id, handle_abort).await;
         });
+        if let Some(task) = self.running_tasks.lock().await.get_mut(&id) {
+            task.handle = Some(handle);
+        } else {
+            abort.store(true, Ordering::Release);
+            handle.abort();
+        }
 
-        self.running_tasks
-            .lock()
-            .await
-            .insert(id, RunningTask { abort, handle });
-
-        Ok(())
+        true
     }
 
     async fn abort_task(&self, id: &str) {
         if let Some(task) = self.running_tasks.lock().await.remove(id) {
             task.abort.store(true, Ordering::Release);
-            task.handle.abort();
+            if let Some(handle) = task.handle {
+                handle.abort();
+            }
+            self.scheduler_notify.notify_one();
         }
     }
 
@@ -357,6 +473,7 @@ impl TransferService {
         let result = self.run_task_inner(&id, abort.clone()).await;
 
         self.running_tasks.lock().await.remove(&id);
+        self.scheduler_notify.notify_one();
 
         if let Err(err) = result {
             let task = TransferTaskEntity::find_by_id(id.clone())
@@ -384,7 +501,9 @@ impl TransferService {
 
     async fn run_task_inner(&self, id: &str, abort: Arc<AtomicBool>) -> Result<(), ApiErr> {
         let task = self.get_task_model(id).await?;
-        self.set_status(id, TransferTaskStatus::Run).await?;
+        if task.status != TransferTaskStatus::Run {
+            return Ok(());
+        }
 
         match task.r#type {
             TransferTaskType::Upload => self.run_upload(id, abort).await?,

@@ -18,21 +18,20 @@ import {
     Tooltip,
     Typography,
 } from "antd";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import "./index.css";
 
 import transferService from "@/services/transfer";
-import useTransferStore from "@/services/transfer/store";
 
 import type { MenuProps, TableProps } from "antd";
-import type { ITransferListItem } from "@/services/transfer/store";
+import type { ITransferTask } from "@/api";
 
 const { Text } = Typography;
 
 // 状态配置
 const STATUS_CONFIG: Record<
-    ITransferListItem["status"],
+    ITransferTask["status"],
     { color: string; text: string }
 > = {
     WAIT: { color: "default", text: "等待中" },
@@ -74,7 +73,7 @@ const formatTime = (seconds?: number): string => {
 
 // 获取操作菜单项
 const getActionMenuItems = (
-    record: ITransferListItem,
+    record: ITransferTask,
     onPause: () => void,
     onResume: () => void,
     onCancel: () => void,
@@ -141,31 +140,28 @@ const getActionMenuItems = (
 };
 
 const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
-    const list = useTransferStore((state) => state.list);
-    const {
-        setPause,
-        setResume,
-        setSuccess,
-        delete: deleteTask,
-    } = useTransferStore();
+    const [list, setList] = useState<ITransferTask[]>(() =>
+        transferService.getTasks(),
+    );
+
+    useEffect(() => {
+        return transferService.subscribe(setList);
+    }, []);
 
     // 过滤特定类型的传输任务
     const filteredList = list.filter((item) => item.type === type);
 
-    const handlePause = (record: ITransferListItem) => {
+    const handlePause = (record: ITransferTask) => {
         transferService.pause(record.id);
     };
 
-    const handleResume = (record: ITransferListItem) => {
-        if (record.status === "FAIL") {
-            setSuccess(record.id); // 重置状态以便重新开始
-        }
-        transferService.resume(record.id).catch(() => {
-            setResume(record.id);
+    const handleResume = (record: ITransferTask) => {
+        transferService.resume(record.id).catch((err) => {
+            console.warn("Transfer resume failed", err);
         });
     };
 
-    const handleCancel = (record: ITransferListItem) => {
+    const handleCancel = (record: ITransferTask) => {
         Modal.confirm({
             title: "确认取消",
             content: `确定要取消传输"${record.name}"吗？`,
@@ -177,19 +173,19 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
         });
     };
 
-    const handleDelete = (record: ITransferListItem) => {
+    const handleDelete = (record: ITransferTask) => {
         Modal.confirm({
             title: "确认删除",
             content: `确定要删除任务"${record.name}"吗？`,
             okText: "确定",
             cancelText: "取消",
             onOk: () => {
-                deleteTask(record.id);
+                transferService.remove(record.id);
             },
         });
     };
 
-    const columns: TableProps<ITransferListItem>["columns"] = [
+    const columns: TableProps<ITransferTask>["columns"] = [
         {
             title: "文件名",
             dataIndex: "name",
@@ -207,7 +203,7 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
             dataIndex: "status",
             key: "status",
             width: "10%",
-            render: (status: ITransferListItem["status"]) => {
+            render: (status: ITransferTask["status"]) => {
                 const config = STATUS_CONFIG[status];
                 return <Tag color={config.color}>{config.text}</Tag>;
             },
@@ -217,7 +213,7 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
             key: "progress",
             width: "30%",
             render: (_, record) => {
-                const { percent, loaded, size } = record;
+                const { percent, loaded, total } = record;
 
                 if (record.status === "SUCCESS") {
                     return (
@@ -232,7 +228,7 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
                                 status="success"
                             />
                             <Text type="secondary" style={{ fontSize: "12px" }}>
-                                {formatSize(size)} 已完成
+                                {formatSize(total)} 已完成
                             </Text>
                         </Space>
                     );
@@ -251,7 +247,7 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
                                 status="exception"
                             />
                             <Text type="danger" style={{ fontSize: "12px" }}>
-                                {record.failReason || "传输失败"}
+                                {record.fail_reason || "传输失败"}
                             </Text>
                         </Space>
                     );
@@ -291,7 +287,7 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
                         />
                         <Space>
                             <Text type="secondary" style={{ fontSize: "12px" }}>
-                                {formatSize(loaded)}/{formatSize(size)}
+                                {formatSize(loaded)}/{formatSize(total)}
                             </Text>
                             {record.speed && (
                                 <Text
@@ -308,8 +304,8 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
         },
         {
             title: "剩余时间",
-            dataIndex: "estimatedTime",
-            key: "estimatedTime",
+            dataIndex: "estimated_time",
+            key: "estimated_time",
             width: "10%",
             align: "center",
             render: (estimatedTime, record) => {
@@ -348,7 +344,7 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
     ];
 
     return (
-        <Table<ITransferListItem>
+        <Table<ITransferTask>
             columns={columns}
             dataSource={filteredList}
             rowKey="id"
