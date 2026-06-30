@@ -7,7 +7,10 @@ use axum::{
 use tracing::{debug, info};
 
 use crate::{
-    apis::{ApiErr, InternalErrorResponse},
+    apis::{
+        ApiErr, InternalErrorResponse,
+        ssh_connection::{dto::SshSessionExpirePayload, service},
+    },
     ssh_session_pool::SshSessionPool,
 };
 
@@ -26,15 +29,47 @@ use crate::{
         (status = 500, response = InternalErrorResponse)
     )
 )]
-pub async fn handler(
+pub(crate) async fn list(
     State(session_pool): State<Arc<SshSessionPool>>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<Vec<crate::ssh_session_pool::ConnectionInfo>>, ApiErr> {
     info!("@ssh_connection {:?}", params);
     let target_filter = params.get("target_id").and_then(|s| s.parse::<i32>().ok());
 
-    let list = session_pool.list_all_connections(target_filter).await;
+    let list = service::list(&session_pool, target_filter).await;
 
     debug!("@ssh_connection done {:?}", params);
     Ok(Json(list))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/ssh_connection/expire",
+    tag = "ssh_connection",
+    summary = "使 SSH 连接过期",
+    description = "强制断开指定的 SSH 连接，使其过期并清理相关资源",
+    operation_id = "ssh_connection_expire",
+    params(
+        SshSessionExpirePayload
+    ),
+    responses(
+        (status = 200, description = "成功使连接过期"),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub(crate) async fn expire(
+    State(session_pool): State<Arc<SshSessionPool>>,
+    Query(payload): Query<SshSessionExpirePayload>,
+) -> Result<(), ApiErr> {
+    info!("@ssh_connection {:?}", payload);
+
+    service::expire(
+        &session_pool,
+        payload.target_id,
+        payload.connection_id.as_str(),
+    )
+    .await;
+
+    debug!("@ssh_connection done {:?}", payload);
+    Ok(())
 }

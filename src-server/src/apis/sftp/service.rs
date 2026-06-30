@@ -1,98 +1,12 @@
-pub(crate) mod cp;
-pub(crate) mod download;
-pub(crate) mod home;
-pub(crate) mod ls;
-pub(crate) mod mkdir;
-pub(crate) mod rename;
-pub(crate) mod rm;
-pub(crate) mod rm_rf;
-pub(crate) mod stat;
-pub(crate) mod upload;
-
-use axum::http::HeaderValue;
-use russh_sftp::{
-    client::fs::DirEntry,
-    protocol::{FileAttributes, FileType},
-};
-use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
-
 use crate::{apis::ApiErr, consts::services_err_code::*};
 
 const URI_SEP: &str = ":";
 const PATH_SEP: &str = "/";
 
-#[derive(Serialize, ToSchema)]
-pub struct SftpFile {
-    /// 文件名
-    pub name: String,
-    /// 文件类型：f-文件，d-目录，l-符号链接，?-未知
-    pub r#type: char,
-    /// 文件大小（字节）
-    pub size: Option<u64>,
-    /// 最后访问时间
-    pub atime: Option<u32>,
-    /// 最后修改时间
-    pub mtime: Option<u32>,
-    /// 权限字符串
-    pub permissions: String,
-}
-
-impl SftpFile {
-    fn from_dir_entry(dir_entry: DirEntry) -> Self {
-        let attrs = dir_entry.metadata();
-        Self::from_name_attrs(dir_entry.file_name(), attrs)
-    }
-
-    fn from_name_attrs(name: String, attrs: FileAttributes) -> Self {
-        let permissions = attrs.permissions();
-        SftpFile {
-            name,
-            r#type: match attrs.file_type() {
-                FileType::File => 'f',
-                FileType::Dir => 'd',
-                FileType::Symlink => 'l',
-                _ => '?',
-            },
-            size: attrs.size,
-            atime: attrs.atime,
-            mtime: attrs.mtime,
-            permissions: permissions.to_string(),
-        }
-    }
-}
-
-impl Default for SftpFile {
-    fn default() -> Self {
-        SftpFile {
-            name: "".to_string(),
-            r#type: '?',
-            size: None,
-            atime: None,
-            mtime: None,
-            permissions: "".to_string(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, IntoParams)]
-pub struct SftpFileUriPayload {
-    /// SFTP 文件 URI，格式：sftp://target_id/path
-    pub uri: String,
-}
-
-#[derive(Debug, Deserialize, IntoParams)]
-pub struct SftpRenamePayload {
-    /// 源文件 URI
-    pub uri: String,
-    /// 目标路径
-    pub target_path: String,
-}
-
 #[derive(Debug)]
-struct SftpFileUri<'a> {
-    target_id: i32,
-    path: &'a str,
+pub(crate) struct SftpFileUri<'a> {
+    pub(crate) target_id: i32,
+    pub(crate) path: &'a str,
 }
 
 impl<'a> SftpFileUri<'a> {
@@ -122,104 +36,7 @@ impl<'a> SftpFileUri<'a> {
     }
 }
 
-#[derive(Debug)]
-struct ContentRange {
-    start: usize,
-    end: usize,
-    total: usize,
-}
-
-impl ContentRange {
-    fn from_str(header: &str) -> Option<Self> {
-        // Content-Range: bytes 0-1023/1024
-        let header = header.trim();
-
-        // Check if it starts with "bytes "
-        if !header.starts_with("bytes ") {
-            return None;
-        }
-
-        // Remove "bytes " prefix
-        let range_part = &header[6..];
-
-        // Split by '/' to separate range from total
-        let mut parts = range_part.split('/');
-        let range_str = parts.next()?;
-        let total_str = parts.next()?;
-
-        // Parse total size
-        let total = total_str.parse::<usize>().ok()?;
-
-        // Parse range (start-end)
-        let mut range_parts = range_str.split('-');
-        let start = range_parts.next()?.parse::<usize>().ok()?;
-        let end = range_parts.next()?.parse::<usize>().ok()?;
-
-        // Validate range
-        if start > end || end >= total {
-            return None;
-        }
-
-        Some(Self { start, end, total })
-    }
-
-    fn from_header_value(header: Option<&HeaderValue>) -> Option<Self> {
-        if header.is_none() {
-            return None;
-        }
-        let result = header.unwrap().to_str();
-        if result.is_err() {
-            return None;
-        }
-        Self::from_str(result.unwrap())
-    }
-}
-
-#[derive(Debug)]
-struct Range {
-    start: usize,
-    end: usize,
-}
-
-impl Range {
-    fn from_str(header: &str) -> Option<Self> {
-        // Range: bytes=0-1023
-        let header = header.trim();
-
-        // Check if it starts with "bytes="
-        if !header.starts_with("bytes=") {
-            return None;
-        }
-
-        // Remove "bytes=" prefix
-        let range_str = &header[6..];
-
-        // Parse range (start-end)
-        let mut range_parts = range_str.split('-');
-        let start = range_parts.next()?.parse::<usize>().ok()?;
-        let end = range_parts.next()?.parse::<usize>().ok()?;
-
-        // Validate range
-        if start > end {
-            return None;
-        }
-
-        Some(Self { start, end })
-    }
-
-    fn from_header_value(header: Option<&HeaderValue>) -> Option<Self> {
-        if header.is_none() {
-            return None;
-        }
-        let result = header.unwrap().to_str();
-        if result.is_err() {
-            return None;
-        }
-        Self::from_str(result.unwrap())
-    }
-}
-
-fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri<'_>, ApiErr> {
+pub(crate) fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri<'_>, ApiErr> {
     let uri = SftpFileUri::from_str(file_uri_str);
     uri.ok_or(ApiErr {
         code: ERR_CODE_SFTP_INVALID_URI,
@@ -227,7 +44,7 @@ fn parse_file_uri(file_uri_str: &str) -> Result<SftpFileUri<'_>, ApiErr> {
     })
 }
 
-fn get_file_name(path: &str) -> String {
+pub(crate) fn get_file_name(path: &str) -> String {
     let split = path.split(PATH_SEP);
     let Some(name) = split.last() else {
         return "".to_string();
@@ -286,6 +103,7 @@ fn split_path(path: &str) -> Option<(&str, &str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::apis::sftp::dto::ContentRange;
 
     #[test]
     fn test_sftp_file_uri_from_str() {
@@ -438,7 +256,6 @@ mod tests {
 
     #[test]
     fn test_content_range_from_header() {
-        // Valid Content-Range header
         let header = "bytes 0-1023/1024";
         let range = ContentRange::from_str(header).unwrap();
         assert_eq!(
@@ -451,7 +268,6 @@ mod tests {
             "@test_content_range_from_header: total fail"
         );
 
-        // Valid Content-Range header with whitespace
         let header = "  bytes 200-299/1000  ";
         let range = ContentRange::from_str(header).unwrap();
         assert_eq!(
@@ -467,7 +283,6 @@ mod tests {
             "@test_content_range_from_header: total with whitespace fail"
         );
 
-        // Valid single byte range
         let header = "bytes 0-0/1";
         let range = ContentRange::from_str(header).unwrap();
         assert_eq!(

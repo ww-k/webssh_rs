@@ -1,30 +1,67 @@
 use std::{env, sync::Arc};
 
 use anyhow::Result;
-use axum::Router;
+use axum::{
+    Router,
+    extract::{Query, State},
+};
 use russh::ChannelMsg;
-use serde::Deserialize;
 use socketioxide::{
     SocketIo,
     extract::{Data, SocketRef},
 };
 use tracing::{debug, error, info};
 
-use crate::ssh_session_pool::{SshChannelGuard, SshSessionPool};
+use crate::{
+    apis::{
+        ApiErr, InternalErrorResponse,
+        ssh::{
+            dto::{QueryTargetId, Resize, TerminalQueryParams},
+            service::exec,
+        },
+    },
+    consts::services_err_code::*,
+    map_ssh_err,
+    ssh_session_pool::{SshChannelGuard, SshSessionPool},
+};
 
-#[derive(Deserialize, Debug)]
-struct QueryParams {
-    target_id: i32,
+#[utoipa::path(
+    post,
+    path = "/api/ssh/exec",
+    tag = "ssh",
+    summary = "执行 SSH 命令",
+    description = "在指定的 SSH 目标上执行命令并返回输出结果",
+    operation_id = "ssh_exec",
+    params(
+        QueryTargetId
+    ),
+    request_body(
+        content = String,
+        description = "要执行的命令",
+        example = "ls -la"
+    ),
+    responses(
+        (status = 200, description = "成功执行命令", body = String),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub(crate) async fn exec_handler(
+    State(session_pool): State<Arc<SshSessionPool>>,
+    Query(payload): Query<QueryTargetId>,
+    body: String,
+) -> Result<String, ApiErr> {
+    info!("@ssh_exec {:?}", body);
+
+    let channel = map_ssh_err!(session_pool.get_channel(payload.target_id).await)?;
+    let result = exec(channel, body.as_str()).await?;
+
+    info!("@ssh_exec {:?} done", body);
+    Ok(result)
 }
 
-#[derive(Deserialize, Debug)]
-#[allow(dead_code)]
-struct Resize {
-    col: u32,
-    row: u32,
-}
-
-pub(crate) fn router_builder(session_pool: Arc<SshSessionPool>) -> Router<Arc<SshSessionPool>> {
+pub(crate) fn terminal_router_builder(
+    session_pool: Arc<SshSessionPool>,
+) -> Router<Arc<SshSessionPool>> {
     let session_pool_clone = session_pool.clone();
     let (svc, io) = SocketIo::builder().build_svc();
     io.ns("/", async move |socket: SocketRef| {
@@ -49,7 +86,7 @@ struct SshTerminalSession {
 impl SshTerminalSession {
     async fn start(socket: SocketRef, session_pool: Arc<SshSessionPool>) -> Result<Self> {
         let query = socket.req_parts().uri.query().unwrap_or_default();
-        let result: Result<QueryParams, serde_qs::Error> = serde_qs::from_str(query);
+        let result: Result<TerminalQueryParams, serde_qs::Error> = serde_qs::from_str(query);
         if let Err(err) = result {
             anyhow::bail!("Failed to parse query parameters: {:?}", err);
         }
@@ -147,17 +184,8 @@ impl SshTerminalSession {
         &self,
         channel: SshChannelGuard,
     ) -> Result<SshChannelGuard> {
-        // Request an interactive PTY from the server
         channel
-            .request_pty(
-                false,
-                "xterm-256color",
-                80,
-                25,
-                0,
-                0,
-                &[], // ideally you want to pass the actual terminal modes here
-            )
+            .request_pty(false, "xterm-256color", 80, 25, 0, 0, &[])
             .await?;
         channel
             .set_env(
