@@ -13,10 +13,14 @@ use crate::{
 use super::dto::{FsFile, FsRenamePayload};
 
 pub async fn list(path: &str) -> Result<Vec<FsFile>, ApiErr> {
-    if path == "/" {
+    if should_list_roots(path) {
         return list_roots().await;
     }
 
+    list_dir(path).await
+}
+
+async fn list_dir(path: &str) -> Result<Vec<FsFile>, ApiErr> {
     let mut entries = fs::read_dir(path).await.map_err(map_fs_io_err)?;
     let mut files = Vec::new();
 
@@ -85,31 +89,32 @@ pub async fn rm_rf(path: &str) -> Result<(), ApiErr> {
 }
 
 async fn list_roots() -> Result<Vec<FsFile>, ApiErr> {
-    #[cfg(windows)]
-    {
-        let mut roots = Vec::new();
-        for letter in b'A'..=b'Z' {
-            let path = format!("{}:\\", letter as char);
-            if Path::new(&path).exists() {
-                roots.push(FsFile {
-                    name: path.clone(),
-                    path,
-                    r#type: 'd',
-                    size: None,
-                    atime: None,
-                    mtime: None,
-                    permissions: "".to_string(),
-                });
-            }
+    let mut roots = Vec::new();
+    for letter in b'A'..=b'Z' {
+        let path = format!("{}:\\", letter as char);
+        if std::path::Path::new(&path).exists() {
+            roots.push(FsFile {
+                name: path.clone(),
+                path,
+                r#type: 'd',
+                size: None,
+                atime: None,
+                mtime: None,
+                permissions: "".to_string(),
+            });
         }
-        Ok(roots)
     }
+    Ok(roots)
+}
 
-    #[cfg(not(windows))]
-    {
-        let metadata = fs::metadata("/").await.map_err(map_fs_io_err)?;
-        Ok(vec![fs_file_from_metadata(PathBuf::from("/"), metadata)])
-    }
+#[cfg(windows)]
+fn should_list_roots(path: &str) -> bool {
+    path == "/"
+}
+
+#[cfg(not(windows))]
+fn should_list_roots(_path: &str) -> bool {
+    false
 }
 
 fn fs_file_from_metadata(path: PathBuf, metadata: std::fs::Metadata) -> FsFile {
@@ -166,5 +171,19 @@ fn map_fs_io_err(err: std::io::Error) -> ApiErr {
     ApiErr {
         code: ERR_CODE_FS_IO_ERR,
         message: err.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::list;
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn list_root_returns_root_directory_entries() {
+        let files = list("/").await.unwrap();
+
+        assert!(files.iter().all(|file| file.path != "/"));
+        assert!(files.iter().any(|file| file.path == "/tmp"));
     }
 }
