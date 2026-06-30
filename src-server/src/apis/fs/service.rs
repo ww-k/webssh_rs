@@ -111,7 +111,7 @@ async fn list_roots() -> Result<Vec<FsFile>, ApiErr> {
         let path = format!("{}:\\", letter as char);
         if std::path::Path::new(&path).exists() {
             roots.push(FsFile {
-                name: path.clone(),
+                name: format!("{}:", letter as char),
                 r#type: 'd',
                 size: None,
                 atime: None,
@@ -280,6 +280,15 @@ mod tests {
         assert!(all_files.iter().any(|file| file.name == "hidden.txt"));
 
         fs::remove_dir_all(dir).await.unwrap();
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn list_windows_roots_uses_drive_letter_name_without_separator() {
+        let files = list("/", None).await.unwrap();
+
+        assert!(files.iter().all(|file| !file.name.ends_with('\\')));
+        assert!(files.iter().any(|file| file.name.ends_with(':')));
     }
 
     #[test]
