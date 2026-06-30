@@ -1,5 +1,5 @@
 import { Badge, ConfigProvider, Layout, Menu, theme } from "antd";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import "./App.css";
 
@@ -16,22 +16,31 @@ import type { ITransferTask } from "./api";
 
 const { darkAlgorithm, defaultAlgorithm } = theme;
 const { Content, Sider } = Layout;
+const UNFINISHED_TRANSFER_STATUSES = new Set<ITransferTask["status"]>([
+    "WAIT",
+    "RUN",
+    "PAUSE",
+    "FAIL",
+]);
 
 export default function App() {
     const [siderCollapsed, setSiderCollapsed] = useState(true);
+    const pageOpenedAt = useRef(Date.now());
     const [lastTransferMenuClickAt, setLastTransferMenuClickAt] = useState(0);
     const [transferTasks, setTransferTasks] = useState<ITransferTask[]>(() =>
         transferService.getTasks(),
     );
-    const newTransferCount = useMemo(
-        () =>
-            transferTasks.filter(
-                (item) =>
-                    item.created_at &&
-                    item.created_at > lastTransferMenuClickAt,
-            ).length,
-        [lastTransferMenuClickAt, transferTasks],
-    );
+    const newTransferCount = useMemo(() => {
+        const createdAfter = Math.max(
+            pageOpenedAt.current,
+            lastTransferMenuClickAt,
+        );
+        return transferTasks.filter(
+            (item) =>
+                UNFINISHED_TRANSFER_STATUSES.has(item.status) ||
+                (item.created_at && item.created_at > createdAfter),
+        ).length;
+    }, [lastTransferMenuClickAt, transferTasks]);
     const menusItems = useMemo<Required<MenuProps>["items"]>(() => {
         return [
             {
