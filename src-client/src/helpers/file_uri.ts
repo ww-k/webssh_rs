@@ -18,7 +18,7 @@ export function parseSftpUri(uri: string) {
     }
     const arr = uri.split(":");
     const protocal = arr[0];
-    const targetId = parseInt(arr[1]);
+    const targetId = parseInt(arr[1], 10);
     const path = arr.slice(2).join(":");
     if (Number.isNaN(targetId)) {
         return;
@@ -66,4 +66,11 @@ export function getParentDirUri(uri: string) {
 
 export function getFileName(uri: string) {
     return uri.split("/").pop() as string;
+}
+
+export function joinFileUri(parentUri: string, name: string) {
+    if (parentUri.endsWith("/")) {
+        return `${parentUri}${name}`;
+    }
+    return `${parentUri}/${name}`;
 }

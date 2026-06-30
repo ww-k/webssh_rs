@@ -1,4 +1,5 @@
 import { getSftpLs } from "@/api";
+import { joinFileUri } from "@/helpers/file_uri";
 
 import type { IViewFileStat } from "@/types";
 
@@ -9,7 +10,7 @@ export default async function getSftpLsMapFiles(fileUri: string) {
         mtime: item.mtime * 1000,
         atime: item.atime * 1000,
         isDir: item.type === "d",
-        uri: `${fileUri}/${item.name}`,
+        uri: joinFileUri(fileUri, item.name),
         sortName: item.name.toLowerCase(),
     }));
     return files;
