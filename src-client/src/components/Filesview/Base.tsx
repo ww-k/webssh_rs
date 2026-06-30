@@ -1,4 +1,5 @@
 import { useMemoizedFn } from "ahooks";
+import { Spin } from "antd";
 import { useEffect, useMemo } from "react";
 
 import Pathbar, { type IQuickLink } from "@/components/Pathbar";
@@ -102,6 +103,11 @@ export default function FilesviewBase({
                 onPaste={onPaste}
                 {...restProps}
             />
+            {loading && (
+                <div className="filesviewBaseLoadLayer">
+                    <Spin spinning={loading} />
+                </div>
+            )}
         </div>
     );
 }

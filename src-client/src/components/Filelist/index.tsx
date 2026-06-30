@@ -1,4 +1,3 @@
-import { Spin } from "antd";
 import classNames from "clsx";
 import orderBy from "lodash/orderBy";
 import { Component, createRef } from "react";
@@ -266,10 +265,6 @@ export default class Filelist extends Component<IProps, IState> {
             [className || ""]: className !== "",
             filelistLoading: loading,
         });
-        const loadLayerCls = classNames({
-            filelistLoadLayer: loading,
-            filelistLoadLayerHide: !loading,
-        });
         return (
             <div
                 className={rootCls}
@@ -329,9 +324,6 @@ export default class Filelist extends Component<IProps, IState> {
                         onSelected={this.filesSelectedChange.bind(this)}
                     />
                 )}
-                <div className={loadLayerCls}>
-                    <Spin spinning={loading} />
-                </div>
             </div>
         );
     }
