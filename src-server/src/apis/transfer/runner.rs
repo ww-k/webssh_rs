@@ -23,11 +23,10 @@ use super::{
     service::{TransferService, map_transfer_io_err},
 };
 
-const CHUNK_SIZE: usize = 1024 * 1024;
-
 impl TransferService {
     pub(super) async fn run_upload(&self, id: &str, abort: Arc<AtomicBool>) -> Result<(), ApiErr> {
         let task = self.get_task_model(id).await?;
+        let chunk_size = self.transfer_chunk_size;
         let local_path = task
             .local_path
             .clone()
@@ -73,15 +72,16 @@ impl TransferService {
                 if abort.load(Ordering::Acquire) {
                     return Ok(());
                 }
-                let chunk_size = std::cmp::min(CHUNK_SIZE as i64, end - offset + 1) as usize;
-                let mut buffer = vec![0; chunk_size];
+                let current_chunk_size =
+                    std::cmp::min(chunk_size as i64, end - offset + 1) as usize;
+                let mut buffer = vec![0; current_chunk_size];
                 local_file
                     .read_exact(&mut buffer)
                     .await
                     .map_err(map_transfer_io_err)?;
                 map_ssh_err!(remote_file.write_all(&buffer).await)?;
-                offset += chunk_size as i64;
-                self.mark_range_done(id, [offset - chunk_size as i64, offset - 1])
+                offset += current_chunk_size as i64;
+                self.mark_range_done(id, [offset - current_chunk_size as i64, offset - 1])
                     .await?;
             }
         }
@@ -96,6 +96,7 @@ impl TransferService {
         abort: Arc<AtomicBool>,
     ) -> Result<(), ApiErr> {
         let task = self.get_task_model(id).await?;
+        let chunk_size = self.transfer_chunk_size;
         let source_uri = task
             .source_uri
             .clone()
@@ -137,15 +138,16 @@ impl TransferService {
                 if abort.load(Ordering::Acquire) {
                     return Ok(());
                 }
-                let chunk_size = std::cmp::min(CHUNK_SIZE as i64, end - offset + 1) as usize;
-                let mut buffer = vec![0; chunk_size];
+                let current_chunk_size =
+                    std::cmp::min(chunk_size as i64, end - offset + 1) as usize;
+                let mut buffer = vec![0; current_chunk_size];
                 map_ssh_err!(remote_file.read_exact(&mut buffer).await)?;
                 local_file
                     .write_all(&buffer)
                     .await
                     .map_err(map_transfer_io_err)?;
-                offset += chunk_size as i64;
-                self.mark_range_done(id, [offset - chunk_size as i64, offset - 1])
+                offset += current_chunk_size as i64;
+                self.mark_range_done(id, [offset - current_chunk_size as i64, offset - 1])
                     .await?;
             }
         }

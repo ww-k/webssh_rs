@@ -54,6 +54,7 @@ pub struct TransferService {
     scheduler_notify: Arc<Notify>,
     scheduler_started: Arc<AtomicBool>,
     max_concurrent_tasks: usize,
+    pub(super) transfer_chunk_size: usize,
 }
 
 struct RunningTask {
@@ -76,6 +77,7 @@ impl TransferService {
             scheduler_notify: Arc::new(Notify::new()),
             scheduler_started: Arc::new(AtomicBool::new(false)),
             max_concurrent_tasks: app_state.config.transfer_task_concurrency,
+            transfer_chunk_size: app_state.config.transfer_chunk_size,
         };
         service
     }

@@ -1141,6 +1141,7 @@ mod tests {
                     max_session_per_target: 2,
                     max_channel_per_session: 3,
                     transfer_task_concurrency: 3,
+                    transfer_chunk_size: 10 * 1024 * 1024,
                     check_server_key: CheckServerKey::AcceptNew,
                 };
 

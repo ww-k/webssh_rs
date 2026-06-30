@@ -25,6 +25,7 @@ pub struct Config {
     pub max_session_per_target: u8,
     pub max_channel_per_session: u8,
     pub transfer_task_concurrency: usize,
+    pub transfer_chunk_size: usize,
     pub check_server_key: CheckServerKey,
 }
 
@@ -34,6 +35,7 @@ impl Default for Config {
             max_session_per_target: 10,
             max_channel_per_session: 10,
             transfer_task_concurrency: 3,
+            transfer_chunk_size: 10 * 1024 * 1024,
             check_server_key: CheckServerKey::AcceptNew,
         }
     }
@@ -54,6 +56,9 @@ impl Config {
             config.transfer_task_concurrency =
                 Config::parse_transfer_task_concurrency(value.as_str())?;
         }
+        if let Ok(value) = std::env::var("WEBSSH_RS_TRANSFER_CHUNK_SIZE") {
+            config.transfer_chunk_size = Config::parse_transfer_chunk_size(value.as_str())?;
+        }
 
         Ok(config)
     }
@@ -68,6 +73,18 @@ impl Config {
             ));
         }
         Ok(concurrency)
+    }
+
+    fn parse_transfer_chunk_size(value: &str) -> Result<usize> {
+        let chunk_size = value.parse::<usize>().map_err(|err| {
+            anyhow::anyhow!("invalid WEBSSH_RS_TRANSFER_CHUNK_SIZE value: {value}: {err}")
+        })?;
+        if chunk_size == 0 {
+            return Err(anyhow::anyhow!(
+                "invalid WEBSSH_RS_TRANSFER_CHUNK_SIZE value: {value}; expected positive integer"
+            ));
+        }
+        Ok(chunk_size)
     }
 }
 
@@ -98,5 +115,16 @@ mod tests {
         assert_eq!(Config::parse_transfer_task_concurrency("8").unwrap(), 8);
         assert!(Config::parse_transfer_task_concurrency("0").is_err());
         assert!(Config::parse_transfer_task_concurrency("abc").is_err());
+    }
+
+    #[test]
+    fn parse_transfer_chunk_size() {
+        assert_eq!(Config::parse_transfer_chunk_size("1").unwrap(), 1);
+        assert_eq!(
+            Config::parse_transfer_chunk_size("10485760").unwrap(),
+            10 * 1024 * 1024
+        );
+        assert!(Config::parse_transfer_chunk_size("0").is_err());
+        assert!(Config::parse_transfer_chunk_size("abc").is_err());
     }
 }
