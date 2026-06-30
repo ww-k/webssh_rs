@@ -20,6 +20,19 @@ pub async fn list(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> 
     list_dir(path, all).await
 }
 
+pub fn home() -> String {
+    home_from_env(
+        std::env::var("HOME").ok(),
+        std::env::var("USERPROFILE").ok(),
+    )
+}
+
+fn home_from_env(home: Option<String>, userprofile: Option<String>) -> String {
+    home.or(userprofile)
+        .filter(|path| !path.is_empty())
+        .unwrap_or_else(|| "/".to_string())
+}
+
 async fn list_dir(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> {
     let mut entries = fs::read_dir(path).await.map_err(map_fs_io_err)?;
     let mut files = Vec::new();
@@ -55,21 +68,21 @@ pub async fn mkdir(path: &str) -> Result<(), ApiErr> {
 }
 
 pub async fn cp(payload: FsRenamePayload) -> Result<(), ApiErr> {
-    let metadata = fs::metadata(&payload.path).await.map_err(map_fs_io_err)?;
+    let metadata = fs::metadata(&payload.uri).await.map_err(map_fs_io_err)?;
     if metadata.is_dir() {
         return Err(ApiErr {
             code: ERR_CODE_FS_INVALID_REQUEST,
             message: "copy directory is not supported".to_string(),
         });
     }
-    fs::copy(&payload.path, &payload.target_path)
+    fs::copy(payload.uri, &payload.target_path)
         .await
         .map_err(map_fs_io_err)?;
     Ok(())
 }
 
 pub async fn rename(payload: FsRenamePayload) -> Result<(), ApiErr> {
-    fs::rename(&payload.path, &payload.target_path)
+    fs::rename(payload.uri, &payload.target_path)
         .await
         .map_err(map_fs_io_err)
 }
@@ -99,7 +112,6 @@ async fn list_roots() -> Result<Vec<FsFile>, ApiErr> {
         if std::path::Path::new(&path).exists() {
             roots.push(FsFile {
                 name: path.clone(),
-                path,
                 r#type: 'd',
                 size: None,
                 atime: None,
@@ -125,7 +137,6 @@ fn fs_file_from_metadata(path: PathBuf, metadata: std::fs::Metadata) -> FsFile {
     let name = file_name(&path);
     FsFile {
         name,
-        path: path.to_string_lossy().to_string(),
         r#type: if metadata.is_dir() {
             'd'
         } else if metadata.is_file() {
@@ -140,12 +151,12 @@ fn fs_file_from_metadata(path: PathBuf, metadata: std::fs::Metadata) -> FsFile {
             .accessed()
             .ok()
             .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-            .map(|duration| duration.as_secs()),
+            .and_then(|duration| u32::try_from(duration.as_secs()).ok()),
         mtime: metadata
             .modified()
             .ok()
             .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-            .map(|duration| duration.as_secs()),
+            .and_then(|duration| u32::try_from(duration.as_secs()).ok()),
         permissions: permissions_to_string(&metadata),
     }
 }
@@ -196,8 +207,8 @@ mod tests {
     async fn list_root_returns_root_directory_entries() {
         let files = list("/", None).await.unwrap();
 
-        assert!(files.iter().all(|file| file.path != "/"));
-        assert!(files.iter().any(|file| file.path == "/tmp"));
+        assert!(files.iter().all(|file| file.name != "/"));
+        assert!(files.iter().any(|file| file.name == "tmp"));
     }
 
     #[tokio::test]
@@ -232,6 +243,22 @@ mod tests {
         assert!(files.iter().any(|file| file.name == ".hidden.txt"));
 
         fs::remove_dir_all(dir).await.unwrap();
+    }
+
+    #[test]
+    fn home_returns_root_when_home_env_is_missing() {
+        assert_eq!(super::home_from_env(None, None), "/");
+    }
+
+    #[test]
+    fn home_prefers_home_env() {
+        assert_eq!(
+            super::home_from_env(
+                Some("/home/user".to_string()),
+                Some("/Users/user".to_string())
+            ),
+            "/home/user"
+        );
     }
 
     async fn create_test_dir(name: &str) -> std::path::PathBuf {

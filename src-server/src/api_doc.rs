@@ -21,6 +21,7 @@ use utoipa::OpenApi;
         crate::apis::sftp::handlers::upload,
         crate::apis::sftp::handlers::download,
         crate::apis::fs::handlers::ls,
+        crate::apis::fs::handlers::home,
         crate::apis::fs::handlers::stat,
         crate::apis::fs::handlers::mkdir,
         crate::apis::fs::handlers::cp,

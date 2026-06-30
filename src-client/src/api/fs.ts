@@ -1,72 +1,87 @@
 import axios from "axios";
 
 export interface IFsFileStat {
+    /** 文件名 */
     name: string;
-    path: string;
+    /** 文件类型 */
     type: "f" | "d" | "l" | "?";
+    /** 文件大小 */
     size?: number;
+    /** 最近访问时间 */
     atime?: number;
+    /** 最近修改时间 */
     mtime?: number;
+    /** 权限 */
     permissions: string;
 }
 
-export async function getFsLs(path: string, all?: boolean) {
+export async function getFsLs(uri: string, all?: boolean) {
     const response = await axios.get<IFsFileStat[]>("/api/fs/ls", {
         params: {
-            path,
+            uri,
             all,
         },
     });
     return response.data;
 }
 
-export async function getFsStat(path: string) {
+export async function getFsHome(): Promise<string> {
+    const response = await axios.get<string>("/api/fs/home");
+    return response.data;
+}
+
+export async function getFsStat(uri: string) {
     const response = await axios.get<IFsFileStat>("/api/fs/stat", {
         params: {
-            path,
+            uri,
         },
     });
     return response.data;
 }
 
-export async function postFsMkdir(path: string) {
-    await axios.post("/api/fs/mkdir", null, {
+export async function postFsMkdir(uri: string) {
+    await axios.post<boolean>("/api/fs/mkdir", null, {
         params: {
-            path,
+            uri,
         },
     });
+    return true;
 }
 
-export async function postFsCp(path: string, targetPath: string) {
-    await axios.post("/api/fs/cp", null, {
+export async function postFsCp(uri: string, targetPath: string) {
+    await axios.post<boolean>("/api/fs/cp", null, {
         params: {
-            path,
+            uri,
             target_path: targetPath,
         },
     });
+    return true;
 }
 
-export async function postFsRename(path: string, targetPath: string) {
-    await axios.post("/api/fs/rename", null, {
+export async function postFsRename(uri: string, targetPath: string) {
+    await axios.post<boolean>("/api/fs/rename", null, {
         params: {
-            path,
+            uri,
             target_path: targetPath,
         },
     });
+    return true;
 }
 
-export async function postFsRm(path: string) {
-    await axios.post("/api/fs/rm", null, {
+export async function postFsRm(uri: string) {
+    await axios.post<boolean>("/api/fs/rm", null, {
         params: {
-            path,
+            uri,
         },
     });
+    return true;
 }
 
-export async function postFsRmRf(path: string) {
-    await axios.post("/api/fs/rm/rf", null, {
+export async function postFsRmRf(uri: string) {
+    await axios.post<boolean>("/api/fs/rm/rf", null, {
         params: {
-            path,
+            uri,
         },
     });
+    return true;
 }

@@ -1,8 +1,9 @@
 import { useMemoizedFn, useRequest } from "ahooks";
 import { useState } from "react";
 
-import { getFsLs } from "@/api";
+import { getFsHome, getFsLs } from "@/api";
 import { getFilePath } from "@/helpers/file_uri";
+import { posix, win32 } from "@/helpers/path";
 import { isMSWindows } from "@/helpers/platform";
 
 import FilesviewBase from "./Base";
@@ -52,14 +53,17 @@ export default function FilesviewLocal({
         data: files = [],
         loading,
         runAsync: getCwdFiles,
-    } = useRequest(async () => getFsLs(cwd).then(mapFsFiles), {
-        manual: true,
-    });
+    } = useRequest(
+        async () => getFsLs(cwd).then((files) => mapFsFiles(files, cwd)),
+        {
+            manual: true,
+        },
+    );
 
-    const getHome = useMemoizedFn(async () => "/");
+    const getHome = useMemoizedFn(() => getFsHome());
     const getDirs = useMemoizedFn(async (path: string) => {
         const files = await getFsLs(normalizeLocalPath(getFilePath(path)));
-        return mapFsFiles(files).filter((file) => file.isDir);
+        return mapFsFiles(files, path).filter((file) => file.isDir);
     });
     const getQuickLinks = useMemoizedFn(async () => [
         {
@@ -99,8 +103,8 @@ export default function FilesviewLocal({
     );
 }
 
-function mapFsFiles(files: IFsFileStat[]) {
-    return files.map(toViewFile);
+function mapFsFiles(files: IFsFileStat[], cwd: string) {
+    return files.map((file) => toViewFile(file, cwd));
 }
 
 function normalizeLocalPath(path: string) {
@@ -110,7 +114,8 @@ function normalizeLocalPath(path: string) {
     return path;
 }
 
-function toViewFile(file: IFsFileStat): IViewFileStat {
+function toViewFile(file: IFsFileStat, cwd: string): IViewFileStat {
+    const uri = joinLocalPath(cwd, file.name);
     return {
         name: file.name,
         type: file.type,
@@ -118,8 +123,19 @@ function toViewFile(file: IFsFileStat): IViewFileStat {
         atime: file.atime || 0,
         mtime: file.mtime || 0,
         permissions: file.permissions,
-        uri: file.path,
+        uri,
         sortName: file.name.toLowerCase(),
         isDir: file.type === "d",
     };
+}
+
+function joinLocalPath(parent: string, name: string) {
+    if (isMSWindows) {
+        const parentPath = getFilePath(parent);
+        if (parentPath === "/") {
+            return normalizeLocalPath(name);
+        }
+        return normalizeLocalPath(win32.join(parentPath, name));
+    }
+    return posix.join(getFilePath(parent), name);
 }
