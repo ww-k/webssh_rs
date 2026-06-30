@@ -39,7 +39,4 @@ export default defineConfig({
             classnames: "clsx",
         },
     },
-    performance: {
-        removeMomentLocale: true,
-    },
 });
