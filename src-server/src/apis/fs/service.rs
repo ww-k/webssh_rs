@@ -39,11 +39,11 @@ async fn list_dir(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> 
 
     while let Some(entry) = entries.next_entry().await.map_err(map_fs_io_err)? {
         let path = entry.path();
-        if !all.unwrap_or(false) && is_hidden_path(&path) {
+        let metadata = entry.metadata().await.map_err(map_fs_io_err)?;
+        if !all.unwrap_or(false) && is_hidden_path(&path, &metadata) {
             continue;
         }
 
-        let metadata = entry.metadata().await.map_err(map_fs_io_err)?;
         files.push(fs_file_from_metadata(path, metadata));
     }
 
@@ -167,10 +167,24 @@ fn file_name(path: &Path) -> String {
         .unwrap_or_else(|| path.to_string_lossy().to_string())
 }
 
-fn is_hidden_path(path: &Path) -> bool {
+fn has_dot_hidden_name(path: &Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
         .is_some_and(|name| name.starts_with('.'))
+}
+
+#[cfg(windows)]
+fn is_hidden_path(path: &Path, metadata: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+
+    const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+
+    has_dot_hidden_name(path) || metadata.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0
+}
+
+#[cfg(not(windows))]
+fn is_hidden_path(path: &Path, _metadata: &std::fs::Metadata) -> bool {
+    has_dot_hidden_name(path)
 }
 
 #[cfg(unix)]
@@ -245,6 +259,29 @@ mod tests {
         fs::remove_dir_all(dir).await.unwrap();
     }
 
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn list_filters_windows_hidden_attribute_by_default() {
+        let dir = create_test_dir("list_filters_windows_hidden_attribute_by_default").await;
+        let visible_path = dir.join("visible.txt");
+        let hidden_path = dir.join("hidden.txt");
+
+        fs::write(&visible_path, "").await.unwrap();
+        fs::write(&hidden_path, "").await.unwrap();
+        set_windows_hidden_attribute(&hidden_path);
+
+        let files = list(dir.to_str().unwrap(), None).await.unwrap();
+
+        assert!(files.iter().any(|file| file.name == "visible.txt"));
+        assert!(!files.iter().any(|file| file.name == "hidden.txt"));
+
+        let all_files = list(dir.to_str().unwrap(), Some(true)).await.unwrap();
+
+        assert!(all_files.iter().any(|file| file.name == "hidden.txt"));
+
+        fs::remove_dir_all(dir).await.unwrap();
+    }
+
     #[test]
     fn home_returns_root_when_home_env_is_missing() {
         assert_eq!(super::home_from_env(None, None), "/");
@@ -269,5 +306,16 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("webssh_rs_{name}_{nanos}"));
         fs::create_dir_all(&dir).await.unwrap();
         dir
+    }
+
+    #[cfg(windows)]
+    fn set_windows_hidden_attribute(path: &std::path::Path) {
+        let status = std::process::Command::new("attrib")
+            .arg("+h")
+            .arg(path)
+            .status()
+            .unwrap();
+
+        assert!(status.success());
     }
 }
