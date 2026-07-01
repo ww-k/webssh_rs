@@ -1,10 +1,8 @@
 use axum::http::HeaderValue;
-use russh_sftp::{
-    client::fs::DirEntry,
-    protocol::{FileAttributes, FileType},
-};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
+
+use crate::sftp_client::{SftpAttrs, SftpDirEntry, SftpFileType};
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct QueryTargetId {
@@ -37,25 +35,24 @@ pub struct SftpFile {
 }
 
 impl SftpFile {
-    pub(crate) fn from_dir_entry(dir_entry: DirEntry) -> Self {
-        let attrs = dir_entry.metadata();
-        Self::from_name_attrs(dir_entry.file_name(), attrs)
+    pub(crate) fn from_dir_entry(dir_entry: SftpDirEntry) -> Self {
+        let (name, attrs) = dir_entry.into_parts();
+        Self::from_name_attrs(name, attrs)
     }
 
-    pub(crate) fn from_name_attrs(name: String, attrs: FileAttributes) -> Self {
-        let permissions = attrs.permissions();
+    pub(crate) fn from_name_attrs(name: String, attrs: SftpAttrs) -> Self {
         SftpFile {
             name,
             r#type: match attrs.file_type() {
-                FileType::File => 'f',
-                FileType::Dir => 'd',
-                FileType::Symlink => 'l',
+                SftpFileType::File => 'f',
+                SftpFileType::Dir => 'd',
+                SftpFileType::Symlink => 'l',
                 _ => '?',
             },
             size: attrs.size,
             atime: attrs.atime,
             mtime: attrs.mtime,
-            permissions: permissions.to_string(),
+            permissions: attrs.permissions_string(),
         }
     }
 }

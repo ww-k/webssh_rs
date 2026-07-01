@@ -31,6 +31,14 @@ impl IntoResponse for ApiErr {
     }
 }
 
+impl std::fmt::Display for ApiErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for ApiErr {}
+
 // We implement `From<JsonRejection> for ApiErr`
 impl From<JsonRejection> for ApiErr {
     fn from(rejection: JsonRejection) -> Self {

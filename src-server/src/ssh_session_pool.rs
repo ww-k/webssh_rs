@@ -1,22 +1,26 @@
 use std::{
     collections::{HashMap, VecDeque},
+    pin::Pin,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
+    task::{Context, Poll},
     time::Duration,
 };
 
 use anyhow::{Ok, Result};
 use russh::{
-    Channel, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, Disconnect,
+    Channel, ChannelMsg, ChannelReadHalf, ChannelStream, ChannelWriteHalf, Disconnect,
     client::DisconnectReason,
     keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, decode_secret_key, ssh_key},
 };
-use russh_sftp::client::SftpSession;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use serde::Serialize;
-use tokio::sync::{Mutex, MutexGuard, oneshot};
+use tokio::{
+    io::{AsyncRead, AsyncWrite, ReadBuf},
+    sync::{Mutex, MutexGuard, oneshot},
+};
 use tracing::debug;
 use utoipa::ToSchema;
 
@@ -28,6 +32,7 @@ use crate::{
         ssh_known_host,
         target::{self, TargetAuthMethod},
     },
+    sftp_client::FastSftpClient,
 };
 
 #[derive(Clone)]
@@ -167,7 +172,12 @@ impl SshClient {
         target: target::Model,
         tx: oneshot::Sender<bool>,
     ) -> Result<russh::client::Handle<SshClientHandler>> {
-        let config = russh::client::Config::default();
+        let config = russh::client::Config {
+            window_size: 16 * 1024 * 1024,
+            maximum_packet_size: 64 * 1024,
+            nodelay: true,
+            ..Default::default()
+        };
         let host = target.host.as_str();
         let port = target.port.unwrap_or(22);
         let pinned_server_public_keys =
@@ -294,7 +304,7 @@ impl ConnectionType for SshConnectionType {
 // SFTP连接类型
 struct SftpConnectionType;
 impl ConnectionType for SftpConnectionType {
-    type Resource = SftpSession;
+    type Resource = FastSftpClient;
     const TYPE_NAME: &'static str = "SFTP";
 }
 
@@ -327,11 +337,12 @@ impl<T: ConnectionType> SshConnection<T> {
     async fn has_idle(&self) -> bool {
         let state = self.resource_pool_state.lock().await;
         let expired = self.expired.load(Ordering::Acquire);
+        let closed = self.closed.load(Ordering::Acquire);
         debug!(
-            "SshConnection: {} has_idle. expired {} state.total_count {} max_size {}",
-            self.id, expired, state.total_count, self.max_size
+            "SshConnection: {} has_idle. expired {} closed {} state.total_count {} max_size {}",
+            self.id, expired, closed, state.total_count, self.max_size
         );
-        expired == false && state.total_count < self.max_size
+        !expired && !closed && state.total_count < self.max_size
     }
 
     async fn close_when_expired(&self) {
@@ -451,21 +462,20 @@ impl ResourceMaker<SshConnectionType> for SshConnection<SshConnectionType> {
 
 // SFTP连接类型特定实现
 impl SshConnection<SftpConnectionType> {
-    async fn get_or_make_sftp_session(&self) -> Result<SftpSession> {
+    async fn get_or_make_sftp_session(&self) -> Result<FastSftpClient> {
         self.get_or_make().await
     }
 }
 
 impl ResourceMaker<SftpConnectionType> for SshConnection<SftpConnectionType> {
-    async fn make(&self) -> Result<SftpSession> {
+    async fn make(&self) -> Result<FastSftpClient> {
         let channel = self.client_handle.channel_open_session().await?;
         let channel_id = channel.id();
 
-        channel.request_subsystem(true, "sftp").await?;
-        let sftp = SftpSession::new(channel.into_stream()).await?;
+        let sftp = FastSftpClient::new_from_channel(channel).await?;
 
         debug!(
-            "SshConnection: {} create SftpSession on SshChannel {}",
+            "SshConnection: {} create FastSftpClient on SshChannel {}",
             self.id, channel_id
         );
 
@@ -569,12 +579,12 @@ impl SshSession {
         Ok((ssh_connection, channel, option_rx))
     }
 
-    // 获取或创建一个 SftpSession, 并自动回收 SshConnection
+    // 获取或创建一个 FastSftpClient, 并自动回收 SshConnection
     async fn get_or_make_sftp_session(
         &self,
     ) -> Result<(
         Arc<SshConnection<SftpConnectionType>>,
-        SftpSession,
+        FastSftpClient,
         Option<oneshot::Receiver<bool>>,
     )> {
         let (ssh_connection, option_rx) = self.get_or_make_connection_sftp().await?;
@@ -839,6 +849,7 @@ pub struct SshChannelGuard {
     channel: Option<Channel<russh::client::Msg>>,
     pool: Arc<SshConnection<SshConnectionType>>,
     closed: bool,
+    transferred: bool,
 }
 
 impl SshChannelGuard {
@@ -863,6 +874,15 @@ impl SshChannelGuard {
             None
         }
     }
+
+    pub fn into_stream(mut self) -> Option<SshChannelStreamGuard> {
+        self.transferred = true;
+        self.pool.expired.store(true, Ordering::Release);
+        self.channel.take().map(|channel| SshChannelStreamGuard {
+            stream: Some(channel.into_stream()),
+            pool: self.pool.clone(),
+        })
+    }
 }
 
 impl Drop for SshChannelGuard {
@@ -870,11 +890,15 @@ impl Drop for SshChannelGuard {
         let channel_o = self.channel.take();
         let pool = self.pool.clone();
         let closed = self.closed;
+        let transferred = self.transferred;
         let connection_closed = pool.closed.load(Ordering::Acquire);
         if connection_closed {
             return;
         }
         tokio::spawn(async move {
+            if transferred {
+                return;
+            }
             if !closed && let Some(channel) = channel_o {
                 pool.return_resource(channel).await;
             } else {
@@ -898,30 +922,83 @@ impl std::ops::DerefMut for SshChannelGuard {
     }
 }
 
-pub struct SftpSessionGuard {
-    sftp_session: Option<SftpSession>,
-    pool: Arc<SshConnection<SftpConnectionType>>,
+pub struct SshChannelStreamGuard {
+    stream: Option<ChannelStream<russh::client::Msg>>,
+    pool: Arc<SshConnection<SshConnectionType>>,
 }
 
-impl Drop for SftpSessionGuard {
+impl Drop for SshChannelStreamGuard {
     fn drop(&mut self) {
-        let sftp_session = self.sftp_session.take().unwrap();
+        let _ = self.stream.take();
         let pool = self.pool.clone();
         let connection_closed = pool.closed.load(Ordering::Acquire);
         if connection_closed {
             return;
         }
         tokio::spawn(async move {
-            let _ = pool.return_resource(sftp_session).await;
+            pool.rollback_count().await;
+            pool.close_when_expired().await;
         });
     }
 }
 
-impl std::ops::Deref for SftpSessionGuard {
-    type Target = SftpSession;
+impl AsyncRead for SshChannelStreamGuard {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        Pin::new(this.stream.as_mut().expect("ssh channel stream missing")).poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for SshChannelStreamGuard {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let this = self.get_mut();
+        Pin::new(this.stream.as_mut().expect("ssh channel stream missing")).poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        Pin::new(this.stream.as_mut().expect("ssh channel stream missing")).poll_flush(cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        Pin::new(this.stream.as_mut().expect("ssh channel stream missing")).poll_shutdown(cx)
+    }
+}
+
+pub struct SftpClientGuard {
+    sftp_client: Option<FastSftpClient>,
+    pool: Arc<SshConnection<SftpConnectionType>>,
+}
+
+impl Drop for SftpClientGuard {
+    fn drop(&mut self) {
+        let sftp_client = self.sftp_client.take().unwrap();
+        let pool = self.pool.clone();
+        let connection_closed = pool.closed.load(Ordering::Acquire);
+        if connection_closed {
+            return;
+        }
+        tokio::spawn(async move {
+            sftp_client.shutdown().await;
+            pool.rollback_count().await;
+        });
+    }
+}
+
+impl std::ops::Deref for SftpClientGuard {
+    type Target = FastSftpClient;
 
     fn deref(&self) -> &Self::Target {
-        &self.sftp_session.as_ref().unwrap()
+        &self.sftp_client.as_ref().unwrap()
     }
 }
 
@@ -996,20 +1073,21 @@ impl SshSessionPool {
             channel: Some(channel),
             pool: ssh_connection,
             closed: false,
+            transferred: false,
         })
     }
 
-    pub async fn get_sftp_session(&self, target_id: i32) -> Result<SftpSessionGuard> {
+    pub async fn get_sftp_session(&self, target_id: i32) -> Result<SftpClientGuard> {
         let ssh_session = self.get_session(target_id).await?;
         let (ssh_connection, sftp_session, rx_option) =
             ssh_session.get_or_make_sftp_session().await?;
 
         drop_connection_received_msg(ssh_session, &ssh_connection, rx_option);
 
-        debug!("SshSessionPool: target {} get SftpSession", target_id);
+        debug!("SshSessionPool: target {} get FastSftpClient", target_id);
 
-        Ok(SftpSessionGuard {
-            sftp_session: Some(sftp_session),
+        Ok(SftpClientGuard {
+            sftp_client: Some(sftp_session),
             pool: ssh_connection,
         })
     }
@@ -1331,7 +1409,10 @@ mod tests {
         let sftp_guard = session_pool.get_sftp_session(1).await.unwrap();
 
         let read_dir = sftp_guard.read_dir("/").await.unwrap();
-        let file_names: Vec<String> = read_dir.map(|dir_entry| dir_entry.file_name()).collect();
+        let file_names: Vec<String> = read_dir
+            .into_iter()
+            .map(|dir_entry| dir_entry.file_name().to_string())
+            .collect();
         assert_eq!(
             file_names,
             vec!["foo", "bar"],
@@ -1362,9 +1443,12 @@ mod tests {
         let result = session.get_by_id_sftp(connection_id.as_str()).await;
         assert!(result.is_none());
 
-        // 过期的连接下的SftpSessionGuard仍然可用
+        // 过期的连接下的 SftpClientGuard 仍然可用
         let read_dir = sftp_guard.read_dir("/").await.unwrap();
-        let file_names: Vec<String> = read_dir.map(|dir_entry| dir_entry.file_name()).collect();
+        let file_names: Vec<String> = read_dir
+            .into_iter()
+            .map(|dir_entry| dir_entry.file_name().to_string())
+            .collect();
         assert_eq!(
             file_names,
             vec!["foo", "bar"],

@@ -11,9 +11,8 @@ use axum::{
     response::IntoResponse,
 };
 use futures_util::TryStreamExt;
-use russh_sftp::protocol::{FileAttributes, FileType, OpenFlags};
 use sha2::{Digest, Sha256};
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 use tokio_util::io::StreamReader;
 use tracing::{debug, info};
 
@@ -29,6 +28,7 @@ use crate::{
     },
     consts::services_err_code::*,
     map_db_err, map_ssh_err,
+    sftp_client::{SftpAttrs, SftpFileType, SftpOpenOptions},
 };
 
 use super::service::{get_file_name, parse_file_uri};
@@ -65,11 +65,12 @@ pub async fn ls(
 
     let files = match payload.all {
         Some(true) => {
-            let files = read_dir.map(SftpFile::from_dir_entry);
+            let files = read_dir.into_iter().map(SftpFile::from_dir_entry);
             Vec::from_iter(files)
         }
         _ => {
             let files = read_dir
+                .into_iter()
                 .filter(|dir_entry| !dir_entry.file_name().starts_with("."))
                 .map(SftpFile::from_dir_entry);
             Vec::from_iter(files)
@@ -375,17 +376,14 @@ pub async fn upload(
     let mut file = map_ssh_err!(
         sftp.open_with_flags(
             uri.path,
-            OpenFlags::WRITE | OpenFlags::READ | OpenFlags::CREATE
+            SftpOpenOptions::WRITE | SftpOpenOptions::READ | SftpOpenOptions::CREATE
         )
         .await
     )?;
 
     map_ssh_err!(
-        file.set_metadata(FileAttributes {
-            size: Some(file_size as u64),
-            ..FileAttributes::empty()
-        })
-        .await
+        file.set_metadata(SftpAttrs::with_size(file_size as u64))
+            .await
     )?;
 
     if start > 0 {
@@ -477,7 +475,7 @@ pub async fn download(
     }
 
     let attr = map_ssh_err!(sftp.metadata(uri.path).await)?;
-    if attr.file_type() == FileType::Dir {
+    if attr.file_type() == SftpFileType::Dir {
         return Err(ApiErr {
             code: ERR_CODE_SFTP_DOWNLOAD_INVALID_REQUEST,
             message: "file is a directory".to_string(),

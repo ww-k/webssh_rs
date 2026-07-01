@@ -9,7 +9,6 @@ use std::{
 };
 
 use nanoid::nanoid;
-use russh_sftp::protocol::FileType;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder, QuerySelect,
@@ -35,6 +34,7 @@ use crate::{
         TransferTaskStatus, TransferTaskType,
     },
     map_db_err, map_ssh_err,
+    sftp_client::SftpFileType,
     ssh_session_pool::SshSessionPool,
 };
 
@@ -190,7 +190,7 @@ impl TransferService {
 
         let sftp = map_ssh_err!(self.session_pool.get_sftp_session(target_id).await)?;
         let attr = map_ssh_err!(sftp.metadata(source_path.as_str()).await)?;
-        if attr.file_type() == FileType::Dir {
+        if attr.file_type() == SftpFileType::Dir {
             return Err(ApiErr {
                 code: ERR_CODE_TRANSFER_INVALID_REQUEST,
                 message: "source_uri is a directory".to_string(),

@@ -4,6 +4,7 @@ mod config;
 mod consts;
 pub mod entities;
 mod migrations;
+pub mod sftp_client;
 pub mod ssh_session_pool;
 #[cfg(test)]
 mod tests;
