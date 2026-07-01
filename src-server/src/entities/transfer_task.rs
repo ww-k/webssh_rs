@@ -50,7 +50,6 @@ pub struct Model {
     pub r#type: TransferTaskType,
     pub status: TransferTaskStatus,
     pub local_path: Option<String>,
-    pub source_uri: Option<String>,
     pub target_uri: Option<String>,
     pub target_id: Option<i32>,
     pub name: String,

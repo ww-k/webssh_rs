@@ -190,7 +190,6 @@ impl IntoTransferResponse for TransferTaskModel {
             r#type: self.r#type,
             status: self.status,
             local_path: self.local_path,
-            source_uri: self.source_uri,
             target_uri: self.target_uri,
             target_id: self.target_id,
             name: self.name,

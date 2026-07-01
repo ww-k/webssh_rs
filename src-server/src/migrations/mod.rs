@@ -4,6 +4,7 @@ mod m000001_init_db;
 mod m000002_win_target;
 mod m000003_ssh_known_host;
 mod m000004_transfer_task;
+mod m000005_drop_transfer_task_source_uri;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000002_win_target::Migration),
             Box::new(m000003_ssh_known_host::Migration),
             Box::new(m000004_transfer_task::Migration),
+            Box::new(m000005_drop_transfer_task_source_uri::Migration),
         ]
     }
 }

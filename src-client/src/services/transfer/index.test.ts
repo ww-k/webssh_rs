@@ -29,7 +29,7 @@ rs.mock("@/api", () => ({
             id: "download-1",
             type: "DOWNLOAD",
             local_path: payload.local_path || payload.local_dir,
-            source_uri: payload.source_uri,
+            target_uri: payload.source_uri,
         });
         tasks[task.id] = task;
         return task;
@@ -84,7 +84,7 @@ test("[TransferService] download creates server task", async () => {
         type: "DOWNLOAD",
         status: "SUCCESS",
         local_path: "/tmp",
-        source_uri: "sftp:1:/tmp/b.txt",
+        target_uri: "sftp:1:/tmp/b.txt",
         target_id: 1,
     });
 });
@@ -95,7 +95,6 @@ function createTask(
     return {
         status: "SUCCESS",
         local_path: undefined,
-        source_uri: undefined,
         target_uri: undefined,
         target_id: 1,
         name: "a.txt",

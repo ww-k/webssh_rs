@@ -111,15 +111,15 @@ impl TransferService {
         abort: Arc<AtomicBool>,
     ) -> Result<(), ApiErr> {
         let task = self.get_task_model(id).await?;
-        let source_uri = task
-            .source_uri
+        let target_uri = task
+            .target_uri
             .clone()
-            .ok_or_else(|| invalid_task("missing source_uri"))?;
+            .ok_or_else(|| invalid_task("missing target_uri"))?;
         let local_path = task
             .local_path
             .clone()
             .ok_or_else(|| invalid_task("missing local_path"))?;
-        let uri = parse_file_uri(&source_uri)?;
+        let uri = parse_file_uri(&target_uri)?;
         let ranges = ranges_from_json(&task.ranges)?;
 
         let channel = map_ssh_err!(self.session_pool.get_channel(uri.target_id).await)?;

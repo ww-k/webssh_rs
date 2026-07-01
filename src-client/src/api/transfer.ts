@@ -16,7 +16,6 @@ export interface ITransferTask {
     type: ITransferTaskType;
     status: ITransferTaskStatus;
     local_path?: string;
-    source_uri?: string;
     target_uri?: string;
     target_id?: number;
     name: string;
