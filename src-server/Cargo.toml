@@ -12,6 +12,10 @@ path = "src/main.rs"
 name = "gen-docs"
 path = "src/bin/gen_docs.rs"
 
+[[bin]]
+name = "webssh-transfer-cli"
+path = "src/bin/webssh_transfer_cli.rs"
+
 [dependencies]
 anyhow = "1.0.98"
 async-stream = "0.3.6"

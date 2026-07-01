@@ -361,7 +361,7 @@ impl TransferService {
                     .read_exact(&mut buffer[..current_chunk_size])
                     .await
                     .map_err(map_transfer_io_err)?;
-                let data = buffer[..current_chunk_size].to_vec();
+                let data: Box<[u8]> = buffer[..current_chunk_size].into();
                 let end = offset + data.len() as i64 - 1;
                 let write = sftp
                     .begin_write(Arc::clone(&handle), offset as u64, data)

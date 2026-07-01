@@ -11,8 +11,10 @@ use std::{
 
 use anyhow::{Ok, Result};
 use russh::{
-    Channel, ChannelMsg, ChannelReadHalf, ChannelStream, ChannelWriteHalf, Disconnect,
+    Channel, ChannelMsg, ChannelReadHalf, ChannelStream, ChannelWriteHalf, Disconnect, Preferred,
+    cipher,
     client::DisconnectReason,
+    compression,
     keys::{HashAlg, PrivateKeyWithHashAlg, PublicKeyBase64, decode_secret_key, ssh_key},
 };
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
@@ -176,6 +178,17 @@ impl SshClient {
             window_size: 16 * 1024 * 1024,
             maximum_packet_size: 64 * 1024,
             nodelay: true,
+            preferred: Preferred {
+                cipher: std::borrow::Cow::Borrowed(&[
+                    cipher::AES_128_GCM,
+                    cipher::AES_256_GCM,
+                    cipher::AES_128_CTR,
+                    cipher::AES_256_CTR,
+                    cipher::CHACHA20_POLY1305,
+                ]),
+                compression: std::borrow::Cow::Borrowed(&[compression::NONE]),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let host = target.host.as_str();
