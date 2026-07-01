@@ -111,7 +111,6 @@ impl TransferService {
         abort: Arc<AtomicBool>,
     ) -> Result<(), ApiErr> {
         let task = self.get_task_model(id).await?;
-        let chunk_size = self.transfer_chunk_size;
         let source_uri = task
             .source_uri
             .clone()
@@ -123,8 +122,9 @@ impl TransferService {
         let uri = parse_file_uri(&source_uri)?;
         let ranges = ranges_from_json(&task.ranges)?;
 
-        let sftp = map_ssh_err!(self.session_pool.get_sftp_session(uri.target_id).await)?;
-        let mut remote_file = map_ssh_err!(sftp.open(uri.path).await)?;
+        let channel = map_ssh_err!(self.session_pool.get_channel(uri.target_id).await)?;
+        let sftp = FastSftpClient::new(channel).await?;
+        let remote_handle = sftp.open_read_handle(uri.path).await?;
         let mut local_file = File::options()
             .create(true)
             .write(true)
@@ -137,37 +137,128 @@ impl TransferService {
             .await
             .map_err(map_transfer_io_err)?;
 
+        let download_result = self
+            .recv_pipelined_sftp_reads(id, &sftp, &remote_handle, &mut local_file, ranges, abort)
+            .await;
+        let close_result = sftp.close(remote_handle.to_vec()).await;
+        sftp.shutdown().await;
+
+        download_result?;
+        if let Err(err) = close_result {
+            tracing::debug!(
+                "ignore sftp close error after successful download: {}",
+                err.message
+            );
+        }
+        local_file.flush().await.map_err(map_transfer_io_err)?;
+        Ok(())
+    }
+
+    async fn recv_pipelined_sftp_reads(
+        &self,
+        id: &str,
+        sftp: &FastSftpClient,
+        handle: &[u8],
+        local_file: &mut File,
+        ranges: Vec<[i64; 2]>,
+        abort: Arc<AtomicBool>,
+    ) -> Result<(), ApiErr> {
+        let handle: Arc<[u8]> = Arc::from(handle.to_vec());
         for range in ranges {
             if abort.load(Ordering::Acquire) {
                 return Ok(());
             }
             let [start, end] = range;
-            map_ssh_err!(remote_file.seek(SeekFrom::Start(start as u64)).await)?;
-            local_file
-                .seek(SeekFrom::Start(start as u64))
-                .await
-                .map_err(map_transfer_io_err)?;
 
-            let mut offset = start;
-            while offset <= end {
+            let mut next_offset = start;
+            let mut contiguous_done = start;
+            let mut progress_start = start;
+            let mut pending = VecDeque::new();
+
+            loop {
+                while pending.len() < SFTP_PIPELINE_MAX_IN_FLIGHT && next_offset <= end {
+                    if abort.load(Ordering::Acquire) {
+                        return Ok(());
+                    }
+
+                    let offset = next_offset;
+                    let current_chunk_size =
+                        std::cmp::min(SFTP_PIPELINE_CHUNK_SIZE as i64, end - next_offset + 1)
+                            as usize;
+                    let read = sftp
+                        .begin_read(Arc::clone(&handle), offset as u64, current_chunk_size)
+                        .await?;
+                    pending.push_back((offset, read));
+                    next_offset += current_chunk_size as i64;
+                }
+
+                if pending.is_empty() {
+                    break;
+                }
+
                 if abort.load(Ordering::Acquire) {
                     return Ok(());
                 }
-                let current_chunk_size =
-                    std::cmp::min(chunk_size as i64, end - offset + 1) as usize;
-                let mut buffer = vec![0; current_chunk_size];
-                map_ssh_err!(remote_file.read_exact(&mut buffer).await)?;
+
+                let Some((offset, read)) = pending.pop_front() else {
+                    break;
+                };
+                if offset != contiguous_done {
+                    return Err(ApiErr {
+                        code: ERR_CODE_SSH_ERR,
+                        message: format!(
+                            "sftp download progress mismatch: expected offset {contiguous_done}, got {offset}"
+                        ),
+                    });
+                }
+
+                let buffer = read.wait().await?;
+                if buffer.is_empty() {
+                    return Err(ApiErr {
+                        code: ERR_CODE_SSH_ERR,
+                        message: format!("sftp download reached eof before offset {}", end + 1),
+                    });
+                }
+                let data_end = offset + buffer.len() as i64 - 1;
+                if data_end > end {
+                    return Err(ApiErr {
+                        code: ERR_CODE_SSH_ERR,
+                        message: format!(
+                            "sftp download read past range end: got {data_end}, expected {end}"
+                        ),
+                    });
+                }
+
+                local_file
+                    .seek(SeekFrom::Start(offset as u64))
+                    .await
+                    .map_err(map_transfer_io_err)?;
                 local_file
                     .write_all(&buffer)
                     .await
                     .map_err(map_transfer_io_err)?;
-                offset += current_chunk_size as i64;
-                self.mark_range_done(id, [offset - current_chunk_size as i64, offset - 1])
-                    .await?;
+
+                contiguous_done = data_end + 1;
+                if contiguous_done - progress_start >= self.transfer_chunk_size as i64
+                    || contiguous_done > end
+                {
+                    self.mark_range_done(id, [progress_start, contiguous_done - 1])
+                        .await?;
+                    progress_start = contiguous_done;
+                }
+            }
+
+            if contiguous_done <= end {
+                return Err(ApiErr {
+                    code: ERR_CODE_SSH_ERR,
+                    message: format!(
+                        "sftp download progress mismatch: expected {}, got {contiguous_done}",
+                        end + 1
+                    ),
+                });
             }
         }
 
-        local_file.flush().await.map_err(map_transfer_io_err)?;
         Ok(())
     }
 
