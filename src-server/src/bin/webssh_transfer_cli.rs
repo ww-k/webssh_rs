@@ -1,7 +1,6 @@
 use std::{
-    collections::VecDeque,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, atomic::AtomicBool},
     time::{Duration, Instant},
 };
 
@@ -12,11 +11,11 @@ use russh::{
     compression,
     keys::{HashAlg, PrivateKeyWithHashAlg, decode_secret_key, ssh_key},
 };
-use tokio::{
-    fs::File,
-    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+use webssh_rs_server::sftp_client::{
+    FastSftpClient,
+    download::{DownloadOptions, run_download},
+    upload::{UploadOptions, run_upload},
 };
-use webssh_rs_server::sftp_client::FastSftpClient;
 
 #[derive(Debug)]
 struct Cli {
@@ -392,18 +391,21 @@ async fn upload(
         .await
         .with_context(|| format!("stat {}", local_path.display()))?
         .len();
-    let mut local_file = File::open(local_path)
-        .await
-        .with_context(|| format!("open {}", local_path.display()))?;
-    let handle = sftp.open_upload(remote_path, total).await?;
-    sftp.set_size(&handle, total).await?;
 
     let started = Instant::now();
-    let upload_result = send_pipelined_writes(sftp, &handle, &mut local_file, total, config).await;
-    let close_result = sftp.close(handle).await;
-
-    upload_result?;
-    close_result?;
+    let mut options = UploadOptions::new(
+        sftp.clone(),
+        local_path.to_path_buf(),
+        remote_path.to_string(),
+        total,
+        Arc::new(AtomicBool::new(false)),
+        initial_ranges(total),
+    );
+    options.chunk_size = config.chunk_size;
+    options.max_in_flight = config.max_in_flight;
+    options.progress_chunk_size = config.chunk_size;
+    options.write_timeout = config.write_timeout;
+    run_upload(options).await?;
 
     Ok(TransferStats {
         bytes: total,
@@ -425,27 +427,23 @@ async fn download(
     let total = attrs
         .size
         .with_context(|| format!("remote path has no size metadata: {remote_path}"))?;
-    let handle = sftp.open_read_handle(remote_path).await?;
-    let mut local_file = File::options()
-        .create(true)
-        .write(true)
-        .read(true)
-        .truncate(false)
-        .open(local_path)
-        .await
-        .with_context(|| format!("open {}", local_path.display()))?;
-    local_file.set_len(total).await?;
     let setup_elapsed = setup_started.elapsed();
 
     let started = Instant::now();
-    let download_result = recv_pipelined_reads(sftp, &handle, &mut local_file, total, config).await;
+    let mut options = DownloadOptions::new(
+        sftp.clone(),
+        remote_path.to_string(),
+        local_path.to_path_buf(),
+        total,
+        Arc::new(AtomicBool::new(false)),
+        initial_ranges(total),
+    );
+    options.chunk_size = config.chunk_size;
+    options.max_in_flight = config.max_in_flight;
+    options.progress_chunk_size = config.chunk_size;
+    run_download(options).await?;
     let elapsed = started.elapsed();
     let finish_started = Instant::now();
-    let close_result = sftp.close(handle).await;
-
-    download_result?;
-    close_result?;
-    local_file.flush().await?;
     let finish_elapsed = finish_started.elapsed();
 
     Ok(TransferStats {
@@ -457,102 +455,12 @@ async fn download(
     })
 }
 
-async fn send_pipelined_writes(
-    sftp: &FastSftpClient,
-    handle: &[u8],
-    local_file: &mut File,
-    total: u64,
-    config: &TransferConfig,
-) -> Result<()> {
-    let mut buffer = vec![0; config.chunk_size];
-    let handle: Arc<[u8]> = Arc::from(handle.to_vec());
-    let mut next_offset = 0u64;
-    let mut contiguous_done = 0u64;
-    let mut pending = VecDeque::new();
-
-    loop {
-        while pending.len() < config.max_in_flight && next_offset < total {
-            let offset = next_offset;
-            let current_chunk_size = std::cmp::min(buffer.len() as u64, total - next_offset);
-            local_file
-                .read_exact(&mut buffer[..current_chunk_size as usize])
-                .await?;
-            let data: Box<[u8]> = buffer[..current_chunk_size as usize].into();
-            let end = offset + data.len() as u64;
-            let write = sftp.begin_write(Arc::clone(&handle), offset, data).await?;
-            pending.push_back((offset, end, write));
-            next_offset += current_chunk_size;
-        }
-
-        let Some((start, end, write)) = pending.pop_front() else {
-            break;
-        };
-        tokio::time::timeout(config.write_timeout, write.wait())
-            .await
-            .context("sftp write response timeout")??;
-
-        if start != contiguous_done {
-            bail!("sftp upload progress mismatch: expected {contiguous_done}, got {start}");
-        }
-        contiguous_done = end;
+fn initial_ranges(total: u64) -> Vec<[i64; 2]> {
+    if total == 0 {
+        Vec::new()
+    } else {
+        vec![[0, total as i64 - 1]]
     }
-
-    if contiguous_done != total {
-        bail!("sftp upload progress mismatch: expected {total}, got {contiguous_done}");
-    }
-
-    Ok(())
-}
-
-async fn recv_pipelined_reads(
-    sftp: &FastSftpClient,
-    handle: &[u8],
-    local_file: &mut File,
-    total: u64,
-    config: &TransferConfig,
-) -> Result<()> {
-    let handle: Arc<[u8]> = Arc::from(handle.to_vec());
-    let mut next_offset = 0u64;
-    let mut contiguous_done = 0u64;
-    let mut local_write_offset = 0u64;
-    let mut pending = VecDeque::new();
-
-    loop {
-        while pending.len() < config.max_in_flight && next_offset < total {
-            let offset = next_offset;
-            let current_chunk_size = std::cmp::min(config.chunk_size as u64, total - next_offset);
-            let read = sftp
-                .begin_read(Arc::clone(&handle), offset, current_chunk_size as usize)
-                .await?;
-            pending.push_back((offset, read));
-            next_offset += current_chunk_size;
-        }
-
-        let Some((offset, read)) = pending.pop_front() else {
-            break;
-        };
-        if offset != contiguous_done {
-            bail!("sftp download progress mismatch: expected {contiguous_done}, got {offset}");
-        }
-
-        let data = read.wait_data().await?;
-        if data.is_empty() && contiguous_done < total {
-            bail!("sftp download reached eof before offset {total}");
-        }
-
-        if local_write_offset != offset {
-            local_file.seek(std::io::SeekFrom::Start(offset)).await?;
-        }
-        local_file.write_all(data.as_slice()).await?;
-        contiguous_done += data.len() as u64;
-        local_write_offset = contiguous_done;
-    }
-
-    if contiguous_done != total {
-        bail!("sftp download progress mismatch: expected {total}, got {contiguous_done}");
-    }
-
-    Ok(())
 }
 
 fn print_stats(stats: TransferStats) {

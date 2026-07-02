@@ -1,3 +1,7 @@
+pub mod download;
+pub mod transfer;
+pub mod upload;
+
 use std::{collections::BTreeMap, io::SeekFrom, ops::BitOr, sync::Arc};
 
 use russh::{Channel, client::Msg};

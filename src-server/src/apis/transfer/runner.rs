@@ -1,38 +1,33 @@
 use std::{
-    collections::VecDeque,
-    io::SeekFrom,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    path::PathBuf,
+    sync::{Arc, atomic::AtomicBool},
 };
 
-use tokio::{
-    fs::File,
-    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
-    time::Duration,
-};
+use tokio::sync::Mutex;
 
 use crate::{
     apis::{ApiErr, sftp::parse_file_uri},
     consts::services_err_code::ERR_CODE_SSH_ERR,
     map_ssh_err,
-    sftp_client::{FastSftpClient, SftpAttrs, SftpOpenOptions},
+    sftp_client::{
+        FastSftpClient,
+        download::{DownloadOptions, run_download},
+        transfer::{
+            DEFAULT_PIPELINE_CHUNK_SIZE, DEFAULT_READ_MAX_IN_FLIGHT, DEFAULT_WRITE_MAX_IN_FLIGHT,
+            DEFAULT_WRITE_RESPONSE_TIMEOUT, TransferProgress,
+        },
+        upload::{UploadOptions, run_upload},
+    },
 };
 
 use super::{
     ranges::{invalid_task, ranges_from_json},
-    service::{TransferService, map_transfer_io_err},
+    service::TransferService,
 };
 
-const SFTP_PIPELINE_CHUNK_SIZE: usize = 255 * 1024;
-const SFTP_READ_PIPELINE_MAX_IN_FLIGHT: usize = 8;
-const SFTP_WRITE_PIPELINE_MAX_IN_FLIGHT: usize = 64;
-const SFTP_WRITE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(2);
 impl TransferService {
     pub(super) async fn run_upload(&self, id: &str, abort: Arc<AtomicBool>) -> Result<(), ApiErr> {
         let task = self.get_task_model(id).await?;
-        let chunk_size = self.transfer_chunk_size;
         let local_path = task
             .local_path
             .clone()
@@ -43,66 +38,43 @@ impl TransferService {
             .ok_or_else(|| invalid_task("missing target_uri"))?;
         let uri = parse_file_uri(&target_uri)?;
         let ranges = ranges_from_json(&task.ranges)?;
+        let truncate = ranges.len() == 1 && ranges[0] == [0, task.total - 1];
 
-        if ranges.len() == 1 && ranges[0] == [0, task.total - 1] {
-            return self
-                .run_pipelined_sftp_upload(
-                    id,
-                    uri.target_id,
-                    uri.path,
-                    &local_path,
-                    task.total,
-                    abort,
-                )
-                .await;
-        }
+        let channel = map_ssh_err!(self.session_pool.get_channel(uri.target_id).await)?;
+        let sftp = FastSftpClient::new(channel).await?;
+        let mut options = UploadOptions::new(
+            sftp.clone(),
+            PathBuf::from(local_path),
+            uri.path.to_string(),
+            task.total as u64,
+            abort,
+            ranges,
+        );
+        options.chunk_size = DEFAULT_PIPELINE_CHUNK_SIZE;
+        options.max_in_flight = DEFAULT_WRITE_MAX_IN_FLIGHT;
+        options.progress_chunk_size = self.transfer_chunk_size;
+        options.write_timeout = DEFAULT_WRITE_RESPONSE_TIMEOUT;
+        options.truncate = truncate;
+        options.progress = transfer_progress(self.clone(), id.to_string());
 
-        let mut local_file = File::open(local_path).await.map_err(map_transfer_io_err)?;
-        let sftp = map_ssh_err!(self.session_pool.get_sftp_session(uri.target_id).await)?;
-        let mut remote_file = map_ssh_err!(
-            sftp.open_with_flags(
-                uri.path,
-                SftpOpenOptions::WRITE | SftpOpenOptions::READ | SftpOpenOptions::CREATE
-            )
-            .await
-        )?;
-        map_ssh_err!(
-            remote_file
-                .set_metadata(SftpAttrs::with_size(task.total as u64))
-                .await
-        )?;
+        let upload_result = run_upload(options).await;
+        sftp.shutdown().await;
 
-        for range in ranges {
-            if abort.load(Ordering::Acquire) {
+        if let Err(err) = upload_result {
+            if self
+                .remote_file_size_matches(uri.target_id, uri.path, task.total)
+                .await?
+            {
+                let task = self.get_task_model(id).await?;
+                let ranges = ranges_from_json(&task.ranges)?;
+                for range in ranges {
+                    self.mark_range_done(id, range).await?;
+                }
                 return Ok(());
             }
-            let [start, end] = range;
-            local_file
-                .seek(SeekFrom::Start(start as u64))
-                .await
-                .map_err(map_transfer_io_err)?;
-            map_ssh_err!(remote_file.seek(SeekFrom::Start(start as u64)).await)?;
-
-            let mut offset = start;
-            while offset <= end {
-                if abort.load(Ordering::Acquire) {
-                    return Ok(());
-                }
-                let current_chunk_size =
-                    std::cmp::min(chunk_size as i64, end - offset + 1) as usize;
-                let mut buffer = vec![0; current_chunk_size];
-                local_file
-                    .read_exact(&mut buffer)
-                    .await
-                    .map_err(map_transfer_io_err)?;
-                map_ssh_err!(remote_file.write_all(&buffer).await)?;
-                offset += current_chunk_size as i64;
-                self.mark_range_done(id, [offset - current_chunk_size as i64, offset - 1])
-                    .await?;
-            }
+            return Err(map_transfer_anyhow_err(err));
         }
 
-        map_ssh_err!(remote_file.flush().await)?;
         Ok(())
     }
 
@@ -125,203 +97,23 @@ impl TransferService {
 
         let channel = map_ssh_err!(self.session_pool.get_channel(uri.target_id).await)?;
         let sftp = FastSftpClient::new(channel).await?;
-        let remote_handle = sftp.open_read_handle(uri.path).await?;
-        let mut local_file = File::options()
-            .create(true)
-            .write(true)
-            .read(true)
-            .open(local_path)
-            .await
-            .map_err(map_transfer_io_err)?;
-        local_file
-            .set_len(task.total as u64)
-            .await
-            .map_err(map_transfer_io_err)?;
+        let mut options = DownloadOptions::new(
+            sftp.clone(),
+            uri.path.to_string(),
+            PathBuf::from(local_path),
+            task.total as u64,
+            abort,
+            ranges,
+        );
+        options.chunk_size = DEFAULT_PIPELINE_CHUNK_SIZE;
+        options.max_in_flight = DEFAULT_READ_MAX_IN_FLIGHT;
+        options.progress_chunk_size = self.transfer_chunk_size;
+        options.progress = transfer_progress(self.clone(), id.to_string());
 
-        let download_result = self
-            .recv_pipelined_sftp_reads(id, &sftp, &remote_handle, &mut local_file, ranges, abort)
-            .await;
-        let close_result = sftp.close(remote_handle.to_vec()).await;
+        let download_result = run_download(options).await;
         sftp.shutdown().await;
 
-        download_result?;
-        if let Err(err) = close_result {
-            tracing::debug!(
-                "ignore sftp close error after successful download: {}",
-                err.message
-            );
-        }
-        local_file.flush().await.map_err(map_transfer_io_err)?;
-        Ok(())
-    }
-
-    async fn recv_pipelined_sftp_reads(
-        &self,
-        id: &str,
-        sftp: &FastSftpClient,
-        handle: &[u8],
-        local_file: &mut File,
-        ranges: Vec<[i64; 2]>,
-        abort: Arc<AtomicBool>,
-    ) -> Result<(), ApiErr> {
-        let handle: Arc<[u8]> = Arc::from(handle.to_vec());
-        let mut local_write_offset = 0i64;
-        for range in ranges {
-            if abort.load(Ordering::Acquire) {
-                return Ok(());
-            }
-            let [start, end] = range;
-
-            let mut next_offset = start;
-            let mut contiguous_done = start;
-            let mut progress_start = start;
-            let mut pending = VecDeque::new();
-
-            loop {
-                while pending.len() < SFTP_READ_PIPELINE_MAX_IN_FLIGHT && next_offset <= end {
-                    if abort.load(Ordering::Acquire) {
-                        return Ok(());
-                    }
-
-                    let offset = next_offset;
-                    let current_chunk_size =
-                        std::cmp::min(SFTP_PIPELINE_CHUNK_SIZE as i64, end - next_offset + 1)
-                            as usize;
-                    let read = sftp
-                        .begin_read(Arc::clone(&handle), offset as u64, current_chunk_size)
-                        .await?;
-                    pending.push_back((offset, read));
-                    next_offset += current_chunk_size as i64;
-                }
-
-                if pending.is_empty() {
-                    break;
-                }
-
-                if abort.load(Ordering::Acquire) {
-                    return Ok(());
-                }
-
-                let Some((offset, read)) = pending.pop_front() else {
-                    break;
-                };
-                if offset != contiguous_done {
-                    return Err(ApiErr {
-                        code: ERR_CODE_SSH_ERR,
-                        message: format!(
-                            "sftp download progress mismatch: expected offset {contiguous_done}, got {offset}"
-                        ),
-                    });
-                }
-
-                let data = read.wait_data().await?;
-                if data.is_empty() {
-                    return Err(ApiErr {
-                        code: ERR_CODE_SSH_ERR,
-                        message: format!("sftp download reached eof before offset {}", end + 1),
-                    });
-                }
-                let data_end = offset + data.len() as i64 - 1;
-                if data_end > end {
-                    return Err(ApiErr {
-                        code: ERR_CODE_SSH_ERR,
-                        message: format!(
-                            "sftp download read past range end: got {data_end}, expected {end}"
-                        ),
-                    });
-                }
-
-                if local_write_offset != offset {
-                    local_file
-                        .seek(SeekFrom::Start(offset as u64))
-                        .await
-                        .map_err(map_transfer_io_err)?;
-                }
-                local_file
-                    .write_all(data.as_slice())
-                    .await
-                    .map_err(map_transfer_io_err)?;
-
-                contiguous_done = data_end + 1;
-                local_write_offset = contiguous_done;
-                if contiguous_done - progress_start >= self.transfer_chunk_size as i64
-                    || contiguous_done > end
-                {
-                    self.mark_range_done(id, [progress_start, contiguous_done - 1])
-                        .await?;
-                    progress_start = contiguous_done;
-                }
-            }
-
-            if contiguous_done <= end {
-                return Err(ApiErr {
-                    code: ERR_CODE_SSH_ERR,
-                    message: format!(
-                        "sftp download progress mismatch: expected {}, got {contiguous_done}",
-                        end + 1
-                    ),
-                });
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn run_pipelined_sftp_upload(
-        &self,
-        id: &str,
-        target_id: i32,
-        remote_path: &str,
-        local_path: &str,
-        total: i64,
-        abort: Arc<AtomicBool>,
-    ) -> Result<(), ApiErr> {
-        let mut local_file = File::open(local_path).await.map_err(map_transfer_io_err)?;
-        let channel = map_ssh_err!(self.session_pool.get_channel(target_id).await)?;
-        let sftp = FastSftpClient::new(channel).await?;
-        let handle = sftp.open_upload(remote_path, total as u64).await?;
-        sftp.set_size(&handle, total as u64).await?;
-
-        let upload_result = self
-            .send_pipelined_sftp_writes(
-                id,
-                target_id,
-                remote_path,
-                &sftp,
-                &handle,
-                &mut local_file,
-                total,
-                abort,
-            )
-            .await;
-        let close_result = sftp.close(handle).await;
-        sftp.shutdown().await;
-
-        if let Err(err) = upload_result {
-            let _ = close_result;
-            if self
-                .remote_file_size_matches(target_id, remote_path, total)
-                .await?
-            {
-                let task = self.get_task_model(id).await?;
-                let ranges = ranges_from_json(&task.ranges)?;
-                for range in ranges {
-                    self.mark_range_done(id, range).await?;
-                }
-                return Ok(());
-            }
-            return Err(err);
-        }
-        if let Err(err) = close_result {
-            if self
-                .remote_file_size_matches(target_id, remote_path, total)
-                .await?
-            {
-                return Ok(());
-            }
-            return Err(err);
-        }
-        Ok(())
+        download_result.map_err(map_transfer_anyhow_err)
     }
 
     async fn remote_file_size_matches(
@@ -334,110 +126,27 @@ impl TransferService {
         let attr = map_ssh_err!(sftp.metadata(remote_path).await)?;
         Ok(attr.size == Some(total as u64))
     }
+}
 
-    async fn send_pipelined_sftp_writes(
-        &self,
-        id: &str,
-        target_id: i32,
-        remote_path: &str,
-        sftp: &FastSftpClient,
-        handle: &[u8],
-        local_file: &mut File,
-        total: i64,
-        abort: Arc<AtomicBool>,
-    ) -> Result<(), ApiErr> {
-        let mut buffer = vec![0; SFTP_PIPELINE_CHUNK_SIZE];
-        let handle: Arc<[u8]> = Arc::from(handle.to_vec());
-        let mut next_offset = 0i64;
-        let mut contiguous_done = 0i64;
-        let mut progress_start = 0i64;
-        let mut pending = VecDeque::new();
-
-        loop {
-            while pending.len() < SFTP_WRITE_PIPELINE_MAX_IN_FLIGHT && next_offset < total {
-                if abort.load(Ordering::Acquire) {
-                    return Ok(());
-                }
-
-                let offset = next_offset;
-                let current_chunk_size =
-                    std::cmp::min(buffer.len() as i64, total - next_offset) as usize;
-                local_file
-                    .read_exact(&mut buffer[..current_chunk_size])
-                    .await
-                    .map_err(map_transfer_io_err)?;
-                let data: Box<[u8]> = buffer[..current_chunk_size].into();
-                let end = offset + data.len() as i64 - 1;
-                let write = sftp
-                    .begin_write(Arc::clone(&handle), offset as u64, data)
-                    .await?;
-                pending.push_back((offset, end, write));
-                next_offset += current_chunk_size as i64;
-            }
-
-            if pending.is_empty() {
-                break;
-            }
-
-            let Some((start, end, write)) = pending.pop_front() else {
-                break;
-            };
-            let write_result =
-                tokio::time::timeout(SFTP_WRITE_RESPONSE_TIMEOUT, write.wait()).await;
-            match write_result {
-                Ok(result) => result?,
-                Err(_) if next_offset == total => {
-                    if self
-                        .remote_file_size_matches(target_id, remote_path, total)
-                        .await?
-                    {
-                        let task = self.get_task_model(id).await?;
-                        let ranges = ranges_from_json(&task.ranges)?;
-                        for range in ranges {
-                            self.mark_range_done(id, range).await?;
-                        }
-                        return Ok(());
-                    }
-                    return Err(ApiErr {
-                        code: ERR_CODE_SSH_ERR,
-                        message: "sftp write response timeout".to_string(),
-                    });
-                }
-                Err(_) => {
-                    return Err(ApiErr {
-                        code: ERR_CODE_SSH_ERR,
-                        message: "sftp write response timeout".to_string(),
-                    });
-                }
-            }
-
-            if start != contiguous_done {
-                return Err(ApiErr {
-                    code: ERR_CODE_SSH_ERR,
-                    message: format!(
-                        "sftp upload progress mismatch: expected offset {contiguous_done}, got {start}"
-                    ),
-                });
-            }
-            contiguous_done = end + 1;
-            if contiguous_done - progress_start >= self.transfer_chunk_size as i64
-                || contiguous_done == total
-            {
-                self.mark_range_done(id, [progress_start, contiguous_done - 1])
-                    .await?;
-                progress_start = contiguous_done;
-            }
+fn transfer_progress(service: TransferService, id: String) -> TransferProgress {
+    let progress_lock = Arc::new(Mutex::new(()));
+    TransferProgress::new(move |range| {
+        let service = service.clone();
+        let id = id.clone();
+        let progress_lock = Arc::clone(&progress_lock);
+        async move {
+            let _guard = progress_lock.lock().await;
+            service
+                .mark_range_done(&id, range)
+                .await
+                .map_err(|err| anyhow::anyhow!(err.message))
         }
+    })
+}
 
-        if contiguous_done != total {
-            return Err(ApiErr {
-                code: ERR_CODE_SSH_ERR,
-                message: format!(
-                    "sftp upload progress mismatch: expected {total}, got {contiguous_done}"
-                ),
-            });
-        }
-
-        Ok(())
+fn map_transfer_anyhow_err(err: anyhow::Error) -> ApiErr {
+    ApiErr {
+        code: ERR_CODE_SSH_ERR,
+        message: err.to_string(),
     }
 }
