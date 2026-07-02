@@ -26,7 +26,7 @@ struct Cli {
     password: Option<String>,
     key_passphrase: Option<String>,
     chunk_size: usize,
-    in_flight: usize,
+    in_flight: Option<usize>,
     ssh_pool: usize,
     sftp_pool: usize,
     write_timeout_secs: u64,
@@ -62,7 +62,9 @@ struct TransferConfig {
 struct TransferStats {
     bytes: u64,
     connect_elapsed: Duration,
+    setup_elapsed: Duration,
     elapsed: Duration,
+    finish_elapsed: Duration,
 }
 
 #[tokio::main]
@@ -90,7 +92,10 @@ async fn main() -> Result<()> {
 
     let config = TransferConfig {
         chunk_size: cli.chunk_size.min(255 * 1024),
-        max_in_flight: cli.in_flight,
+        max_in_flight: cli.in_flight.unwrap_or(match direction {
+            Direction::Upload => 64,
+            Direction::Download => 8,
+        }),
         write_timeout: Duration::from_secs(cli.write_timeout_secs),
     };
     let connect_started = Instant::now();
@@ -130,7 +135,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli> {
         password: None,
         key_passphrase: None,
         chunk_size: 255 * 1024,
-        in_flight: 64,
+        in_flight: None,
         ssh_pool: 1,
         sftp_pool: 1,
         write_timeout_secs: 2,
@@ -150,7 +155,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli> {
             "--password" => cli.password = Some(next(&mut args, &arg)?),
             "--key-passphrase" => cli.key_passphrase = Some(next(&mut args, &arg)?),
             "--chunk-size" => cli.chunk_size = parse_next(&mut args, &arg)?,
-            "--in-flight" => cli.in_flight = parse_next(&mut args, &arg)?,
+            "--in-flight" => cli.in_flight = Some(parse_next(&mut args, &arg)?),
             "--ssh-pool" => cli.ssh_pool = parse_next(&mut args, &arg)?,
             "--sftp-pool" => cli.sftp_pool = parse_next(&mut args, &arg)?,
             "--write-timeout-secs" => cli.write_timeout_secs = parse_next(&mut args, &arg)?,
@@ -159,7 +164,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli> {
                 cli.chunk_size = parse_value(value, "--chunk-size=")?
             }
             value if value.starts_with("--in-flight=") => {
-                cli.in_flight = parse_value(value, "--in-flight=")?
+                cli.in_flight = Some(parse_value(value, "--in-flight=")?)
             }
             value if value.starts_with("--ssh-pool=") => {
                 cli.ssh_pool = parse_value(value, "--ssh-pool=")?
@@ -222,7 +227,7 @@ fn validate_options(cli: &Cli) -> Result<()> {
     if cli.chunk_size == 0 {
         bail!("--chunk-size must be greater than 0");
     }
-    if cli.in_flight == 0 {
+    if cli.in_flight == Some(0) {
         bail!("--in-flight must be greater than 0");
     }
     if cli.threads == 0 {
@@ -403,7 +408,9 @@ async fn upload(
     Ok(TransferStats {
         bytes: total,
         connect_elapsed: Duration::ZERO,
+        setup_elapsed: Duration::ZERO,
         elapsed: started.elapsed(),
+        finish_elapsed: Duration::ZERO,
     })
 }
 
@@ -413,6 +420,7 @@ async fn download(
     local_path: &Path,
     config: &TransferConfig,
 ) -> Result<TransferStats> {
+    let setup_started = Instant::now();
     let attrs = sftp.metadata(remote_path).await?;
     let total = attrs
         .size
@@ -427,19 +435,25 @@ async fn download(
         .await
         .with_context(|| format!("open {}", local_path.display()))?;
     local_file.set_len(total).await?;
+    let setup_elapsed = setup_started.elapsed();
 
     let started = Instant::now();
     let download_result = recv_pipelined_reads(sftp, &handle, &mut local_file, total, config).await;
+    let elapsed = started.elapsed();
+    let finish_started = Instant::now();
     let close_result = sftp.close(handle).await;
 
     download_result?;
     close_result?;
     local_file.flush().await?;
+    let finish_elapsed = finish_started.elapsed();
 
     Ok(TransferStats {
         bytes: total,
         connect_elapsed: Duration::ZERO,
-        elapsed: started.elapsed(),
+        setup_elapsed,
+        elapsed,
+        finish_elapsed,
     })
 }
 
@@ -521,16 +535,16 @@ async fn recv_pipelined_reads(
             bail!("sftp download progress mismatch: expected {contiguous_done}, got {offset}");
         }
 
-        let buffer = read.wait().await?;
-        if buffer.is_empty() && contiguous_done < total {
+        let data = read.wait_data().await?;
+        if data.is_empty() && contiguous_done < total {
             bail!("sftp download reached eof before offset {total}");
         }
 
         if local_write_offset != offset {
             local_file.seek(std::io::SeekFrom::Start(offset)).await?;
         }
-        local_file.write_all(&buffer).await?;
-        contiguous_done += buffer.len() as u64;
+        local_file.write_all(data.as_slice()).await?;
+        contiguous_done += data.len() as u64;
         local_write_offset = contiguous_done;
     }
 
@@ -543,8 +557,12 @@ async fn recv_pipelined_reads(
 
 fn print_stats(stats: TransferStats) {
     let connect_seconds = stats.connect_elapsed.as_secs_f64();
+    let setup_seconds = stats.setup_elapsed.as_secs_f64();
     let seconds = stats.elapsed.as_secs_f64();
-    let total_seconds = (stats.connect_elapsed + stats.elapsed).as_secs_f64();
+    let finish_seconds = stats.finish_elapsed.as_secs_f64();
+    let total_seconds =
+        (stats.connect_elapsed + stats.setup_elapsed + stats.elapsed + stats.finish_elapsed)
+            .as_secs_f64();
     let mib = stats.bytes as f64 / 1024.0 / 1024.0;
     let mib_per_sec = if seconds > 0.0 { mib / seconds } else { 0.0 };
     let total_mib_per_sec = if total_seconds > 0.0 {
@@ -555,7 +573,9 @@ fn print_stats(stats: TransferStats) {
 
     println!("bytes={}", stats.bytes);
     println!("connect_sec={connect_seconds:.3}");
+    println!("setup_sec={setup_seconds:.3}");
     println!("elapsed_sec={seconds:.3}");
+    println!("finish_sec={finish_seconds:.3}");
     println!("throughput_mib_s={mib_per_sec:.2}");
     println!("total_sec={total_seconds:.3}");
     println!("total_throughput_mib_s={total_mib_per_sec:.2}");

@@ -26,7 +26,8 @@ use super::{
 };
 
 const SFTP_PIPELINE_CHUNK_SIZE: usize = 255 * 1024;
-const SFTP_PIPELINE_MAX_IN_FLIGHT: usize = 64;
+const SFTP_READ_PIPELINE_MAX_IN_FLIGHT: usize = 8;
+const SFTP_WRITE_PIPELINE_MAX_IN_FLIGHT: usize = 64;
 const SFTP_WRITE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(2);
 impl TransferService {
     pub(super) async fn run_upload(&self, id: &str, abort: Arc<AtomicBool>) -> Result<(), ApiErr> {
@@ -164,6 +165,7 @@ impl TransferService {
         abort: Arc<AtomicBool>,
     ) -> Result<(), ApiErr> {
         let handle: Arc<[u8]> = Arc::from(handle.to_vec());
+        let mut local_write_offset = 0i64;
         for range in ranges {
             if abort.load(Ordering::Acquire) {
                 return Ok(());
@@ -176,7 +178,7 @@ impl TransferService {
             let mut pending = VecDeque::new();
 
             loop {
-                while pending.len() < SFTP_PIPELINE_MAX_IN_FLIGHT && next_offset <= end {
+                while pending.len() < SFTP_READ_PIPELINE_MAX_IN_FLIGHT && next_offset <= end {
                     if abort.load(Ordering::Acquire) {
                         return Ok(());
                     }
@@ -212,14 +214,14 @@ impl TransferService {
                     });
                 }
 
-                let buffer = read.wait().await?;
-                if buffer.is_empty() {
+                let data = read.wait_data().await?;
+                if data.is_empty() {
                     return Err(ApiErr {
                         code: ERR_CODE_SSH_ERR,
                         message: format!("sftp download reached eof before offset {}", end + 1),
                     });
                 }
-                let data_end = offset + buffer.len() as i64 - 1;
+                let data_end = offset + data.len() as i64 - 1;
                 if data_end > end {
                     return Err(ApiErr {
                         code: ERR_CODE_SSH_ERR,
@@ -229,16 +231,19 @@ impl TransferService {
                     });
                 }
 
+                if local_write_offset != offset {
+                    local_file
+                        .seek(SeekFrom::Start(offset as u64))
+                        .await
+                        .map_err(map_transfer_io_err)?;
+                }
                 local_file
-                    .seek(SeekFrom::Start(offset as u64))
-                    .await
-                    .map_err(map_transfer_io_err)?;
-                local_file
-                    .write_all(&buffer)
+                    .write_all(data.as_slice())
                     .await
                     .map_err(map_transfer_io_err)?;
 
                 contiguous_done = data_end + 1;
+                local_write_offset = contiguous_done;
                 if contiguous_done - progress_start >= self.transfer_chunk_size as i64
                     || contiguous_done > end
                 {
@@ -349,7 +354,7 @@ impl TransferService {
         let mut pending = VecDeque::new();
 
         loop {
-            while pending.len() < SFTP_PIPELINE_MAX_IN_FLIGHT && next_offset < total {
+            while pending.len() < SFTP_WRITE_PIPELINE_MAX_IN_FLIGHT && next_offset < total {
                 if abort.load(Ordering::Acquire) {
                     return Ok(());
                 }

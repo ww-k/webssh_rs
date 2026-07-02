@@ -72,6 +72,35 @@ pub struct PendingSftpRead {
     rx: oneshot::Receiver<Result<ResponsePacket, ApiErr>>,
 }
 
+pub struct SftpReadData {
+    payload: Vec<u8>,
+    data_start: usize,
+    data_len: usize,
+}
+
+impl SftpReadData {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.payload[self.data_start..self.data_start + self.data_len]
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data_len == 0
+    }
+
+    pub fn len(&self) -> usize {
+        self.data_len
+    }
+
+    pub fn into_vec(mut self) -> Vec<u8> {
+        if self.data_start == self.payload.len() {
+            return Vec::new();
+        }
+        let mut data = self.payload.split_off(self.data_start);
+        data.truncate(self.data_len);
+        data
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SftpFileType {
     Dir,
@@ -316,6 +345,35 @@ struct FastSftpInner {
 struct ResponsePacket {
     packet_type: u8,
     payload: Vec<u8>,
+    payload_start: usize,
+}
+
+impl ResponsePacket {
+    fn payload(&self) -> &[u8] {
+        &self.payload[self.payload_start..]
+    }
+
+    fn split_response_id(&mut self) -> Option<u32> {
+        if self.payload().len() < 4 {
+            return None;
+        }
+        let id = u32::from_be_bytes(self.payload()[0..4].try_into().ok()?);
+        self.payload_start += 4;
+        Some(id)
+    }
+
+    fn into_read_data(self) -> Result<SftpReadData, ApiErr> {
+        payload_into_read_data(self.payload, self.payload_start)
+    }
+
+    #[cfg(test)]
+    fn into_payload(self) -> Vec<u8> {
+        if self.payload_start == 0 {
+            self.payload
+        } else {
+            self.payload[self.payload_start..].to_vec()
+        }
+    }
 }
 
 impl FastSftpClient {
@@ -372,10 +430,10 @@ impl FastSftpClient {
 
             match response.packet_type {
                 SSH_FXP_NAME => {
-                    entries.extend(parse_name_entries(&response.payload)?);
+                    entries.extend(parse_name_entries(response.payload())?);
                 }
                 SSH_FXP_STATUS => {
-                    let status = parse_status_packet(&response.payload)?;
+                    let status = parse_status_packet(response.payload())?;
                     if status.code == SSH_FX_EOF {
                         break;
                     }
@@ -409,7 +467,7 @@ impl FastSftpClient {
             ));
         }
 
-        Ok(parse_attrs(&response.payload)?)
+        Ok(parse_attrs(response.payload())?)
     }
 
     pub async fn rename<O, N>(&self, oldpath: O, newpath: N) -> SftpResult<()>
@@ -486,7 +544,7 @@ impl FastSftpClient {
             )));
         }
 
-        let mut cursor = Cursor::new(&response.payload);
+        let mut cursor = Cursor::new(response.payload());
         Ok(cursor.read_string()?.to_vec())
     }
 
@@ -564,9 +622,9 @@ impl FastSftpClient {
 
         let response = self.request(SSH_FXP_READ, payload).await?;
         match response.packet_type {
-            SSH_FXP_DATA => payload_into_data(response.payload),
+            SSH_FXP_DATA => payload_into_data(response),
             SSH_FXP_STATUS => {
-                let status = parse_status_packet(&response.payload)?;
+                let status = parse_status_packet(response.payload())?;
                 if status.code == SSH_FX_EOF {
                     Ok(Vec::new())
                 } else {
@@ -588,7 +646,7 @@ impl FastSftpClient {
             )));
         }
 
-        parse_status(&response.payload)
+        parse_status(response.payload())
     }
 
     async fn request(&self, packet_type: u8, payload: Vec<u8>) -> Result<ResponsePacket, ApiErr> {
@@ -671,22 +729,30 @@ impl PendingSftpWrite {
             )));
         }
 
-        parse_status(&response.payload)
+        parse_status(response.payload())
     }
 }
 
 impl PendingSftpRead {
     pub async fn wait(self) -> Result<Vec<u8>, ApiErr> {
+        self.wait_data().await.map(SftpReadData::into_vec)
+    }
+
+    pub async fn wait_data(self) -> Result<SftpReadData, ApiErr> {
         let response = self
             .rx
             .await
             .map_err(|_| protocol_err("sftp response channel closed"))??;
         match response.packet_type {
-            SSH_FXP_DATA => payload_into_data(response.payload),
+            SSH_FXP_DATA => response.into_read_data(),
             SSH_FXP_STATUS => {
-                let status = parse_status_packet(&response.payload)?;
+                let status = parse_status_packet(response.payload())?;
                 if status.code == SSH_FX_EOF {
-                    Ok(Vec::new())
+                    Ok(SftpReadData {
+                        payload: Vec::new(),
+                        data_start: 0,
+                        data_len: 0,
+                    })
                 } else {
                     Err(protocol_err(status.message))
                 }
@@ -712,16 +778,14 @@ where
             }
         };
 
-        let Some((id, payload)) = split_response_id(packet.payload) else {
+        let mut packet = packet;
+        let Some(id) = packet.split_response_id() else {
             fail_all_pending(&inner, protocol_err("sftp response missing id")).await;
             break;
         };
 
         if let Some(tx) = inner.pending.lock().await.remove(&id) {
-            let _ = tx.send(Ok(ResponsePacket {
-                packet_type: packet.packet_type,
-                payload,
-            }));
+            let _ = tx.send(Ok(packet));
         }
     }
 }
@@ -819,9 +883,11 @@ where
     Ok(ResponsePacket {
         packet_type,
         payload,
+        payload_start: 0,
     })
 }
 
+#[cfg(test)]
 fn split_response_id(mut payload: Vec<u8>) -> Option<(u32, Vec<u8>)> {
     if payload.len() < 4 {
         return None;
@@ -831,25 +897,28 @@ fn split_response_id(mut payload: Vec<u8>) -> Option<(u32, Vec<u8>)> {
     Some((id, payload))
 }
 
-fn payload_into_data(mut payload: Vec<u8>) -> Result<Vec<u8>, ApiErr> {
-    if payload.len() < 4 {
+fn payload_into_data(packet: ResponsePacket) -> Result<Vec<u8>, ApiErr> {
+    packet.into_read_data().map(SftpReadData::into_vec)
+}
+
+fn payload_into_read_data(payload: Vec<u8>, payload_start: usize) -> Result<SftpReadData, ApiErr> {
+    if payload.len() < payload_start + 4 {
         return Err(protocol_err("unexpected end of sftp packet"));
     }
     let len = u32::from_be_bytes(
-        payload[0..4]
+        payload[payload_start..payload_start + 4]
             .try_into()
             .map_err(|_| protocol_err("invalid data length"))?,
     ) as usize;
-    if payload.len() - 4 < len {
+    let data_start = payload_start + 4;
+    if payload.len() - data_start < len {
         return Err(protocol_err("unexpected end of sftp string"));
     }
-    if payload.len() - 4 == len {
-        Ok(payload.split_off(4))
-    } else {
-        let mut data = payload.split_off(4);
-        data.truncate(len);
-        Ok(data)
-    }
+    Ok(SftpReadData {
+        payload,
+        data_start,
+        data_len: len,
+    })
 }
 
 struct SftpStatus {
@@ -1221,7 +1290,7 @@ mod tests {
         let packet = read_packet(&mut server).await.expect("read packet");
 
         assert_eq!(packet.packet_type, SSH_FXP_STATUS);
-        assert_eq!(packet.payload, payload);
+        assert_eq!(packet.payload(), payload);
     }
 
     #[tokio::test]
@@ -1236,7 +1305,7 @@ mod tests {
 
             let open = read_packet(&mut server_stream).await.expect("open packet");
             assert_eq!(open.packet_type, SSH_FXP_OPEN);
-            let (id, payload) = split_response_id(open.payload).expect("open id");
+            let (id, payload) = split_response_id(open.into_payload()).expect("open id");
             let mut cursor = Cursor::new(&payload);
             assert_eq!(cursor.read_string().expect("path"), b"/tmp/file.bin");
             assert_eq!(
@@ -1256,16 +1325,16 @@ mod tests {
                 .await
                 .expect("setstat packet");
             assert_eq!(setstat.packet_type, SSH_FXP_FSETSTAT);
-            respond_status_ok(&mut server_stream, setstat.payload).await;
+            respond_status_ok(&mut server_stream, setstat.into_payload()).await;
 
             let write = read_packet(&mut server_stream).await.expect("write packet");
             assert_eq!(write.packet_type, SSH_FXP_WRITE);
-            let write_id = inspect_write_request(write.payload);
+            let write_id = inspect_write_request(write.into_payload());
             respond_status_ok_with_id(&mut server_stream, write_id).await;
 
             let close = read_packet(&mut server_stream).await.expect("close packet");
             assert_eq!(close.packet_type, SSH_FXP_CLOSE);
-            respond_status_ok(&mut server_stream, close.payload).await;
+            respond_status_ok(&mut server_stream, close.into_payload()).await;
         });
 
         let client = FastSftpClient::new_with_stream(Box::new(client_stream))
@@ -1297,7 +1366,7 @@ mod tests {
 
             let open = read_packet(&mut server_stream).await.expect("open packet");
             assert_eq!(open.packet_type, SSH_FXP_OPEN);
-            let (id, payload) = split_response_id(open.payload).expect("open id");
+            let (id, payload) = split_response_id(open.into_payload()).expect("open id");
             let mut cursor = Cursor::new(&payload);
             assert_eq!(cursor.read_string().expect("path"), b"/tmp/file.bin");
             assert_eq!(cursor.read_u32().expect("flags"), SSH_FXF_READ);
@@ -1311,7 +1380,7 @@ mod tests {
 
             let read = read_packet(&mut server_stream).await.expect("read packet");
             assert_eq!(read.packet_type, SSH_FXP_READ);
-            let read_id = inspect_read_request(read.payload);
+            let read_id = inspect_read_request(read.into_payload());
             let mut data_response = Vec::new();
             put_u32(&mut data_response, read_id);
             put_string(&mut data_response, b"abc");
@@ -1321,7 +1390,7 @@ mod tests {
 
             let close = read_packet(&mut server_stream).await.expect("close packet");
             assert_eq!(close.packet_type, SSH_FXP_CLOSE);
-            respond_status_ok(&mut server_stream, close.payload).await;
+            respond_status_ok(&mut server_stream, close.into_payload()).await;
         });
 
         let client = FastSftpClient::new_with_stream(Box::new(client_stream))
