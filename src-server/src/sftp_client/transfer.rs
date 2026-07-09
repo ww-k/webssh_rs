@@ -15,13 +15,14 @@ pub type ProgressFuture = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
 pub type ProgressCallback = Arc<dyn Fn(TransferRange) -> ProgressFuture + Send + Sync>;
 
 pub const DEFAULT_PIPELINE_CHUNK_SIZE: usize = 255 * 1024;
-pub const DEFAULT_READ_MAX_IN_FLIGHT: usize = 8;
+pub const DEFAULT_READ_PIPELINE_CHUNK_SIZE: usize = 128 * 1024;
+pub const DEFAULT_READ_MAX_IN_FLIGHT: usize = 48;
 pub const DEFAULT_WRITE_MAX_IN_FLIGHT: usize = 64;
 pub const DEFAULT_WRITE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Clone)]
 pub struct TransferProgress {
-    callback: ProgressCallback,
+    callback: Option<ProgressCallback>,
 }
 
 impl TransferProgress {
@@ -31,18 +32,21 @@ impl TransferProgress {
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         Self {
-            callback: Arc::new(move |range| Box::pin(callback(range))),
+            callback: Some(Arc::new(move |range| Box::pin(callback(range)))),
         }
     }
 
     pub async fn mark(&self, range: TransferRange) -> Result<()> {
-        (self.callback)(range).await
+        if let Some(callback) = &self.callback {
+            callback(range).await?;
+        }
+        Ok(())
     }
 }
 
 impl Default for TransferProgress {
     fn default() -> Self {
-        Self::new(|_| async { Ok(()) })
+        Self { callback: None }
     }
 }
 

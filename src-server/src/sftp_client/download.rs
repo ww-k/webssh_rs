@@ -1,20 +1,18 @@
 use std::{
-    collections::VecDeque,
+    collections::BTreeMap,
+    fs::OpenOptions,
+    io::{BufWriter, Seek, Write},
     path::PathBuf,
     sync::{Arc, atomic::AtomicBool},
 };
 
 use anyhow::{Context, Result, anyhow};
-use tokio::{
-    fs::File,
-    io::{AsyncSeekExt, AsyncWriteExt},
-};
 
 use super::{
     FastSftpClient,
     transfer::{
-        DEFAULT_PIPELINE_CHUNK_SIZE, DEFAULT_READ_MAX_IN_FLIGHT, TransferProgress, TransferRange,
-        check_range, is_aborted,
+        DEFAULT_READ_MAX_IN_FLIGHT, DEFAULT_READ_PIPELINE_CHUNK_SIZE, TransferProgress,
+        TransferRange, check_range, is_aborted,
     },
 };
 
@@ -48,9 +46,9 @@ impl DownloadOptions {
             total,
             abort,
             ranges,
-            chunk_size: DEFAULT_PIPELINE_CHUNK_SIZE,
+            chunk_size: DEFAULT_READ_PIPELINE_CHUNK_SIZE,
             max_in_flight: DEFAULT_READ_MAX_IN_FLIGHT,
-            progress_chunk_size: DEFAULT_PIPELINE_CHUNK_SIZE,
+            progress_chunk_size: DEFAULT_READ_PIPELINE_CHUNK_SIZE,
             progress: TransferProgress::default(),
         }
     }
@@ -64,18 +62,18 @@ pub async fn run_download(options: DownloadOptions) -> Result<()> {
         return Err(anyhow!("download max_in_flight must be greater than 0"));
     }
 
-    let local_file = File::options()
+    let full_single_range = is_full_single_range(&options.ranges, options.total);
+    let local_file = OpenOptions::new()
         .create(true)
         .write(true)
-        .read(true)
-        .truncate(false)
+        .truncate(full_single_range)
         .open(&options.local_path)
-        .await
         .with_context(|| format!("open {}", options.local_path.display()))?;
-    local_file.set_len(options.total).await?;
+    if !full_single_range {
+        local_file.set_len(options.total)?;
+    }
     drop(local_file);
     if options.ranges.is_empty() {
-        flush_local_file(&options.local_path).await?;
         return Ok(());
     }
 
@@ -86,8 +84,11 @@ pub async fn run_download(options: DownloadOptions) -> Result<()> {
 
     download_result?;
     close_result?;
-    flush_local_file(&options.local_path).await?;
     Ok(())
+}
+
+fn is_full_single_range(ranges: &[TransferRange], total: u64) -> bool {
+    total > 0 && ranges.len() == 1 && ranges[0] == [0, total as i64 - 1]
 }
 
 async fn run_download_ranges(options: &DownloadOptions, handle: Arc<[u8]>) -> Result<()> {
@@ -134,21 +135,25 @@ pub struct DownloadSlice {
 
 pub async fn run_download_slice(slice: DownloadSlice) -> Result<()> {
     let [start, end] = slice.range;
-    let mut local_file = File::options()
+    let mut local_file = OpenOptions::new()
         .create(true)
         .write(true)
-        .read(true)
         .truncate(false)
         .open(&slice.local_path)
-        .await
         .with_context(|| format!("open {}", slice.local_path.display()))?;
+    local_file.seek(std::io::SeekFrom::Start(start))?;
+    let mut local_file = BufWriter::with_capacity(8 * 1024 * 1024, local_file);
     let mut next_offset = start;
     let mut contiguous_done = start;
     let mut progress_start = start;
-    let mut pending = VecDeque::new();
+    let mut read_stream = slice.sftp.read_stream();
+    let mut pending_responses = BTreeMap::new();
+    let mut in_flight = 0usize;
+    let mut read_requests = Vec::with_capacity(slice.max_in_flight);
 
     loop {
-        while pending.len() < slice.max_in_flight && next_offset <= end {
+        read_requests.clear();
+        while in_flight + read_requests.len() < slice.max_in_flight && next_offset <= end {
             if is_aborted(&slice.abort) {
                 return Ok(());
             }
@@ -156,24 +161,29 @@ pub async fn run_download_slice(slice: DownloadSlice) -> Result<()> {
             let offset = next_offset;
             let current_chunk_size =
                 std::cmp::min(slice.chunk_size as u64, end - next_offset + 1) as usize;
-            let read = slice
-                .sftp
-                .begin_read(Arc::clone(&slice.handle), offset, current_chunk_size)
-                .await?;
-            pending.push_back((offset, read));
+            read_requests.push((offset, current_chunk_size));
             next_offset += current_chunk_size as u64;
         }
+        in_flight += read_stream
+            .begin_reads(Arc::clone(&slice.handle), &read_requests)
+            .await?;
 
-        let Some((offset, read)) = pending.pop_front() else {
+        if in_flight == 0 {
             break;
         };
-        if offset != contiguous_done {
-            return Err(anyhow!(
-                "sftp download progress mismatch: expected offset {contiguous_done}, got {offset}"
-            ));
-        }
 
-        let data = read.wait_data().await?;
+        let (offset, data) = if let Some(data) = pending_responses.remove(&contiguous_done) {
+            (contiguous_done, data)
+        } else {
+            loop {
+                let (offset, data) = read_stream.recv_data().await?;
+                in_flight -= 1;
+                if offset == contiguous_done {
+                    break (offset, data);
+                }
+                pending_responses.insert(offset, data);
+            }
+        };
         if data.is_empty() {
             return Err(anyhow!(
                 "sftp download reached eof before offset {}",
@@ -187,7 +197,7 @@ pub async fn run_download_slice(slice: DownloadSlice) -> Result<()> {
             ));
         }
 
-        write_at(&mut local_file, offset, data.as_slice()).await?;
+        local_file.write_all(data.as_slice())?;
         contiguous_done = data_end + 1;
         if contiguous_done - progress_start >= slice.progress_chunk_size as u64
             || contiguous_done > end
@@ -207,16 +217,6 @@ pub async fn run_download_slice(slice: DownloadSlice) -> Result<()> {
         ));
     }
 
+    local_file.flush()?;
     Ok(())
-}
-
-async fn write_at(file: &mut File, offset: u64, data: &[u8]) -> std::io::Result<()> {
-    file.seek(std::io::SeekFrom::Start(offset)).await?;
-    file.write_all(data).await?;
-    Ok(())
-}
-
-async fn flush_local_file(path: &PathBuf) -> std::io::Result<()> {
-    let mut file = File::options().write(true).open(path).await?;
-    file.flush().await
 }

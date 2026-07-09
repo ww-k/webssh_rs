@@ -14,6 +14,10 @@ use russh::{
 use webssh_rs_server::sftp_client::{
     FastSftpClient,
     download::{DownloadOptions, run_download},
+    transfer::{
+        DEFAULT_PIPELINE_CHUNK_SIZE, DEFAULT_READ_MAX_IN_FLIGHT, DEFAULT_READ_PIPELINE_CHUNK_SIZE,
+        DEFAULT_WRITE_MAX_IN_FLIGHT,
+    },
     upload::{UploadOptions, run_upload},
 };
 
@@ -24,7 +28,7 @@ struct Cli {
     identity_file: Option<PathBuf>,
     password: Option<String>,
     key_passphrase: Option<String>,
-    chunk_size: usize,
+    chunk_size: Option<usize>,
     in_flight: Option<usize>,
     ssh_pool: usize,
     sftp_pool: usize,
@@ -90,10 +94,16 @@ async fn main() -> Result<()> {
         .context("missing SSH user, use user@host:/path")?;
 
     let config = TransferConfig {
-        chunk_size: cli.chunk_size.min(255 * 1024),
+        chunk_size: cli
+            .chunk_size
+            .unwrap_or(match direction {
+                Direction::Upload => DEFAULT_PIPELINE_CHUNK_SIZE,
+                Direction::Download => DEFAULT_READ_PIPELINE_CHUNK_SIZE,
+            })
+            .min(255 * 1024),
         max_in_flight: cli.in_flight.unwrap_or(match direction {
-            Direction::Upload => 64,
-            Direction::Download => 8,
+            Direction::Upload => DEFAULT_WRITE_MAX_IN_FLIGHT,
+            Direction::Download => DEFAULT_READ_MAX_IN_FLIGHT,
         }),
         write_timeout: Duration::from_secs(cli.write_timeout_secs),
     };
@@ -121,7 +131,7 @@ async fn main() -> Result<()> {
     };
     stats.connect_elapsed = connect_elapsed;
 
-    sftp.shutdown().await;
+    sftp.abort().await;
     print_stats(stats);
     Ok(())
 }
@@ -133,7 +143,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli> {
         identity_file: None,
         password: None,
         key_passphrase: None,
-        chunk_size: 255 * 1024,
+        chunk_size: None,
         in_flight: None,
         ssh_pool: 1,
         sftp_pool: 1,
@@ -153,14 +163,14 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli> {
             }
             "--password" => cli.password = Some(next(&mut args, &arg)?),
             "--key-passphrase" => cli.key_passphrase = Some(next(&mut args, &arg)?),
-            "--chunk-size" => cli.chunk_size = parse_next(&mut args, &arg)?,
+            "--chunk-size" => cli.chunk_size = Some(parse_next(&mut args, &arg)?),
             "--in-flight" => cli.in_flight = Some(parse_next(&mut args, &arg)?),
             "--ssh-pool" => cli.ssh_pool = parse_next(&mut args, &arg)?,
             "--sftp-pool" => cli.sftp_pool = parse_next(&mut args, &arg)?,
             "--write-timeout-secs" => cli.write_timeout_secs = parse_next(&mut args, &arg)?,
             "--help" | "-h" => bail!("{}", usage()),
             value if value.starts_with("--chunk-size=") => {
-                cli.chunk_size = parse_value(value, "--chunk-size=")?
+                cli.chunk_size = Some(parse_value(value, "--chunk-size=")?)
             }
             value if value.starts_with("--in-flight=") => {
                 cli.in_flight = Some(parse_value(value, "--in-flight=")?)
@@ -223,7 +233,7 @@ fn usage() -> &'static str {
 }
 
 fn validate_options(cli: &Cli) -> Result<()> {
-    if cli.chunk_size == 0 {
+    if cli.chunk_size == Some(0) {
         bail!("--chunk-size must be greater than 0");
     }
     if cli.in_flight == Some(0) {
