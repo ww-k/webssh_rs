@@ -283,14 +283,13 @@ async fn connect_sftp(
     key_passphrase: Option<&str>,
     password: Option<&str>,
 ) -> Result<FastSftpClient> {
-    let config = build_ssh_config();
-    let handler = ClientHandler;
-    let mut handle = client::connect(Arc::new(config), (host, port), handler)
-        .await
-        .with_context(|| format!("connect {host}:{port}"))?;
-
     if let Some(identity_file) = identity_file {
-        if authenticate_publickey(&mut handle, user, identity_file, key_passphrase).await? {
+        let connect = client::connect(Arc::new(build_ssh_config()), (host, port), ClientHandler);
+        let load_key = load_publickey(identity_file, key_passphrase);
+        let (connect_result, private_key) = tokio::join!(connect, load_key);
+        let mut handle = connect_result.with_context(|| format!("connect {host}:{port}"))?;
+        let private_key = private_key?;
+        if authenticate_loaded_publickey(&mut handle, user, private_key, identity_file).await? {
             let channel = handle.channel_open_session().await?;
             return FastSftpClient::new_from_channel(channel).await;
         }
@@ -299,6 +298,10 @@ async fn connect_sftp(
             identity_file.display()
         );
     }
+
+    let mut handle = client::connect(Arc::new(build_ssh_config()), (host, port), ClientHandler)
+        .await
+        .with_context(|| format!("connect {host}:{port}"))?;
 
     for identity_file in default_identity_files() {
         if !identity_file.exists() {
@@ -355,12 +358,31 @@ async fn authenticate_publickey(
     identity_file: &Path,
     key_passphrase: Option<&str>,
 ) -> Result<bool> {
+    let private_key = load_publickey(identity_file, key_passphrase).await?;
+    authenticate_loaded_publickey(handle, user, private_key, identity_file).await
+}
+
+async fn load_publickey(
+    identity_file: &Path,
+    key_passphrase: Option<&str>,
+) -> Result<PrivateKeyWithHashAlg> {
     let key_data = tokio::fs::read_to_string(identity_file)
         .await
         .with_context(|| format!("read identity file {}", identity_file.display()))?;
     let private_key = decode_secret_key(&key_data, key_passphrase)
         .with_context(|| format!("decode identity file {}", identity_file.display()))?;
-    let private_key = PrivateKeyWithHashAlg::new(Arc::new(private_key), Some(HashAlg::Sha256));
+    Ok(PrivateKeyWithHashAlg::new(
+        Arc::new(private_key),
+        Some(HashAlg::Sha256),
+    ))
+}
+
+async fn authenticate_loaded_publickey(
+    handle: &mut client::Handle<ClientHandler>,
+    user: &str,
+    private_key: PrivateKeyWithHashAlg,
+    identity_file: &Path,
+) -> Result<bool> {
     let auth_result = handle
         .authenticate_publickey(user.to_string(), private_key)
         .await

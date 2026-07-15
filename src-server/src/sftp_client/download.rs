@@ -1,7 +1,7 @@
 use std::{
     collections::BTreeMap,
     fs::OpenOptions,
-    io::{BufWriter, Seek, Write},
+    io::{Seek, Write},
     path::PathBuf,
     sync::{Arc, atomic::AtomicBool},
 };
@@ -142,7 +142,6 @@ pub async fn run_download_slice(slice: DownloadSlice) -> Result<()> {
         .open(&slice.local_path)
         .with_context(|| format!("open {}", slice.local_path.display()))?;
     local_file.seek(std::io::SeekFrom::Start(start))?;
-    let mut local_file = BufWriter::with_capacity(8 * 1024 * 1024, local_file);
     let mut next_offset = start;
     let mut contiguous_done = start;
     let mut progress_start = start;
@@ -150,6 +149,7 @@ pub async fn run_download_slice(slice: DownloadSlice) -> Result<()> {
     let mut pending_responses = BTreeMap::new();
     let mut in_flight = 0usize;
     let mut read_requests = Vec::with_capacity(slice.max_in_flight);
+    let track_progress = slice.progress.is_enabled();
 
     loop {
         read_requests.clear();
@@ -197,10 +197,11 @@ pub async fn run_download_slice(slice: DownloadSlice) -> Result<()> {
             ));
         }
 
-        local_file.write_all(data.as_slice())?;
+        data.write_all_to(&mut local_file)?;
         contiguous_done = data_end + 1;
-        if contiguous_done - progress_start >= slice.progress_chunk_size as u64
-            || contiguous_done > end
+        if track_progress
+            && (contiguous_done - progress_start >= slice.progress_chunk_size as u64
+                || contiguous_done > end)
         {
             slice
                 .progress

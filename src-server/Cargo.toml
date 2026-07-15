@@ -20,11 +20,12 @@ path = "src/bin/webssh_transfer_cli.rs"
 anyhow = "1.0.98"
 async-stream = "0.3.6"
 axum = { version = "0.8.3", features = ["macros"] }
+bytes = "1.12.1"
 utoipa = { version = "5.4.0", features = ["axum_extras"] }
 futures-util = "0.3.31"
 hex = "0.4.3"
 nanoid = "0.4.0"
-russh = { version = "0.54", default-features = false, features = [
+russh = { version = "0.62.2", default-features = false, features = [
     "flate2",
     "rsa",
     "ring",
@@ -40,6 +41,7 @@ serde_json = "1.0.140"
 serde_qs = "0.15.0"
 serde_repr = "0.1.20"
 sha2 = "0.10.9"
+smallvec = "1.15.0"
 socketioxide = { version = "0.17.0", features = [
     "tracing",
     "state",
@@ -52,5 +54,5 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [dev-dependencies]
-rand_core = "0.6.4"
+rand = "0.10.2"
 russh-sftp = "2.1.1"

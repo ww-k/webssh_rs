@@ -6,26 +6,54 @@ use std::{
     collections::{HashMap, VecDeque},
     io::SeekFrom,
     ops::BitOr,
-    sync::Arc,
+    sync::{Arc, atomic::AtomicU32},
 };
 
-use russh::{Channel, client::Msg};
+use bytes::Bytes;
+use russh::{Channel, ChannelMsg, ChannelReadHalf, client::Msg};
+use smallvec::SmallVec;
+#[cfg(test)]
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    io::{AsyncWrite, AsyncWriteExt},
     sync::{Mutex, mpsc, oneshot},
     task::JoinHandle,
 };
 
 use crate::{
-    apis::ApiErr, consts::services_err_code::ERR_CODE_SSH_ERR, map_ssh_err,
-    ssh_session_pool::SshChannelGuard,
+    apis::ApiErr,
+    consts::services_err_code::ERR_CODE_SSH_ERR,
+    map_ssh_err,
+    ssh_session_pool::{SshChannelGuard, SshChannelTransferGuard},
 };
 
 pub type SftpResult<T> = anyhow::Result<T>;
 
+#[cfg(test)]
 trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
 
+#[cfg(test)]
 impl<T> AsyncReadWrite for T where T: AsyncRead + AsyncWrite + Unpin + Send {}
+
+#[cfg(test)]
+type AsyncSftpReader = tokio::io::ReadHalf<Box<dyn AsyncReadWrite>>;
+type AsyncSftpWriter = Box<dyn AsyncWrite + Unpin + Send>;
+
+enum SftpPacketReader {
+    #[cfg(test)]
+    Async(AsyncSftpReader),
+    Channel(ChannelDataReader),
+}
+
+struct ChannelDataReader {
+    channel: ChannelReadHalf,
+    current: Option<ChannelDataBuffer>,
+}
+
+struct ChannelDataBuffer {
+    data: Bytes,
+    offset: usize,
+}
 
 const SSH_FXP_INIT: u8 = 1;
 const SSH_FXP_VERSION: u8 = 2;
@@ -85,19 +113,23 @@ pub struct SftpReadStream {
     client: FastSftpClient,
     tx: mpsc::UnboundedSender<Result<(u64, ResponsePacket), ApiErr>>,
     rx: mpsc::UnboundedReceiver<Result<(u64, ResponsePacket), ApiErr>>,
+    ids: Vec<u32>,
+    request_packets: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub struct SftpReadData {
-    payload: Vec<u8>,
-    data_start: usize,
+    payload: SftpReadPayload,
     data_len: usize,
 }
 
-impl SftpReadData {
-    pub fn as_slice(&self) -> &[u8] {
-        &self.payload[self.data_start..self.data_start + self.data_len]
-    }
+#[derive(Debug)]
+enum SftpReadPayload {
+    Contiguous { payload: Vec<u8>, data_start: usize },
+    Segmented(SmallVec<[Bytes; 4]>),
+}
 
+impl SftpReadData {
     pub fn is_empty(&self) -> bool {
         self.data_len == 0
     }
@@ -106,13 +138,64 @@ impl SftpReadData {
         self.data_len
     }
 
-    pub fn into_vec(mut self) -> Vec<u8> {
-        if self.data_start == self.payload.len() {
-            return Vec::new();
+    pub fn write_all_to<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        match &self.payload {
+            SftpReadPayload::Contiguous {
+                payload,
+                data_start,
+            } => writer.write_all(&payload[*data_start..*data_start + self.data_len]),
+            SftpReadPayload::Segmented(segments) => {
+                let mut slices = segments
+                    .iter()
+                    .map(|segment| std::io::IoSlice::new(segment.as_ref()))
+                    .collect::<SmallVec<[_; 4]>>();
+                let mut remaining = slices.as_mut_slice();
+                while !remaining.is_empty() {
+                    let written = writer.write_vectored(remaining)?;
+                    if written == 0 {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::WriteZero,
+                            "failed to write sftp data",
+                        ));
+                    }
+                    std::io::IoSlice::advance_slices(&mut remaining, written);
+                }
+                Ok(())
+            }
         }
-        let mut data = self.payload.split_off(self.data_start);
-        data.truncate(self.data_len);
-        data
+    }
+
+    pub fn into_vec(self) -> Vec<u8> {
+        match self.payload {
+            SftpReadPayload::Contiguous {
+                mut payload,
+                data_start,
+            } => {
+                if data_start == payload.len() {
+                    return Vec::new();
+                }
+                let mut data = payload.split_off(data_start);
+                data.truncate(self.data_len);
+                data
+            }
+            SftpReadPayload::Segmented(segments) => {
+                let mut data = Vec::with_capacity(self.data_len);
+                for segment in segments {
+                    data.extend_from_slice(segment.as_ref());
+                }
+                data
+            }
+        }
+    }
+
+    fn empty() -> Self {
+        Self {
+            payload: SftpReadPayload::Contiguous {
+                payload: Vec::new(),
+                data_start: 0,
+            },
+            data_len: 0,
+        }
     }
 }
 
@@ -351,10 +434,11 @@ pub struct FastSftpClient {
 }
 
 struct FastSftpInner {
-    writer: Mutex<tokio::io::WriteHalf<Box<dyn AsyncReadWrite>>>,
+    writer: Mutex<AsyncSftpWriter>,
     pending: Mutex<HashMap<u32, oneshot::Sender<Result<ResponsePacket, ApiErr>>>>,
     read_stream_pending: Mutex<VecDeque<PendingReadStreamEntry>>,
-    next_id: Mutex<u32>,
+    next_id: AtomicU32,
+    _channel_guard: Option<SshChannelTransferGuard>,
 }
 
 struct PendingReadStreamEntry {
@@ -368,6 +452,8 @@ struct ResponsePacket {
     packet_type: u8,
     payload: Vec<u8>,
     payload_start: usize,
+    response_id: Option<u32>,
+    read_data: Option<SftpReadData>,
 }
 
 impl ResponsePacket {
@@ -376,6 +462,9 @@ impl ResponsePacket {
     }
 
     fn split_response_id(&mut self) -> Option<u32> {
+        if let Some(id) = self.response_id.take() {
+            return Some(id);
+        }
         if self.payload().len() < 4 {
             return None;
         }
@@ -385,6 +474,9 @@ impl ResponsePacket {
     }
 
     fn into_read_data(self) -> Result<SftpReadData, ApiErr> {
+        if let Some(data) = self.read_data {
+            return Ok(data);
+        }
         payload_into_read_data(self.payload, self.payload_start)
     }
 
@@ -401,22 +493,52 @@ impl ResponsePacket {
 impl FastSftpClient {
     pub async fn new(channel: SshChannelGuard) -> Result<Self, ApiErr> {
         map_ssh_err!(channel.request_subsystem(true, "sftp").await)?;
-        let stream = channel
-            .into_stream()
+        let (reader, writer, channel_guard) = channel
+            .into_split()
             .ok_or_else(|| protocol_err("missing ssh channel"))?;
-        Self::new_with_stream(Box::new(stream)).await
+        Self::new_with_channel(reader, writer.make_writer(), Some(channel_guard)).await
     }
 
     pub async fn new_from_channel(channel: Channel<Msg>) -> SftpResult<Self> {
         channel.request_subsystem(true, "sftp").await?;
-        Self::new_with_stream(Box::new(channel.into_stream()))
+        let (reader, writer) = channel.split();
+        Self::new_with_channel(reader, writer.make_writer(), None)
             .await
             .map_err(|err| anyhow::anyhow!(err.message))
     }
 
-    async fn new_with_stream(mut stream: Box<dyn AsyncReadWrite>) -> Result<Self, ApiErr> {
-        write_raw_packet_to(&mut stream, SSH_FXP_INIT, &[0, 0, 0, 3]).await?;
-        let version_packet = read_packet(&mut stream).await?;
+    async fn new_with_channel<W>(
+        reader: ChannelReadHalf,
+        writer: W,
+        channel_guard: Option<SshChannelTransferGuard>,
+    ) -> Result<Self, ApiErr>
+    where
+        W: AsyncWrite + Unpin + Send + 'static,
+    {
+        Self::new_with_parts(
+            SftpPacketReader::Channel(ChannelDataReader {
+                channel: reader,
+                current: None,
+            }),
+            Box::new(writer),
+            channel_guard,
+        )
+        .await
+    }
+
+    #[cfg(test)]
+    async fn new_with_stream(stream: Box<dyn AsyncReadWrite>) -> Result<Self, ApiErr> {
+        let (reader, writer) = tokio::io::split(stream);
+        Self::new_with_parts(SftpPacketReader::Async(reader), Box::new(writer), None).await
+    }
+
+    async fn new_with_parts(
+        mut reader: SftpPacketReader,
+        mut writer: AsyncSftpWriter,
+        channel_guard: Option<SshChannelTransferGuard>,
+    ) -> Result<Self, ApiErr> {
+        write_raw_packet_to(&mut writer, SSH_FXP_INIT, &[0, 0, 0, 3]).await?;
+        let version_packet = reader.read_packet().await?;
         if version_packet.packet_type != SSH_FXP_VERSION {
             return Err(protocol_err(format!(
                 "expected SFTP VERSION, got {}",
@@ -424,12 +546,12 @@ impl FastSftpClient {
             )));
         }
 
-        let (reader, writer) = tokio::io::split(stream);
         let inner = Arc::new(FastSftpInner {
             writer: Mutex::new(writer),
             pending: Mutex::new(HashMap::new()),
             read_stream_pending: Mutex::new(VecDeque::new()),
-            next_id: Mutex::new(1),
+            next_id: AtomicU32::new(1),
+            _channel_guard: channel_guard,
         });
 
         let read_task = tokio::spawn(read_loop(reader, inner.clone()));
@@ -614,7 +736,7 @@ impl FastSftpClient {
             return Ok(Vec::new());
         }
 
-        let ids = self.next_ids(requests.len()).await;
+        let ids = self.next_ids(requests.len());
         let mut pending_reads = Vec::with_capacity(requests.len());
         let mut pending_senders = Vec::with_capacity(requests.len());
         for (&id, &(offset, _)) in ids.iter().zip(requests) {
@@ -649,6 +771,8 @@ impl FastSftpClient {
             client: self.clone(),
             tx,
             rx,
+            ids: Vec::new(),
+            request_packets: Vec::new(),
         }
     }
 
@@ -735,7 +859,7 @@ impl FastSftpClient {
         packet_type: u8,
         mut payload: Vec<u8>,
     ) -> Result<PendingSftpRequest, ApiErr> {
-        let id = self.next_id().await;
+        let id = self.next_id();
         let (tx, rx) = oneshot::channel();
         self.inner.pending.lock().await.insert(id, tx);
 
@@ -756,7 +880,7 @@ impl FastSftpClient {
         offset: u64,
         data: &[u8],
     ) -> Result<PendingSftpWrite, ApiErr> {
-        let id = self.next_id().await;
+        let id = self.next_id();
         let (tx, rx) = oneshot::channel();
         self.inner.pending.lock().await.insert(id, tx);
 
@@ -776,7 +900,7 @@ impl FastSftpClient {
         offset: u64,
         len: usize,
     ) -> Result<PendingSftpRead, ApiErr> {
-        let id = self.next_id().await;
+        let id = self.next_id();
         let (tx, rx) = oneshot::channel();
         self.inner.pending.lock().await.insert(id, tx);
 
@@ -789,28 +913,36 @@ impl FastSftpClient {
         Ok(PendingSftpRead { rx })
     }
 
-    async fn next_id(&self) -> u32 {
-        let mut id = self.inner.next_id.lock().await;
-        let current = *id;
-        *id = id.wrapping_add(1).max(1);
-        current
+    fn next_id(&self) -> u32 {
+        loop {
+            let id = self
+                .inner
+                .next_id
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if id != 0 {
+                return id;
+            }
+        }
     }
 
-    async fn next_ids(&self, count: usize) -> Vec<u32> {
-        let mut next_id = self.inner.next_id.lock().await;
+    fn next_ids(&self, count: usize) -> Vec<u32> {
         let mut ids = Vec::with_capacity(count);
-        for _ in 0..count {
-            let current = *next_id;
-            ids.push(current);
-            *next_id = next_id.wrapping_add(1).max(1);
-        }
+        self.next_ids_into(count, &mut ids);
         ids
+    }
+
+    fn next_ids_into(&self, count: usize, ids: &mut Vec<u32>) {
+        ids.clear();
+        ids.reserve(count);
+        for _ in 0..count {
+            ids.push(self.next_id());
+        }
     }
 }
 
 impl SftpReadStream {
     pub async fn begin_reads(
-        &self,
+        &mut self,
         handle: Arc<[u8]>,
         requests: &[(u64, usize)],
     ) -> Result<usize, ApiErr> {
@@ -818,10 +950,10 @@ impl SftpReadStream {
             return Ok(0);
         }
 
-        let ids = self.client.next_ids(requests.len()).await;
+        self.client.next_ids_into(requests.len(), &mut self.ids);
         {
             let mut pending = self.client.inner.read_stream_pending.lock().await;
-            for (&id, &(offset, _)) in ids.iter().zip(requests) {
+            for (&id, &(offset, _)) in self.ids.iter().zip(requests) {
                 pending.push_back(PendingReadStreamEntry {
                     id,
                     offset,
@@ -830,11 +962,16 @@ impl SftpReadStream {
             }
         }
 
-        let write_result =
-            write_sftp_read_packets(&self.client.inner.writer, handle.as_ref(), &ids, requests)
-                .await;
+        let write_result = write_sftp_read_packets_buffered(
+            &self.client.inner.writer,
+            handle.as_ref(),
+            &self.ids,
+            requests,
+            &mut self.request_packets,
+        )
+        .await;
         if let Err(err) = write_result {
-            remove_read_stream_pending(&self.client.inner, &ids).await;
+            remove_read_stream_pending(&self.client.inner, &self.ids).await;
             return Err(err);
         }
 
@@ -852,11 +989,7 @@ impl SftpReadStream {
             SSH_FXP_STATUS => {
                 let status = parse_status_packet(response.payload())?;
                 if status.code == SSH_FX_EOF {
-                    Ok(SftpReadData {
-                        payload: Vec::new(),
-                        data_start: 0,
-                        data_len: 0,
-                    })
+                    Ok(SftpReadData::empty())
                 } else {
                     Err(protocol_err(status.message))
                 }
@@ -914,11 +1047,7 @@ impl PendingSftpRead {
             SSH_FXP_STATUS => {
                 let status = parse_status_packet(response.payload())?;
                 if status.code == SSH_FX_EOF {
-                    Ok(SftpReadData {
-                        payload: Vec::new(),
-                        data_start: 0,
-                        data_len: 0,
-                    })
+                    Ok(SftpReadData::empty())
                 } else {
                     Err(protocol_err(status.message))
                 }
@@ -930,12 +1059,9 @@ impl PendingSftpRead {
     }
 }
 
-async fn read_loop<R>(mut reader: R, inner: Arc<FastSftpInner>)
-where
-    R: AsyncRead + Unpin + Send + 'static,
-{
+async fn read_loop(mut reader: SftpPacketReader, inner: Arc<FastSftpInner>) {
     loop {
-        let packet = read_packet(&mut reader).await;
+        let packet = reader.read_packet().await;
         let packet = match packet {
             Ok(packet) => packet,
             Err(err) => {
@@ -955,6 +1081,154 @@ where
         } else if let Some(tx) = inner.pending.lock().await.remove(&id) {
             let _ = tx.send(Ok(packet));
         }
+    }
+}
+
+impl SftpPacketReader {
+    async fn read_packet(&mut self) -> Result<ResponsePacket, ApiErr> {
+        match self {
+            #[cfg(test)]
+            Self::Async(reader) => read_packet(reader).await,
+            Self::Channel(reader) => reader.read_packet().await,
+        }
+    }
+}
+
+impl ChannelDataReader {
+    async fn read_packet(&mut self) -> Result<ResponsePacket, ApiErr> {
+        let mut len = [0u8; 4];
+        self.read_exact(&mut len).await?;
+        let len = u32::from_be_bytes(len) as usize;
+        if len == 0 {
+            return Err(protocol_err("empty sftp packet"));
+        }
+
+        let mut packet_type = [0u8; 1];
+        self.read_exact(&mut packet_type).await?;
+        let packet_type = packet_type[0];
+        if packet_type == SSH_FXP_DATA {
+            if len < 9 {
+                return Err(protocol_err("invalid sftp data packet"));
+            }
+
+            let mut header = [0u8; 8];
+            self.read_exact(&mut header).await?;
+            let response_id = u32::from_be_bytes([header[0], header[1], header[2], header[3]]);
+            let data_len =
+                u32::from_be_bytes([header[4], header[5], header[6], header[7]]) as usize;
+            if len != 9 + data_len {
+                return Err(protocol_err(format!(
+                    "invalid sftp data length: packet={len}, data={data_len}"
+                )));
+            }
+
+            return Ok(ResponsePacket {
+                packet_type,
+                payload: Vec::new(),
+                payload_start: 0,
+                response_id: Some(response_id),
+                read_data: Some(SftpReadData {
+                    payload: SftpReadPayload::Segmented(self.read_segments(data_len).await?),
+                    data_len,
+                }),
+            });
+        }
+
+        let mut payload = Vec::with_capacity(len);
+        payload.push(packet_type);
+        while payload.len() < len {
+            self.copy_into_vec(&mut payload, len).await?;
+        }
+        Ok(ResponsePacket {
+            packet_type,
+            payload,
+            payload_start: 1,
+            response_id: None,
+            read_data: None,
+        })
+    }
+
+    async fn read_segments(&mut self, len: usize) -> Result<SmallVec<[Bytes; 4]>, ApiErr> {
+        let mut remaining = len;
+        let mut segments = SmallVec::new();
+        while remaining > 0 {
+            self.ensure_data().await?;
+            let current = self
+                .current
+                .take()
+                .ok_or_else(|| protocol_err("missing sftp channel data"))?;
+            let available = current.data.len() - current.offset;
+            let segment_len = remaining.min(available);
+            let next_offset = current.offset + segment_len;
+            segments.push(current.data.slice(current.offset..next_offset));
+            if segment_len < available {
+                self.current = Some(ChannelDataBuffer {
+                    data: current.data,
+                    offset: next_offset,
+                });
+            }
+            remaining -= segment_len;
+        }
+        Ok(segments)
+    }
+
+    async fn read_exact(&mut self, buffer: &mut [u8]) -> Result<(), ApiErr> {
+        let mut filled = 0usize;
+        while filled < buffer.len() {
+            self.ensure_data().await?;
+            let current = self
+                .current
+                .as_mut()
+                .ok_or_else(|| protocol_err("missing sftp channel data"))?;
+            let data = current.data.as_ref();
+            let copied = (buffer.len() - filled).min(data.len() - current.offset);
+            buffer[filled..filled + copied]
+                .copy_from_slice(&data[current.offset..current.offset + copied]);
+            filled += copied;
+            current.offset += copied;
+            if current.offset == data.len() {
+                self.current = None;
+            }
+        }
+        Ok(())
+    }
+
+    async fn copy_into_vec(
+        &mut self,
+        buffer: &mut Vec<u8>,
+        target_len: usize,
+    ) -> Result<(), ApiErr> {
+        self.ensure_data().await?;
+        let current = self
+            .current
+            .as_mut()
+            .ok_or_else(|| protocol_err("missing sftp channel data"))?;
+        let data = current.data.as_ref();
+        let copied = (target_len - buffer.len()).min(data.len() - current.offset);
+        buffer.extend_from_slice(&data[current.offset..current.offset + copied]);
+        current.offset += copied;
+        if current.offset == data.len() {
+            self.current = None;
+        }
+        Ok(())
+    }
+
+    async fn ensure_data(&mut self) -> Result<(), ApiErr> {
+        while self.current.is_none() {
+            match self.channel.wait().await {
+                Some(ChannelMsg::Data { data }) if !data.is_empty() => {
+                    self.current = Some(ChannelDataBuffer { data, offset: 0 });
+                }
+                Some(ChannelMsg::Eof | ChannelMsg::Close) | None => {
+                    return Err(map_io_err(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "early eof while reading sftp packet",
+                    )));
+                }
+                Some(_) => {}
+            }
+        }
+        Ok(())
     }
 }
 
@@ -1080,8 +1354,23 @@ async fn write_sftp_read_packets<W>(
 where
     W: AsyncWrite + Unpin,
 {
+    let mut packets = Vec::new();
+    write_sftp_read_packets_buffered(writer, handle, ids, requests, &mut packets).await
+}
+
+async fn write_sftp_read_packets_buffered<W>(
+    writer: &Mutex<W>,
+    handle: &[u8],
+    ids: &[u32],
+    requests: &[(u64, usize)],
+    packets: &mut Vec<u8>,
+) -> Result<(), ApiErr>
+where
+    W: AsyncWrite + Unpin,
+{
     let packet_len = 4 + 1 + 4 + 4 + handle.len() + 8 + 4;
-    let mut packets = Vec::with_capacity(packet_len * requests.len());
+    packets.clear();
+    packets.reserve(packet_len * requests.len());
     for (&id, &(offset, data_len)) in ids.iter().zip(requests) {
         let payload_len = 4 + 4 + handle.len() + 8 + 4;
         let len = payload_len + 1;
@@ -1089,16 +1378,16 @@ where
             return Err(protocol_err("sftp packet too large"));
         }
 
-        put_u32(&mut packets, len as u32);
+        put_u32(packets, len as u32);
         packets.push(SSH_FXP_READ);
-        put_u32(&mut packets, id);
-        put_string(&mut packets, handle);
-        put_u64(&mut packets, offset);
-        put_u32(&mut packets, data_len as u32);
+        put_u32(packets, id);
+        put_string(packets, handle);
+        put_u64(packets, offset);
+        put_u32(packets, data_len as u32);
     }
 
     let mut writer = writer.lock().await;
-    writer.write_all(&packets).await.map_err(map_io_err)?;
+    writer.write_all(packets).await.map_err(map_io_err)?;
     Ok(())
 }
 
@@ -1115,15 +1404,15 @@ where
         return Err(protocol_err("sftp packet too large"));
     }
 
-    writer
-        .write_all(&(len as u32).to_be_bytes())
-        .await
-        .map_err(map_io_err)?;
-    writer.write_all(&[packet_type]).await.map_err(map_io_err)?;
-    writer.write_all(payload).await.map_err(map_io_err)?;
+    let mut packet = Vec::with_capacity(4 + len);
+    put_u32(&mut packet, len as u32);
+    packet.push(packet_type);
+    packet.extend_from_slice(payload);
+    writer.write_all(&packet).await.map_err(map_io_err)?;
     Ok(())
 }
 
+#[cfg(test)]
 async fn read_packet<R>(reader: &mut R) -> Result<ResponsePacket, ApiErr>
 where
     R: AsyncRead + Unpin,
@@ -1138,9 +1427,12 @@ where
         packet_type,
         payload,
         payload_start: 1,
+        response_id: None,
+        read_data: None,
     })
 }
 
+#[cfg(test)]
 async fn read_exact_vec<R>(reader: &mut R, len: usize) -> Result<Vec<u8>, ApiErr>
 where
     R: AsyncRead + Unpin,
@@ -1186,8 +1478,10 @@ fn payload_into_read_data(payload: Vec<u8>, payload_start: usize) -> Result<Sftp
         return Err(protocol_err("unexpected end of sftp string"));
     }
     Ok(SftpReadData {
-        payload,
-        data_start,
+        payload: SftpReadPayload::Contiguous {
+            payload,
+            data_start,
+        },
         data_len: len,
     })
 }

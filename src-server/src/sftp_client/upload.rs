@@ -144,6 +144,7 @@ pub async fn run_upload_slice(slice: UploadSlice) -> Result<()> {
     let mut next_offset = start;
     let mut contiguous_done = start;
     let mut progress_start = start;
+    let track_progress = slice.progress.is_enabled();
     let mut pending = VecDeque::new();
 
     loop {
@@ -179,8 +180,9 @@ pub async fn run_upload_slice(slice: UploadSlice) -> Result<()> {
             ));
         }
         contiguous_done = write_end + 1;
-        if contiguous_done - progress_start >= slice.progress_chunk_size as u64
-            || contiguous_done > end
+        if track_progress
+            && (contiguous_done - progress_start >= slice.progress_chunk_size as u64
+                || contiguous_done > end)
         {
             slice
                 .progress

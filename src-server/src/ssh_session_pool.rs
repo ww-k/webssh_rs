@@ -896,6 +896,27 @@ impl SshChannelGuard {
             pool: self.pool.clone(),
         })
     }
+
+    pub fn into_split(
+        mut self,
+    ) -> Option<(
+        ChannelReadHalf,
+        ChannelWriteHalf<russh::client::Msg>,
+        SshChannelTransferGuard,
+    )> {
+        self.transferred = true;
+        self.pool.expired.store(true, Ordering::Release);
+        self.channel.take().map(|channel| {
+            let (reader, writer) = channel.split();
+            (
+                reader,
+                writer,
+                SshChannelTransferGuard {
+                    pool: self.pool.clone(),
+                },
+            )
+        })
+    }
 }
 
 impl Drop for SshChannelGuard {
@@ -938,6 +959,23 @@ impl std::ops::DerefMut for SshChannelGuard {
 pub struct SshChannelStreamGuard {
     stream: Option<ChannelStream<russh::client::Msg>>,
     pool: Arc<SshConnection<SshConnectionType>>,
+}
+
+pub struct SshChannelTransferGuard {
+    pool: Arc<SshConnection<SshConnectionType>>,
+}
+
+impl Drop for SshChannelTransferGuard {
+    fn drop(&mut self) {
+        let pool = self.pool.clone();
+        if pool.closed.load(Ordering::Acquire) {
+            return;
+        }
+        tokio::spawn(async move {
+            pool.rollback_count().await;
+            pool.close_when_expired().await;
+        });
+    }
 }
 
 impl Drop for SshChannelStreamGuard {
@@ -1472,7 +1510,10 @@ mod tests {
         drop(sftp_guard);
         sleep(Duration::from_secs(1)).await;
         let state = connection.resource_pool_state.lock().await;
-        assert_eq!(state.total_count, 1);
+        assert_eq!(state.total_count, 0);
+        assert!(state.idle_resources.is_empty());
+        drop(state);
+        assert!(connection.closed.load(Ordering::Acquire));
     }
 
     /// 测试ssh server断开连接后，断开的连接已经不在连接池中

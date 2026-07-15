@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use rand_core::OsRng;
 use russh::keys::ssh_key;
-use russh::server::{Auth, Msg, Session, run_stream};
+use russh::server::{Auth, ChannelOpenHandle, Msg, Session, run_stream};
 use russh::{Channel, ChannelId, Disconnect};
 use russh_sftp::protocol::{File, FileAttributes, Handle, Name, Status, StatusCode, Version};
 use tokio::net::TcpListener;
@@ -115,15 +114,17 @@ impl russh::server::Handler for SshServerSession {
     async fn channel_open_session(
         &mut self,
         channel: Channel<Msg>,
+        reply: ChannelOpenHandle,
         _session: &mut Session,
-    ) -> Result<bool, Self::Error> {
+    ) -> Result<(), Self::Error> {
         {
             let mut channels = self.channels.lock().await;
             let channel_id = channel.id();
             info!("SshServerSession: channel_open_session {}", channel_id);
             channels.insert(channel_id, channel);
         }
-        Ok(true)
+        reply.accept().await;
+        Ok(())
     }
 
     async fn channel_eof(
@@ -262,7 +263,7 @@ impl russh_sftp::server::Handler for SftpServerSession {
 pub async fn run_server() -> Result<broadcast::Sender<String>, std::io::Error> {
     let config = Arc::new(russh::server::Config {
         keys: vec![
-            russh::keys::PrivateKey::random(&mut OsRng, ssh_key::Algorithm::Ed25519).unwrap(),
+            russh::keys::PrivateKey::random(&mut rand::rng(), ssh_key::Algorithm::Ed25519).unwrap(),
         ],
         ..Default::default()
     });
