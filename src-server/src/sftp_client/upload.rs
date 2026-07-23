@@ -202,7 +202,7 @@ pub async fn run_upload_slice(slice: UploadSlice) -> Result<()> {
     Ok(())
 }
 
-async fn read_at(file: &mut File, offset: u64, buffer: &mut [u8]) -> std::io::Result<()> {
+async fn read_at(file: &mut File, offset: u64, buffer: &mut [u8]) -> Result<()> {
     file.seek(std::io::SeekFrom::Start(offset)).await?;
     file.read_exact(buffer).await?;
     Ok(())

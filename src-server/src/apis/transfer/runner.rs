@@ -10,7 +10,6 @@ use crate::{
     consts::services_err_code::ERR_CODE_SSH_ERR,
     map_ssh_err,
     sftp_client::{
-        FastSftpClient,
         download::{DownloadOptions, run_download},
         transfer::{
             DEFAULT_PIPELINE_CHUNK_SIZE, DEFAULT_READ_MAX_IN_FLIGHT, DEFAULT_WRITE_MAX_IN_FLIGHT,
@@ -18,6 +17,7 @@ use crate::{
         },
         upload::{UploadOptions, run_upload},
     },
+    ssh_connection_pool::ChannelMode,
 };
 
 use super::{
@@ -40,8 +40,11 @@ impl TransferService {
         let ranges = ranges_from_json(&task.ranges)?;
         let truncate = ranges.len() == 1 && ranges[0] == [0, task.total - 1];
 
-        let channel = map_ssh_err!(self.session_pool.get_channel(uri.target_id).await)?;
-        let sftp = FastSftpClient::new(channel).await?;
+        let sftp = map_ssh_err!(
+            self.ssh_service
+                .sftp(uri.target_id, ChannelMode::Dedicated)
+                .await
+        )?;
         let mut options = UploadOptions::new(
             sftp.clone(),
             PathBuf::from(local_path),
@@ -72,7 +75,7 @@ impl TransferService {
                 }
                 return Ok(());
             }
-            return Err(map_transfer_anyhow_err(err));
+            return Err(map_transfer_err(err));
         }
 
         Ok(())
@@ -95,8 +98,11 @@ impl TransferService {
         let uri = parse_file_uri(&target_uri)?;
         let ranges = ranges_from_json(&task.ranges)?;
 
-        let channel = map_ssh_err!(self.session_pool.get_channel(uri.target_id).await)?;
-        let sftp = FastSftpClient::new(channel).await?;
+        let sftp = map_ssh_err!(
+            self.ssh_service
+                .sftp(uri.target_id, ChannelMode::Dedicated)
+                .await
+        )?;
         let mut options = DownloadOptions::new(
             sftp.clone(),
             uri.path.to_string(),
@@ -113,7 +119,7 @@ impl TransferService {
         let download_result = run_download(options).await;
         sftp.shutdown().await;
 
-        download_result.map_err(map_transfer_anyhow_err)
+        download_result.map_err(map_transfer_err)
     }
 
     async fn remote_file_size_matches(
@@ -122,7 +128,7 @@ impl TransferService {
         remote_path: &str,
         total: i64,
     ) -> Result<bool, ApiErr> {
-        let sftp = map_ssh_err!(self.session_pool.get_sftp_session(target_id).await)?;
+        let sftp = map_ssh_err!(self.ssh_service.sftp(target_id, ChannelMode::Shared).await)?;
         let attr = map_ssh_err!(sftp.metadata(remote_path).await)?;
         Ok(attr.size == Some(total as u64))
     }
@@ -144,7 +150,7 @@ fn transfer_progress(service: TransferService, id: String) -> TransferProgress {
     })
 }
 
-fn map_transfer_anyhow_err(err: anyhow::Error) -> ApiErr {
+fn map_transfer_err(err: impl std::fmt::Display) -> ApiErr {
     ApiErr {
         code: ERR_CODE_SSH_ERR,
         message: err.to_string(),

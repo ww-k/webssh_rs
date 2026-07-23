@@ -1,18 +1,72 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use russh::keys::ssh_key;
 use russh::server::{Auth, ChannelOpenHandle, Msg, Session, run_stream};
 use russh::{Channel, ChannelId, Disconnect};
-use russh_sftp::protocol::{File, FileAttributes, Handle, Name, Status, StatusCode, Version};
+use russh_sftp::protocol::{
+    Attrs, Data, File, FileAttributes, Handle, Name, OpenFlags, Status, StatusCode, Version,
+};
 use tokio::net::TcpListener;
-use tokio::sync::{Mutex, broadcast};
+use tokio::sync::{Mutex, Semaphore, broadcast};
 use tracing::{debug, error, info};
+
+pub(crate) const DOWNLOAD_FILE_SIZE: usize = 20_000;
+pub(crate) const DOWNLOAD_FILE_PATH: &str = "/download.bin";
+
+#[derive(Clone)]
+pub(crate) struct ChannelOpenControl {
+    inner: Arc<ChannelOpenControlInner>,
+}
+
+struct ChannelOpenControlInner {
+    block_next: AtomicBool,
+    entered: Semaphore,
+    release: Semaphore,
+}
+
+impl ChannelOpenControl {
+    fn new() -> Self {
+        Self {
+            inner: Arc::new(ChannelOpenControlInner {
+                block_next: AtomicBool::new(false),
+                entered: Semaphore::new(0),
+                release: Semaphore::new(0),
+            }),
+        }
+    }
+
+    pub(crate) fn block_next(&self) {
+        assert!(
+            !self.inner.block_next.swap(true, Ordering::AcqRel),
+            "a channel-open gate is already armed"
+        );
+    }
+
+    pub(crate) async fn wait_until_blocked(&self) {
+        self.inner.entered.acquire().await.unwrap().forget();
+    }
+
+    pub(crate) fn release(&self) {
+        self.inner.release.add_permits(1);
+    }
+
+    async fn wait_if_blocked(&self) {
+        if self.inner.block_next.swap(false, Ordering::AcqRel) {
+            self.inner.entered.add_permits(1);
+            self.inner.release.acquire().await.unwrap().forget();
+        }
+    }
+}
 
 async fn run_on_socket(
     config: Arc<russh::server::Config>,
     socket: &tokio::net::TcpListener,
     disconnect_tx: broadcast::Sender<String>,
+    channel_open_control: ChannelOpenControl,
 ) {
     loop {
         info!("SftpServer: @run_on_socket in loop start");
@@ -23,7 +77,7 @@ async fn run_on_socket(
                 let socket_addr = socket.peer_addr().unwrap();
                 let mut disconnect_rx = disconnect_tx.subscribe();
                 let config = config.clone();
-                let handler = SshServerSession::new();
+                let handler = SshServerSession::new(channel_open_control.clone());
 
                 info!(
                     "SftpServer: @run_on_socket socket accepted {:?}",
@@ -68,12 +122,14 @@ async fn run_on_socket(
 
 struct SshServerSession {
     channels: Arc<Mutex<HashMap<ChannelId, Channel<Msg>>>>,
+    channel_open_control: ChannelOpenControl,
 }
 
 impl SshServerSession {
-    fn new() -> Self {
+    fn new(channel_open_control: ChannelOpenControl) -> Self {
         Self {
             channels: Arc::new(Mutex::new(HashMap::new())),
+            channel_open_control,
         }
     }
 
@@ -117,6 +173,7 @@ impl russh::server::Handler for SshServerSession {
         reply: ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
+        self.channel_open_control.wait_if_blocked().await;
         {
             let mut channels = self.channels.lock().await;
             let channel_id = channel.id();
@@ -229,6 +286,56 @@ impl russh_sftp::server::Handler for SftpServerSession {
         })
     }
 
+    async fn open(
+        &mut self,
+        id: u32,
+        filename: String,
+        _pflags: OpenFlags,
+        _attrs: FileAttributes,
+    ) -> Result<Handle, Self::Error> {
+        if filename != DOWNLOAD_FILE_PATH {
+            return Err(StatusCode::NoSuchFile);
+        }
+        Ok(Handle {
+            id,
+            handle: filename,
+        })
+    }
+
+    async fn read(
+        &mut self,
+        id: u32,
+        handle: String,
+        offset: u64,
+        len: u32,
+    ) -> Result<Data, Self::Error> {
+        if handle != DOWNLOAD_FILE_PATH {
+            return Err(StatusCode::Failure);
+        }
+        let offset = usize::try_from(offset).map_err(|_| StatusCode::Failure)?;
+        if offset >= DOWNLOAD_FILE_SIZE {
+            return Err(StatusCode::Eof);
+        }
+        let len = usize::try_from(len).map_err(|_| StatusCode::Failure)?;
+        let end = offset.saturating_add(len).min(DOWNLOAD_FILE_SIZE);
+        let data = (offset..end).map(|index| (index % 251) as u8).collect();
+        Ok(Data { id, data })
+    }
+
+    async fn stat(&mut self, id: u32, path: String) -> Result<Attrs, Self::Error> {
+        if path != DOWNLOAD_FILE_PATH {
+            return Err(StatusCode::NoSuchFile);
+        }
+        Ok(Attrs {
+            id,
+            attrs: FileAttributes {
+                size: Some(DOWNLOAD_FILE_SIZE as u64),
+                permissions: Some(0o100644),
+                ..FileAttributes::default()
+            },
+        })
+    }
+
     async fn opendir(&mut self, id: u32, path: String) -> Result<Handle, Self::Error> {
         info!("SftpServerSession: @opendir {}", path);
         self.root_dir_read_done = false;
@@ -260,7 +367,8 @@ impl russh_sftp::server::Handler for SftpServerSession {
     }
 }
 
-pub async fn run_server() -> Result<broadcast::Sender<String>, std::io::Error> {
+pub(crate) async fn run_server_with_channel_control()
+-> Result<(broadcast::Sender<String>, ChannelOpenControl), std::io::Error> {
     let config = Arc::new(russh::server::Config {
         keys: vec![
             russh::keys::PrivateKey::random(&mut rand::rng(), ssh_key::Algorithm::Ed25519).unwrap(),
@@ -273,11 +381,13 @@ pub async fn run_server() -> Result<broadcast::Sender<String>, std::io::Error> {
 
     let (disconnect_tx, _) = broadcast::channel(1);
     let disconnect_tx2 = disconnect_tx.clone();
+    let channel_open_control = ChannelOpenControl::new();
+    let server_control = channel_open_control.clone();
     tokio::spawn(async move {
-        run_on_socket(config, &socket, disconnect_tx2).await;
+        run_on_socket(config, &socket, disconnect_tx2, server_control).await;
     });
 
-    Ok(disconnect_tx)
+    Ok((disconnect_tx, channel_open_control))
 }
 
 // #[tokio::test]

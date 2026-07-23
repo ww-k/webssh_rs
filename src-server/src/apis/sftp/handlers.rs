@@ -24,11 +24,11 @@ use crate::{
             ContentRange, QueryTargetId, Range, SftpFile, SftpFileUriPayload, SftpLsPayload,
             SftpRenamePayload, SftpUploadResponse,
         },
-        target::get_target_by_id,
     },
     consts::services_err_code::*,
     map_db_err, map_ssh_err,
     sftp_client::{SftpAttrs, SftpFileType, SftpOpenOptions},
+    ssh_connection_pool::ChannelMode,
 };
 
 use super::service::{get_file_name, parse_file_uri};
@@ -58,7 +58,12 @@ pub async fn ls(
     info!("@sftp_ls {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = map_ssh_err!(state.session_pool.get_sftp_session(uri.target_id).await)?;
+    let sftp = map_ssh_err!(
+        state
+            .ssh_service
+            .sftp(uri.target_id, ChannelMode::Shared)
+            .await
+    )?;
     let read_dir = map_ssh_err!(sftp.read_dir(uri.path).await)?;
 
     debug!("@sftp_ls sftp.read_dir {:?}", payload);
@@ -102,7 +107,12 @@ pub async fn mkdir(
     info!("@sftp_mkdir {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = map_ssh_err!(state.session_pool.get_sftp_session(uri.target_id).await)?;
+    let sftp = map_ssh_err!(
+        state
+            .ssh_service
+            .sftp(uri.target_id, ChannelMode::Shared)
+            .await
+    )?;
     let _ = map_ssh_err!(sftp.create_dir(uri.path).await)?;
 
     debug!("@sftp_mkdir sftp.create_dir done {:?}", payload);
@@ -132,7 +142,12 @@ pub async fn stat(
     info!("@sftp_stat {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = map_ssh_err!(state.session_pool.get_sftp_session(uri.target_id).await)?;
+    let sftp = map_ssh_err!(
+        state
+            .ssh_service
+            .sftp(uri.target_id, ChannelMode::Shared)
+            .await
+    )?;
     let attr = map_ssh_err!(sftp.metadata(uri.path).await)?;
     let file = SftpFile::from_name_attrs(get_file_name(uri.path), attr);
     Ok(Json(file))
@@ -159,11 +174,11 @@ pub async fn home(
 ) -> Result<String, ApiErr> {
     info!("@sftp_home {:?}", payload);
 
-    let target = map_db_err!(get_target_by_id(&state.base_state.db, payload.target_id).await)?;
-    let channel = map_ssh_err!(state.session_pool.get_channel(payload.target_id).await)?;
-    if target.system.as_deref() == Some(WINDOWS) {
+    let context = map_db_err!(state.ssh_service.context(payload.target_id).await)?;
+    if context.target().system.as_deref() == Some(WINDOWS) {
         return Ok("/C:".to_string());
     }
+    let channel = map_ssh_err!(context.channel(ChannelMode::Shared).await)?;
 
     let home_path = crate::apis::ssh::exec(channel, "pwd").await?;
     let home_path = home_path.trim().to_string();
@@ -195,10 +210,11 @@ pub async fn cp(
     info!("@sftp_cp {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let target = map_db_err!(get_target_by_id(&state.base_state.db, uri.target_id).await)?;
-    let channel = map_ssh_err!(state.session_pool.get_channel(uri.target_id).await)?;
+    let context = map_db_err!(state.ssh_service.context(uri.target_id).await)?;
+    let is_windows = context.target().system.as_deref() == Some(WINDOWS);
+    let channel = map_ssh_err!(context.channel(ChannelMode::Shared).await)?;
 
-    if target.system.as_deref() == Some(WINDOWS) {
+    if is_windows {
         todo!();
     } else {
         crate::apis::ssh::exec(
@@ -235,7 +251,12 @@ pub async fn rename(
     info!("@sftp_rename {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = map_ssh_err!(state.session_pool.get_sftp_session(uri.target_id).await)?;
+    let sftp = map_ssh_err!(
+        state
+            .ssh_service
+            .sftp(uri.target_id, ChannelMode::Shared)
+            .await
+    )?;
     let _ = map_ssh_err!(sftp.rename(uri.path, payload.target_path.as_str()).await)?;
 
     debug!("@sftp_rename sftp.rename done {:?}", payload);
@@ -265,7 +286,12 @@ pub async fn rm(
     info!("@sftp_rm {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = map_ssh_err!(state.session_pool.get_sftp_session(uri.target_id).await)?;
+    let sftp = map_ssh_err!(
+        state
+            .ssh_service
+            .sftp(uri.target_id, ChannelMode::Shared)
+            .await
+    )?;
     let _ = map_ssh_err!(sftp.remove_file(uri.path).await)?;
 
     debug!("@sftp_rm sftp.remove_file done {:?}", payload);
@@ -296,10 +322,11 @@ pub async fn rm_rf(
     info!("@sftp_rm_rf {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let target = map_db_err!(get_target_by_id(&state.base_state.db, uri.target_id).await)?;
-    let channel = map_ssh_err!(state.session_pool.get_channel(uri.target_id).await)?;
+    let context = map_db_err!(state.ssh_service.context(uri.target_id).await)?;
+    let is_windows = context.target().system.as_deref() == Some(WINDOWS);
+    let channel = map_ssh_err!(context.channel(ChannelMode::Shared).await)?;
 
-    if target.system.as_deref() == Some(WINDOWS) {
+    if is_windows {
         let file_path = uri.path[1..].replace("/", "\\");
         crate::apis::ssh::exec(channel, format!(r#"rd /s /q "{}""#, file_path).as_str()).await?;
     } else {
@@ -371,7 +398,12 @@ pub async fn upload(
     }
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = map_ssh_err!(state.session_pool.get_sftp_session(uri.target_id).await)?;
+    let sftp = map_ssh_err!(
+        state
+            .ssh_service
+            .sftp(uri.target_id, ChannelMode::Shared)
+            .await
+    )?;
 
     let mut file = map_ssh_err!(
         sftp.open_with_flags(
@@ -464,7 +496,12 @@ pub async fn download(
     debug!("@sftp_download range {:?}", h_range);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let sftp = map_ssh_err!(state.session_pool.get_sftp_session(uri.target_id).await)?;
+    let sftp = map_ssh_err!(
+        state
+            .ssh_service
+            .sftp(uri.target_id, ChannelMode::Shared)
+            .await
+    )?;
 
     let file_name = uri.path.split('/').last().unwrap_or("");
     if file_name == "" {
@@ -544,6 +581,8 @@ pub async fn download(
     }
 
     let stream = async_stream::stream! {
+        // Keep the SFTP session alive until the response body is consumed or dropped.
+        let sftp_guard = sftp;
         let mut remaining = range_len;
         while remaining > 0 {
             let chunk_size = std::cmp::min(CHUNK_SIZE, remaining);
@@ -560,6 +599,8 @@ pub async fn download(
                 }
             }
         }
+        drop(file);
+        sftp_guard.shutdown().await;
     };
 
     headers.insert(

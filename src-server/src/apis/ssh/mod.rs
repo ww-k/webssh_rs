@@ -6,18 +6,18 @@ use std::sync::Arc;
 
 use axum::{Router, routing::post};
 
-use crate::ssh_session_pool::SshSessionPool;
+use crate::target_ssh_service::TargetSshService;
 
 pub(crate) use handlers::exec_handler;
 pub use service::exec;
 
-pub(crate) fn router_builder(session_pool: Arc<SshSessionPool>) -> Router {
+pub(crate) fn router_builder(ssh_service: Arc<TargetSshService>) -> Router {
     Router::new()
         .nest(
             "/terminal",
-            handlers::terminal_router_builder(session_pool.clone()),
+            handlers::terminal_router_builder(ssh_service.clone()),
         )
         .route("/exec", post(exec_handler))
         .fallback(|| async { "not supported" })
-        .with_state(session_pool)
+        .with_state(ssh_service)
 }

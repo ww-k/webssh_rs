@@ -9,9 +9,12 @@ use tracing::{debug, info};
 use crate::{
     apis::{
         ApiErr, InternalErrorResponse,
-        ssh_connection::{dto::SshSessionExpirePayload, service},
+        ssh_connection::{
+            dto::{ConnectionInfo, SshConnectionExpirePayload},
+            service,
+        },
     },
-    ssh_session_pool::SshSessionPool,
+    ssh_connection_pool::SshConnectionPool,
 };
 
 #[utoipa::path(
@@ -25,18 +28,18 @@ use crate::{
         ("target_id" = Option<i32>, description = "过滤指定目标的连接", example = "1")
     ),
     responses(
-        (status = 200, description = "成功获取连接列表", body = [crate::ssh_session_pool::ConnectionInfo]),
+        (status = 200, description = "成功获取连接列表", body = [ConnectionInfo]),
         (status = 500, response = InternalErrorResponse)
     )
 )]
 pub(crate) async fn list(
-    State(session_pool): State<Arc<SshSessionPool>>,
+    State(connection_pool): State<Arc<SshConnectionPool>>,
     Query(params): Query<HashMap<String, String>>,
-) -> Result<Json<Vec<crate::ssh_session_pool::ConnectionInfo>>, ApiErr> {
+) -> Result<Json<Vec<ConnectionInfo>>, ApiErr> {
     info!("@ssh_connection {:?}", params);
     let target_filter = params.get("target_id").and_then(|s| s.parse::<i32>().ok());
 
-    let list = service::list(&session_pool, target_filter).await;
+    let list = service::list(&connection_pool, target_filter).await;
 
     debug!("@ssh_connection done {:?}", params);
     Ok(Json(list))
@@ -50,7 +53,7 @@ pub(crate) async fn list(
     description = "强制断开指定的 SSH 连接，使其过期并清理相关资源",
     operation_id = "ssh_connection_expire",
     params(
-        SshSessionExpirePayload
+        SshConnectionExpirePayload
     ),
     responses(
         (status = 200, description = "成功使连接过期"),
@@ -58,13 +61,13 @@ pub(crate) async fn list(
     )
 )]
 pub(crate) async fn expire(
-    State(session_pool): State<Arc<SshSessionPool>>,
-    Query(payload): Query<SshSessionExpirePayload>,
+    State(connection_pool): State<Arc<SshConnectionPool>>,
+    Query(payload): Query<SshConnectionExpirePayload>,
 ) -> Result<(), ApiErr> {
     info!("@ssh_connection {:?}", payload);
 
     service::expire(
-        &session_pool,
+        &connection_pool,
         payload.target_id,
         payload.connection_id.as_str(),
     )

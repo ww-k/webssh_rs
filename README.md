@@ -21,7 +21,7 @@ The project is split into three main components:
 - **Database**: SQLite with Sea-ORM
 - **SSH/SFTP**: russh and russh-sftp libraries
 - **Real-time**: Socket.IO integration via socketioxide
-- **Session Management**: Custom SSH session pooling
+- **Connection Management**: Custom SSH connection pooling
 
 ### Desktop App (`/src-tauri/`)
 - **Framework**: Tauri v2 for cross-platform desktop applications
@@ -43,7 +43,7 @@ The project is split into three main components:
 
 ### Server Architecture
 - **Services**: Modular service architecture for SSH, SFTP, and target management
-- **Session Pool**: SSH connection pooling for efficient resource management
+- **Connection Pool**: SSH connection pooling for efficient resource management
 - **Database**: SQLite with Sea-ORM migrations for target storage
 - **WebSocket**: Socket.IO integration for real-time terminal communication
 

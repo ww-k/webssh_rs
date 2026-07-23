@@ -6,7 +6,7 @@ This file provides essential guidance for AI coding agents working in the WebSSH
 
 WebSSH RS is a web-based SSH client with file management capabilities, consisting of:
 - React/TypeScript frontend with xterm.js and SFTP file browser
-- Rust backend using Axum, with SSH session pooling and SQLite storage
+- Rust backend using Axum, with SSH connection pooling and SQLite storage
 
 ## Key Architecture Points
 
@@ -21,7 +21,7 @@ WebSSH RS is a web-based SSH client with file management capabilities, consistin
 
 ### Backend (`/server/`)
 - Axum web framework with modular service architecture
-- SSH session pooling in `ssh_session_pool.rs`
+- SSH connection pooling in `src-server/src/ssh_connection_pool/`
 - Sea-ORM for SQLite database management
 - `apis/handlers/` contains all endpoint implementations
 

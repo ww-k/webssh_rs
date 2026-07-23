@@ -6,7 +6,7 @@ This file provides essential guidance for AI coding agents working in the WebSSH
 
 WebSSH RS is a web-based SSH client with file management capabilities, consisting of:
 - React/TypeScript frontend with xterm.js and SFTP file browser  
-- Rust backend using Axum, with SSH session pooling and SQLite storage
+- Rust backend using Axum, with SSH connection pooling and SQLite storage
 - Tauri desktop app wrapper for cross-platform distribution
 
 ## Architecture
@@ -19,7 +19,7 @@ WebSSH RS is a web-based SSH client with file management capabilities, consistin
 ### Key Integration Points
 - Frontend-backend communication via REST API (`/api/*`) and WebSocket (`/api/ssh/*`)
 - SQLite database at `src-server/target/db.sqlite` (auto-created)
-- SSH session pooling in `src-server/src/ssh_session_pool.rs`
+- SSH connection pooling in `src-server/src/ssh_connection_pool/`
 
 ## Development Commands
 
@@ -237,7 +237,7 @@ export default create<AppStore>((set) => ({
 ## Security & Performance
 
 - Use proper error handling without exposing internal details
-- SSH session pooling for resource efficiency
+- SSH connection pooling for resource efficiency
 - CSP configuration in Tauri for desktop security
 - Input validation on all API endpoints
 

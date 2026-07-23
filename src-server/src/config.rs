@@ -22,8 +22,8 @@ impl CheckServerKey {
 }
 
 pub struct Config {
-    pub max_session_per_target: u8,
-    pub max_channel_per_session: u8,
+    pub max_connections_per_target: u8,
+    pub max_channels_per_connection: u8,
     pub transfer_task_concurrency: usize,
     pub transfer_chunk_size: usize,
     pub check_server_key: CheckServerKey,
@@ -32,8 +32,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            max_session_per_target: 10,
-            max_channel_per_session: 10,
+            max_connections_per_target: 10,
+            max_channels_per_connection: 10,
             transfer_task_concurrency: 3,
             transfer_chunk_size: 10 * 1024 * 1024,
             check_server_key: CheckServerKey::AcceptNew,

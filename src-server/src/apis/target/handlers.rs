@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{Json, extract::State};
 
 use crate::{
-    AppBaseState,
+    AppState,
     apis::{
         ApiErr, InternalErrorResponse, ValidJson,
         target::{
@@ -26,7 +26,7 @@ use crate::{
     )
 )]
 pub async fn target_list(
-    State(state): State<Arc<AppBaseState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<target::Model>>, ApiErr> {
     let targets = service::list(&state.db).await?;
     Ok(Json(targets))
@@ -45,7 +45,7 @@ pub async fn target_list(
     )
 )]
 pub async fn target_add(
-    State(state): State<Arc<AppBaseState>>,
+    State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<target::Model>,
 ) -> Result<Json<target::Model>, ApiErr> {
     let target = service::add(&state.db, payload).await?;
@@ -65,10 +65,10 @@ pub async fn target_add(
     )
 )]
 pub async fn target_update(
-    State(state): State<Arc<AppBaseState>>,
+    State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<TargetUpdatePayload>,
 ) -> Result<Json<target::Model>, ApiErr> {
-    let target = service::update(&state.db, payload).await?;
+    let target = service::update(&state.ssh_service, payload).await?;
     Ok(Json(target))
 }
 
@@ -85,8 +85,8 @@ pub async fn target_update(
     )
 )]
 pub async fn target_remove(
-    State(state): State<Arc<AppBaseState>>,
+    State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<TargetRemovePayload>,
 ) -> Result<(), ApiErr> {
-    service::remove(&state.db, payload.id).await
+    service::remove(&state.ssh_service, payload.id).await
 }

@@ -291,7 +291,7 @@ async fn connect_sftp(
         let private_key = private_key?;
         if authenticate_loaded_publickey(&mut handle, user, private_key, identity_file).await? {
             let channel = handle.channel_open_session().await?;
-            return FastSftpClient::new_from_channel(channel).await;
+            return Ok(FastSftpClient::new_from_channel(channel).await?);
         }
         bail!(
             "publickey authentication failed with {}",
@@ -309,7 +309,7 @@ async fn connect_sftp(
         }
         if authenticate_publickey(&mut handle, user, &identity_file, key_passphrase).await? {
             let channel = handle.channel_open_session().await?;
-            return FastSftpClient::new_from_channel(channel).await;
+            return Ok(FastSftpClient::new_from_channel(channel).await?);
         }
     }
 
@@ -323,7 +323,7 @@ async fn connect_sftp(
             .context("authenticate password")?;
         if auth_result.success() {
             let channel = handle.channel_open_session().await?;
-            return FastSftpClient::new_from_channel(channel).await;
+            return Ok(FastSftpClient::new_from_channel(channel).await?);
         }
     }
 

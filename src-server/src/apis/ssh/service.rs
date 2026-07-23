@@ -3,7 +3,7 @@ use russh::ChannelMsg;
 use tracing::debug;
 
 use crate::{
-    apis::ApiErr, consts::services_err_code::*, map_ssh_err, ssh_session_pool::SshChannelGuard,
+    apis::ApiErr, consts::services_err_code::*, map_ssh_err, ssh_connection_pool::SshChannelGuard,
 };
 
 pub async fn exec(mut channel: SshChannelGuard, command: &str) -> Result<String, ApiErr> {

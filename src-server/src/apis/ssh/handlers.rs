@@ -22,7 +22,8 @@ use crate::{
     },
     consts::services_err_code::*,
     map_ssh_err,
-    ssh_session_pool::{SshChannelGuard, SshSessionPool},
+    ssh_connection_pool::{ChannelMode, SshChannelGuard},
+    target_ssh_service::TargetSshService,
 };
 
 #[utoipa::path(
@@ -46,13 +47,17 @@ use crate::{
     )
 )]
 pub(crate) async fn exec_handler(
-    State(session_pool): State<Arc<SshSessionPool>>,
+    State(ssh_service): State<Arc<TargetSshService>>,
     Query(payload): Query<QueryTargetId>,
     body: String,
 ) -> Result<String, ApiErr> {
     info!("@ssh_exec {:?}", body);
 
-    let channel = map_ssh_err!(session_pool.get_channel(payload.target_id).await)?;
+    let channel = map_ssh_err!(
+        ssh_service
+            .channel(payload.target_id, ChannelMode::Shared)
+            .await
+    )?;
     let result = exec(channel, body.as_str()).await?;
 
     info!("@ssh_exec {:?} done", body);
@@ -60,13 +65,13 @@ pub(crate) async fn exec_handler(
 }
 
 pub(crate) fn terminal_router_builder(
-    session_pool: Arc<SshSessionPool>,
-) -> Router<Arc<SshSessionPool>> {
-    let session_pool_clone = session_pool.clone();
+    ssh_service: Arc<TargetSshService>,
+) -> Router<Arc<TargetSshService>> {
+    let ssh_service_clone = ssh_service.clone();
     let (svc, io) = SocketIo::builder().build_svc();
     io.ns("/", async move |socket: SocketRef| {
         let sid = socket.id;
-        let result = SshTerminalSession::start(socket.clone(), session_pool).await;
+        let result = SshTerminalSession::start(socket.clone(), ssh_service).await;
 
         if let Err(err) = result {
             error!("sid={} start fail. {:?}", sid, err);
@@ -76,7 +81,7 @@ pub(crate) fn terminal_router_builder(
     });
     Router::new()
         .fallback_service(svc)
-        .with_state(session_pool_clone)
+        .with_state(ssh_service_clone)
 }
 
 struct SshTerminalSession {
@@ -84,14 +89,16 @@ struct SshTerminalSession {
 }
 
 impl SshTerminalSession {
-    async fn start(socket: SocketRef, session_pool: Arc<SshSessionPool>) -> Result<Self> {
+    async fn start(socket: SocketRef, ssh_service: Arc<TargetSshService>) -> Result<Self> {
         let query = socket.req_parts().uri.query().unwrap_or_default();
         let result: Result<TerminalQueryParams, serde_qs::Error> = serde_qs::from_str(query);
         if let Err(err) = result {
             anyhow::bail!("Failed to parse query parameters: {:?}", err);
         }
         let params = result.unwrap();
-        let result = session_pool.get_channel(params.target_id).await;
+        let result = ssh_service
+            .channel(params.target_id, ChannelMode::Shared)
+            .await;
         if let Err(err) = result {
             anyhow::bail!("Failed to get channel: {:?}", err);
         }
@@ -127,7 +134,7 @@ impl SshTerminalSession {
     async fn open_socket_channel_tunnel(&self, channel_guard: SshChannelGuard) {
         let socket = self.socket.clone();
         let sid = socket.id;
-        let (mut read_half, write_half) = channel_guard.split().unwrap();
+        let (mut read_half, write_half, channel_lease) = channel_guard.split().unwrap();
         let write_half_arc = Arc::new(write_half);
 
         socket.on_disconnect({
@@ -147,8 +154,11 @@ impl SshTerminalSession {
             }
         });
 
-        socket.on("input", async move |Data::<String>(data)| {
-            let _ = write_half_arc.data(data.as_bytes()).await;
+        socket.on("input", {
+            let channel_write_half = write_half_arc.clone();
+            async move |Data::<String>(data)| {
+                let _ = channel_write_half.data(data.as_bytes()).await;
+            }
         });
 
         loop {
@@ -178,6 +188,12 @@ impl SshTerminalSession {
                 _ => {}
             }
         }
+
+        let cleanup = tokio::spawn(async move {
+            let _ = write_half_arc.close().await;
+            drop(channel_lease);
+        });
+        let _ = cleanup.await;
     }
 
     async fn open_session_channel_request_pty_shell(

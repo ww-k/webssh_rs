@@ -4,8 +4,10 @@ mod config;
 mod consts;
 pub mod entities;
 mod migrations;
+mod repositories;
 pub mod sftp_client;
-pub mod ssh_session_pool;
+pub mod ssh_connection_pool;
+mod target_ssh_service;
 #[cfg(test)]
 mod tests;
 
@@ -20,7 +22,8 @@ use apis::{fs, sftp, ssh, ssh_connection, target, transfer};
 use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
 
-use crate::{api_doc::ApiDoc, ssh_session_pool::SshSessionPool};
+use crate::target_ssh_service::TargetSshService;
+use crate::{api_doc::ApiDoc, ssh_connection_pool::SshConnectionPool};
 
 pub struct AppBaseState {
     db: DatabaseConnection,
@@ -29,7 +32,7 @@ pub struct AppBaseState {
 
 pub struct AppState {
     base_state: Arc<AppBaseState>,
-    session_pool: Arc<SshSessionPool>,
+    ssh_service: Arc<TargetSshService>,
     transfer_service: transfer::TransferService,
 }
 
@@ -62,30 +65,36 @@ pub async fn run_server() {
     Migrator::up(&db, None).await.unwrap();
 
     let app_base_state = Arc::new(AppBaseState { db, config });
-    let session_pool = Arc::new(SshSessionPool::new(app_base_state.clone()));
+    let connection_pool = Arc::new(SshConnectionPool::new(
+        app_base_state.db.clone(),
+        app_base_state.config.check_server_key,
+        app_base_state.config.max_connections_per_target as usize,
+        app_base_state.config.max_channels_per_connection as usize,
+    ));
+    let ssh_service = Arc::new(TargetSshService::new(
+        app_base_state.db.clone(),
+        connection_pool.clone(),
+    ));
     let transfer_service =
-        transfer::TransferService::new(app_base_state.clone(), session_pool.clone());
+        transfer::TransferService::new(app_base_state.clone(), ssh_service.clone());
     transfer_service.init_pending_tasks().await.unwrap();
 
     let app_state = Arc::new(AppState {
         base_state: app_base_state.clone(),
-        session_pool: session_pool.clone(),
+        ssh_service: ssh_service.clone(),
         transfer_service,
     });
 
     let app = Router::new()
         .nest(
             "/api/ssh_connection",
-            ssh_connection::router_builder(session_pool.clone()),
+            ssh_connection::router_builder(connection_pool.clone()),
         )
-        .nest("/api/ssh", ssh::router_builder(session_pool.clone()))
+        .nest("/api/ssh", ssh::router_builder(ssh_service.clone()))
         .nest("/api/sftp", sftp::router_builder(app_state.clone()))
         .nest("/api/fs", fs::router_builder(app_base_state.clone()))
         .nest("/api/transfer", transfer::router_builder(app_state.clone()))
-        .nest(
-            "/api/target",
-            target::router_builder(app_base_state.clone()),
-        )
+        .nest("/api/target", target::router_builder(app_state.clone()))
         .route(
             "/api-docs/openapi.json",
             axum::routing::get(|| async { axum::Json(ApiDoc::openapi()) }),
