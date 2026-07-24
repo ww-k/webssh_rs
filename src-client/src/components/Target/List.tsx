@@ -14,36 +14,6 @@ import type { ColumnsType } from "antd/es/table/interface";
 import type { ITarget } from "@/api";
 import type { ITab } from "@/store";
 
-const mockData: ITarget[] = [
-    {
-        id: 1,
-        host: "127.0.0.1",
-        port: undefined,
-        method: 1,
-        user: "user1",
-        key: "",
-        password: "111111",
-    },
-    {
-        id: 2,
-        host: "127.0.0.1",
-        port: undefined,
-        method: 2,
-        user: "user2",
-        key: "123123",
-        password: "222222",
-    },
-    {
-        id: 3,
-        host: "127.0.0.1",
-        port: 2222,
-        method: 1,
-        user: "user3",
-        key: "",
-        password: "333333",
-    },
-];
-
 export default function TargetList({ tab }: { tab: ITab }) {
     const { t } = useTranslation();
     const { setTabPath } = useAppStore();
@@ -143,7 +113,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
         ],
         [],
     );
-    const [dataSource, setDataSource] = useState<ITarget[]>(mockData);
+    const [dataSource, setDataSource] = useState<ITarget[]>([]);
 
     useMount(refresh);
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import "./index.css";
 
 import { getSftpHome } from "@/api/sftp";
-import { isSftpFileUri } from "@/helpers/file_uri";
+import { getFilePath, isSftpFileUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
 import useAppStore from "@/store";
 
@@ -15,57 +15,6 @@ import handleContextmenu from "./remoteHandleContextmenu";
 
 import type { IViewFileStat } from "@/types";
 
-const mockFiles: IViewFileStat[] = import.meta.env.DEV
-    ? [
-          {
-              name: "file1.txt",
-              type: "f",
-              size: 1024,
-              atime: 1638400000,
-              mtime: 1638400000,
-              permissions: "rw-r--r--",
-              uri: "sftp:1:/Users/test/Downloads/file1.txt",
-              sortName: "file1.txt",
-              isDir: false,
-          },
-          {
-              name: "file2.txt",
-              type: "f",
-              size: 2048,
-              atime: 1638400000,
-              mtime: 1638400000,
-              permissions: "rw-r--r--",
-              uri: "sftp:1:/Users/test/Downloads/file2.txt",
-              sortName: "file2.txt",
-              isDir: false,
-          },
-          {
-              name: "dir1",
-              type: "d",
-              size: 2048,
-              atime: 1638400000,
-              mtime: 1638400000,
-              permissions: "rw-r--r--",
-              uri: "sftp:1:/Users/test/Downloads/dir1",
-              sortName: "dir1",
-              isDir: true,
-          },
-          {
-              name: "dir2",
-              type: "d",
-              size: 2048,
-              atime: 1638400000,
-              mtime: 1638400000,
-              permissions: "rw-r--r--",
-              uri: "sftp:1:/Users/test/Downloads/dir2",
-              sortName: "dir2",
-              isDir: true,
-          },
-      ]
-    : [];
-
-const mockCwd = import.meta.env.DEV ? "sftp:1:/Users/test/Downloads" : "";
-
 export default function FilesviewRemote({
     baseUrl,
     targetId,
@@ -74,7 +23,7 @@ export default function FilesviewRemote({
     targetId: number;
 }) {
     const { copyData, setCopyData } = useAppStore();
-    const [cwd, setCwd] = useState(mockCwd);
+    const [cwd, setCwd] = useState(`${baseUrl}/`);
     const [pathHistory, setPathHistory] = useState<string[]>([]);
 
     const pushPathHistory = useMemoizedFn((newPath: string) => {
@@ -101,7 +50,7 @@ export default function FilesviewRemote({
     });
 
     const {
-        data: files = mockFiles,
+        data: files = [],
         loading,
         runAsync: getCwdFiles,
     } = useRequest(
@@ -123,7 +72,7 @@ export default function FilesviewRemote({
         return files.filter((file) => file.isDir);
     });
     const getQuickLinks = useMemoizedFn(async () => {
-        // TODO:
+        const home = getFilePath(await getSftpHome(targetId));
         return [
             {
                 name: "/",
@@ -131,19 +80,19 @@ export default function FilesviewRemote({
             },
             {
                 name: "Home",
-                path: "/Users/test",
+                path: home,
             },
             {
                 name: "Desktop",
-                path: "/Users/test/Desktop",
+                path: `${home}/Desktop`,
             },
             {
                 name: "Documents",
-                path: "/Users/test/Documents",
+                path: `${home}/Documents`,
             },
             {
                 name: "Downloads",
-                path: "/Users/test/Downloads",
+                path: `${home}/Downloads`,
             },
         ];
     });

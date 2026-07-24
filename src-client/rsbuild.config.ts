@@ -1,6 +1,11 @@
 import { defineConfig } from "@rsbuild/core";
 import { pluginReact } from "@rsbuild/plugin-react";
 
+import { mockMiddlewares } from "./mock/server.mjs";
+
+// 配置是否启用 mock 服务时
+const enableMock = false;
+
 export default defineConfig({
     source: {
         entry: {
@@ -12,6 +17,13 @@ export default defineConfig({
         template: "./src/template.html",
     },
     server: {
+        port: 3000,
+        strictPort: true,
+        setup: ({ action, server }) => {
+            if (action === "dev") {
+                server.middlewares.use(mockMiddlewares);
+            }
+        },
         publicDir: [
             {
                 name: "public",
@@ -23,7 +35,11 @@ export default defineConfig({
                 ws: true,
                 changeOrigin: true,
             },
-            "/api": {
+            "/api": enableMock ? {
+                target: "http://localhost:3000",
+                changeOrigin: true,
+                pathRewrite: { "^/api": "/mock_api" },
+            } : {
                 target: "http://localhost:8080",
                 changeOrigin: true,
             },
