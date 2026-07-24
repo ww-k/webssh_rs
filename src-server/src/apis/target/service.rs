@@ -6,7 +6,7 @@ use crate::{
     entities::target,
     map_db_err,
     repositories::target as target_repository,
-    target_ssh_service::TargetSshService,
+    ssh_connection_pool::SshConnectionPool,
 };
 
 pub async fn list(db: &DatabaseConnection) -> Result<Vec<target::Model>, ApiErr> {
@@ -20,15 +20,31 @@ pub async fn add(db: &DatabaseConnection, payload: target::Model) -> Result<targ
 }
 
 pub async fn update(
-    ssh_service: &TargetSshService,
+    db: &DatabaseConnection,
+    connection_pool: &SshConnectionPool,
     payload: TargetUpdatePayload,
 ) -> Result<target::Model, ApiErr> {
+    let target_id = payload.id;
     let active_model = target::ActiveModel::from(payload);
-    let target = map_db_err!(ssh_service.update_target(active_model).await)?;
+    let target = map_db_err!(
+        connection_pool
+            .with_target_mutation(target_id, move || {
+                target_repository::update(db, active_model)
+            })
+            .await
+    )?;
     Ok(target)
 }
 
-pub async fn remove(ssh_service: &TargetSshService, id: i32) -> Result<(), ApiErr> {
-    map_db_err!(ssh_service.remove_target(id).await)?;
+pub async fn remove(
+    db: &DatabaseConnection,
+    connection_pool: &SshConnectionPool,
+    id: i32,
+) -> Result<(), ApiErr> {
+    map_db_err!(
+        connection_pool
+            .with_target_mutation(id, || target_repository::delete_by_id(db, id))
+            .await
+    )?;
     Ok(())
 }

@@ -19,7 +19,6 @@ use crate::{
     entities::target::{self, TargetAuthMethod},
     migrations::Migrator,
     repositories::target as target_repository,
-    target_ssh_service::TargetSshService,
     tests::sftp_server,
 };
 
@@ -61,19 +60,17 @@ fn test_target() -> target::Model {
     }
 }
 
-fn service(
+fn connection_pool(
     context: &TestContext,
     max_connections: usize,
     max_channels: usize,
-) -> (Arc<SshConnectionPool>, TargetSshService) {
-    let pool = Arc::new(SshConnectionPool::new(
+) -> Arc<SshConnectionPool> {
+    Arc::new(SshConnectionPool::new(
         context.db.clone(),
         CheckServerKey::AcceptNew,
         max_connections,
         max_channels,
-    ));
-    let service = TargetSshService::new(context.db.clone(), Arc::clone(&pool));
-    (pool, service)
+    ))
 }
 
 #[tokio::test]
@@ -136,6 +133,12 @@ async fn connection_pool_regressions() {
     .expect("post-open target expiry scenario timed out");
     tokio::time::timeout(
         Duration::from_secs(10),
+        target_reads_wait_for_mutation(&context),
+    )
+    .await
+    .expect("target mutation serialization scenario timed out");
+    tokio::time::timeout(
+        Duration::from_secs(10),
         target_update_is_not_blocked_by_a_capacity_waiter(&context),
     )
     .await
@@ -153,8 +156,8 @@ async fn unsupported_auth_is_rejected_before_pool_creation(context: &TestContext
     unsupported.method = Set(TargetAuthMethod::None);
     unsupported.update(&context.db).await.unwrap();
 
-    let (pool, service) = service(context, 1, 1);
-    let err = match service.channel(1, ChannelMode::Shared).await {
+    let pool = connection_pool(context, 1, 1);
+    let err = match pool.channel(1, ChannelMode::Shared).await {
         Ok(_) => panic!("unsupported authentication should be rejected"),
         Err(err) => err,
     };
@@ -170,32 +173,29 @@ async fn unsupported_auth_is_rejected_before_pool_creation(context: &TestContext
 }
 
 async fn released_channel_capacity_can_be_acquired_again(context: &TestContext) {
-    let (_pool, service) = service(context, 1, 1);
-    let first = service.channel(1, ChannelMode::Shared).await.unwrap();
+    let pool = connection_pool(context, 1, 1);
+    let first = pool.channel(1, ChannelMode::Shared).await.unwrap();
 
     assert!(
         tokio::time::timeout(
             Duration::from_millis(100),
-            service.channel(1, ChannelMode::Shared),
+            pool.channel(1, ChannelMode::Shared),
         )
         .await
         .is_err()
     );
 
     drop(first);
-    let second = tokio::time::timeout(
-        Duration::from_secs(2),
-        service.channel(1, ChannelMode::Shared),
-    )
-    .await
-    .expect("released permit should wake a waiter")
-    .unwrap();
+    let second = tokio::time::timeout(Duration::from_secs(2), pool.channel(1, ChannelMode::Shared))
+        .await
+        .expect("released permit should wake a waiter")
+        .unwrap();
     drop(second);
 }
 
 async fn split_keeps_capacity_until_transfer_guard_is_dropped(context: &TestContext) {
-    let (_pool, service) = service(context, 1, 1);
-    let channel = service.channel(1, ChannelMode::Shared).await.unwrap();
+    let pool = connection_pool(context, 1, 1);
+    let channel = pool.channel(1, ChannelMode::Shared).await.unwrap();
     let (reader, writer, lease) = channel.split().unwrap();
     writer.close().await.unwrap();
     drop(reader);
@@ -204,27 +204,25 @@ async fn split_keeps_capacity_until_transfer_guard_is_dropped(context: &TestCont
     assert!(
         tokio::time::timeout(
             Duration::from_millis(100),
-            service.channel(1, ChannelMode::Shared),
+            pool.channel(1, ChannelMode::Shared),
         )
         .await
         .is_err()
     );
 
     drop(lease);
-    let channel = tokio::time::timeout(
-        Duration::from_secs(2),
-        service.channel(1, ChannelMode::Shared),
-    )
-    .await
-    .expect("dropping split lease should release capacity")
-    .unwrap();
+    let channel =
+        tokio::time::timeout(Duration::from_secs(2), pool.channel(1, ChannelMode::Shared))
+            .await
+            .expect("dropping split lease should release capacity")
+            .unwrap();
     drop(channel);
 }
 
 async fn dedicated_channel_does_not_expire_an_active_shared_connection(context: &TestContext) {
-    let (pool, service) = service(context, 2, 1);
-    let mut shared = service.channel(1, ChannelMode::Shared).await.unwrap();
-    let dedicated = service.channel(1, ChannelMode::Dedicated).await.unwrap();
+    let pool = connection_pool(context, 2, 1);
+    let mut shared = pool.channel(1, ChannelMode::Shared).await.unwrap();
+    let dedicated = pool.channel(1, ChannelMode::Dedicated).await.unwrap();
 
     let snapshots = pool.connection_snapshots(Some(1)).await;
     assert_eq!(snapshots.len(), 2);
@@ -253,20 +251,18 @@ async fn dedicated_channel_does_not_expire_an_active_shared_connection(context: 
 }
 
 async fn changed_connection_spec_replaces_the_target_connection_pool(context: &TestContext) {
-    let (pool, service) = service(context, 1, 1);
-    let old_channel = service.channel(1, ChannelMode::Shared).await.unwrap();
+    let pool = connection_pool(context, 1, 1);
+    let old_channel = pool.channel(1, ChannelMode::Shared).await.unwrap();
     let old_connection_id = pool.connection_snapshots(Some(1)).await[0].id.clone();
 
     let mut changed = target::ActiveModel::from(test_target());
     changed.password = Set(Some("changed".to_string()));
     changed.update(&context.db).await.unwrap();
-    let replacement = tokio::time::timeout(
-        Duration::from_secs(2),
-        service.channel(1, ChannelMode::Shared),
-    )
-    .await
-    .expect("replacement channel acquisition timed out")
-    .unwrap();
+    let replacement =
+        tokio::time::timeout(Duration::from_secs(2), pool.channel(1, ChannelMode::Shared))
+            .await
+            .expect("replacement channel acquisition timed out")
+            .unwrap();
     let snapshots = pool.connection_snapshots(Some(1)).await;
     assert_eq!(snapshots.len(), 2);
     assert!(snapshots.iter().any(|snapshot| {
@@ -282,8 +278,8 @@ async fn changed_connection_spec_replaces_the_target_connection_pool(context: &T
 }
 
 async fn expiring_an_idle_connection_closes_it(context: &TestContext) {
-    let (pool, service) = service(context, 1, 1);
-    let channel = service.channel(1, ChannelMode::Shared).await.unwrap();
+    let pool = connection_pool(context, 1, 1);
+    let channel = pool.channel(1, ChannelMode::Shared).await.unwrap();
     drop(channel);
     let connection_id = pool.connection_snapshots(Some(1)).await[0].id.clone();
 
@@ -292,26 +288,23 @@ async fn expiring_an_idle_connection_closes_it(context: &TestContext) {
 }
 
 async fn dropping_dedicated_sftp_releases_its_connection(context: &TestContext) {
-    let (_pool, service) = service(context, 1, 1);
-    let sftp = service.sftp(1, ChannelMode::Dedicated).await.unwrap();
+    let pool = connection_pool(context, 1, 1);
+    let sftp = pool.sftp(1, ChannelMode::Dedicated).await.unwrap();
     drop(sftp);
 
-    let shared = tokio::time::timeout(
-        Duration::from_secs(2),
-        service.channel(1, ChannelMode::Shared),
-    )
-    .await
-    .expect("dropping the SFTP guard should close its dedicated connection")
-    .unwrap();
+    let shared = tokio::time::timeout(Duration::from_secs(2), pool.channel(1, ChannelMode::Shared))
+        .await
+        .expect("dropping the SFTP guard should close its dedicated connection")
+        .unwrap();
     drop(shared);
 }
 
 async fn hard_aborting_dedicated_sftp_releases_its_connection(context: &TestContext) {
-    let (pool, service) = service(context, 1, 1);
+    let pool = connection_pool(context, 1, 1);
     let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
-    let task_service = service.clone();
+    let task_pool = Arc::clone(&pool);
     let task = tokio::spawn(async move {
-        let sftp = task_service.sftp(1, ChannelMode::Dedicated).await.unwrap();
+        let sftp = task_pool.sftp(1, ChannelMode::Dedicated).await.unwrap();
         let _ = ready_tx.send(());
         std::future::pending::<()>().await;
         drop(sftp);
@@ -325,13 +318,10 @@ async fn hard_aborting_dedicated_sftp_releases_its_connection(context: &TestCont
     task.abort();
     assert!(task.await.unwrap_err().is_cancelled());
 
-    let shared = tokio::time::timeout(
-        Duration::from_secs(2),
-        service.channel(1, ChannelMode::Shared),
-    )
-    .await
-    .expect("hard-aborted SFTP task should release its dedicated connection")
-    .unwrap();
+    let shared = tokio::time::timeout(Duration::from_secs(2), pool.channel(1, ChannelMode::Shared))
+        .await
+        .expect("hard-aborted SFTP task should release its dedicated connection")
+        .unwrap();
     drop(shared);
 }
 
@@ -364,16 +354,15 @@ async fn download_body_releases_its_sftp_lease(context: &TestContext) {
 }
 
 fn download_app_state(context: &TestContext) -> (Arc<SshConnectionPool>, Arc<AppState>) {
-    let (pool, service) = service(context, 1, 1);
-    let ssh_service = Arc::new(service);
+    let pool = connection_pool(context, 1, 1);
     let base_state = Arc::new(AppBaseState {
         db: context.db.clone(),
         config: Config::default(),
     });
-    let transfer_service = TransferService::new(Arc::clone(&base_state), Arc::clone(&ssh_service));
+    let transfer_service = TransferService::new(Arc::clone(&base_state), Arc::clone(&pool));
     let state = Arc::new(AppState {
         base_state,
-        ssh_service,
+        connection_pool: Arc::clone(&pool),
         transfer_service,
     });
     (pool, state)
@@ -413,9 +402,10 @@ async fn wait_until_no_active_channels(pool: &SshConnectionPool) {
 }
 
 async fn target_expiry_rejects_a_channel_opened_after_expiry(context: &TestContext) {
-    let (pool, service) = service(context, 1, 1);
+    let pool = connection_pool(context, 1, 1);
     context.channel_open_control.block_next();
-    let acquire = tokio::spawn(async move { service.channel(1, ChannelMode::Shared).await });
+    let acquire_pool = Arc::clone(&pool);
+    let acquire = tokio::spawn(async move { acquire_pool.channel(1, ChannelMode::Shared).await });
 
     context.channel_open_control.wait_until_blocked().await;
     pool.expire_target(1).await;
@@ -449,10 +439,56 @@ async fn target_expiry_rejects_a_channel_opened_after_expiry(context: &TestConte
     .expect("the rejected channel and expired connection should be cleaned up");
 }
 
+async fn target_reads_wait_for_mutation(context: &TestContext) {
+    let pool = connection_pool(context, 1, 1);
+    let current = target_repository::find_by_id(&context.db, 1)
+        .await
+        .unwrap()
+        .unwrap();
+    let updated_system = "mutation-serialized-linux".to_string();
+    let mut active_model = target::ActiveModel::from(current);
+    active_model.system = Set(Some(updated_system.clone()));
+
+    let (mutation_started_tx, mutation_started_rx) = tokio::sync::oneshot::channel();
+    let (mutation_release_tx, mutation_release_rx) = tokio::sync::oneshot::channel();
+    let mutation_pool = Arc::clone(&pool);
+    let mutation_db = context.db.clone();
+    let mutation = tokio::spawn(async move {
+        mutation_pool
+            .with_target_mutation(1, move || async move {
+                let _ = mutation_started_tx.send(());
+                mutation_release_rx.await.unwrap();
+                target_repository::update(&mutation_db, active_model).await
+            })
+            .await
+    });
+
+    mutation_started_rx.await.unwrap();
+    let reader_pool = Arc::clone(&pool);
+    let reader = tokio::spawn(async move { reader_pool.context(1).await });
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(
+        !reader.is_finished(),
+        "target reads must wait until the mutation finishes"
+    );
+
+    mutation_release_tx.send(()).unwrap();
+    mutation.await.unwrap().unwrap();
+    let refreshed = tokio::time::timeout(Duration::from_secs(2), reader)
+        .await
+        .expect("target read should resume after the mutation")
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        refreshed.target().system.as_deref(),
+        Some(updated_system.as_str())
+    );
+}
+
 async fn target_update_is_not_blocked_by_a_capacity_waiter(context: &TestContext) {
-    let (_pool, service) = service(context, 1, 1);
-    let active = service.channel(1, ChannelMode::Shared).await.unwrap();
-    let waiter = spawn_capacity_waiter(&service).await;
+    let pool = connection_pool(context, 1, 1);
+    let active = pool.channel(1, ChannelMode::Shared).await.unwrap();
+    let waiter = spawn_capacity_waiter(&pool).await;
 
     let current = target_repository::find_by_id(&context.db, 1)
         .await
@@ -470,10 +506,13 @@ async fn target_update_is_not_blocked_by_a_capacity_waiter(context: &TestContext
         system: Some(updated_system.clone()),
     };
 
-    let updated = tokio::time::timeout(Duration::from_secs(2), update_for_test(&service, payload))
-        .await
-        .expect("target update must not wait for channel capacity")
-        .unwrap();
+    let updated = tokio::time::timeout(
+        Duration::from_secs(2),
+        update_for_test(&context.db, &pool, payload),
+    )
+    .await
+    .expect("target update must not wait for channel capacity")
+    .unwrap();
     assert_eq!(updated.system.as_deref(), Some(updated_system.as_str()));
     assert_capacity_waiter_expired(waiter).await;
 
@@ -483,7 +522,7 @@ async fn target_update_is_not_blocked_by_a_capacity_waiter(context: &TestContext
         .unwrap();
     assert_eq!(persisted.system.as_deref(), Some(updated_system.as_str()));
     {
-        let refreshed = service.context(1).await.unwrap();
+        let refreshed = pool.context(1).await.unwrap();
         assert_eq!(
             refreshed.target().system.as_deref(),
             Some(updated_system.as_str())
@@ -494,14 +533,17 @@ async fn target_update_is_not_blocked_by_a_capacity_waiter(context: &TestContext
 }
 
 async fn target_delete_is_not_blocked_by_a_capacity_waiter(context: &TestContext) {
-    let (_pool, service) = service(context, 1, 1);
-    let active = service.channel(1, ChannelMode::Shared).await.unwrap();
-    let waiter = spawn_capacity_waiter(&service).await;
+    let pool = connection_pool(context, 1, 1);
+    let active = pool.channel(1, ChannelMode::Shared).await.unwrap();
+    let waiter = spawn_capacity_waiter(&pool).await;
 
-    tokio::time::timeout(Duration::from_secs(2), remove_for_test(&service, 1))
-        .await
-        .expect("target delete must not wait for channel capacity")
-        .unwrap();
+    tokio::time::timeout(
+        Duration::from_secs(2),
+        remove_for_test(&context.db, &pool, 1),
+    )
+    .await
+    .expect("target delete must not wait for channel capacity")
+    .unwrap();
     assert_capacity_waiter_expired(waiter).await;
 
     assert!(
@@ -510,15 +552,15 @@ async fn target_delete_is_not_blocked_by_a_capacity_waiter(context: &TestContext
             .unwrap()
             .is_none()
     );
-    assert!(service.context(1).await.is_err());
+    assert!(pool.context(1).await.is_err());
 
     drop(active);
 }
 
 async fn spawn_capacity_waiter(
-    service: &TargetSshService,
+    pool: &SshConnectionPool,
 ) -> tokio::task::JoinHandle<anyhow::Result<super::SshChannelGuard>> {
-    let waiting_context = service.context(1).await.unwrap();
+    let waiting_context = pool.context(1).await.unwrap();
     let waiter = tokio::spawn(async move { waiting_context.channel(ChannelMode::Shared).await });
     tokio::time::sleep(Duration::from_millis(50)).await;
     assert!(

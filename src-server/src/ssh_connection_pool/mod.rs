@@ -3,6 +3,7 @@ mod connector;
 mod error;
 mod known_hosts;
 mod lease;
+mod target;
 mod target_connection_pool;
 #[cfg(test)]
 mod tests;
@@ -10,18 +11,17 @@ mod tests;
 use std::{collections::HashMap, sync::Arc};
 
 use sea_orm::DatabaseConnection;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::config::CheckServerKey;
 
 pub use connection::ConnectionState;
-pub(crate) use connector::{SshAuth, SshConnectionSpec};
 pub use error::{SshPoolError, SshPoolResult};
 pub use lease::{SshChannelGuard, SshChannelStreamGuard, SshChannelTransferGuard};
-pub(crate) use target_connection_pool::TargetConnectionPool;
 
-use connector::SshConnector;
+use connector::{SshConnectionSpec, SshConnector};
 use known_hosts::KnownHosts;
+use target_connection_pool::TargetConnectionPool;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ChannelMode {
@@ -39,8 +39,10 @@ pub struct ConnectionSnapshot {
 }
 
 pub(crate) struct SshConnectionPool {
+    db: DatabaseConnection,
     target_connection_pools: Mutex<HashMap<i32, Arc<TargetConnectionPool>>>,
     expired_connection_pools: Arc<Mutex<Vec<Arc<TargetConnectionPool>>>>,
+    lifecycle_locks: Mutex<HashMap<i32, Arc<RwLock<()>>>>,
     connector: Arc<SshConnector>,
     max_connections_per_target: usize,
     max_channels_per_connection: usize,
@@ -53,20 +55,19 @@ impl SshConnectionPool {
         max_connections_per_target: usize,
         max_channels_per_connection: usize,
     ) -> Self {
-        let known_hosts = KnownHosts::new(db, check_server_key);
+        let known_hosts = KnownHosts::new(db.clone(), check_server_key);
         Self {
+            db,
             target_connection_pools: Mutex::new(HashMap::new()),
             expired_connection_pools: Arc::new(Mutex::new(Vec::new())),
+            lifecycle_locks: Mutex::new(HashMap::new()),
             connector: Arc::new(SshConnector::new(known_hosts)),
             max_connections_per_target,
             max_channels_per_connection,
         }
     }
 
-    pub(crate) async fn connection_pool_for(
-        &self,
-        spec: SshConnectionSpec,
-    ) -> Arc<TargetConnectionPool> {
+    async fn connection_pool_for(&self, spec: SshConnectionSpec) -> Arc<TargetConnectionPool> {
         let target_id = spec.target_id();
         let (target_connection_pool, expired_connection_pool) = {
             let mut target_connection_pools = self.target_connection_pools.lock().await;
@@ -102,7 +103,7 @@ impl SshConnectionPool {
         target_connection_pool
     }
 
-    pub(crate) async fn expire_target(&self, target_id: i32) {
+    async fn expire_target(&self, target_id: i32) {
         let target_connection_pool = self.target_connection_pools.lock().await.remove(&target_id);
         if let Some(target_connection_pool) = target_connection_pool {
             self.schedule_expire(target_connection_pool).await;

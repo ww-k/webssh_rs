@@ -60,7 +60,7 @@ pub async fn ls(
     let uri = parse_file_uri(payload.uri.as_str())?;
     let sftp = map_ssh_err!(
         state
-            .ssh_service
+            .connection_pool
             .sftp(uri.target_id, ChannelMode::Shared)
             .await
     )?;
@@ -109,7 +109,7 @@ pub async fn mkdir(
     let uri = parse_file_uri(payload.uri.as_str())?;
     let sftp = map_ssh_err!(
         state
-            .ssh_service
+            .connection_pool
             .sftp(uri.target_id, ChannelMode::Shared)
             .await
     )?;
@@ -144,7 +144,7 @@ pub async fn stat(
     let uri = parse_file_uri(payload.uri.as_str())?;
     let sftp = map_ssh_err!(
         state
-            .ssh_service
+            .connection_pool
             .sftp(uri.target_id, ChannelMode::Shared)
             .await
     )?;
@@ -174,7 +174,7 @@ pub async fn home(
 ) -> Result<String, ApiErr> {
     info!("@sftp_home {:?}", payload);
 
-    let context = map_db_err!(state.ssh_service.context(payload.target_id).await)?;
+    let context = map_db_err!(state.connection_pool.context(payload.target_id).await)?;
     if context.target().system.as_deref() == Some(WINDOWS) {
         return Ok("/C:".to_string());
     }
@@ -210,7 +210,7 @@ pub async fn cp(
     info!("@sftp_cp {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let context = map_db_err!(state.ssh_service.context(uri.target_id).await)?;
+    let context = map_db_err!(state.connection_pool.context(uri.target_id).await)?;
     let is_windows = context.target().system.as_deref() == Some(WINDOWS);
     let channel = map_ssh_err!(context.channel(ChannelMode::Shared).await)?;
 
@@ -253,7 +253,7 @@ pub async fn rename(
     let uri = parse_file_uri(payload.uri.as_str())?;
     let sftp = map_ssh_err!(
         state
-            .ssh_service
+            .connection_pool
             .sftp(uri.target_id, ChannelMode::Shared)
             .await
     )?;
@@ -288,7 +288,7 @@ pub async fn rm(
     let uri = parse_file_uri(payload.uri.as_str())?;
     let sftp = map_ssh_err!(
         state
-            .ssh_service
+            .connection_pool
             .sftp(uri.target_id, ChannelMode::Shared)
             .await
     )?;
@@ -322,7 +322,7 @@ pub async fn rm_rf(
     info!("@sftp_rm_rf {:?}", payload);
 
     let uri = parse_file_uri(payload.uri.as_str())?;
-    let context = map_db_err!(state.ssh_service.context(uri.target_id).await)?;
+    let context = map_db_err!(state.connection_pool.context(uri.target_id).await)?;
     let is_windows = context.target().system.as_deref() == Some(WINDOWS);
     let channel = map_ssh_err!(context.channel(ChannelMode::Shared).await)?;
 
@@ -400,7 +400,7 @@ pub async fn upload(
     let uri = parse_file_uri(payload.uri.as_str())?;
     let sftp = map_ssh_err!(
         state
-            .ssh_service
+            .connection_pool
             .sftp(uri.target_id, ChannelMode::Shared)
             .await
     )?;
@@ -498,7 +498,7 @@ pub async fn download(
     let uri = parse_file_uri(payload.uri.as_str())?;
     let sftp = map_ssh_err!(
         state
-            .ssh_service
+            .connection_pool
             .sftp(uri.target_id, ChannelMode::Shared)
             .await
     )?;

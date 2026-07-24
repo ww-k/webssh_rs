@@ -68,7 +68,7 @@ pub async fn target_update(
     State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<TargetUpdatePayload>,
 ) -> Result<Json<target::Model>, ApiErr> {
-    let target = service::update(&state.ssh_service, payload).await?;
+    let target = service::update(&state.db, &state.connection_pool, payload).await?;
     Ok(Json(target))
 }
 
@@ -88,5 +88,5 @@ pub async fn target_remove(
     State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<TargetRemovePayload>,
 ) -> Result<(), ApiErr> {
-    service::remove(&state.ssh_service, payload.id).await
+    service::remove(&state.db, &state.connection_pool, payload.id).await
 }

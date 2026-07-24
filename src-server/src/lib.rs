@@ -7,7 +7,6 @@ mod migrations;
 mod repositories;
 pub mod sftp_client;
 pub mod ssh_connection_pool;
-mod target_ssh_service;
 #[cfg(test)]
 mod tests;
 
@@ -22,7 +21,6 @@ use apis::{fs, sftp, ssh, ssh_connection, target, transfer};
 use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
 
-use crate::target_ssh_service::TargetSshService;
 use crate::{api_doc::ApiDoc, ssh_connection_pool::SshConnectionPool};
 
 pub struct AppBaseState {
@@ -32,7 +30,7 @@ pub struct AppBaseState {
 
 pub struct AppState {
     base_state: Arc<AppBaseState>,
-    ssh_service: Arc<TargetSshService>,
+    connection_pool: Arc<SshConnectionPool>,
     transfer_service: transfer::TransferService,
 }
 
@@ -71,17 +69,13 @@ pub async fn run_server() {
         app_base_state.config.max_connections_per_target as usize,
         app_base_state.config.max_channels_per_connection as usize,
     ));
-    let ssh_service = Arc::new(TargetSshService::new(
-        app_base_state.db.clone(),
-        connection_pool.clone(),
-    ));
     let transfer_service =
-        transfer::TransferService::new(app_base_state.clone(), ssh_service.clone());
+        transfer::TransferService::new(app_base_state.clone(), connection_pool.clone());
     transfer_service.init_pending_tasks().await.unwrap();
 
     let app_state = Arc::new(AppState {
         base_state: app_base_state.clone(),
-        ssh_service: ssh_service.clone(),
+        connection_pool: connection_pool.clone(),
         transfer_service,
     });
 
@@ -90,7 +84,7 @@ pub async fn run_server() {
             "/api/ssh_connection",
             ssh_connection::router_builder(connection_pool.clone()),
         )
-        .nest("/api/ssh", ssh::router_builder(ssh_service.clone()))
+        .nest("/api/ssh", ssh::router_builder(connection_pool.clone()))
         .nest("/api/sftp", sftp::router_builder(app_state.clone()))
         .nest("/api/fs", fs::router_builder(app_base_state.clone()))
         .nest("/api/transfer", transfer::router_builder(app_state.clone()))

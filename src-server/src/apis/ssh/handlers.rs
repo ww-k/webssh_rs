@@ -22,8 +22,7 @@ use crate::{
     },
     consts::services_err_code::*,
     map_ssh_err,
-    ssh_connection_pool::{ChannelMode, SshChannelGuard},
-    target_ssh_service::TargetSshService,
+    ssh_connection_pool::{ChannelMode, SshChannelGuard, SshConnectionPool},
 };
 
 #[utoipa::path(
@@ -47,14 +46,14 @@ use crate::{
     )
 )]
 pub(crate) async fn exec_handler(
-    State(ssh_service): State<Arc<TargetSshService>>,
+    State(connection_pool): State<Arc<SshConnectionPool>>,
     Query(payload): Query<QueryTargetId>,
     body: String,
 ) -> Result<String, ApiErr> {
     info!("@ssh_exec {:?}", body);
 
     let channel = map_ssh_err!(
-        ssh_service
+        connection_pool
             .channel(payload.target_id, ChannelMode::Shared)
             .await
     )?;
@@ -65,13 +64,13 @@ pub(crate) async fn exec_handler(
 }
 
 pub(crate) fn terminal_router_builder(
-    ssh_service: Arc<TargetSshService>,
-) -> Router<Arc<TargetSshService>> {
-    let ssh_service_clone = ssh_service.clone();
+    connection_pool: Arc<SshConnectionPool>,
+) -> Router<Arc<SshConnectionPool>> {
+    let connection_pool_clone = connection_pool.clone();
     let (svc, io) = SocketIo::builder().build_svc();
     io.ns("/", async move |socket: SocketRef| {
         let sid = socket.id;
-        let result = SshTerminalSession::start(socket.clone(), ssh_service).await;
+        let result = SshTerminalSession::start(socket.clone(), connection_pool).await;
 
         if let Err(err) = result {
             error!("sid={} start fail. {:?}", sid, err);
@@ -81,7 +80,7 @@ pub(crate) fn terminal_router_builder(
     });
     Router::new()
         .fallback_service(svc)
-        .with_state(ssh_service_clone)
+        .with_state(connection_pool_clone)
 }
 
 struct SshTerminalSession {
@@ -89,14 +88,14 @@ struct SshTerminalSession {
 }
 
 impl SshTerminalSession {
-    async fn start(socket: SocketRef, ssh_service: Arc<TargetSshService>) -> Result<Self> {
+    async fn start(socket: SocketRef, connection_pool: Arc<SshConnectionPool>) -> Result<Self> {
         let query = socket.req_parts().uri.query().unwrap_or_default();
         let result: Result<TerminalQueryParams, serde_qs::Error> = serde_qs::from_str(query);
         if let Err(err) = result {
             anyhow::bail!("Failed to parse query parameters: {:?}", err);
         }
         let params = result.unwrap();
-        let result = ssh_service
+        let result = connection_pool
             .channel(params.target_id, ChannelMode::Shared)
             .await;
         if let Err(err) = result {

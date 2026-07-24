@@ -35,8 +35,7 @@ use crate::{
     },
     map_db_err, map_ssh_err,
     sftp_client::SftpFileType,
-    ssh_connection_pool::ChannelMode,
-    target_ssh_service::TargetSshService,
+    ssh_connection_pool::{ChannelMode, SshConnectionPool},
 };
 
 use super::{
@@ -50,7 +49,7 @@ use super::{
 #[derive(Clone)]
 pub struct TransferService {
     pub(super) db: DatabaseConnection,
-    pub(super) ssh_service: Arc<TargetSshService>,
+    pub(super) connection_pool: Arc<SshConnectionPool>,
     running_tasks: Arc<Mutex<HashMap<String, RunningTask>>>,
     scheduler_notify: Arc<Notify>,
     scheduler_started: Arc<AtomicBool>,
@@ -70,10 +69,13 @@ enum AbortKind {
 }
 
 impl TransferService {
-    pub(crate) fn new(app_state: Arc<AppBaseState>, ssh_service: Arc<TargetSshService>) -> Self {
+    pub(crate) fn new(
+        app_state: Arc<AppBaseState>,
+        connection_pool: Arc<SshConnectionPool>,
+    ) -> Self {
         let service = Self {
             db: app_state.db.clone(),
-            ssh_service,
+            connection_pool,
             running_tasks: Arc::new(Mutex::new(HashMap::new())),
             scheduler_notify: Arc::new(Notify::new()),
             scheduler_started: Arc::new(AtomicBool::new(false)),
@@ -188,7 +190,11 @@ impl TransferService {
             }
         }
 
-        let sftp = map_ssh_err!(self.ssh_service.sftp(target_id, ChannelMode::Shared).await)?;
+        let sftp = map_ssh_err!(
+            self.connection_pool
+                .sftp(target_id, ChannelMode::Shared)
+                .await
+        )?;
         let attr = map_ssh_err!(sftp.metadata(source_path.as_str()).await)?;
         if attr.file_type() == SftpFileType::Dir {
             return Err(ApiErr {

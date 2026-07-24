@@ -41,7 +41,7 @@ impl TransferService {
         let truncate = ranges.len() == 1 && ranges[0] == [0, task.total - 1];
 
         let sftp = map_ssh_err!(
-            self.ssh_service
+            self.connection_pool
                 .sftp(uri.target_id, ChannelMode::Dedicated)
                 .await
         )?;
@@ -99,7 +99,7 @@ impl TransferService {
         let ranges = ranges_from_json(&task.ranges)?;
 
         let sftp = map_ssh_err!(
-            self.ssh_service
+            self.connection_pool
                 .sftp(uri.target_id, ChannelMode::Dedicated)
                 .await
         )?;
@@ -128,7 +128,11 @@ impl TransferService {
         remote_path: &str,
         total: i64,
     ) -> Result<bool, ApiErr> {
-        let sftp = map_ssh_err!(self.ssh_service.sftp(target_id, ChannelMode::Shared).await)?;
+        let sftp = map_ssh_err!(
+            self.connection_pool
+                .sftp(target_id, ChannelMode::Shared)
+                .await
+        )?;
         let attr = map_ssh_err!(sftp.metadata(remote_path).await)?;
         Ok(attr.size == Some(total as u64))
     }
