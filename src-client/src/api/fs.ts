@@ -85,3 +85,12 @@ export async function postFsRmRf(uri: string) {
     });
     return true;
 }
+
+export async function postFsShowInFolder(uri: string) {
+    await axios.post<boolean>("/api/fs/show-in-folder", null, {
+        params: {
+            uri,
+        },
+    });
+    return true;
+}

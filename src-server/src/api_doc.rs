@@ -28,6 +28,7 @@ use utoipa::OpenApi;
         crate::apis::fs::handlers::rename,
         crate::apis::fs::handlers::rm,
         crate::apis::fs::handlers::rm_rf,
+        crate::apis::fs::handlers::show_in_folder,
         crate::apis::transfer::handlers::create_upload_task,
         crate::apis::transfer::handlers::create_download_task,
         crate::apis::transfer::handlers::list_tasks,

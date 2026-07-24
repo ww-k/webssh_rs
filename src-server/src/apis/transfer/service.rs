@@ -279,13 +279,13 @@ impl TransferService {
     pub async fn resume_task(&self, id: &str) -> Result<TransferTaskModel, ApiErr> {
         let task = self.get_task_model(id).await?;
         match task.status {
-            TransferTaskStatus::Pause | TransferTaskStatus::Fail => {
+            TransferTaskStatus::Pause | TransferTaskStatus::Fail | TransferTaskStatus::Cancel => {
                 self.queue_task(id.to_string()).await?;
                 self.get_task_model(id).await
             }
             _ => Err(ApiErr {
                 code: ERR_CODE_TRANSFER_INVALID_REQUEST,
-                message: "only PAUSE or FAIL task can resume".to_string(),
+                message: "only PAUSE, FAIL or CANCEL task can resume".to_string(),
             }),
         }
     }
@@ -336,7 +336,7 @@ impl TransferService {
         let task = self.get_task_model(&id).await?;
         if matches!(
             task.status,
-            TransferTaskStatus::Run | TransferTaskStatus::Success | TransferTaskStatus::Cancel
+            TransferTaskStatus::Run | TransferTaskStatus::Success
         ) {
             return Err(ApiErr {
                 code: ERR_CODE_TRANSFER_INVALID_REQUEST,
@@ -347,6 +347,7 @@ impl TransferService {
         let mut active: ActiveModel = task.into();
         active.status = Set(TransferTaskStatus::Wait);
         active.fail_reason = Set(None);
+        active.ended_at = Set(None);
         active.updated_at = Set(now_ms());
         map_db_err!(active.update(&self.db).await)?;
 

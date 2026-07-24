@@ -12,7 +12,7 @@ use axum::{
 use crate::AppBaseState;
 
 pub use dto::FsFile;
-pub use handlers::{cp, home, ls, mkdir, rename, rm, rm_rf, stat};
+pub use handlers::{cp, home, ls, mkdir, rename, rm, rm_rf, show_in_folder, stat};
 
 pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
     Router::new()
@@ -24,5 +24,6 @@ pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
         .route("/rename", post(rename))
         .route("/rm", post(rm))
         .route("/rm/rf", post(rm_rf))
+        .route("/show-in-folder", post(show_in_folder))
         .with_state(app_state)
 }

@@ -1,5 +1,8 @@
 import {
+    ArrowDownOutlined,
+    ArrowUpOutlined,
     DeleteOutlined,
+    FolderOpenOutlined,
     MoreOutlined,
     PauseCircleOutlined,
     PlayCircleOutlined,
@@ -8,43 +11,45 @@ import {
 } from "@ant-design/icons";
 import {
     Button,
+    ConfigProvider,
     Dropdown,
     Modal,
+    message,
     Progress,
-    Space,
     Table,
     Tabs,
-    Tag,
     Tooltip,
     Typography,
 } from "antd";
+import enUS from "antd/locale/en_US";
+import zhCN from "antd/locale/zh_CN";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import "./index.css";
 
+import { postFsShowInFolder } from "@/api";
 import transferService from "@/services/transfer";
 
 import type { MenuProps, TableProps } from "antd";
+import type { TFunction } from "i18next";
 import type { ITransferTask } from "@/api";
 
 const { Text } = Typography;
 
-// 状态配置
-const STATUS_CONFIG: Record<
-    ITransferTask["status"],
-    { color: string; text: string }
-> = {
-    WAIT: { color: "default", text: "等待中" },
-    RUN: { color: "processing", text: "传输中" },
-    PAUSE: { color: "warning", text: "已暂停" },
-    SUCCESS: { color: "success", text: "已完成" },
-    FAIL: { color: "error", text: "失败" },
-    CANCEL: { color: "default", text: "已取消" },
+const STATUS_TEXT_KEY: Record<ITransferTask["status"], string> = {
+    WAIT: "transfer_status_waiting",
+    RUN: "transfer_status_running",
+    PAUSE: "transfer_status_paused",
+    SUCCESS: "transfer_status_completed",
+    FAIL: "transfer_status_failed",
+    CANCEL: "transfer_status_cancelled",
 };
 
 // 格式化文件大小
 const formatSize = (bytes?: number): string => {
-    if (!bytes) return "-";
+    if (bytes === undefined) return "-";
+    if (bytes === 0) return "0 B";
     const units = ["B", "KB", "MB", "GB", "TB"];
     let size = bytes;
     let unitIndex = 0;
@@ -63,50 +68,56 @@ const formatSpeed = (speed?: number): string => {
     return `${formatSize(speed)}/s`;
 };
 
-// 格式化时间
-const formatTime = (seconds?: number): string => {
-    if (!seconds) return "-";
-    if (seconds < 60) return `${Math.ceil(seconds)}秒`;
-    if (seconds < 3600) return `${Math.ceil(seconds / 60)}分钟`;
-    return `${Math.ceil(seconds / 3600)}小时`;
+// 格式化时长
+const formatDuration = (seconds?: number): string => {
+    const totalSeconds = Math.max(0, Math.ceil(seconds ?? 0));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const remainingSeconds = totalSeconds % 60;
+
+    return [hours, minutes, remainingSeconds]
+        .map((value) => String(value).padStart(2, "0"))
+        .join(":");
 };
 
 // 获取操作菜单项
 const getActionMenuItems = (
     record: ITransferTask,
+    t: TFunction,
     onPause: () => void,
     onResume: () => void,
     onCancel: () => void,
     onDelete: () => void,
+    onShowInFolder: () => void,
 ): MenuProps["items"] => {
     const items: MenuProps["items"] = [];
 
     switch (record.status) {
         case "RUN":
+        case "WAIT":
             items.push({
                 key: "pause",
-                label: "暂停",
+                label: t("transfer_action_pause"),
                 icon: <PauseCircleOutlined />,
                 onClick: onPause,
             });
             items.push({
                 key: "cancel",
-                label: "取消",
+                label: t("app_btn_cancel"),
                 icon: <StopOutlined />,
                 onClick: onCancel,
             });
             break;
         case "PAUSE":
-        case "WAIT":
             items.push({
                 key: "resume",
-                label: "恢复",
+                label: t("transfer_action_resume"),
                 icon: <PlayCircleOutlined />,
                 onClick: onResume,
             });
             items.push({
                 key: "cancel",
-                label: "取消",
+                label: t("app_btn_cancel"),
                 icon: <StopOutlined />,
                 onClick: onCancel,
             });
@@ -114,23 +125,41 @@ const getActionMenuItems = (
         case "FAIL":
             items.push({
                 key: "retry",
-                label: "重试",
+                label: t("transfer_action_retry"),
                 icon: <ReloadOutlined />,
                 onClick: onResume,
             });
             break;
         case "CANCEL":
+            items.push({
+                key: "retry",
+                label: t("transfer_action_retry"),
+                icon: <ReloadOutlined />,
+                onClick: onResume,
+            });
+            break;
         case "SUCCESS":
             break;
     }
 
-    items.push({
-        type: "divider",
-    });
+    if (record.local_path) {
+        items.push({
+            key: "show-in-folder",
+            label: t("transfer_action_show_in_folder"),
+            icon: <FolderOpenOutlined />,
+            onClick: onShowInFolder,
+        });
+    }
+
+    if (items.length > 0 && record.status !== "SUCCESS") {
+        items.push({
+            type: "divider",
+        });
+    }
 
     items.push({
         key: "delete",
-        label: "删除",
+        label: t("app_btn_delete"),
         icon: <DeleteOutlined />,
         danger: true,
         onClick: onDelete,
@@ -139,7 +168,8 @@ const getActionMenuItems = (
     return items;
 };
 
-const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
+const TransferTable = ({ type }: { type: "ALL" | ITransferTask["type"] }) => {
+    const { t } = useTranslation();
     const [list, setList] = useState<ITransferTask[]>(() =>
         transferService.getTasks(),
     );
@@ -148,8 +178,8 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
         return transferService.subscribe(setList);
     }, []);
 
-    // 过滤特定类型的传输任务
-    const filteredList = list.filter((item) => item.type === type);
+    const filteredList =
+        type === "ALL" ? list : list.filter((item) => item.type === type);
 
     const handlePause = (record: ITransferTask) => {
         transferService.pause(record.id);
@@ -163,10 +193,12 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
 
     const handleCancel = (record: ITransferTask) => {
         Modal.confirm({
-            title: "确认取消",
-            content: `确定要取消传输"${record.name}"吗？`,
-            okText: "确定",
-            cancelText: "取消",
+            title: t("transfer_confirm_cancel_title"),
+            content: t("transfer_confirm_cancel_content", {
+                name: record.name,
+            }),
+            okText: t("app_btn_ok"),
+            cancelText: t("app_btn_cancel"),
             onOk: () => {
                 transferService.remove(record.id);
             },
@@ -175,159 +207,163 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
 
     const handleDelete = (record: ITransferTask) => {
         Modal.confirm({
-            title: "确认删除",
-            content: `确定要删除任务"${record.name}"吗？`,
-            okText: "确定",
-            cancelText: "取消",
+            title: t("transfer_confirm_delete_title"),
+            content: t("transfer_confirm_delete_content", {
+                name: record.name,
+            }),
+            okText: t("app_btn_ok"),
+            cancelText: t("app_btn_cancel"),
             onOk: () => {
                 transferService.remove(record.id);
             },
         });
     };
 
+    const handleShowInFolder = (record: ITransferTask) => {
+        if (!record.local_path) return;
+
+        postFsShowInFolder(record.local_path).catch((err) => {
+            console.warn("Show transfer in folder failed", err);
+            message.error(t("transfer_show_in_folder_failed"));
+        });
+    };
+
     const columns: TableProps<ITransferTask>["columns"] = [
         {
-            title: "文件名",
+            title: t("transfer_column_filename"),
             dataIndex: "name",
             key: "name",
-            width: "25%",
+            width: "24%",
             ellipsis: true,
-            render: (text) => (
-                <Tooltip title={text}>
-                    <Text>{text}</Text>
+            render: (text, record) => (
+                <Tooltip title={record.local_path || record.target_uri || text}>
+                    <Text className="WebSSH-TransferFileName">{text}</Text>
                 </Tooltip>
             ),
         },
         {
-            title: "状态",
-            dataIndex: "status",
-            key: "status",
+            title: t("transfer_column_type"),
+            dataIndex: "type",
+            key: "type",
             width: "10%",
-            render: (status: ITransferTask["status"]) => {
-                const config = STATUS_CONFIG[status];
-                return <Tag color={config.color}>{config.text}</Tag>;
-            },
-        },
-        {
-            title: "进度",
-            key: "progress",
-            width: "30%",
-            render: (_, record) => {
-                const { percent, loaded, total } = record;
-
-                if (record.status === "SUCCESS") {
-                    return (
-                        <Space
-                            size="small"
-                            style={{ width: "100%" }}
-                            orientation="vertical"
-                        >
-                            <Progress
-                                percent={100}
-                                size="small"
-                                status="success"
-                            />
-                            <Text type="secondary" style={{ fontSize: "12px" }}>
-                                {formatSize(total)} 已完成
-                            </Text>
-                        </Space>
-                    );
-                }
-
-                if (record.status === "FAIL") {
-                    return (
-                        <Space
-                            size="small"
-                            style={{ width: "100%" }}
-                            orientation="vertical"
-                        >
-                            <Progress
-                                percent={Number((percent || 0).toFixed(2))}
-                                size="small"
-                                status="exception"
-                            />
-                            <Text type="danger" style={{ fontSize: "12px" }}>
-                                {record.fail_reason || "传输失败"}
-                            </Text>
-                        </Space>
-                    );
-                }
-
-                if (record.status === "CANCEL") {
-                    return (
-                        <Space
-                            size="small"
-                            style={{ width: "100%" }}
-                            orientation="vertical"
-                        >
-                            <Progress
-                                percent={Number((percent || 0).toFixed(2))}
-                                size="small"
-                                status="normal"
-                            />
-                            <Text type="secondary" style={{ fontSize: "12px" }}>
-                                已取消
-                            </Text>
-                        </Space>
-                    );
-                }
+            align: "center",
+            render: (transferType: ITransferTask["type"]) => {
+                const isUpload = transferType === "UPLOAD";
+                const label = t(
+                    isUpload
+                        ? "transfer_type_upload"
+                        : "transfer_type_download",
+                );
 
                 return (
-                    <Space
-                        size="small"
-                        style={{ width: "100%" }}
-                        orientation="vertical"
-                    >
-                        <Progress
-                            percent={Number((percent || 0).toFixed(2))}
-                            size="small"
-                            status={
-                                record.status === "PAUSE" ? "normal" : "active"
-                            }
-                        />
-                        <Space>
-                            <Text type="secondary" style={{ fontSize: "12px" }}>
-                                {formatSize(loaded)}/{formatSize(total)}
-                            </Text>
-                            {record.speed && (
-                                <Text
-                                    type="secondary"
-                                    style={{ fontSize: "12px" }}
-                                >
-                                    {formatSpeed(record.speed)}
-                                </Text>
+                    <Tooltip title={label}>
+                        <span
+                            className={`WebSSH-TransferType WebSSH-TransferType--${transferType.toLowerCase()}`}
+                        >
+                            {isUpload ? (
+                                <ArrowUpOutlined aria-label={label} />
+                            ) : (
+                                <ArrowDownOutlined aria-label={label} />
                             )}
-                        </Space>
-                    </Space>
+                        </span>
+                    </Tooltip>
                 );
             },
         },
         {
-            title: "剩余时间",
-            dataIndex: "estimated_time",
-            key: "estimated_time",
-            width: "10%",
-            align: "center",
-            render: (estimatedTime, record) => {
-                if (record.status === "SUCCESS") return "-";
-                if (record.status === "FAIL") return "-";
-                if (record.status === "PAUSE") return "已暂停";
-                if (record.status === "CANCEL") return "-";
-                return formatTime(estimatedTime);
+            title: t("transfer_column_progress"),
+            key: "progress",
+            width: "56%",
+            render: (_, record) => {
+                const { percent, loaded, total } = record;
+                const isRunning = record.status === "RUN";
+                const failureReason =
+                    record.fail_reason || t("transfer_unknown_reason");
+                const progressPercent =
+                    record.status === "SUCCESS"
+                        ? 100
+                        : Number((percent || 0).toFixed(2));
+                const progressStatus =
+                    record.status === "SUCCESS"
+                        ? "success"
+                        : record.status === "FAIL"
+                          ? "exception"
+                          : ["PAUSE", "CANCEL"].includes(record.status)
+                            ? "normal"
+                            : "active";
+
+                return (
+                    <div className="WebSSH-TransferProgress">
+                        <div className="WebSSH-TransferProgressMeta">
+                            <Text
+                                className="WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--size"
+                                type="secondary"
+                            >
+                                {formatSize(loaded)}/{formatSize(total)}
+                            </Text>
+                            {isRunning ? (
+                                <>
+                                    <Text
+                                        className="WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--speed"
+                                        type="secondary"
+                                    >
+                                        {formatSpeed(record.speed)}
+                                    </Text>
+                                    <Text
+                                        className="WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--remaining"
+                                        type="secondary"
+                                    >
+                                        {t("transfer_remaining", {
+                                            duration: formatDuration(
+                                                record.estimated_time,
+                                            ),
+                                        })}
+                                    </Text>
+                                </>
+                            ) : (
+                                <>
+                                    {record.status === "FAIL" && (
+                                        <Tooltip title={failureReason}>
+                                            <Text
+                                                className="WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--reason"
+                                                type="secondary"
+                                            >
+                                                {failureReason}
+                                            </Text>
+                                        </Tooltip>
+                                    )}
+                                    <Text
+                                        className={`WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--status WebSSH-TransferProgressMetaItem--status-${record.status.toLowerCase()}`}
+                                    >
+                                        {t(STATUS_TEXT_KEY[record.status])}
+                                    </Text>
+                                </>
+                            )}
+                        </div>
+                        <Progress
+                            percent={progressPercent}
+                            size={["100%", 4]}
+                            status={progressStatus}
+                            showInfo={false}
+                        />
+                    </div>
+                );
             },
         },
         {
-            title: "操作",
+            title: t("app_common_action"),
             key: "action",
             width: "10%",
             align: "center",
             render: (_, record) => {
                 const menuItems = getActionMenuItems(
                     record,
+                    t,
                     () => handlePause(record),
                     () => handleResume(record),
                     () => handleCancel(record),
                     () => handleDelete(record),
+                    () => handleShowInFolder(record),
                 );
 
                 return (
@@ -336,7 +372,14 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
                         trigger={["click"]}
                         placement="bottomRight"
                     >
-                        <Button type="text" icon={<MoreOutlined />} />
+                        <Tooltip title={t("transfer_action_more")}>
+                            <Button
+                                className="WebSSH-TransferAction"
+                                type="text"
+                                aria-label={t("transfer_action_more")}
+                                icon={<MoreOutlined />}
+                            />
+                        </Tooltip>
                     </Dropdown>
                 );
             },
@@ -349,37 +392,50 @@ const TransferTable = ({ type }: { type: "UPLOAD" | "DOWNLOAD" }) => {
             dataSource={filteredList}
             rowKey="id"
             size="small"
+            rowClassName="WebSSH-TransferRow"
             pagination={{
                 pageSize: 10,
                 showSizeChanger: true,
                 showQuickJumper: true,
-                showTotal: (total) => `共 ${total} 个任务`,
+                showTotal: (total) =>
+                    t("transfer_task_total", { count: total }),
             }}
         />
     );
 };
 
 export default function Transfer() {
+    const { i18n, t } = useTranslation();
+    const antdLocale = i18n.resolvedLanguage?.startsWith("en") ? enUS : zhCN;
+
     useEffect(() => {
         transferService.syncTasks();
     }, []);
 
     return (
-        <Tabs
-            className="WebSSH-Transfer"
-            type="card"
-            items={[
-                {
-                    key: "upload",
-                    label: "上传",
-                    children: <TransferTable type="UPLOAD" />,
-                },
-                {
-                    key: "download",
-                    label: "下载",
-                    children: <TransferTable type="DOWNLOAD" />,
-                },
-            ]}
-        />
+        <ConfigProvider locale={antdLocale}>
+            <Tabs
+                className="WebSSH-Transfer"
+                tabBarGutter={28}
+                defaultActiveKey="all"
+                items={[
+                    {
+                        key: "all",
+                        label: t("transfer_tab_all"),
+                        children: <TransferTable type="ALL" />,
+                    },
+                    {
+                        key: "upload",
+                        label: t("transfer_tab_upload"),
+                        children: <TransferTable type="UPLOAD" />,
+                    },
+                    {
+                        key: "download",
+                        label: t("transfer_tab_download"),
+                        children: <TransferTable type="DOWNLOAD" />,
+                    },
+                ]}
+            />
+        </ConfigProvider>
     );
 }

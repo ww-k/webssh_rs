@@ -133,3 +133,19 @@ pub async fn rm(Query(payload): Query<FsFileUriPayload>) -> Result<(), ApiErr> {
 pub async fn rm_rf(Query(payload): Query<FsFileUriPayload>) -> Result<(), ApiErr> {
     service::rm_rf(&payload.uri).await
 }
+
+#[utoipa::path(
+    post,
+    path = "/api/fs/show-in-folder",
+    tag = "fs",
+    summary = "在系统文件管理器中显示本机文件",
+    description = "macOS 使用 Finder 定位文件，Windows 使用文件资源管理器定位文件，Linux 打开文件所在目录",
+    params(FsFileUriPayload),
+    responses(
+        (status = 200, description = "成功启动系统文件管理器"),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn show_in_folder(Query(payload): Query<FsFileUriPayload>) -> Result<(), ApiErr> {
+    service::show_in_folder(&payload.uri).await
+}

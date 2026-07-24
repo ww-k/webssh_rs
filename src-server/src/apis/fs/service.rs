@@ -1,5 +1,6 @@
 use std::{
     path::{Path, PathBuf},
+    process::Command,
     time::UNIX_EPOCH,
 };
 
@@ -103,6 +104,50 @@ pub async fn rm_rf(path: &str) -> Result<(), ApiErr> {
     } else {
         fs::remove_file(path).await.map_err(map_fs_io_err)
     }
+}
+
+pub async fn show_in_folder(path: &str) -> Result<(), ApiErr> {
+    let path = PathBuf::from(path);
+    let metadata = fs::metadata(&path).await.map_err(map_fs_io_err)?;
+    let mut command = show_in_folder_command(&path, metadata.is_dir())?;
+    command.spawn().map_err(map_fs_io_err)?;
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn show_in_folder_command(path: &Path, _is_dir: bool) -> Result<Command, ApiErr> {
+    let mut command = Command::new("open");
+    command.arg("-R").arg(path);
+    Ok(command)
+}
+
+#[cfg(target_os = "windows")]
+fn show_in_folder_command(path: &Path, _is_dir: bool) -> Result<Command, ApiErr> {
+    let mut command = Command::new("explorer.exe");
+    command.arg(format!("/select,{}", path.display()));
+    Ok(command)
+}
+
+#[cfg(target_os = "linux")]
+fn show_in_folder_command(path: &Path, is_dir: bool) -> Result<Command, ApiErr> {
+    let folder = if is_dir {
+        path
+    } else {
+        path.parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."))
+    };
+    let mut command = Command::new("xdg-open");
+    command.arg(folder);
+    Ok(command)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+fn show_in_folder_command(_path: &Path, _is_dir: bool) -> Result<Command, ApiErr> {
+    Err(ApiErr {
+        code: ERR_CODE_FS_INVALID_REQUEST,
+        message: "show in folder is not supported on this platform".to_string(),
+    })
 }
 
 async fn list_roots() -> Result<Vec<FsFile>, ApiErr> {
@@ -211,6 +256,7 @@ fn map_fs_io_err(err: std::io::Error) -> ApiErr {
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::list;
@@ -304,6 +350,46 @@ mod tests {
                 Some("/Users/user".to_string())
             ),
             "/home/user"
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn show_in_folder_uses_finder_reveal() {
+        let command =
+            super::show_in_folder_command(std::path::Path::new("/tmp/example.txt"), false).unwrap();
+
+        assert_eq!(command.get_program(), OsStr::new("open"));
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            vec![OsStr::new("-R"), OsStr::new("/tmp/example.txt")]
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn show_in_folder_uses_explorer_select() {
+        let command =
+            super::show_in_folder_command(std::path::Path::new(r"C:\tmp\example.txt"), false)
+                .unwrap();
+
+        assert_eq!(command.get_program(), OsStr::new("explorer.exe"));
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            vec![OsStr::new(r"/select,C:\tmp\example.txt")]
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn show_in_folder_opens_parent_directory() {
+        let command =
+            super::show_in_folder_command(std::path::Path::new("/tmp/example.txt"), false).unwrap();
+
+        assert_eq!(command.get_program(), OsStr::new("xdg-open"));
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            vec![OsStr::new("/tmp")]
         );
     }
 
