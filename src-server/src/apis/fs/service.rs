@@ -11,7 +11,7 @@ use crate::{
     consts::services_err_code::{ERR_CODE_FS_INVALID_REQUEST, ERR_CODE_FS_IO_ERR},
 };
 
-use super::dto::{FsFile, FsRenamePayload};
+use super::dto::{FsFile, FsRenamePayload, FsUserDir};
 
 pub async fn list(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> {
     if should_list_roots(path) {
@@ -21,17 +21,69 @@ pub async fn list(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> 
     list_dir(path, all).await
 }
 
-pub fn home() -> String {
-    home_from_env(
+pub fn user_dir_home() -> String {
+    user_dir_home_from_env(
         std::env::var("HOME").ok(),
         std::env::var("USERPROFILE").ok(),
     )
 }
 
-fn home_from_env(home: Option<String>, userprofile: Option<String>) -> String {
+pub fn user_dir_download() -> String {
+    user_dir_download_from_path(dirs::download_dir(), user_dir_home())
+}
+
+pub fn user_dirs() -> Vec<FsUserDir> {
+    user_dirs_from_paths(
+        user_dir_home(),
+        dirs::desktop_dir(),
+        dirs::document_dir(),
+        dirs::download_dir(),
+    )
+}
+
+fn user_dir_home_from_env(home: Option<String>, userprofile: Option<String>) -> String {
     home.or(userprofile)
         .filter(|path| !path.is_empty())
         .unwrap_or_else(|| "/".to_string())
+}
+
+fn user_dir_download_from_path(download_dir: Option<PathBuf>, fallback: String) -> String {
+    download_dir
+        .map(|path| path.to_string_lossy().into_owned())
+        .filter(|path| !path.is_empty())
+        .unwrap_or(fallback)
+}
+
+fn user_dirs_from_paths(
+    home: String,
+    desktop: Option<PathBuf>,
+    documents: Option<PathBuf>,
+    downloads: Option<PathBuf>,
+) -> Vec<FsUserDir> {
+    let candidates = [
+        ("/", Some(PathBuf::from("/"))),
+        ("Home", Some(PathBuf::from(home))),
+        ("Desktop", desktop),
+        ("Documents", documents),
+        ("Downloads", downloads),
+    ];
+    let mut links = Vec::with_capacity(candidates.len());
+
+    for (name, path) in candidates {
+        let Some(path) = path else {
+            continue;
+        };
+        let path = path.to_string_lossy().into_owned();
+        if path.is_empty() || links.iter().any(|link: &FsUserDir| link.path == path) {
+            continue;
+        }
+        links.push(FsUserDir {
+            name: name.to_string(),
+            path,
+        });
+    }
+
+    links
 }
 
 async fn list_dir(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> {
@@ -259,7 +311,7 @@ mod tests {
     use std::ffi::OsStr;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::list;
+    use super::{list, user_dir_download_from_path, user_dirs_from_paths};
     use tokio::fs;
 
     #[cfg(unix)]
@@ -338,18 +390,79 @@ mod tests {
     }
 
     #[test]
-    fn home_returns_root_when_home_env_is_missing() {
-        assert_eq!(super::home_from_env(None, None), "/");
+    fn user_dir_home_returns_root_when_home_env_is_missing() {
+        assert_eq!(super::user_dir_home_from_env(None, None), "/");
     }
 
     #[test]
-    fn home_prefers_home_env() {
+    fn user_dir_home_prefers_home_env() {
         assert_eq!(
-            super::home_from_env(
+            super::user_dir_home_from_env(
                 Some("/home/user".to_string()),
                 Some("/Users/user".to_string())
             ),
             "/home/user"
+        );
+    }
+
+    #[test]
+    fn user_dir_download_prefers_system_directory() {
+        assert_eq!(
+            user_dir_download_from_path(
+                Some(std::path::PathBuf::from("/home/user/My Downloads")),
+                "/home/user".to_string()
+            ),
+            "/home/user/My Downloads"
+        );
+    }
+
+    #[test]
+    fn user_dir_download_falls_back_to_home() {
+        assert_eq!(
+            user_dir_download_from_path(None, "/home/user".to_string()),
+            "/home/user"
+        );
+    }
+
+    #[test]
+    fn user_dirs_use_system_directories_in_display_order() {
+        let links = user_dirs_from_paths(
+            "/home/user".to_string(),
+            Some(std::path::PathBuf::from("/home/user/Work Surface")),
+            Some(std::path::PathBuf::from("/home/user/My Documents")),
+            Some(std::path::PathBuf::from("/data/downloads")),
+        );
+
+        assert_eq!(
+            links
+                .iter()
+                .map(|link| (link.name.as_str(), link.path.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("/", "/"),
+                ("Home", "/home/user"),
+                ("Desktop", "/home/user/Work Surface"),
+                ("Documents", "/home/user/My Documents"),
+                ("Downloads", "/data/downloads"),
+            ]
+        );
+    }
+
+    #[test]
+    fn user_dirs_skip_missing_and_duplicate_directories() {
+        let links = user_dirs_from_paths(
+            "/home/user".to_string(),
+            None,
+            Some(std::path::PathBuf::from("/home/user")),
+            Some(std::path::PathBuf::from("/home/user/Downloads")),
+        );
+
+        assert_eq!(
+            links
+                .iter()
+                .map(|link| link.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["/", "Home", "Downloads"]
         );
     }
 

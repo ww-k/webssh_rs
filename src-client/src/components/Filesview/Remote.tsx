@@ -3,8 +3,8 @@ import { useState } from "react";
 
 import "./index.css";
 
-import { getSftpHome } from "@/api/sftp";
-import { getFilePath, isSftpFileUri } from "@/helpers/file_uri";
+import { getSftpUserDirHome, getSftpUserDirs } from "@/api/sftp";
+import { isSftpFileUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
 import useAppStore from "@/store";
 
@@ -23,7 +23,7 @@ export default function FilesviewRemote({
     targetId: number;
 }) {
     const { copyData, setCopyData } = useAppStore();
-    const [cwd, setCwd] = useState(`${baseUrl}/`);
+    const [cwd, setCwd] = useState("");
     const [pathHistory, setPathHistory] = useState<string[]>([]);
 
     const pushPathHistory = useMemoizedFn((newPath: string) => {
@@ -66,36 +66,12 @@ export default function FilesviewRemote({
         },
     );
 
-    const getHome = useMemoizedFn(() => getSftpHome(targetId));
+    const getHome = useMemoizedFn(() => getSftpUserDirHome(targetId));
     const getDirs = useMemoizedFn(async (fileUrl: string) => {
         const files = await getSftpLsMapFiles(fileUrl);
         return files.filter((file) => file.isDir);
     });
-    const getQuickLinks = useMemoizedFn(async () => {
-        const home = getFilePath(await getSftpHome(targetId));
-        return [
-            {
-                name: "/",
-                path: "/",
-            },
-            {
-                name: "Home",
-                path: home,
-            },
-            {
-                name: "Desktop",
-                path: `${home}/Desktop`,
-            },
-            {
-                name: "Documents",
-                path: `${home}/Documents`,
-            },
-            {
-                name: "Downloads",
-                path: `${home}/Downloads`,
-            },
-        ];
-    });
+    const getQuickLinks = useMemoizedFn(() => getSftpUserDirs(targetId));
     const onFileDoubleClick = useMemoizedFn((file: IViewFileStat) => {
         if (file.isDir) {
             setCwd(file.uri);

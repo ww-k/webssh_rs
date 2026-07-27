@@ -11,8 +11,10 @@ use axum::{
 
 use crate::AppState;
 
-pub use dto::SftpFile;
-pub use handlers::{cp, download, home, ls, mkdir, rename, rm, rm_rf, stat, upload};
+pub use dto::{SftpFile, SftpUserDir};
+pub use handlers::{
+    cp, download, ls, mkdir, rename, rm, rm_rf, stat, upload, user_dir_home, user_dirs,
+};
 pub(crate) use service::{get_file_name, parse_file_uri};
 
 pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
@@ -20,7 +22,8 @@ pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
         .route("/ls", get(ls))
         .route("/mkdir", post(mkdir))
         .route("/stat", get(stat))
-        .route("/home", get(home))
+        .route("/user-dirs", get(user_dirs))
+        .route("/user-dirs/home", get(user_dir_home))
         .route("/cp", post(cp))
         .route("/rename", post(rename))
         .route("/rm", post(rm))

@@ -3,7 +3,7 @@ use axum::{Json, extract::Query};
 use crate::apis::{ApiErr, InternalErrorResponse};
 
 use super::{
-    dto::{FsFile, FsFileUriPayload, FsLsPayload, FsRenamePayload},
+    dto::{FsFile, FsFileUriPayload, FsLsPayload, FsRenamePayload, FsUserDir},
     service,
 };
 
@@ -25,7 +25,7 @@ pub async fn ls(Query(payload): Query<FsLsPayload>) -> Result<Json<Vec<FsFile>>,
 
 #[utoipa::path(
     get,
-    path = "/api/fs/home",
+    path = "/api/fs/user-dirs/home",
     tag = "fs",
     summary = "获取本机主目录路径",
     description = "获取本机用户主目录路径，获取不到时返回根目录",
@@ -34,8 +34,38 @@ pub async fn ls(Query(payload): Query<FsLsPayload>) -> Result<Json<Vec<FsFile>>,
         (status = 500, response = InternalErrorResponse)
     )
 )]
-pub async fn home() -> Result<String, ApiErr> {
-    Ok(service::home())
+pub async fn user_dir_home() -> Result<String, ApiErr> {
+    Ok(service::user_dir_home())
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/fs/user-dirs/download",
+    tag = "fs",
+    summary = "获取本机下载目录路径",
+    description = "获取操作系统配置的本机用户下载目录路径，获取不到时返回用户主目录",
+    responses(
+        (status = 200, description = "成功获取本机下载目录路径", body = String),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn user_dir_download() -> Result<String, ApiErr> {
+    Ok(service::user_dir_download())
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/fs/user-dirs",
+    tag = "fs",
+    summary = "获取本机用户目录",
+    description = "获取本机根目录、用户主目录及操作系统配置的桌面、文档和下载目录",
+    responses(
+        (status = 200, description = "成功获取本机用户目录", body = Vec<FsUserDir>),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn user_dirs() -> Result<Json<Vec<FsUserDir>>, ApiErr> {
+    Ok(Json(service::user_dirs()))
 }
 
 #[utoipa::path(

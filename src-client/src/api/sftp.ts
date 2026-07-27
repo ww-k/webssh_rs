@@ -21,6 +21,11 @@ export interface ISftpFileStat {
     permissions: string;
 }
 
+export interface ISftpUserDir {
+    name: "/" | "Home" | "Desktop" | "Documents" | "Downloads";
+    path: string;
+}
+
 export async function getSftpLs(uri: string) {
     const response = await axios.get<ISftpFileStat[]>("/api/sftp/ls", {
         params: {
@@ -30,8 +35,19 @@ export async function getSftpLs(uri: string) {
     return response.data;
 }
 
-export async function getSftpHome(target_id: number): Promise<string> {
-    const response = await axios.get<string>("/api/sftp/home", {
+export async function getSftpUserDirHome(target_id: number): Promise<string> {
+    const response = await axios.get<string>("/api/sftp/user-dirs/home", {
+        params: {
+            target_id,
+        },
+    });
+    return response.data;
+}
+
+export async function getSftpUserDirs(
+    target_id: number,
+): Promise<ISftpUserDir[]> {
+    const response = await axios.get<ISftpUserDir[]>("/api/sftp/user-dirs", {
         params: {
             target_id,
         },

@@ -1,7 +1,12 @@
 import { useMemoizedFn, useRequest } from "ahooks";
 import { useState } from "react";
 
-import { getFsHome, getFsLs } from "@/api";
+import {
+    getFsLs,
+    getFsUserDirDownload,
+    getFsUserDirHome,
+    getFsUserDirs,
+} from "@/api";
 import { getFilePath } from "@/helpers/file_uri";
 import { posix, win32 } from "@/helpers/path";
 import { isMSWindows } from "@/helpers/platform";
@@ -11,18 +16,24 @@ import FilesviewBase from "./Base";
 import type { IFsFileStat } from "@/api";
 import type { IViewFileStat } from "@/types";
 
+export type LocalDefaultDirectory = "home" | "downloads";
+
 export default function FilesviewLocal({
     className,
     style,
+    initialCwd,
+    defaultDirectory = "home",
     onCwdChange,
     onSelecteChange,
 }: {
     className?: string;
     style?: React.CSSProperties;
+    initialCwd?: string;
+    defaultDirectory?: LocalDefaultDirectory;
     onCwdChange?: (cwd: string) => void;
     onSelecteChange?: (files: IViewFileStat[]) => void;
 }) {
-    const [cwd, setCwd] = useState("/");
+    const [cwd, setCwd] = useState(() => normalizeLocalPath(initialCwd || ""));
     const [pathHistory, setPathHistory] = useState<string[]>([]);
 
     const pushPathHistory = useMemoizedFn((newPath: string) => {
@@ -60,17 +71,16 @@ export default function FilesviewLocal({
         },
     );
 
-    const getHome = useMemoizedFn(() => getFsHome());
+    const getHome = useMemoizedFn(() =>
+        defaultDirectory === "downloads"
+            ? getFsUserDirDownload()
+            : getFsUserDirHome(),
+    );
     const getDirs = useMemoizedFn(async (path: string) => {
         const files = await getFsLs(normalizeLocalPath(getFilePath(path)));
         return mapFsFiles(files, path).filter((file) => file.isDir);
     });
-    const getQuickLinks = useMemoizedFn(async () => [
-        {
-            name: "/",
-            path: "/",
-        },
-    ]);
+    const getQuickLinks = useMemoizedFn(() => getFsUserDirs());
     const onFileDoubleClick = useMemoizedFn((file: IViewFileStat) => {
         if (file.isDir) {
             setCwdPath(file.uri);

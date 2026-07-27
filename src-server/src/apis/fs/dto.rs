@@ -38,3 +38,11 @@ pub struct FsFile {
     /// 权限字符串
     pub permissions: String,
 }
+
+#[derive(Debug, PartialEq, Eq, Serialize, ToSchema)]
+pub struct FsUserDir {
+    /// 用户目录名称，用于匹配前端图标和国际化文案
+    pub name: String,
+    /// 本机目录路径
+    pub path: String,
+}

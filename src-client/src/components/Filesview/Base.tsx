@@ -58,11 +58,13 @@ export default function FilesviewBase({
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: just init run
     useEffect(() => {
+        if (cwd) return;
         getHome().then(setCwd);
     }, []);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: false
     useEffect(() => {
+        if (!cwd) return;
         getCwdFiles();
     }, [cwd]);
 

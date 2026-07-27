@@ -11,13 +11,18 @@ use axum::{
 
 use crate::AppBaseState;
 
-pub use dto::FsFile;
-pub use handlers::{cp, home, ls, mkdir, rename, rm, rm_rf, show_in_folder, stat};
+pub use dto::{FsFile, FsUserDir};
+pub use handlers::{
+    cp, ls, mkdir, rename, rm, rm_rf, show_in_folder, stat, user_dir_download, user_dir_home,
+    user_dirs,
+};
 
 pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
     Router::new()
         .route("/ls", get(ls))
-        .route("/home", get(home))
+        .route("/user-dirs", get(user_dirs))
+        .route("/user-dirs/home", get(user_dir_home))
+        .route("/user-dirs/download", get(user_dir_download))
         .route("/stat", get(stat))
         .route("/mkdir", post(mkdir))
         .route("/cp", post(cp))

@@ -10,6 +10,14 @@ pub struct QueryTargetId {
     pub target_id: i32,
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, ToSchema)]
+pub struct SftpUserDir {
+    /// 用户目录名称，用于匹配前端图标和国际化文案
+    pub name: String,
+    /// 远端目录路径
+    pub path: String,
+}
+
 #[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct SftpLsPayload {
     /// SFTP 文件 URI，格式：sftp://target_id/path

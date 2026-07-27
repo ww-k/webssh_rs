@@ -2,8 +2,13 @@ import { Button, Modal, Space } from "antd";
 import { useMemo, useState } from "react";
 
 import FilesviewLocal from "../Filesview/Local";
+import {
+    getLastLocalDirectory,
+    setLastLocalDirectory,
+} from "./lastLocalDirectory";
 
 import type { IViewFileStat } from "@/types";
+import type { LocalDefaultDirectory } from "../Filesview/Local";
 
 type FsSelectorMode = "file" | "directory";
 
@@ -11,6 +16,7 @@ export default function FsSelector({
     open,
     mode,
     multiple,
+    defaultDirectory,
     title,
     onCancel,
     onOk,
@@ -18,11 +24,13 @@ export default function FsSelector({
     open: boolean;
     mode: FsSelectorMode;
     multiple?: boolean;
+    defaultDirectory?: LocalDefaultDirectory;
     title: string;
     onCancel: () => void;
     onOk: (paths: string[]) => void;
 }) {
-    const [cwd, setCwd] = useState("/");
+    const [initialCwd] = useState(getLastLocalDirectory);
+    const [cwd, setCwd] = useState(initialCwd || "/");
     const [selectedFiles, setSelectedFiles] = useState<IViewFileStat[]>([]);
 
     const canOk = useMemo(() => {
@@ -35,7 +43,9 @@ export default function FsSelector({
             onOk([cwd]);
             return;
         }
-        onOk(selectedFiles.filter((file) => !file.isDir).map((file) => file.uri));
+        onOk(
+            selectedFiles.filter((file) => !file.isDir).map((file) => file.uri),
+        );
     }
 
     return (
@@ -55,8 +65,11 @@ export default function FsSelector({
         >
             <FilesviewLocal
                 style={{ height: 420 }}
+                initialCwd={initialCwd}
+                defaultDirectory={defaultDirectory}
                 onCwdChange={(cwd) => {
                     setCwd(cwd);
+                    setLastLocalDirectory(cwd);
                     setSelectedFiles([]);
                 }}
                 onSelecteChange={(files) => {

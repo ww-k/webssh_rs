@@ -21,6 +21,7 @@ anyhow = "1.0.98"
 async-stream = "0.3.6"
 axum = { version = "0.8.3", features = ["macros"] }
 bytes = "1.12.1"
+dirs = "6.0.0"
 utoipa = { version = "5.4.0", features = ["axum_extras"] }
 futures-util = "0.3.31"
 hex = "0.4.3"

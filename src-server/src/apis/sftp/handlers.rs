@@ -1,4 +1,4 @@
-use std::{io::SeekFrom, pin::pin, sync::Arc};
+use std::{collections::HashSet, io::SeekFrom, pin::pin, sync::Arc};
 
 use axum::{
     Json,
@@ -22,16 +22,16 @@ use crate::{
         ApiErr, InternalErrorResponse,
         sftp::dto::{
             ContentRange, QueryTargetId, Range, SftpFile, SftpFileUriPayload, SftpLsPayload,
-            SftpRenamePayload, SftpUploadResponse,
+            SftpRenamePayload, SftpUploadResponse, SftpUserDir,
         },
     },
     consts::services_err_code::*,
     map_db_err, map_ssh_err,
-    sftp_client::{SftpAttrs, SftpFileType, SftpOpenOptions},
+    sftp_client::{FastSftpClient, SftpAttrs, SftpFileType, SftpOpenOptions},
     ssh_connection_pool::ChannelMode,
 };
 
-use super::service::{get_file_name, parse_file_uri};
+use super::service::{get_file_name, normalize_user_dir_home, parse_file_uri, user_dirs_from_home};
 
 const WINDOWS: &str = "windows";
 const CHUNK_SIZE: usize = 8192;
@@ -155,11 +155,11 @@ pub async fn stat(
 
 #[utoipa::path(
     get,
-    path = "/api/sftp/home",
+    path = "/api/sftp/user-dirs/home",
     tag = "sftp",
     summary = "获取主目录路径",
-    description = "获取指定 SSH 目标的主目录路径",
-    operation_id = "sftp_home",
+    description = "通过 SFTP REALPATH 获取指定 SSH 目标的主目录路径，不支持时返回根目录",
+    operation_id = "sftp_user_dir_home",
     params(
         QueryTargetId
     ),
@@ -168,24 +168,73 @@ pub async fn stat(
         (status = 500, response = InternalErrorResponse)
     )
 )]
-pub async fn home(
+pub async fn user_dir_home(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<QueryTargetId>,
 ) -> Result<String, ApiErr> {
-    info!("@sftp_home {:?}", payload);
+    info!("@sftp_user_dir_home {:?}", payload);
 
-    let context = map_db_err!(state.connection_pool.context(payload.target_id).await)?;
-    if context.target().system.as_deref() == Some(WINDOWS) {
-        return Ok("/C:".to_string());
+    let sftp = map_ssh_err!(
+        state
+            .connection_pool
+            .sftp(payload.target_id, ChannelMode::Shared)
+            .await
+    )?;
+    resolve_user_dir_home(&sftp).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/sftp/user-dirs",
+    tag = "sftp",
+    summary = "获取远端用户目录",
+    description = "获取指定 SSH 目标的根目录、主目录及主目录下实际存在的桌面、文档和下载目录",
+    operation_id = "sftp_user_dirs",
+    params(
+        QueryTargetId
+    ),
+    responses(
+        (status = 200, description = "成功获取远端用户目录", body = Vec<SftpUserDir>),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn user_dirs(
+    State(state): State<Arc<AppState>>,
+    Query(payload): Query<QueryTargetId>,
+) -> Result<Json<Vec<SftpUserDir>>, ApiErr> {
+    info!("@sftp_user_dirs {:?}", payload);
+
+    let sftp = map_ssh_err!(
+        state
+            .connection_pool
+            .sftp(payload.target_id, ChannelMode::Shared)
+            .await
+    )?;
+    let home = resolve_user_dir_home(&sftp).await?;
+    let entries = map_ssh_err!(sftp.read_dir(&home).await)?;
+    let available_dirs = entries
+        .into_iter()
+        .filter_map(|entry| {
+            let (name, attrs) = entry.into_parts();
+            (attrs.file_type() == SftpFileType::Dir).then_some(name)
+        })
+        .collect::<HashSet<_>>();
+
+    Ok(Json(user_dirs_from_home(&home, &available_dirs)))
+}
+
+async fn resolve_user_dir_home(sftp: &FastSftpClient) -> Result<String, ApiErr> {
+    match sftp.realpath(".").await {
+        Ok(path) => Ok(normalize_user_dir_home(&path)),
+        Err(err) if err.is_operation_unsupported() => {
+            debug!("SFTP REALPATH is unsupported, falling back to root");
+            Ok("/".to_string())
+        }
+        Err(err) => Err(ApiErr {
+            code: ERR_CODE_SSH_ERR,
+            message: err.to_string(),
+        }),
     }
-    let channel = map_ssh_err!(context.channel(ChannelMode::Shared).await)?;
-
-    let home_path = crate::apis::ssh::exec(channel, "pwd").await?;
-    let home_path = home_path.trim().to_string();
-
-    debug!("@sftp_home home_path: {}", home_path);
-
-    Ok(home_path)
 }
 
 #[utoipa::path(

@@ -1,7 +1,59 @@
+use std::collections::HashSet;
+
 use crate::{apis::ApiErr, consts::services_err_code::*};
+
+use super::dto::SftpUserDir;
 
 const URI_SEP: &str = ":";
 const PATH_SEP: &str = "/";
+
+pub(crate) fn normalize_user_dir_home(path: &str) -> String {
+    let path = path.trim().replace('\\', PATH_SEP);
+    let path = path.trim_end_matches(PATH_SEP);
+    if path.is_empty() {
+        PATH_SEP.to_string()
+    } else if path.starts_with(PATH_SEP) {
+        path.to_string()
+    } else {
+        format!("/{path}")
+    }
+}
+
+pub(crate) fn user_dirs_from_home(
+    home: &str,
+    available_dirs: &HashSet<String>,
+) -> Vec<SftpUserDir> {
+    let home = normalize_user_dir_home(home);
+    let child_path = |name: &str| {
+        if home == PATH_SEP {
+            format!("/{name}")
+        } else {
+            format!("{home}/{name}")
+        }
+    };
+
+    let mut user_dirs = vec![
+        SftpUserDir {
+            name: "/".to_string(),
+            path: "/".to_string(),
+        },
+        SftpUserDir {
+            name: "Home".to_string(),
+            path: home.clone(),
+        },
+    ];
+
+    for name in ["Desktop", "Documents", "Downloads"] {
+        if available_dirs.contains(name) {
+            user_dirs.push(SftpUserDir {
+                name: name.to_string(),
+                path: child_path(name),
+            });
+        }
+    }
+
+    user_dirs
+}
 
 #[derive(Debug)]
 pub(crate) struct SftpFileUri<'a> {
@@ -104,6 +156,59 @@ fn split_path(path: &str) -> Option<(&str, &str)> {
 mod tests {
     use super::*;
     use crate::apis::sftp::dto::ContentRange;
+
+    #[test]
+    fn normalize_user_dir_home_uses_posix_path_format() {
+        assert_eq!(
+            normalize_user_dir_home(r"C:\Users\kevin\"),
+            "/C:/Users/kevin"
+        );
+        assert_eq!(normalize_user_dir_home("/home/user/"), "/home/user");
+        assert_eq!(normalize_user_dir_home(""), "/");
+    }
+
+    #[test]
+    fn user_dirs_include_existing_directories_in_display_order() {
+        let available_dirs = HashSet::from([
+            "Downloads".to_string(),
+            "Desktop".to_string(),
+            "Documents".to_string(),
+        ]);
+        let dirs = user_dirs_from_home("/home/user/", &available_dirs);
+
+        assert_eq!(
+            dirs.iter()
+                .map(|dir| (dir.name.as_str(), dir.path.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("/", "/"),
+                ("Home", "/home/user"),
+                ("Desktop", "/home/user/Desktop"),
+                ("Documents", "/home/user/Documents"),
+                ("Downloads", "/home/user/Downloads"),
+            ]
+        );
+    }
+
+    #[test]
+    fn user_dirs_skip_missing_directories() {
+        let available_dirs = HashSet::from(["Downloads".to_string()]);
+        let dirs = user_dirs_from_home("/home/user", &available_dirs);
+
+        assert_eq!(
+            dirs.iter().map(|dir| dir.name.as_str()).collect::<Vec<_>>(),
+            vec!["/", "Home", "Downloads"]
+        );
+    }
+
+    #[test]
+    fn user_dirs_join_children_to_root_without_duplicate_separator() {
+        let available_dirs = HashSet::from(["Desktop".to_string()]);
+        let dirs = user_dirs_from_home("/", &available_dirs);
+
+        assert_eq!(dirs[1].path, "/");
+        assert_eq!(dirs[2].path, "/Desktop");
+    }
 
     #[test]
     fn test_sftp_file_uri_from_str() {

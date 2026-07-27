@@ -38,6 +38,18 @@ pub enum SftpError {
     Aborted,
 }
 
+impl SftpError {
+    pub fn is_operation_unsupported(&self) -> bool {
+        matches!(
+            self,
+            Self::Status {
+                code: SSH_FX_OP_UNSUPPORTED,
+                ..
+            }
+        )
+    }
+}
+
 impl std::fmt::Display for SftpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -116,6 +128,7 @@ const SSH_FXP_OPENDIR: u8 = 11;
 const SSH_FXP_READDIR: u8 = 12;
 const SSH_FXP_REMOVE: u8 = 13;
 const SSH_FXP_MKDIR: u8 = 14;
+const SSH_FXP_REALPATH: u8 = 16;
 const SSH_FXP_RENAME: u8 = 18;
 const SSH_FXP_STATUS: u8 = 101;
 const SSH_FXP_HANDLE: u8 = 102;
@@ -125,6 +138,7 @@ const SSH_FXP_ATTRS: u8 = 105;
 
 const SSH_FX_OK: u32 = 0;
 const SSH_FX_EOF: u32 = 1;
+const SSH_FX_OP_UNSUPPORTED: u32 = 8;
 
 const SSH_FXF_READ: u32 = 0x0000_0001;
 const SSH_FXF_WRITE: u32 = 0x0000_0002;
@@ -756,6 +770,25 @@ impl FastSftpClient {
             SSH_FXP_STATUS => Err(parse_status_packet(response.payload())?.into()),
             actual => Err(SftpError::UnexpectedPacket {
                 expected: "ATTRS",
+                actual,
+            }),
+        }
+    }
+
+    pub async fn realpath<T: Into<String>>(&self, path: T) -> SftpResult<String> {
+        let mut payload = Vec::new();
+        put_string(&mut payload, path.into().as_bytes());
+        let response = self.request(SSH_FXP_REALPATH, payload).await?;
+
+        match response.packet_type {
+            SSH_FXP_NAME => parse_name_entries(response.payload())?
+                .into_iter()
+                .next()
+                .map(|entry| entry.into_parts().0)
+                .ok_or_else(|| SftpError::Protocol("realpath returned no path".to_string())),
+            SSH_FXP_STATUS => Err(parse_status_packet(response.payload())?.into()),
+            actual => Err(SftpError::UnexpectedPacket {
+                expected: "NAME",
                 actual,
             }),
         }
@@ -2075,6 +2108,84 @@ mod tests {
 
         assert_eq!(packet.packet_type, SSH_FXP_STATUS);
         assert_eq!(packet.payload(), payload);
+    }
+
+    #[tokio::test]
+    async fn realpath_returns_server_canonical_path() {
+        let (client_stream, mut server_stream) = duplex(8192);
+        let server = tokio::spawn(async move {
+            let init = read_packet(&mut server_stream).await.expect("init packet");
+            assert_eq!(init.packet_type, SSH_FXP_INIT);
+            write_raw_packet_to(&mut server_stream, SSH_FXP_VERSION, &3u32.to_be_bytes())
+                .await
+                .expect("version response");
+
+            let request = read_packet(&mut server_stream)
+                .await
+                .expect("realpath packet");
+            assert_eq!(request.packet_type, SSH_FXP_REALPATH);
+            let (id, payload) = split_response_id(request.into_payload()).expect("realpath id");
+            let mut cursor = Cursor::new(&payload);
+            assert_eq!(cursor.read_string().expect("path"), b".");
+
+            let mut response = Vec::new();
+            put_u32(&mut response, id);
+            put_u32(&mut response, 1);
+            put_string(&mut response, b"/C:/Users/kevin");
+            put_string(&mut response, b"/C:/Users/kevin");
+            put_attrs(&mut response, &SftpAttrs::empty());
+            write_raw_packet_to(&mut server_stream, SSH_FXP_NAME, &response)
+                .await
+                .expect("realpath response");
+        });
+
+        let client = FastSftpClient::new_with_stream(Box::new(client_stream))
+            .await
+            .expect("client");
+
+        assert_eq!(
+            client.realpath(".").await.expect("realpath"),
+            "/C:/Users/kevin"
+        );
+        server.await.expect("server task");
+    }
+
+    #[tokio::test]
+    async fn realpath_preserves_unsupported_status() {
+        let (client_stream, mut server_stream) = duplex(8192);
+        let server = tokio::spawn(async move {
+            let init = read_packet(&mut server_stream).await.expect("init packet");
+            assert_eq!(init.packet_type, SSH_FXP_INIT);
+            write_raw_packet_to(&mut server_stream, SSH_FXP_VERSION, &3u32.to_be_bytes())
+                .await
+                .expect("version response");
+
+            let request = read_packet(&mut server_stream)
+                .await
+                .expect("realpath packet");
+            assert_eq!(request.packet_type, SSH_FXP_REALPATH);
+            let (id, _) = split_response_id(request.into_payload()).expect("realpath id");
+
+            let mut status = Vec::new();
+            put_u32(&mut status, id);
+            put_u32(&mut status, SSH_FX_OP_UNSUPPORTED);
+            put_string(&mut status, b"unsupported");
+            put_string(&mut status, b"");
+            write_raw_packet_to(&mut server_stream, SSH_FXP_STATUS, &status)
+                .await
+                .expect("status response");
+        });
+
+        let client = FastSftpClient::new_with_stream(Box::new(client_stream))
+            .await
+            .expect("client");
+        let err = client
+            .realpath(".")
+            .await
+            .expect_err("unsupported realpath");
+
+        assert!(err.is_operation_unsupported());
+        server.await.expect("server task");
     }
 
     #[tokio::test]

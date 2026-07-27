@@ -47,6 +47,7 @@ export default function remoteHandleContextmenu(
             click: async () => {
                 const [localDir] = await renderFsSelector({
                     mode: "directory",
+                    defaultDirectory: "downloads",
                     title: "选择下载目录",
                 });
                 const allPromises = files.map((file) => {
@@ -126,7 +127,8 @@ export default function remoteHandleContextmenu(
                     title: "选择上传文件",
                 });
                 const allPromises = localPaths.map((localPath) => {
-                    const fileName = localPath.split(/[\\/]/).pop() || "Untitled";
+                    const fileName =
+                        localPath.split(/[\\/]/).pop() || "Untitled";
                     return transferService.upload({
                         localPath,
                         fileUri: joinUri(context.fileUri, fileName),

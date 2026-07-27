@@ -15,6 +15,11 @@ export interface IFsFileStat {
     permissions: string;
 }
 
+export interface IFsUserDir {
+    name: "/" | "Home" | "Desktop" | "Documents" | "Downloads";
+    path: string;
+}
+
 export async function getFsLs(uri: string, all?: boolean) {
     const response = await axios.get<IFsFileStat[]>("/api/fs/ls", {
         params: {
@@ -25,8 +30,18 @@ export async function getFsLs(uri: string, all?: boolean) {
     return response.data;
 }
 
-export async function getFsHome(): Promise<string> {
-    const response = await axios.get<string>("/api/fs/home");
+export async function getFsUserDirHome(): Promise<string> {
+    const response = await axios.get<string>("/api/fs/user-dirs/home");
+    return response.data;
+}
+
+export async function getFsUserDirDownload(): Promise<string> {
+    const response = await axios.get<string>("/api/fs/user-dirs/download");
+    return response.data;
+}
+
+export async function getFsUserDirs(): Promise<IFsUserDir[]> {
+    const response = await axios.get<IFsUserDir[]>("/api/fs/user-dirs");
     return response.data;
 }
 

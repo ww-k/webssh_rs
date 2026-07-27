@@ -2,9 +2,12 @@ import { createRoot } from "react-dom/client";
 
 import FsSelector from "./index";
 
+import type { LocalDefaultDirectory } from "../Filesview/Local";
+
 export default function renderFsSelector(option: {
     mode: "file" | "directory";
     multiple?: boolean;
+    defaultDirectory?: LocalDefaultDirectory;
     title: string;
 }) {
     return new Promise<string[]>((resolve, reject) => {
@@ -24,6 +27,7 @@ export default function renderFsSelector(option: {
                 open={true}
                 mode={option.mode}
                 multiple={option.multiple}
+                defaultDirectory={option.defaultDirectory}
                 title={option.title}
                 onOk={(paths) => {
                     destroy();
