@@ -129,6 +129,7 @@ cargo tauri build --target universal-apple-darwin
    - Starts the Rust server on port 8080
    - Starts the React development server with proxy
    - Launches the Tauri desktop application
+   - To run only the server and client in a browser, use `pnpm run dev -- --mode=browser`, then open `http://localhost:3000`
 3. **Build Production**: Run `npm run build` to build both web and desktop versions
 
 ### Manual Component Development

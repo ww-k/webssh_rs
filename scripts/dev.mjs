@@ -4,6 +4,14 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(fileURLToPath(import.meta.url), "../..");
+const args = process.argv.slice(2);
+const modeArgument = args.find((argument) => argument.startsWith("--mode="));
+const mode = modeArgument?.slice("--mode=".length) || "desktop";
+
+if (!new Set(["browser", "desktop"]).has(mode)) {
+    console.error(`[dev] Unsupported mode: ${mode}. Use browser or desktop.`);
+    process.exit(1);
+}
 
 const env = {
     ...process.env,
@@ -38,20 +46,41 @@ const clientChild = spawn("npm", ["run", "dev"], {
 });
 processStdio("client", clientChild);
 
-// 启动前端服务
-const tauriChild = spawn("tauri", ["dev"], {
-    cwd: projectRoot,
-    env,
-    shell: isWin32,
-});
-processStdio("tauri", tauriChild);
+const children = [serverChild, clientChild];
 
-tauriChild.on("exit", (code) => {
-    clientChild.kill();
-    serverChild.kill();
-    tauriChild.kill();
-    process.exit(code);
-});
+if (mode === "browser") {
+    console.log("[dev] Browser mode. Open http://localhost:3000 in your browser.");
+    serverChild.on("exit", shutdown);
+    clientChild.on("exit", shutdown);
+} else {
+    // 启动桌面应用
+    const tauriChild = spawn("tauri", ["dev"], {
+        cwd: projectRoot,
+        env,
+        shell: isWin32,
+    });
+    processStdio("tauri", tauriChild);
+    children.push(tauriChild);
+    tauriChild.on("exit", shutdown);
+}
+
+process.on("SIGINT", () => shutdown(0));
+process.on("SIGTERM", () => shutdown(0));
+
+let isShuttingDown = false;
+
+function shutdown(code) {
+    if (isShuttingDown) {
+        return;
+    }
+    isShuttingDown = true;
+    for (const child of children) {
+        if (!child.killed) {
+            child.kill();
+        }
+    }
+    process.exit(code ?? 0);
+}
 
 function processStdio(name, child) {
     child.stdout.on("data", (data) => {
