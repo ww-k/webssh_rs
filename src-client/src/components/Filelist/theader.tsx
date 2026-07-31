@@ -8,7 +8,7 @@ import type { IFileListColumn } from "./types";
 
 interface IProps {
     columns: IFileListColumn[];
-    enableCheckbox?: boolean;
+    multiple?: boolean;
     layoutTableWidth: number;
     layoutColCheckboxWidth: number;
     sortByDefault: string;
@@ -28,7 +28,7 @@ interface IState {
 
 export default class Theader extends Component<IProps, IState> {
     static defaultProps = {
-        enableCheckbox: true,
+        multiple: true,
     };
     isClick: boolean = true;
     _tmpOriginWidth?: number | null;
@@ -51,7 +51,7 @@ export default class Theader extends Component<IProps, IState> {
     render() {
         const {
             columns,
-            enableCheckbox,
+            multiple,
             layoutTableWidth,
             layoutColCheckboxWidth,
             onContextMenu,
@@ -71,7 +71,7 @@ export default class Theader extends Component<IProps, IState> {
                 >
                     <thead>
                         <tr>
-                            {enableCheckbox && (
+                            {multiple !== false && (
                                 <th
                                     className="filelistTableCellColCheckbox"
                                     style={{ width: layoutColCheckboxWidth }}

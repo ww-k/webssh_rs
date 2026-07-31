@@ -12,10 +12,14 @@ import type { LocalDefaultDirectory } from "../Filesview/Local";
 
 type FsSelectorMode = "file" | "directory";
 
+function isDirectory(file: IViewFileStat) {
+    return file.isDir;
+}
+
 export default function FsSelector({
     open,
     mode,
-    multiple,
+    multiple = false,
     defaultDirectory,
     title,
     onCancel,
@@ -34,13 +38,19 @@ export default function FsSelector({
     const [selectedFiles, setSelectedFiles] = useState<IViewFileStat[]>([]);
 
     const canOk = useMemo(() => {
-        if (mode === "directory") return cwd !== "" && cwd !== "/";
+        if (mode === "directory") {
+            return (
+                selectedFiles.some((file) => file.isDir) ||
+                (cwd !== "" && cwd !== "/")
+            );
+        }
         return selectedFiles.some((file) => !file.isDir);
     }, [cwd, mode, selectedFiles]);
 
     function handleOk() {
         if (mode === "directory") {
-            onOk([cwd]);
+            const selectedDirectory = selectedFiles.find((file) => file.isDir);
+            onOk([selectedDirectory?.uri || cwd]);
             return;
         }
         onOk(
@@ -67,13 +77,23 @@ export default function FsSelector({
                 style={{ height: 420 }}
                 initialCwd={initialCwd}
                 defaultDirectory={defaultDirectory}
+                multiple={multiple}
+                isFileSelectable={
+                    mode === "directory" ? isDirectory : undefined
+                }
                 onCwdChange={(cwd) => {
                     setCwd(cwd);
                     setLastLocalDirectory(cwd);
                     setSelectedFiles([]);
                 }}
                 onSelecteChange={(files) => {
-                    const selected = multiple ? files : files.slice(0, 1);
+                    const selectableFiles =
+                        mode === "directory"
+                            ? files.filter((file) => file.isDir)
+                            : files;
+                    const selected = multiple
+                        ? selectableFiles
+                        : selectableFiles.slice(-1);
                     setSelectedFiles(selected);
                 }}
             />

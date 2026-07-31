@@ -27,6 +27,8 @@ type IProps = {
     getDirs?: (fileUrlOrPath: string) => Promise<IViewFileStat[]>;
     getQuickLinks?: () => Promise<IQuickLink[]>;
     getCwdFiles: () => Promise<IViewFileStat[]>;
+    multiple?: boolean;
+    isFileSelectable?: (file: IViewFileStat) => boolean;
     onSelecteChange?: (files: IViewFileStat[]) => void;
     onFileDoubleClick?: (file: IViewFileStat) => void;
     onContextMenu?: (

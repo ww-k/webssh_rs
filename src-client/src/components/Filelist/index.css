@@ -213,6 +213,18 @@
     background-color: var(--ant-color-fill-quaternary);
 }
 
+.filelistTable > tbody > tr.filelistTableTrDisabled {
+    cursor: not-allowed;
+}
+
+.filelistTable > tbody > tr.filelistTableTrDisabled > td {
+    color: var(--ant-color-text-disabled);
+}
+
+.filelistTable > tbody > tr.filelistTableTrDisabled:hover > td {
+    background-color: transparent;
+}
+
 .filelistTable > tbody > .hover > td {
     background-color: var(--ant-color-fill-quaternary);
 }
@@ -299,6 +311,10 @@
 .filelistTableCellColCheckbox input[type="checkbox"]:checked:after {
     transition: all 0.2s cubic-bezier(0.12, 0.4, 0.29, 1.46) 0.1s;
     transform: rotate(45deg) scale(1);
+}
+
+.filelistTableTrDisabled .filelistTableCellColCheckbox input[type="checkbox"] {
+    opacity: 0.45;
 }
 
 .filelistTableCellColName {

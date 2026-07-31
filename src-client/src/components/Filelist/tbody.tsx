@@ -35,8 +35,9 @@ interface IProps {
     cwd?: string;
     selected?: IViewFileStat[];
     activeKey?: string | null;
-    enableCheckbox?: boolean;
     enableDragFromOS?: boolean;
+    multiple?: boolean;
+    isFileSelectable?: (file: IViewFileStat) => boolean;
     onSelected?: (files: IViewFileStat[]) => void;
     onFileClick?: (file: IViewFileStat) => void;
     onFileDoubleClick?: (file: IViewFileStat, evt: MouseEvent) => void;
@@ -63,7 +64,7 @@ export default class Tbody extends Component<IProps, IState> {
         selected: [],
         activeKey: null,
         draggable: false,
-        enableCheckbox: true,
+        multiple: true,
         onActive: null,
         onContextMenu: null,
         onDrop: null,
@@ -120,8 +121,13 @@ export default class Tbody extends Component<IProps, IState> {
 
     shouldComponentUpdate(nextProps: IProps, nextState: IState) {
         const { props } = this;
-        const { onSelected, columns, layoutContainerWidth, layoutTableWidth } =
-            props;
+        const {
+            onSelected,
+            columns,
+            multiple,
+            layoutContainerWidth,
+            layoutTableWidth,
+        } = props;
 
         /* 属性改变，重新生成某些状态 */
         if (
@@ -153,6 +159,7 @@ export default class Tbody extends Component<IProps, IState> {
 
         if (
             columns !== nextProps.columns ||
+            multiple !== nextProps.multiple ||
             layoutContainerWidth !== nextProps.layoutContainerWidth ||
             layoutTableWidth !== nextProps.layoutTableWidth
         ) {
@@ -169,7 +176,12 @@ export default class Tbody extends Component<IProps, IState> {
             lasterSelected,
             dropFileHover,
         } = this.state;
-        if (data !== nextState.data || columns !== nextProps.columns) {
+        if (
+            data !== nextState.data ||
+            columns !== nextProps.columns ||
+            multiple !== nextProps.multiple ||
+            props.isFileSelectable !== nextProps.isFileSelectable
+        ) {
             this._refreshList(nextProps, nextState);
         }
 
@@ -254,7 +266,7 @@ export default class Tbody extends Component<IProps, IState> {
             columns,
             layoutContainerWidth,
             layoutTableWidth,
-            enableCheckbox,
+            multiple,
             layoutColCheckboxWidth,
         } = nextProps;
         const colgroup = this.colgroupRef.current;
@@ -263,7 +275,7 @@ export default class Tbody extends Component<IProps, IState> {
         }
         colgroup.innerHTML = "";
 
-        if (enableCheckbox) {
+        if (multiple !== false) {
             const col0 = document.createElement("col");
             col0.style.width = `${layoutColCheckboxWidth}px`;
             colgroup.appendChild(col0);
@@ -293,7 +305,7 @@ export default class Tbody extends Component<IProps, IState> {
         console.debug("Filelist/Tbody: _refreshList");
         const {
             columns,
-            enableCheckbox,
+            multiple,
             layoutRowHeight,
             layoutContainerHeight,
             draggable,
@@ -322,16 +334,22 @@ export default class Tbody extends Component<IProps, IState> {
 
         data.forEach((item, i) => {
             const isParentFile = i === 0 && item.name === "..";
+            const selectable = this.isFileSelectable(item);
             const tr = document.createElement("tr");
             tr.style.height = `${layoutRowHeight}px`;
+            if (!selectable) {
+                tr.classList.add("filelistTableTrDisabled");
+                tr.setAttribute("aria-disabled", "true");
+            }
 
-            if (enableCheckbox) {
+            if (multiple !== false) {
                 const td0 = document.createElement("td");
                 td0.className = "filelistTableCellColCheckbox";
 
                 if (!isParentFile) {
                     const checkbox = document.createElement("input");
                     checkbox.setAttribute("type", "checkbox");
+                    checkbox.disabled = !selectable;
                     checkbox.onclick = preventDefault;
                     td0.appendChild(checkbox);
                 }
@@ -425,7 +443,7 @@ export default class Tbody extends Component<IProps, IState> {
             } else {
                 //框选/单击(点击在非文件名且不是已选中状态)。说明：此时还不能确定是框选行为还是单击行为，需进入mouseMove事件
                 this._isUp = true;
-                this._isMove = true;
+                this._isMove = this.isMultiple();
                 this._dragTarget = null;
             }
         }
@@ -516,6 +534,14 @@ export default class Tbody extends Component<IProps, IState> {
 
             let newSelected: IViewFileStat[] = EMPTY_FILE_ARR;
             if (
+                !this.isMultiple() &&
+                _endSelectDataIndex > -1 &&
+                data[_endSelectDataIndex] &&
+                this.isFileSelectable(data[_endSelectDataIndex])
+            ) {
+                newSelected = [data[_endSelectDataIndex]];
+            } else if (
+                this.isMultiple() &&
                 this._startSelectDataIndex > -1 &&
                 _endSelectDataIndex > -1 &&
                 data
@@ -526,12 +552,15 @@ export default class Tbody extends Component<IProps, IState> {
                             _endSelectDataIndex,
                             this._startSelectDataIndex + 1,
                         )
-                        .reverse();
+                        .reverse()
+                        .filter((file) => this.isFileSelectable(file));
                 } else if (this._startSelectDataIndex < _endSelectDataIndex) {
-                    newSelected = data.slice(
-                        this._startSelectDataIndex,
-                        _endSelectDataIndex + 1,
-                    );
+                    newSelected = data
+                        .slice(
+                            this._startSelectDataIndex,
+                            _endSelectDataIndex + 1,
+                        )
+                        .filter((file) => this.isFileSelectable(file));
                 }
             }
 
@@ -626,6 +655,9 @@ export default class Tbody extends Component<IProps, IState> {
         index: number,
         e: MouseEvent | React.MouseEvent,
     ) {
+        if (!this.isFileSelectable(file)) {
+            return;
+        }
         const { onFileClick } = this.props;
         const parentFile = this.props.parentFile;
         let selected = this.state.selected || [];
@@ -633,13 +665,14 @@ export default class Tbody extends Component<IProps, IState> {
         const data = this.props.data;
         const evtTarget = e.target as Element;
         const isAppendClick =
+            this.isMultiple() &&
             // @ts-expect-error
-            evtTarget.type === "checkbox" ||
-            (evtTarget.children[0] &&
-                // @ts-expect-error
-                evtTarget.children[0].type === "checkbox") ||
-            e.metaKey ||
-            e.ctrlKey;
+            (evtTarget.type === "checkbox" ||
+                (evtTarget.children[0] &&
+                    // @ts-expect-error
+                    evtTarget.children[0].type === "checkbox") ||
+                e.metaKey ||
+                e.ctrlKey);
 
         if (isAppendClick) {
             // 多选不允许选中 `parentFile` 即 `..`目录.
@@ -659,7 +692,12 @@ export default class Tbody extends Component<IProps, IState> {
                 selected = [].concat(selected);
                 selected.splice(_index, 1);
             }
-        } else if (e.shiftKey && selected.length > 0 && data) {
+        } else if (
+            this.isMultiple() &&
+            e.shiftKey &&
+            selected.length > 0 &&
+            data
+        ) {
             // 选中当前选中的第一条与当前点击的行数之间的所有行
             const firstSelected = selected[0];
             const firstSelectedIndex = data.indexOf(firstSelected);
@@ -668,12 +706,12 @@ export default class Tbody extends Component<IProps, IState> {
                 // 这样是为了实现类似window和mac中按住shift, 连续往上或往下,追加选择, 以及向相反方向点击后的反选操作
                 selected = data
                     .slice(Math.max(0, index), firstSelectedIndex + 1)
-                    .reverse();
+                    .reverse()
+                    .filter((file) => this.isFileSelectable(file));
             } else {
-                selected = data.slice(
-                    Math.max(0, firstSelectedIndex),
-                    index + 1,
-                );
+                selected = data
+                    .slice(Math.max(0, firstSelectedIndex), index + 1)
+                    .filter((file) => this.isFileSelectable(file));
             }
         } else {
             onFileClick?.(file);
@@ -707,6 +745,9 @@ export default class Tbody extends Component<IProps, IState> {
         e.preventDefault();
         const { onContextMenu } = this.props;
         if (!onContextMenu) {
+            return false;
+        }
+        if (!this.isFileSelectable(file)) {
             return false;
         }
 
@@ -947,7 +988,9 @@ export default class Tbody extends Component<IProps, IState> {
         let selected = this.state.selected;
         const last = selected[selected.length - 1];
         let next: IViewFileStat | undefined;
-        const data = this.props.data;
+        const data = this.props.data.filter((file) =>
+            this.isFileSelectable(file),
+        );
         if (data.length === 0) {
             return;
         }
@@ -972,8 +1015,14 @@ export default class Tbody extends Component<IProps, IState> {
      * 按住SHIFT键用上下键连选
      */
     shiftSelectNext(isUp: boolean) {
+        if (!this.isMultiple()) {
+            this.selectNext(isUp);
+            return;
+        }
         let selected = this.state.selected;
-        const data = this.props.data;
+        const data = this.props.data.filter((file) =>
+            this.isFileSelectable(file),
+        );
         if (data.length === 0) {
             return;
         }
@@ -1017,8 +1066,13 @@ export default class Tbody extends Component<IProps, IState> {
      * ctrl + a 全选
      */
     selectAll() {
+        if (!this.isMultiple()) {
+            return;
+        }
         let selected = this.state.selected;
-        const data = this.props.data;
+        const data = this.props.data.filter((file) =>
+            this.isFileSelectable(file),
+        );
         if (data.length === 0) {
             return;
         }
@@ -1033,7 +1087,9 @@ export default class Tbody extends Component<IProps, IState> {
      * 连续输入不同的字母，则会匹配多字母，如输入'web', 则匹配第一个web开头的文件
      */
     selectByKeyword(keyword: string) {
-        const data = this.props.data;
+        const data = this.props.data.filter((file) =>
+            this.isFileSelectable(file),
+        );
         if (data.length === 0) {
             return;
         }
@@ -1081,6 +1137,14 @@ export default class Tbody extends Component<IProps, IState> {
             activeIndex,
         );
         onActive?.(activeIndex);
+    }
+
+    isFileSelectable(file: IViewFileStat) {
+        return this.props.isFileSelectable?.(file) ?? true;
+    }
+
+    isMultiple() {
+        return this.props.multiple !== false;
     }
 
     /**
@@ -1270,7 +1334,7 @@ export default class Tbody extends Component<IProps, IState> {
 
     /** 获取每列中length最长的td */
     getMaxCols() {
-        const { columns, enableCheckbox } = this.props;
+        const { columns, multiple } = this.props;
         const { data } = this.state;
         const maxCols: Record<
             string,
@@ -1287,7 +1351,7 @@ export default class Tbody extends Component<IProps, IState> {
             const rowIndex = index;
             displayColumns.forEach((column, colIndex: number) => {
                 // eslint-disable-next-line no-param-reassign
-                enableCheckbox && colIndex++;
+                multiple !== false && colIndex++;
                 const itemKey = column.dataIndex as keyof IViewFileStat;
                 const value = `${rowData[itemKey] as number | string}`;
                 const length = value.length;

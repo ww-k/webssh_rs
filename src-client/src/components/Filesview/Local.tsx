@@ -23,6 +23,8 @@ export default function FilesviewLocal({
     style,
     initialCwd,
     defaultDirectory = "home",
+    multiple,
+    isFileSelectable,
     onCwdChange,
     onSelecteChange,
 }: {
@@ -30,6 +32,8 @@ export default function FilesviewLocal({
     style?: React.CSSProperties;
     initialCwd?: string;
     defaultDirectory?: LocalDefaultDirectory;
+    multiple?: boolean;
+    isFileSelectable?: (file: IViewFileStat) => boolean;
     onCwdChange?: (cwd: string) => void;
     onSelecteChange?: (files: IViewFileStat[]) => void;
 }) {
@@ -106,6 +110,8 @@ export default function FilesviewLocal({
             getQuickLinks={getQuickLinks}
             getHome={getHome}
             getCwdFiles={getCwdFiles}
+            multiple={multiple}
+            isFileSelectable={isFileSelectable}
             onSelecteChange={onSelecteChange}
             onFileDoubleClick={onFileDoubleClick}
             onEnter={onEnter}
