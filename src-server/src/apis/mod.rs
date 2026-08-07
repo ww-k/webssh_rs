@@ -1,4 +1,4 @@
-pub mod favorite;
+pub mod favorite_directory;
 pub mod fs;
 pub mod sftp;
 pub mod ssh;

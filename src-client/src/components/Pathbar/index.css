@@ -206,23 +206,23 @@
     border-left-color: var(--ant-color-border);
 }
 
-.pathbarFavoriteBtn {
+.pathbarFavoriteDirectoryBtn {
     border-left: 1px solid transparent;
 }
 
-.pathbarFavoriteBtn:hover {
+.pathbarFavoriteDirectoryBtn:hover {
     border-left-color: var(--ant-color-border);
 }
 
-.pathbarFavoriteBtn.active .anticon {
+.pathbarFavoriteDirectoryBtn.active .anticon {
     color: var(--ant-color-warning);
 }
 
-.pathbarFavoriteBtn:disabled {
+.pathbarFavoriteDirectoryBtn:disabled {
     cursor: not-allowed;
 }
 
-.pathbarFavoriteBtn:disabled .anticon {
+.pathbarFavoriteDirectoryBtn:disabled .anticon {
     color: var(--ant-color-text-quaternary);
 }
 

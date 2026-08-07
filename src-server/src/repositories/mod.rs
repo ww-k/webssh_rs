@@ -1,2 +1,2 @@
-pub(crate) mod favorite;
+pub(crate) mod favorite_directory;
 pub(crate) mod target;

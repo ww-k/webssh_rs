@@ -46,7 +46,7 @@ axios.interceptors.response.use(
     },
 );
 
-export * from "./favorite";
+export * from "./favorite_directory";
 export * from "./fs";
 export * from "./sftp";
 export * from "./target";

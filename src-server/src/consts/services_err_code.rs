@@ -31,5 +31,5 @@ pub const ERR_CODE_TRANSFER_NOT_FOUND: u32 = 4001;
 /// 文件传输任务执行失败
 pub const ERR_CODE_TRANSFER_ERR: u32 = 4002;
 
-/// 收藏请求不合法
-pub const ERR_CODE_FAVORITE_INVALID_REQUEST: u32 = 5000;
+/// 收藏目录请求不合法
+pub const ERR_CODE_FAVORITE_DIRECTORY_INVALID_REQUEST: u32 = 5000;

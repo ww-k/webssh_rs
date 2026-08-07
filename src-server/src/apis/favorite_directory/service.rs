@@ -3,11 +3,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use sea_orm::{ActiveValue::NotSet, ActiveValue::Set, DatabaseConnection};
 
 use crate::{
-    apis::{ApiErr, favorite::dto::FavoriteAddPayload},
-    consts::services_err_code::{ERR_CODE_DB_ERR, ERR_CODE_FAVORITE_INVALID_REQUEST},
+    apis::{ApiErr, favorite_directory::dto::FavoriteDirectoryAddPayload},
+    consts::services_err_code::{ERR_CODE_DB_ERR, ERR_CODE_FAVORITE_DIRECTORY_INVALID_REQUEST},
     entities::favorite_directory,
     map_db_err,
-    repositories::favorite as favorite_repository,
+    repositories::favorite_directory as favorite_directory_repository,
 };
 
 pub async fn list(
@@ -16,25 +16,25 @@ pub async fn list(
 ) -> Result<Vec<favorite_directory::Model>, ApiErr> {
     validate_target_id(target_id)?;
     Ok(map_db_err!(
-        favorite_repository::list_by_target(db, target_id).await
+        favorite_directory_repository::list_by_target(db, target_id).await
     )?)
 }
 
 pub async fn add(
     db: &DatabaseConnection,
-    payload: FavoriteAddPayload,
+    payload: FavoriteDirectoryAddPayload,
 ) -> Result<favorite_directory::Model, ApiErr> {
     validate_target_id(payload.target_id)?;
     validate_text("name", &payload.name)?;
     validate_text("path", &payload.path)?;
 
     if let Some(stored) = map_db_err!(
-        favorite_repository::find_by_location(db, payload.target_id, &payload.path).await
+        favorite_directory_repository::find_by_location(db, payload.target_id, &payload.path).await
     )? {
         return Ok(stored);
     }
 
-    let favorite = favorite_directory::ActiveModel {
+    let favorite_directory = favorite_directory::ActiveModel {
         id: NotSet,
         target_id: Set(payload.target_id),
         name: Set(payload.name),
@@ -42,14 +42,14 @@ pub async fn add(
         created_at: Set(now_ms()),
     };
     Ok(map_db_err!(
-        favorite_repository::insert(db, favorite).await
+        favorite_directory_repository::insert(db, favorite_directory).await
     )?)
 }
 
 pub async fn remove(db: &DatabaseConnection, target_id: i32, path: &str) -> Result<(), ApiErr> {
     validate_target_id(target_id)?;
     validate_text("path", path)?;
-    map_db_err!(favorite_repository::delete_by_location(db, target_id, path).await)?;
+    map_db_err!(favorite_directory_repository::delete_by_location(db, target_id, path).await)?;
     Ok(())
 }
 
@@ -71,7 +71,7 @@ fn validate_text(field: &str, value: &str) -> Result<(), ApiErr> {
 
 fn invalid_request(message: &str) -> ApiErr {
     ApiErr {
-        code: ERR_CODE_FAVORITE_INVALID_REQUEST,
+        code: ERR_CODE_FAVORITE_DIRECTORY_INVALID_REQUEST,
         message: message.to_string(),
     }
 }
@@ -86,16 +86,16 @@ fn now_ms() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{apis::favorite::dto::FavoriteAddPayload, migrations::Migrator};
+    use crate::{apis::favorite_directory::dto::FavoriteDirectoryAddPayload, migrations::Migrator};
     use sea_orm::Database;
     use sea_orm_migration::MigratorTrait;
 
     #[tokio::test]
-    async fn favorites_are_idempotent_and_isolated_by_target() {
+    async fn favorite_directories_are_idempotent_and_isolated_by_target() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         Migrator::up(&db, None).await.unwrap();
 
-        let local = FavoriteAddPayload {
+        let local = FavoriteDirectoryAddPayload {
             target_id: 0,
             name: "/tmp".to_string(),
             path: "/tmp".to_string(),
@@ -103,7 +103,7 @@ mod tests {
         let first = add(&db, local).await.unwrap();
         let duplicate = add(
             &db,
-            FavoriteAddPayload {
+            FavoriteDirectoryAddPayload {
                 target_id: 0,
                 name: "duplicate name".to_string(),
                 path: "/tmp".to_string(),
@@ -113,7 +113,7 @@ mod tests {
         .unwrap();
         add(
             &db,
-            FavoriteAddPayload {
+            FavoriteDirectoryAddPayload {
                 target_id: 1,
                 name: "/tmp".to_string(),
                 path: "/tmp".to_string(),
@@ -132,7 +132,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn favorites_reject_invalid_payloads() {
+    async fn favorite_directories_reject_invalid_payloads() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         Migrator::up(&db, None).await.unwrap();
 
@@ -140,7 +140,7 @@ mod tests {
         assert!(
             add(
                 &db,
-                FavoriteAddPayload {
+                FavoriteDirectoryAddPayload {
                     target_id: 0,
                     name: "/tmp".to_string(),
                     path: "".to_string(),

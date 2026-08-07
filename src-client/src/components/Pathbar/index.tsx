@@ -24,14 +24,18 @@ import i18n from "@/i18n";
 
 import "./index.css";
 
-import { getFavoriteList, postFavoriteAdd, postFavoriteRemove } from "@/api";
+import {
+    getFavoriteDirectoryList,
+    postFavoriteDirectoryAdd,
+    postFavoriteDirectoryRemove,
+} from "@/api";
 import { getFilePath, isSftpFileUri } from "@/helpers/file_uri";
 
 import {
-    favoriteToQuickLink,
-    getFavoriteDefaultName,
-    getFavoriteLocation,
-} from "./favorite";
+    favoriteDirectoryToQuickLink,
+    getFavoriteDirectoryDefaultName,
+    getFavoriteDirectoryLocation,
+} from "./favorite_directory";
 import { buildSearchUri, isSearchUri, parseSearchUri } from "./search";
 
 import type { DebouncedFuncLeading } from "lodash";
@@ -56,7 +60,7 @@ interface IProps {
     /** 是否是posix风格路径 */
     posix?: boolean;
     /** 是否启用家图标 */
-    enableStarIcon?: boolean;
+    enableFavoriteDirectoryIcon?: boolean;
     /** 是否允许用户交互点击路径栏，显示下拉目录等 */
     enableReact?: boolean;
     /** 是否允许手动输入路径 */
@@ -83,18 +87,18 @@ interface IState {
     quickLinksVisible: boolean;
     /** 本机视图快速链接 */
     quickLinks: IQuickLink[];
-    /** 收藏列表是否已加载 */
-    favoritesLoaded: boolean;
-    /** 服务端收藏列表 */
-    favorites: IQuickLink[];
-    /** 收藏增删请求是否正在执行 */
-    favoriteUpdating: boolean;
-    /** 添加收藏名称浮层是否显示 */
-    favoritePopoverOpen: boolean;
-    /** 添加收藏名称 */
-    favoriteName: string;
-    /** 打开添加收藏弹窗时的路径 */
-    favoritePendingCwd: string;
+    /** 收藏目录列表是否已加载 */
+    favoriteDirectoriesLoaded: boolean;
+    /** 服务端收藏目录列表 */
+    favoriteDirectories: IQuickLink[];
+    /** 收藏目录增删请求是否正在执行 */
+    favoriteDirectoryUpdating: boolean;
+    /** 添加收藏目录名称浮层是否显示 */
+    favoriteDirectoryPopoverOpen: boolean;
+    /** 添加收藏目录名称 */
+    favoriteDirectoryName: string;
+    /** 打开添加收藏目录浮层时的路径 */
+    favoriteDirectoryPendingCwd: string;
     /** 隐藏的路径, 路径长度超出路径栏时，超出可视区域前面部分会收到快速链接下拉框里 */
     hiddenRoutes: IRouteItem[];
     /** 是否已激活快速预览子目录模式 */
@@ -133,7 +137,7 @@ export default class Pathbar extends Component<IProps, IState> {
         className: "",
         cwd: "",
         history: [],
-        enableStarIcon: true,
+        enableFavoriteDirectoryIcon: true,
         enableReact: true,
         enableInput: true,
         enableSearch: false,
@@ -157,12 +161,12 @@ export default class Pathbar extends Component<IProps, IState> {
             breadcrumbLeft: 5,
             quickLinksVisible: false,
             quickLinks: [],
-            favoritesLoaded: false,
-            favorites: [],
-            favoriteUpdating: false,
-            favoritePopoverOpen: false,
-            favoriteName: "",
-            favoritePendingCwd: "",
+            favoriteDirectoriesLoaded: false,
+            favoriteDirectories: [],
+            favoriteDirectoryUpdating: false,
+            favoriteDirectoryPopoverOpen: false,
+            favoriteDirectoryName: "",
+            favoriteDirectoryPendingCwd: "",
             hiddenRoutes: [],
             previewModeActived: false,
             activedIndex: null,
@@ -223,8 +227,8 @@ export default class Pathbar extends Component<IProps, IState> {
             preProps.cwd !== cwd &&
             cwd &&
             (!preProps.cwd ||
-                getFavoriteLocation(preProps.cwd).targetId !==
-                    getFavoriteLocation(cwd).targetId)
+                getFavoriteDirectoryLocation(preProps.cwd).targetId !==
+                    getFavoriteDirectoryLocation(cwd).targetId)
         ) {
             this.getQuickLinks();
         }
@@ -237,8 +241,13 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     render() {
-        const { className, cwd, enableStarIcon, enableReact, enableSearch } =
-            this.props;
+        const {
+            className,
+            cwd,
+            enableFavoriteDirectoryIcon,
+            enableReact,
+            enableSearch,
+        } = this.props;
         const {
             historyOpen,
             editorValue,
@@ -248,11 +257,11 @@ export default class Pathbar extends Component<IProps, IState> {
             isFocus,
             breadcrumbLeft,
             quickLinksVisible,
-            favorites,
-            favoritesLoaded,
-            favoriteUpdating,
-            favoritePopoverOpen,
-            favoriteName,
+            favoriteDirectories,
+            favoriteDirectoriesLoaded,
+            favoriteDirectoryUpdating,
+            favoriteDirectoryPopoverOpen,
+            favoriteDirectoryName,
             hiddenRoutes,
             activedIndex,
             dirList,
@@ -263,11 +272,14 @@ export default class Pathbar extends Component<IProps, IState> {
             dirListLoadingMsg,
         } = this.state;
         const locationLinks = this.getLocationLinks();
-        const isFavorite = favorites.some((item) =>
+        const isFavoriteDirectory = favoriteDirectories.some((item) =>
             this.isSameLocation(item.path, cwd),
         );
-        const favoriteDisabled =
-            !favoritesLoaded || favoriteUpdating || !cwd || isSearchUri(cwd);
+        const favoriteDirectoryDisabled =
+            !favoriteDirectoriesLoaded ||
+            favoriteDirectoryUpdating ||
+            !cwd ||
+            isSearchUri(cwd);
         const rootCls = classNames({
             pathbar: true,
             [className || ""]: className !== undefined,
@@ -279,7 +291,7 @@ export default class Pathbar extends Component<IProps, IState> {
                 className={rootCls}
                 onClick={this.handleClickOutside.bind(this)}
             >
-                {enableStarIcon || hiddenRoutes.length > 0 ? (
+                {enableFavoriteDirectoryIcon || hiddenRoutes.length > 0 ? (
                     <div className="pathbarHomeBox">
                         <button
                             type="button"
@@ -287,8 +299,10 @@ export default class Pathbar extends Component<IProps, IState> {
                                 "pathbarDropdownBtn pathbarHomeBtn": true,
                                 hover: quickLinksVisible,
                             })}
-                            title={i18n.t("pathbar_favorite_list")}
-                            aria-label={i18n.t("pathbar_favorite_list")}
+                            title={i18n.t("pathbar_favorite_directory_list")}
+                            aria-label={i18n.t(
+                                "pathbar_favorite_directory_list",
+                            )}
                             onClick={this.btnHomeClickHandle.bind(this)}
                         >
                             {!quickLinksVisible ? (
@@ -325,7 +339,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                 <li>
                                     <ul className="pathbarDropdownMenuQuickLinsMenu">
                                         {locationLinks.map((item) => {
-                                            const name = item.favorite
+                                            const name = item.favoriteDirectory
                                                 ? item.name
                                                 : i18n.t(
                                                       `pathbar_home_path_${item.name}`,
@@ -351,7 +365,7 @@ export default class Pathbar extends Component<IProps, IState> {
 
                                             return (
                                                 <li
-                                                    key={`${item.favorite ? "favorite" : "quick"}:${item.path}`}
+                                                    key={`${item.favoriteDirectory ? "favorite_directory" : "quick"}:${item.path}`}
                                                 >
                                                     <div
                                                         onClick={(e) => {
@@ -513,68 +527,75 @@ export default class Pathbar extends Component<IProps, IState> {
                                 </div>
                             </div>
                         )}
-                        {enableStarIcon && (
+                        {enableFavoriteDirectoryIcon && (
                             <Popconfirm
-                                title={i18n.t("pathbar_favorite_name")}
+                                title={i18n.t(
+                                    "pathbar_favorite_directory_name",
+                                )}
                                 description={
                                     <Input
                                         autoFocus={true}
                                         aria-label={i18n.t(
-                                            "pathbar_favorite_name",
+                                            "pathbar_favorite_directory_name",
                                         )}
-                                        value={favoriteName}
-                                        onChange={this.favoriteNameChangeHandle.bind(
+                                        value={favoriteDirectoryName}
+                                        onChange={this.favoriteDirectoryNameChangeHandle.bind(
                                             this,
                                         )}
-                                        onPressEnter={this.favoritePopoverConfirmHandle.bind(
+                                        onPressEnter={this.favoriteDirectoryPopoverConfirmHandle.bind(
                                             this,
                                         )}
                                     />
                                 }
                                 icon={null}
                                 placement="bottomRight"
-                                open={favoritePopoverOpen}
+                                open={favoriteDirectoryPopoverOpen}
                                 okText={i18n.t("app_btn_ok")}
                                 cancelText={i18n.t("app_btn_cancel")}
                                 okButtonProps={{
-                                    disabled: favoriteName.trim() === "",
-                                    loading: favoriteUpdating,
+                                    disabled:
+                                        favoriteDirectoryName.trim() === "",
+                                    loading: favoriteDirectoryUpdating,
                                 }}
                                 cancelButtonProps={{
-                                    disabled: favoriteUpdating,
+                                    disabled: favoriteDirectoryUpdating,
                                 }}
-                                onOpenChange={this.favoritePopoverOpenChangeHandle.bind(
+                                onOpenChange={this.favoriteDirectoryPopoverOpenChangeHandle.bind(
                                     this,
                                 )}
-                                onCancel={this.favoritePopoverCancelHandle.bind(
+                                onCancel={this.favoriteDirectoryPopoverCancelHandle.bind(
                                     this,
                                 )}
-                                onConfirm={this.favoritePopoverConfirmHandle.bind(
+                                onConfirm={this.favoriteDirectoryPopoverConfirmHandle.bind(
                                     this,
                                 )}
                             >
                                 <button
                                     type="button"
                                     className={classNames({
-                                        "pathbarDropdownBtn pathbarFavoriteBtn": true,
-                                        active: isFavorite,
+                                        "pathbarDropdownBtn pathbarFavoriteDirectoryBtn": true,
+                                        active: isFavoriteDirectory,
                                     })}
-                                    disabled={favoriteDisabled}
+                                    disabled={favoriteDirectoryDisabled}
                                     title={i18n.t(
-                                        isFavorite
-                                            ? "pathbar_favorite_remove"
-                                            : "pathbar_favorite_add",
+                                        isFavoriteDirectory
+                                            ? "pathbar_favorite_directory_remove"
+                                            : "pathbar_favorite_directory_add",
                                     )}
                                     aria-label={
-                                        isFavorite
-                                            ? i18n.t("pathbar_favorite_remove")
-                                            : i18n.t("pathbar_favorite_add")
+                                        isFavoriteDirectory
+                                            ? i18n.t(
+                                                  "pathbar_favorite_directory_remove",
+                                              )
+                                            : i18n.t(
+                                                  "pathbar_favorite_directory_add",
+                                              )
                                     }
-                                    onClick={this.btnFavoriteClickHandle.bind(
+                                    onClick={this.btnFavoriteDirectoryClickHandle.bind(
                                         this,
                                     )}
                                 >
-                                    {isFavorite ? (
+                                    {isFavoriteDirectory ? (
                                         <StarFilled />
                                     ) : (
                                         <StarOutlined />
@@ -898,40 +919,55 @@ export default class Pathbar extends Component<IProps, IState> {
 
     getQuickLinks() {
         const { cwd, getQuickLinks } = this.props;
-        const targetId = getFavoriteLocation(cwd).targetId;
+        const targetId = getFavoriteDirectoryLocation(cwd).targetId;
         this.setState({
-            favorites: [],
-            favoritesLoaded: false,
-            favoriteUpdating: false,
+            favoriteDirectories: [],
+            favoriteDirectoriesLoaded: false,
+            favoriteDirectoryUpdating: false,
             quickLinks: [],
         });
 
-        getFavoriteList(targetId)
+        getFavoriteDirectoryList(targetId)
             .then((list) => {
-                if (getFavoriteLocation(this.props.cwd).targetId !== targetId) {
+                if (
+                    getFavoriteDirectoryLocation(this.props.cwd).targetId !==
+                    targetId
+                ) {
                     return;
                 }
                 this.setState({
-                    favorites: list.map(favoriteToQuickLink),
-                    favoritesLoaded: true,
+                    favoriteDirectories: list.map(favoriteDirectoryToQuickLink),
+                    favoriteDirectoriesLoaded: true,
                 });
             })
             .catch(() => {
-                if (getFavoriteLocation(this.props.cwd).targetId !== targetId) {
+                if (
+                    getFavoriteDirectoryLocation(this.props.cwd).targetId !==
+                    targetId
+                ) {
                     return;
                 }
-                this.setState({ favorites: [], favoritesLoaded: true });
+                this.setState({
+                    favoriteDirectories: [],
+                    favoriteDirectoriesLoaded: true,
+                });
             });
 
         getQuickLinks?.()
             .then((list) => {
-                if (getFavoriteLocation(this.props.cwd).targetId !== targetId) {
+                if (
+                    getFavoriteDirectoryLocation(this.props.cwd).targetId !==
+                    targetId
+                ) {
                     return;
                 }
                 this.setState({ quickLinks: list });
             })
             .catch(() => {
-                if (getFavoriteLocation(this.props.cwd).targetId !== targetId) {
+                if (
+                    getFavoriteDirectoryLocation(this.props.cwd).targetId !==
+                    targetId
+                ) {
                     return;
                 }
                 this.setState({ quickLinks: [] });
@@ -939,17 +975,23 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     getLocationLinks() {
-        const { favorites, quickLinks } = this.state;
+        const { favoriteDirectories, quickLinks } = this.state;
         return [
-            ...favorites.map((item) => ({ ...item, favorite: true })),
+            ...favoriteDirectories.map((item) => ({
+                ...item,
+                favoriteDirectory: true,
+            })),
             ...quickLinks
                 .filter(
                     (quickLink) =>
-                        !favorites.some((favorite) =>
-                            this.isSameLocation(favorite.path, quickLink.path),
+                        !favoriteDirectories.some((favoriteDirectory) =>
+                            this.isSameLocation(
+                                favoriteDirectory.path,
+                                quickLink.path,
+                            ),
                         ),
                 )
-                .map((item) => ({ ...item, favorite: false })),
+                .map((item) => ({ ...item, favoriteDirectory: false })),
         ];
     }
 
@@ -1098,28 +1140,28 @@ export default class Pathbar extends Component<IProps, IState> {
         this.props.getCwdFiles();
     }
 
-    async btnFavoriteClickHandle(e: React.MouseEvent) {
+    async btnFavoriteDirectoryClickHandle(e: React.MouseEvent) {
         e.stopPropagation();
         const { cwd } = this.props;
         if (
             !cwd ||
             isSearchUri(cwd) ||
-            !this.state.favoritesLoaded ||
-            this.state.favoriteUpdating
+            !this.state.favoriteDirectoriesLoaded ||
+            this.state.favoriteDirectoryUpdating
         ) {
             return;
         }
 
-        const location = getFavoriteLocation(cwd);
-        const existing = this.state.favorites.find((item) =>
+        const location = getFavoriteDirectoryLocation(cwd);
+        const existing = this.state.favoriteDirectories.find((item) =>
             this.isSameLocation(item.path, cwd),
         );
 
         if (!existing) {
             this.setState({
-                favoritePopoverOpen: true,
-                favoriteName: getFavoriteDefaultName(cwd),
-                favoritePendingCwd: cwd,
+                favoriteDirectoryPopoverOpen: true,
+                favoriteDirectoryName: getFavoriteDirectoryDefaultName(cwd),
+                favoriteDirectoryPendingCwd: cwd,
                 quickLinksVisible: false,
                 historyOpen: false,
             });
@@ -1127,90 +1169,103 @@ export default class Pathbar extends Component<IProps, IState> {
         }
 
         this.setState({
-            favoriteUpdating: true,
+            favoriteDirectoryUpdating: true,
             quickLinksVisible: false,
             historyOpen: false,
         });
 
         try {
-            await postFavoriteRemove({
+            await postFavoriteDirectoryRemove({
                 target_id: location.targetId,
                 path: location.path,
             });
             if (
-                getFavoriteLocation(this.props.cwd).targetId ===
+                getFavoriteDirectoryLocation(this.props.cwd).targetId ===
                 location.targetId
             ) {
                 this.setState((state) => ({
-                    favorites: state.favorites.filter(
+                    favoriteDirectories: state.favoriteDirectories.filter(
                         (item) =>
                             !this.isSameLocation(item.path, existing.path),
                     ),
                 }));
             }
         } catch {
-            message.error(i18n.t("pathbar_favorite_update_failed"));
+            message.error(i18n.t("pathbar_favorite_directory_update_failed"));
         } finally {
             if (
-                getFavoriteLocation(this.props.cwd).targetId ===
+                getFavoriteDirectoryLocation(this.props.cwd).targetId ===
                 location.targetId
             ) {
-                this.setState({ favoriteUpdating: false });
+                this.setState({ favoriteDirectoryUpdating: false });
             }
         }
     }
 
-    favoriteNameChangeHandle(evt: React.ChangeEvent<HTMLInputElement>) {
-        this.setState({ favoriteName: evt.target.value });
+    favoriteDirectoryNameChangeHandle(
+        evt: React.ChangeEvent<HTMLInputElement>,
+    ) {
+        this.setState({ favoriteDirectoryName: evt.target.value });
     }
 
-    favoritePopoverOpenChangeHandle(open: boolean) {
-        if (!open) this.favoritePopoverCancelHandle();
+    favoriteDirectoryPopoverOpenChangeHandle(open: boolean) {
+        if (!open) this.favoriteDirectoryPopoverCancelHandle();
     }
 
-    favoritePopoverCancelHandle() {
-        if (this.state.favoriteUpdating) return;
+    favoriteDirectoryPopoverCancelHandle() {
+        if (this.state.favoriteDirectoryUpdating) return;
         this.setState({
-            favoritePopoverOpen: false,
-            favoriteName: "",
-            favoritePendingCwd: "",
+            favoriteDirectoryPopoverOpen: false,
+            favoriteDirectoryName: "",
+            favoriteDirectoryPendingCwd: "",
         });
     }
 
-    async favoritePopoverConfirmHandle() {
-        const { favoriteName, favoritePendingCwd, favoriteUpdating } =
-            this.state;
-        const name = favoriteName.trim();
-        if (!name || !favoritePendingCwd || favoriteUpdating) return;
+    async favoriteDirectoryPopoverConfirmHandle() {
+        const {
+            favoriteDirectoryName,
+            favoriteDirectoryPendingCwd,
+            favoriteDirectoryUpdating,
+        } = this.state;
+        const name = favoriteDirectoryName.trim();
+        if (
+            !name ||
+            !favoriteDirectoryPendingCwd ||
+            favoriteDirectoryUpdating
+        ) {
+            return;
+        }
 
-        const location = getFavoriteLocation(favoritePendingCwd);
-        this.setState({ favoriteUpdating: true });
+        const location = getFavoriteDirectoryLocation(
+            favoriteDirectoryPendingCwd,
+        );
+        this.setState({ favoriteDirectoryUpdating: true });
         try {
-            const favorite = await postFavoriteAdd({
+            const favoriteDirectory = await postFavoriteDirectoryAdd({
                 target_id: location.targetId,
                 name,
                 path: location.path,
             });
             if (
-                getFavoriteLocation(this.props.cwd).targetId ===
+                getFavoriteDirectoryLocation(this.props.cwd).targetId ===
                 location.targetId
             ) {
                 this.setState((state) => ({
-                    favorites: [
-                        ...state.favorites,
-                        favoriteToQuickLink(favorite),
+                    favoriteDirectories: [
+                        ...state.favoriteDirectories,
+                        favoriteDirectoryToQuickLink(favoriteDirectory),
                     ],
                 }));
             }
             this.setState({
-                favoritePopoverOpen: false,
-                favoriteName: "",
-                favoritePendingCwd: "",
+                favoriteDirectoryPopoverOpen: false,
+                favoriteDirectoryName: "",
+                favoriteDirectoryPendingCwd: "",
             });
         } catch {
-            message.error(i18n.t("pathbar_favorite_update_failed"));
+            message.error(i18n.t("pathbar_favorite_directory_update_failed"));
         } finally {
-            this.setState({ favoriteUpdating: false });
+            this.setState({ favoriteDirectoryUpdating: false });
         }
     }
 

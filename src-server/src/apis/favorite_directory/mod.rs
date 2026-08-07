@@ -13,9 +13,9 @@ use crate::AppBaseState;
 
 pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
     Router::new()
-        .route("/list", get(handlers::favorite_list))
-        .route("/add", post(handlers::favorite_add))
-        .route("/remove", post(handlers::favorite_remove))
+        .route("/list", get(handlers::favorite_directory_list))
+        .route("/add", post(handlers::favorite_directory_add))
+        .route("/remove", post(handlers::favorite_directory_remove))
         .fallback(|| async { "not supported" })
         .with_state(app_state)
 }
