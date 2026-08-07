@@ -206,6 +206,26 @@
     border-left-color: var(--ant-color-border);
 }
 
+.pathbarFavoriteBtn {
+    border-left: 1px solid transparent;
+}
+
+.pathbarFavoriteBtn:hover {
+    border-left-color: var(--ant-color-border);
+}
+
+.pathbarFavoriteBtn.active .anticon {
+    color: var(--ant-color-warning);
+}
+
+.pathbarFavoriteBtn:disabled {
+    cursor: not-allowed;
+}
+
+.pathbarFavoriteBtn:disabled .anticon {
+    color: var(--ant-color-text-quaternary);
+}
+
 .pathbarEditorInput {
     flex-grow: 1;
     color: var(--ant-color-text);

@@ -17,7 +17,7 @@ use config::Config;
 use sea_orm::{Database, DatabaseConnection};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use apis::{fs, sftp, ssh, ssh_connection, target, transfer};
+use apis::{favorite, fs, sftp, ssh, ssh_connection, target, transfer};
 use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
 
@@ -87,6 +87,10 @@ pub async fn run_server() {
         .nest("/api/ssh", ssh::router_builder(connection_pool.clone()))
         .nest("/api/sftp", sftp::router_builder(app_state.clone()))
         .nest("/api/fs", fs::router_builder(app_base_state.clone()))
+        .nest(
+            "/api/favorite",
+            favorite::router_builder(app_base_state.clone()),
+        )
         .nest("/api/transfer", transfer::router_builder(app_state.clone()))
         .nest("/api/target", target::router_builder(app_state.clone()))
         .route(

@@ -14,9 +14,9 @@ test("[FsSelector] remembers the last local directory", () => {
 
     expect(getLastLocalDirectory(storage)).toBeUndefined();
 
-    setLastLocalDirectory("/Users/kevin/Downloads", storage);
+    setLastLocalDirectory("/Users/test/Downloads", storage);
 
-    expect(getLastLocalDirectory(storage)).toBe("/Users/kevin/Downloads");
+    expect(getLastLocalDirectory(storage)).toBe("/Users/test/Downloads");
 });
 
 test("[FsSelector] ignores unavailable browser storage", () => {

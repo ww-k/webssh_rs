@@ -7,5 +7,5 @@ test("[file_uri] joinFileUri joins root sftp uri without duplicated slash", () =
 });
 
 test("[file_uri] joinFileUri joins nested sftp uri", () => {
-    expect(joinFileUri("sftp:1:/Users", "kevin")).toBe("sftp:1:/Users/kevin");
+    expect(joinFileUri("sftp:1:/Users", "test")).toBe("sftp:1:/Users/test");
 });

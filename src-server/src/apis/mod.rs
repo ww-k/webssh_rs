@@ -1,3 +1,4 @@
+pub mod favorite;
 pub mod fs;
 pub mod sftp;
 pub mod ssh;

@@ -7,6 +7,9 @@ use utoipa::OpenApi;
         crate::apis::target::handlers::target_add,
         crate::apis::target::handlers::target_update,
         crate::apis::target::handlers::target_remove,
+        crate::apis::favorite::handlers::favorite_list,
+        crate::apis::favorite::handlers::favorite_add,
+        crate::apis::favorite::handlers::favorite_remove,
         crate::apis::ssh_connection::handlers::list,
         crate::apis::ssh_connection::handlers::expire,
         crate::apis::ssh::handlers::exec_handler,
@@ -44,6 +47,7 @@ use utoipa::OpenApi;
     components(
         schemas(
             crate::apis::ApiErr,
+            crate::entities::favorite::Model,
             crate::apis::fs::FsFile,
             crate::apis::fs::FsUserDir,
             crate::apis::sftp::SftpUserDir,
@@ -59,6 +63,7 @@ use utoipa::OpenApi;
     ),
     tags(
         (name = "target", description = "SSH 目标管理 API"),
+        (name = "favorite", description = "文件路径收藏 API"),
         (name = "ssh_connection", description = "SSH 连接管理 API"),
         (name = "ssh", description = "SSH 命令执行 API"),
         (name = "sftp", description = "SFTP 文件管理 API"),

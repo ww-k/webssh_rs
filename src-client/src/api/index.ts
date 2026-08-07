@@ -33,7 +33,9 @@ axios.interceptors.response.use(
         ) {
             err.code = err.response.data.code;
             err.message =
-                err.response.data.message || err.response.data.msg || err.message;
+                err.response.data.message ||
+                err.response.data.msg ||
+                err.message;
         } else if (err.response && err.response.status === 401) {
             err.code = 401;
         } else {
@@ -44,7 +46,8 @@ axios.interceptors.response.use(
     },
 );
 
+export * from "./favorite";
+export * from "./fs";
 export * from "./sftp";
 export * from "./target";
-export * from "./fs";
 export * from "./transfer";

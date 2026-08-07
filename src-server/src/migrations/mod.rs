@@ -6,6 +6,7 @@ mod m000003_ssh_known_host;
 mod m000004_transfer_task;
 mod m000005_drop_transfer_task_source_uri;
 mod m000006_pin_one_host_key;
+mod m000007_favorite;
 
 pub struct Migrator;
 
@@ -19,6 +20,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000004_transfer_task::Migration),
             Box::new(m000005_drop_transfer_task_source_uri::Migration),
             Box::new(m000006_pin_one_host_key::Migration),
+            Box::new(m000007_favorite::Migration),
         ]
     }
 }
