@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "scripts": {
         "dev": "node scripts/dev.mjs",
+        "dev:browser": "node scripts/dev.mjs --mode=browser",
         "build": "node scripts/build.mjs",
         "gen-docs": "cd src-server && cargo run --bin gen-docs"
     },
