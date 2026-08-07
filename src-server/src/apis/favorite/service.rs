@@ -5,12 +5,15 @@ use sea_orm::{ActiveValue::NotSet, ActiveValue::Set, DatabaseConnection};
 use crate::{
     apis::{ApiErr, favorite::dto::FavoriteAddPayload},
     consts::services_err_code::{ERR_CODE_DB_ERR, ERR_CODE_FAVORITE_INVALID_REQUEST},
-    entities::favorite,
+    entities::favorite_directory,
     map_db_err,
     repositories::favorite as favorite_repository,
 };
 
-pub async fn list(db: &DatabaseConnection, target_id: i32) -> Result<Vec<favorite::Model>, ApiErr> {
+pub async fn list(
+    db: &DatabaseConnection,
+    target_id: i32,
+) -> Result<Vec<favorite_directory::Model>, ApiErr> {
     validate_target_id(target_id)?;
     Ok(map_db_err!(
         favorite_repository::list_by_target(db, target_id).await
@@ -20,7 +23,7 @@ pub async fn list(db: &DatabaseConnection, target_id: i32) -> Result<Vec<favorit
 pub async fn add(
     db: &DatabaseConnection,
     payload: FavoriteAddPayload,
-) -> Result<favorite::Model, ApiErr> {
+) -> Result<favorite_directory::Model, ApiErr> {
     validate_target_id(payload.target_id)?;
     validate_text("name", &payload.name)?;
     validate_text("path", &payload.path)?;
@@ -31,7 +34,7 @@ pub async fn add(
         return Ok(stored);
     }
 
-    let favorite = favorite::ActiveModel {
+    let favorite = favorite_directory::ActiveModel {
         id: NotSet,
         target_id: Set(payload.target_id),
         name: Set(payload.name),

@@ -47,7 +47,7 @@ use utoipa::OpenApi;
     components(
         schemas(
             crate::apis::ApiErr,
-            crate::entities::favorite::Model,
+            crate::entities::favorite_directory::Model,
             crate::apis::fs::FsFile,
             crate::apis::fs::FsUserDir,
             crate::apis::sftp::SftpUserDir,

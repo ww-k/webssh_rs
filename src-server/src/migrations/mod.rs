@@ -1,27 +1,13 @@
 pub use sea_orm_migration::prelude::*;
 
 mod m000001_init_db;
-mod m000002_win_target;
-mod m000003_ssh_known_host;
-mod m000004_transfer_task;
-mod m000005_drop_transfer_task_source_uri;
-mod m000006_pin_one_host_key;
-mod m000007_favorite;
 
 pub struct Migrator;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![
-            Box::new(m000001_init_db::Migration),
-            Box::new(m000002_win_target::Migration),
-            Box::new(m000003_ssh_known_host::Migration),
-            Box::new(m000004_transfer_task::Migration),
-            Box::new(m000005_drop_transfer_task_source_uri::Migration),
-            Box::new(m000006_pin_one_host_key::Migration),
-            Box::new(m000007_favorite::Migration),
-        ]
+        vec![Box::new(m000001_init_db::Migration)]
     }
 }
 
@@ -29,7 +15,7 @@ impl MigratorTrait for Migrator {
 mod tests {
     use std::fmt::Debug;
 
-    use crate::entities::target::{self};
+    use crate::entities::target;
     use crate::{Migrator, MigratorTrait};
     use sea_orm::{ActiveModelTrait, Database, FromQueryResult, Statement};
 
@@ -57,11 +43,17 @@ mod tests {
             let stmt2 = stmt.clone();
             let rows = TableName::find_by_statement(stmt).all(&db).await.unwrap();
 
-            assert_eq!(rows.len(), 2, "Expecte 2 tables, got {}", rows.len());
+            assert_eq!(rows.len(), 5, "Expected 5 tables, got {}", rows.len());
             assert_eq!(
                 Vec::from_iter(rows.iter().map(|row| row.name.as_str())),
-                vec!["seaql_migrations", "target"],
-                "Expected tables: seaql_migrations, target, got: {:?}",
+                vec![
+                    "seaql_migrations",
+                    "target",
+                    "ssh_known_host",
+                    "transfer_task",
+                    "favorite_directory"
+                ],
+                "Unexpected tables: {:?}",
                 rows
             );
 
@@ -75,23 +67,13 @@ mod tests {
                 password: Some("123456".to_string()),
                 system: Some("windows".to_string()),
             });
-            let active_model2 = active_model.clone();
-            let active_model3 = active_model.clone();
-            let result = active_model.insert(&db).await;
-            assert!(result.is_err(), "Expecte Insert failed");
-
-            Migrator::up(&db, Some(1)).await.unwrap();
-            let target1 = active_model2.insert(&db).await.unwrap();
+            let target1 = active_model.insert(&db).await.unwrap();
             assert_eq!(
                 Some("windows".to_string()),
                 target1.system,
                 "Expected system: windows, got: {:?}",
                 target1
             );
-
-            Migrator::down(&db, Some(2)).await.unwrap();
-            let result = active_model3.insert(&db).await;
-            assert!(result.is_err(), "Expecte Insert failed");
 
             Migrator::down(&db, Some(1)).await.unwrap();
             let rows = TableName::find_by_statement(stmt2).all(&db).await.unwrap();

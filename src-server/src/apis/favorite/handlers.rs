@@ -11,7 +11,7 @@ use crate::{
             service,
         },
     },
-    entities::favorite,
+    entities::favorite_directory,
 };
 
 #[utoipa::path(
@@ -22,14 +22,14 @@ use crate::{
     operation_id = "favorite_list",
     params(FavoriteListQuery),
     responses(
-        (status = 200, description = "成功获取收藏列表", body = [favorite::Model]),
+        (status = 200, description = "成功获取收藏列表", body = [favorite_directory::Model]),
         (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn favorite_list(
     State(state): State<Arc<AppBaseState>>,
     Query(payload): Query<FavoriteListQuery>,
-) -> Result<Json<Vec<favorite::Model>>, ApiErr> {
+) -> Result<Json<Vec<favorite_directory::Model>>, ApiErr> {
     Ok(Json(service::list(&state.db, payload.target_id).await?))
 }
 
@@ -41,14 +41,14 @@ pub async fn favorite_list(
     operation_id = "favorite_add",
     request_body = FavoriteAddPayload,
     responses(
-        (status = 200, description = "成功添加收藏", body = favorite::Model),
+        (status = 200, description = "成功添加收藏", body = favorite_directory::Model),
         (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn favorite_add(
     State(state): State<Arc<AppBaseState>>,
     ValidJson(payload): ValidJson<FavoriteAddPayload>,
-) -> Result<Json<favorite::Model>, ApiErr> {
+) -> Result<Json<favorite_directory::Model>, ApiErr> {
     Ok(Json(service::add(&state.db, payload).await?))
 }
 

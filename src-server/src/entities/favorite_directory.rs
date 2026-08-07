@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel, ToSchema)]
-#[sea_orm(table_name = "favorite")]
-#[schema(as = Favorite)]
+#[sea_orm(table_name = "favorite_directory")]
+#[schema(as = FavoriteDirectory)]
 pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
