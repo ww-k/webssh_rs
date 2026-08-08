@@ -1,7 +1,7 @@
 import { useMemoizedFn, useRequest } from "ahooks";
 import { useState } from "react";
 
-import { getFsUserDirDownload, getFsUserDirHome, getFsUserDirs } from "@/api";
+import { getFsUserDirDownload, getFsUserDirHome } from "@/api";
 import getFsLsMapFiles, { normalizeLocalPath } from "@/helpers/getFsLsMapFiles";
 import { isMSWindows } from "@/helpers/platform";
 
@@ -74,7 +74,6 @@ export default function FilesviewLocal({
         const files = await getFsLsMapFiles(path);
         return files.filter((file) => file.isDir);
     });
-    const getQuickLinks = useMemoizedFn(() => getFsUserDirs());
     const onFileDoubleClick = useMemoizedFn((file: IViewFileStat) => {
         if (file.isDir) {
             setCwdPath(file.uri);
@@ -97,7 +96,6 @@ export default function FilesviewLocal({
             posix={!isMSWindows}
             setCwd={setCwdPath}
             getDirs={getDirs}
-            getQuickLinks={getQuickLinks}
             getHome={getHome}
             getCwdFiles={getCwdFiles}
             multiple={multiple}

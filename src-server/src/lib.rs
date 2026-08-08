@@ -89,7 +89,7 @@ pub async fn run_server() {
         .nest("/api/fs", fs::router_builder(app_base_state.clone()))
         .nest(
             "/api/favorite_directory",
-            favorite_directory::router_builder(app_base_state.clone()),
+            favorite_directory::router_builder(app_state.clone()),
         )
         .nest("/api/transfer", transfer::router_builder(app_state.clone()))
         .nest("/api/target", target::router_builder(app_state.clone()))

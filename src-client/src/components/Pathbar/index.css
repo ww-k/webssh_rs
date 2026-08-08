@@ -86,17 +86,17 @@
     outline: 0;
 }
 
-.pathbarHomeBox {
+.pathbarFavoriteDirectoryMenuBox {
     position: relative;
     width: 25px;
     vertical-align: middle;
 }
 
-.pathbarHomeBtn {
+.pathbarFavoriteDirectoryMenuBtn {
     border-right: 1px solid transparent;
 }
-.pathbarHomeBtn:hover,
-.pathbarHomeBtn.hover {
+.pathbarFavoriteDirectoryMenuBtn:hover,
+.pathbarFavoriteDirectoryMenuBtn.hover {
     border-right-color: var(--ant-color-border);
 }
 
@@ -294,14 +294,14 @@
     font-weight: 700;
 }
 
-.pathbarDropdownMenuQuickLinsMenu {
+.pathbarDropdownMenuFavoriteDirectoryMenu {
     padding-left: 0;
     color: var(--ant-color-text-secondary);
     list-style: none;
     border-top: 1px solid var(--ant-color-border-secondary);
 }
 
-.pathbarDropdownMenuQuickLinsMenu li > div {
+.pathbarDropdownMenuFavoriteDirectoryMenu li > div {
     clear: both;
     padding: 5px 12px;
     overflow: hidden;
@@ -313,11 +313,11 @@
     cursor: pointer;
 }
 
-.pathbarDropdownMenuQuickLinsMenu li > div:hover {
+.pathbarDropdownMenuFavoriteDirectoryMenu li > div:hover {
     background-color: var(--ant-color-fill-tertiary);
 }
 
-.pathbarDropdownMenuQuickLinsMenu li > div > .anticon {
+.pathbarDropdownMenuFavoriteDirectoryMenu li > div > .anticon {
     margin-right: 10px;
 }
 

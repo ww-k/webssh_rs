@@ -32,7 +32,9 @@ import {
 import { getFilePath, isSftpFileUri } from "@/helpers/file_uri";
 
 import {
-    favoriteDirectoryToQuickLink,
+    appendFavoriteDirectoryMenuItem,
+    favoriteDirectoryToMenuItem,
+    getFavoriteDirectoryDefaultKind,
     getFavoriteDirectoryDefaultName,
     getFavoriteDirectoryLocation,
 } from "./favorite_directory";
@@ -40,6 +42,7 @@ import { buildSearchUri, isSearchUri, parseSearchUri } from "./search";
 
 import type { DebouncedFuncLeading } from "lodash";
 import type { IViewFileStat } from "@/types";
+import type { IFavoriteDirectoryMenuItem } from "./favorite_directory";
 
 interface IRouteItem {
     name: string;
@@ -48,7 +51,7 @@ interface IRouteItem {
     link: boolean;
 }
 
-export interface IQuickLink {
+interface IPathLink {
     name: string;
     path: string;
 }
@@ -59,7 +62,7 @@ interface IProps {
     history: string[];
     /** 是否是posix风格路径 */
     posix?: boolean;
-    /** 是否启用家图标 */
+    /** 是否启用收藏目录图标 */
     enableFavoriteDirectoryIcon?: boolean;
     /** 是否允许用户交互点击路径栏，显示下拉目录等 */
     enableReact?: boolean;
@@ -68,7 +71,6 @@ interface IProps {
     /** 是否允许搜索 */
     enableSearch?: boolean;
     getDirs?: (fileUrlOrPath: string) => Promise<IViewFileStat[]>;
-    getQuickLinks?: () => Promise<IQuickLink[]>;
     getCwdFiles: () => void;
     onChange?: (newPath: string) => void;
 }
@@ -80,17 +82,15 @@ interface IState {
     editorValue: string;
     /** 路径原始值格式化后的数据 */
     routes: IRouteItem[];
-    history: IQuickLink[];
+    history: IPathLink[];
     /** 是否聚焦, 聚焦后, 进入编辑模式, 显示路径的原始值, 可直接输入路径 */
     isFocus: boolean;
-    /** 快速链接下拉框是否显示 */
-    quickLinksVisible: boolean;
-    /** 本机视图快速链接 */
-    quickLinks: IQuickLink[];
+    /** 收藏目录下拉框是否显示 */
+    favoriteDirectoryMenuVisible: boolean;
     /** 收藏目录列表是否已加载 */
     favoriteDirectoriesLoaded: boolean;
     /** 服务端收藏目录列表 */
-    favoriteDirectories: IQuickLink[];
+    favoriteDirectories: IFavoriteDirectoryMenuItem[];
     /** 收藏目录增删请求是否正在执行 */
     favoriteDirectoryUpdating: boolean;
     /** 添加收藏目录名称浮层是否显示 */
@@ -99,7 +99,7 @@ interface IState {
     favoriteDirectoryName: string;
     /** 打开添加收藏目录浮层时的路径 */
     favoriteDirectoryPendingCwd: string;
-    /** 隐藏的路径, 路径长度超出路径栏时，超出可视区域前面部分会收到快速链接下拉框里 */
+    /** 隐藏的路径, 路径长度超出路径栏时，超出可视区域前面部分会收到收藏目录下拉框里 */
     hiddenRoutes: IRouteItem[];
     /** 是否已激活快速预览子目录模式 */
     previewModeActived: boolean;
@@ -131,6 +131,8 @@ export default class Pathbar extends Component<IProps, IState> {
     breadcrumbBoxRef: React.RefObject<HTMLDivElement>;
     breadcrumbRef: React.RefObject<HTMLDivElement>;
     routeItemRefsMap: Record<string, HTMLSpanElement | null>;
+    favoriteDirectoryListRequestId = 0;
+    favoriteDirectoryMutationRequestId = 0;
     _resizeObserver!: ResizeObserver;
 
     static defaultProps = {
@@ -159,8 +161,7 @@ export default class Pathbar extends Component<IProps, IState> {
             history,
             isFocus: false,
             breadcrumbLeft: 5,
-            quickLinksVisible: false,
-            quickLinks: [],
+            favoriteDirectoryMenuVisible: false,
             favoriteDirectoriesLoaded: false,
             favoriteDirectories: [],
             favoriteDirectoryUpdating: false,
@@ -192,7 +193,7 @@ export default class Pathbar extends Component<IProps, IState> {
         if (!this.rootElRef.current) return;
         this.resizeViewThrottle();
         if (this.props.cwd) {
-            this.getQuickLinks();
+            this.getFavoriteDirectories();
         }
 
         this._resizeObserver = new ResizeObserver((_entries, observer) => {
@@ -230,11 +231,13 @@ export default class Pathbar extends Component<IProps, IState> {
                 getFavoriteDirectoryLocation(preProps.cwd).targetId !==
                     getFavoriteDirectoryLocation(cwd).targetId)
         ) {
-            this.getQuickLinks();
+            this.getFavoriteDirectories();
         }
     }
 
     componentWillUnmount() {
+        this.favoriteDirectoryListRequestId += 1;
+        this.favoriteDirectoryMutationRequestId += 1;
         this._resizeObserver.disconnect();
         this._resizeObserver = null as unknown as ResizeObserver;
         document.removeEventListener("click", this.handleClickOutside);
@@ -256,7 +259,7 @@ export default class Pathbar extends Component<IProps, IState> {
             history,
             isFocus,
             breadcrumbLeft,
-            quickLinksVisible,
+            favoriteDirectoryMenuVisible,
             favoriteDirectories,
             favoriteDirectoriesLoaded,
             favoriteDirectoryUpdating,
@@ -271,7 +274,6 @@ export default class Pathbar extends Component<IProps, IState> {
             dirListLoading,
             dirListLoadingMsg,
         } = this.state;
-        const locationLinks = this.getLocationLinks();
         const isFavoriteDirectory = favoriteDirectories.some((item) =>
             this.isSameLocation(item.path, cwd),
         );
@@ -292,20 +294,22 @@ export default class Pathbar extends Component<IProps, IState> {
                 onClick={this.handleClickOutside.bind(this)}
             >
                 {enableFavoriteDirectoryIcon || hiddenRoutes.length > 0 ? (
-                    <div className="pathbarHomeBox">
+                    <div className="pathbarFavoriteDirectoryMenuBox">
                         <button
                             type="button"
                             className={classNames({
-                                "pathbarDropdownBtn pathbarHomeBtn": true,
-                                hover: quickLinksVisible,
+                                "pathbarDropdownBtn pathbarFavoriteDirectoryMenuBtn": true,
+                                hover: favoriteDirectoryMenuVisible,
                             })}
                             title={i18n.t("pathbar_favorite_directory_list")}
                             aria-label={i18n.t(
                                 "pathbar_favorite_directory_list",
                             )}
-                            onClick={this.btnHomeClickHandle.bind(this)}
+                            onClick={this.btnFavoriteDirectoryMenuClickHandle.bind(
+                                this,
+                            )}
                         >
-                            {!quickLinksVisible ? (
+                            {!favoriteDirectoryMenuVisible ? (
                                 breadcrumbLeft < 5 ? (
                                     <DoubleLeftOutlined />
                                 ) : (
@@ -318,7 +322,9 @@ export default class Pathbar extends Component<IProps, IState> {
                         <ul
                             className="pathbarDropdownMenu pathbarDropdownMenuDirMenu"
                             style={{
-                                display: quickLinksVisible ? "block" : "none",
+                                display: favoriteDirectoryMenuVisible
+                                    ? "block"
+                                    : "none",
                             }}
                         >
                             {hiddenRoutes.map((item) => (
@@ -335,17 +341,21 @@ export default class Pathbar extends Component<IProps, IState> {
                                     </div>
                                 </li>
                             ))}
-                            {locationLinks.length > 0 && (
+                            {favoriteDirectories.length > 0 && (
                                 <li>
-                                    <ul className="pathbarDropdownMenuQuickLinsMenu">
-                                        {locationLinks.map((item) => {
-                                            const name = item.favoriteDirectory
-                                                ? item.name
-                                                : i18n.t(
-                                                      `pathbar_home_path_${item.name}`,
-                                                  ) || item.name;
+                                    <ul className="pathbarDropdownMenuFavoriteDirectoryMenu">
+                                        {favoriteDirectories.map((item) => {
+                                            const defaultKind =
+                                                getFavoriteDirectoryDefaultKind(
+                                                    item,
+                                                );
+                                            const name = defaultKind
+                                                ? i18n.t(
+                                                      `pathbar_favorite_directory_default_${defaultKind}`,
+                                                  )
+                                                : item.name;
                                             let icon = <FolderTwoTone />;
-                                            switch (item.name) {
+                                            switch (defaultKind) {
                                                 case "/":
                                                     icon = <LaptopOutlined />;
                                                     break;
@@ -364,13 +374,11 @@ export default class Pathbar extends Component<IProps, IState> {
                                             }
 
                                             return (
-                                                <li
-                                                    key={`${item.favoriteDirectory ? "favorite_directory" : "quick"}:${item.path}`}
-                                                >
+                                                <li key={item.path}>
                                                     <div
                                                         onClick={(e) => {
                                                             e.preventDefault();
-                                                            this.btnHomeItemClickHandle(
+                                                            this.favoriteDirectoryItemClickHandle(
                                                                 item.path,
                                                             );
                                                         }}
@@ -737,7 +745,7 @@ export default class Pathbar extends Component<IProps, IState> {
             this.setState({
                 dirList: [],
                 activedIndex: null,
-                quickLinksVisible: false,
+                favoriteDirectoryMenuVisible: false,
                 dirListLoading: false,
                 dirListLoadingMsg: "",
                 previewModeActived: !previewModeActived,
@@ -750,7 +758,7 @@ export default class Pathbar extends Component<IProps, IState> {
          */
         const newState = {
             previewModeActived: !previewModeActived,
-            quickLinksVisible: false,
+            favoriteDirectoryMenuVisible: false,
         };
         this.getFileList(i, newState).then((list) => {
             if (i !== this.state.activedIndex) return;
@@ -917,33 +925,41 @@ export default class Pathbar extends Component<IProps, IState> {
         this.props.onChange?.(getFilePath(dir.uri));
     }
 
-    getQuickLinks() {
-        const { cwd, getQuickLinks } = this.props;
+    getFavoriteDirectories() {
+        const { cwd } = this.props;
         const targetId = getFavoriteDirectoryLocation(cwd).targetId;
+        const requestId = ++this.favoriteDirectoryListRequestId;
+        this.favoriteDirectoryMutationRequestId += 1;
         this.setState({
             favoriteDirectories: [],
             favoriteDirectoriesLoaded: false,
             favoriteDirectoryUpdating: false,
-            quickLinks: [],
+            favoriteDirectoryPopoverOpen: false,
+            favoriteDirectoryName: "",
+            favoriteDirectoryPendingCwd: "",
         });
 
         getFavoriteDirectoryList(targetId)
             .then((list) => {
                 if (
-                    getFavoriteDirectoryLocation(this.props.cwd).targetId !==
-                    targetId
+                    !this.isFavoriteDirectoryListRequestCurrent(
+                        requestId,
+                        targetId,
+                    )
                 ) {
                     return;
                 }
                 this.setState({
-                    favoriteDirectories: list.map(favoriteDirectoryToQuickLink),
+                    favoriteDirectories: list.map(favoriteDirectoryToMenuItem),
                     favoriteDirectoriesLoaded: true,
                 });
             })
             .catch(() => {
                 if (
-                    getFavoriteDirectoryLocation(this.props.cwd).targetId !==
-                    targetId
+                    !this.isFavoriteDirectoryListRequestCurrent(
+                        requestId,
+                        targetId,
+                    )
                 ) {
                     return;
                 }
@@ -952,47 +968,23 @@ export default class Pathbar extends Component<IProps, IState> {
                     favoriteDirectoriesLoaded: true,
                 });
             });
-
-        getQuickLinks?.()
-            .then((list) => {
-                if (
-                    getFavoriteDirectoryLocation(this.props.cwd).targetId !==
-                    targetId
-                ) {
-                    return;
-                }
-                this.setState({ quickLinks: list });
-            })
-            .catch(() => {
-                if (
-                    getFavoriteDirectoryLocation(this.props.cwd).targetId !==
-                    targetId
-                ) {
-                    return;
-                }
-                this.setState({ quickLinks: [] });
-            });
     }
 
-    getLocationLinks() {
-        const { favoriteDirectories, quickLinks } = this.state;
-        return [
-            ...favoriteDirectories.map((item) => ({
-                ...item,
-                favoriteDirectory: true,
-            })),
-            ...quickLinks
-                .filter(
-                    (quickLink) =>
-                        !favoriteDirectories.some((favoriteDirectory) =>
-                            this.isSameLocation(
-                                favoriteDirectory.path,
-                                quickLink.path,
-                            ),
-                        ),
-                )
-                .map((item) => ({ ...item, favoriteDirectory: false })),
-        ];
+    isFavoriteDirectoryListRequestCurrent(requestId: number, targetId: number) {
+        return (
+            requestId === this.favoriteDirectoryListRequestId &&
+            getFavoriteDirectoryLocation(this.props.cwd).targetId === targetId
+        );
+    }
+
+    isFavoriteDirectoryMutationRequestCurrent(
+        requestId: number,
+        targetId: number,
+    ) {
+        return (
+            requestId === this.favoriteDirectoryMutationRequestId &&
+            getFavoriteDirectoryLocation(this.props.cwd).targetId === targetId
+        );
     }
 
     isSameLocation(left: string, right: string) {
@@ -1162,15 +1154,16 @@ export default class Pathbar extends Component<IProps, IState> {
                 favoriteDirectoryPopoverOpen: true,
                 favoriteDirectoryName: getFavoriteDirectoryDefaultName(cwd),
                 favoriteDirectoryPendingCwd: cwd,
-                quickLinksVisible: false,
+                favoriteDirectoryMenuVisible: false,
                 historyOpen: false,
             });
             return;
         }
 
+        const requestId = ++this.favoriteDirectoryMutationRequestId;
         this.setState({
             favoriteDirectoryUpdating: true,
-            quickLinksVisible: false,
+            favoriteDirectoryMenuVisible: false,
             historyOpen: false,
         });
 
@@ -1180,22 +1173,35 @@ export default class Pathbar extends Component<IProps, IState> {
                 path: location.path,
             });
             if (
-                getFavoriteDirectoryLocation(this.props.cwd).targetId ===
-                location.targetId
+                !this.isFavoriteDirectoryMutationRequestCurrent(
+                    requestId,
+                    location.targetId,
+                )
             ) {
-                this.setState((state) => ({
-                    favoriteDirectories: state.favoriteDirectories.filter(
-                        (item) =>
-                            !this.isSameLocation(item.path, existing.path),
-                    ),
-                }));
+                return;
             }
+            this.setState((state) => ({
+                favoriteDirectories: state.favoriteDirectories.filter(
+                    (item) => !this.isSameLocation(item.path, existing.path),
+                ),
+            }));
         } catch {
-            message.error(i18n.t("pathbar_favorite_directory_update_failed"));
+            if (
+                this.isFavoriteDirectoryMutationRequestCurrent(
+                    requestId,
+                    location.targetId,
+                )
+            ) {
+                message.error(
+                    i18n.t("pathbar_favorite_directory_update_failed"),
+                );
+            }
         } finally {
             if (
-                getFavoriteDirectoryLocation(this.props.cwd).targetId ===
-                location.targetId
+                this.isFavoriteDirectoryMutationRequestCurrent(
+                    requestId,
+                    location.targetId,
+                )
             ) {
                 this.setState({ favoriteDirectoryUpdating: false });
             }
@@ -1239,6 +1245,7 @@ export default class Pathbar extends Component<IProps, IState> {
         const location = getFavoriteDirectoryLocation(
             favoriteDirectoryPendingCwd,
         );
+        const requestId = ++this.favoriteDirectoryMutationRequestId;
         this.setState({ favoriteDirectoryUpdating: true });
         try {
             const favoriteDirectory = await postFavoriteDirectoryAdd({
@@ -1247,25 +1254,43 @@ export default class Pathbar extends Component<IProps, IState> {
                 path: location.path,
             });
             if (
-                getFavoriteDirectoryLocation(this.props.cwd).targetId ===
-                location.targetId
+                !this.isFavoriteDirectoryMutationRequestCurrent(
+                    requestId,
+                    location.targetId,
+                )
             ) {
-                this.setState((state) => ({
-                    favoriteDirectories: [
-                        ...state.favoriteDirectories,
-                        favoriteDirectoryToQuickLink(favoriteDirectory),
-                    ],
-                }));
+                return;
             }
-            this.setState({
+            const menuItem = favoriteDirectoryToMenuItem(favoriteDirectory);
+            this.setState((state) => ({
+                favoriteDirectories: appendFavoriteDirectoryMenuItem(
+                    state.favoriteDirectories,
+                    menuItem,
+                ),
                 favoriteDirectoryPopoverOpen: false,
                 favoriteDirectoryName: "",
                 favoriteDirectoryPendingCwd: "",
-            });
+            }));
         } catch {
-            message.error(i18n.t("pathbar_favorite_directory_update_failed"));
+            if (
+                this.isFavoriteDirectoryMutationRequestCurrent(
+                    requestId,
+                    location.targetId,
+                )
+            ) {
+                message.error(
+                    i18n.t("pathbar_favorite_directory_update_failed"),
+                );
+            }
         } finally {
-            this.setState({ favoriteDirectoryUpdating: false });
+            if (
+                this.isFavoriteDirectoryMutationRequestCurrent(
+                    requestId,
+                    location.targetId,
+                )
+            ) {
+                this.setState({ favoriteDirectoryUpdating: false });
+            }
         }
     }
 
@@ -1274,7 +1299,7 @@ export default class Pathbar extends Component<IProps, IState> {
         const { history } = this.props;
         this.setState({
             historyOpen: history.length === 0 ? false : !this.state.historyOpen,
-            quickLinksVisible: false,
+            favoriteDirectoryMenuVisible: false,
         });
     }
 
@@ -1287,34 +1312,25 @@ export default class Pathbar extends Component<IProps, IState> {
         });
     }
 
-    btnHomeClickHandle(e: React.MouseEvent) {
+    btnFavoriteDirectoryMenuClickHandle(e: React.MouseEvent) {
         e.stopPropagation();
-        const locationLinks = this.getLocationLinks();
-        const { quickLinksVisible, breadcrumbLeft } = this.state;
-        if (
-            breadcrumbLeft >= 5 &&
-            !quickLinksVisible &&
-            locationLinks.length === 1
-        ) {
-            this.btnHomeItemClickHandle(locationLinks[0].path);
-            return;
-        }
+        const { favoriteDirectoryMenuVisible } = this.state;
 
         this.setState({
-            quickLinksVisible: !quickLinksVisible,
+            favoriteDirectoryMenuVisible: !favoriteDirectoryMenuVisible,
             historyOpen: false,
             activedIndex: null,
             previewModeActived: false,
         });
     }
 
-    btnHomeItemClickHandle(item: string) {
+    favoriteDirectoryItemClickHandle(item: string) {
         const { onChange } = this.props;
         const path = item;
         onChange?.(path);
 
         this.setState({
-            quickLinksVisible: false,
+            favoriteDirectoryMenuVisible: false,
         });
     }
 
@@ -1322,7 +1338,7 @@ export default class Pathbar extends Component<IProps, IState> {
         console.log("Pathbar: @handleClickOutside", this.state.isFocus);
         this.setState({
             historyOpen: false,
-            quickLinksVisible: false,
+            favoriteDirectoryMenuVisible: false,
             dirList: [],
             activedIndex: null,
             previewModeActived: false,

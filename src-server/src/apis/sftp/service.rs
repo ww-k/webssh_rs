@@ -1,11 +1,51 @@
 use std::collections::HashSet;
 
-use crate::{apis::ApiErr, consts::services_err_code::*};
+use tracing::debug;
+
+use crate::{
+    apis::ApiErr,
+    consts::services_err_code::*,
+    map_ssh_err,
+    sftp_client::{FastSftpClient, SftpFileType},
+    ssh_connection_pool::{ChannelMode, SshConnectionPool},
+};
 
 use super::dto::SftpUserDir;
 
 const URI_SEP: &str = ":";
 const PATH_SEP: &str = "/";
+
+pub(crate) async fn discover_user_dirs(
+    connection_pool: &SshConnectionPool,
+    target_id: i32,
+) -> Result<Vec<SftpUserDir>, ApiErr> {
+    let sftp = map_ssh_err!(connection_pool.sftp(target_id, ChannelMode::Shared).await)?;
+    let home = resolve_user_dir_home(&sftp).await?;
+    let entries = map_ssh_err!(sftp.read_dir(&home).await)?;
+    let available_dirs = entries
+        .into_iter()
+        .filter_map(|entry| {
+            let (name, attrs) = entry.into_parts();
+            (attrs.file_type() == SftpFileType::Dir).then_some(name)
+        })
+        .collect::<HashSet<_>>();
+
+    Ok(user_dirs_from_home(&home, &available_dirs))
+}
+
+pub(crate) async fn resolve_user_dir_home(sftp: &FastSftpClient) -> Result<String, ApiErr> {
+    match sftp.realpath(".").await {
+        Ok(path) => Ok(normalize_user_dir_home(&path)),
+        Err(err) if err.is_operation_unsupported() => {
+            debug!("SFTP REALPATH is unsupported, falling back to root");
+            Ok(PATH_SEP.to_string())
+        }
+        Err(err) => Err(ApiErr {
+            code: ERR_CODE_SSH_ERR,
+            message: err.to_string(),
+        }),
+    }
+}
 
 pub(crate) fn normalize_user_dir_home(path: &str) -> String {
     let path = path.trim().replace('\\', PATH_SEP);
@@ -52,6 +92,8 @@ pub(crate) fn user_dirs_from_home(
         }
     }
 
+    let mut seen_paths = HashSet::new();
+    user_dirs.retain(|dir| seen_paths.insert(dir.path.clone()));
     user_dirs
 }
 
@@ -202,12 +244,16 @@ mod tests {
     }
 
     #[test]
-    fn user_dirs_join_children_to_root_without_duplicate_separator() {
+    fn user_dirs_deduplicate_home_when_home_is_root() {
         let available_dirs = HashSet::from(["Desktop".to_string()]);
         let dirs = user_dirs_from_home("/", &available_dirs);
 
-        assert_eq!(dirs[1].path, "/");
-        assert_eq!(dirs[2].path, "/Desktop");
+        assert_eq!(
+            dirs.iter()
+                .map(|dir| (dir.name.as_str(), dir.path.as_str()))
+                .collect::<Vec<_>>(),
+            vec![("/", "/"), ("Desktop", "/Desktop")]
+        );
     }
 
     #[test]

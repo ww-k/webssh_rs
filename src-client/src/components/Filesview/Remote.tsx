@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import "./index.css";
 
-import { getSftpUserDirHome, getSftpUserDirs } from "@/api/sftp";
+import { getSftpUserDirHome } from "@/api/sftp";
 import { isSftpFileUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
 import useAppStore from "@/store";
@@ -71,7 +71,6 @@ export default function FilesviewRemote({
         const files = await getSftpLsMapFiles(fileUrl);
         return files.filter((file) => file.isDir);
     });
-    const getQuickLinks = useMemoizedFn(() => getSftpUserDirs(targetId));
     const onFileDoubleClick = useMemoizedFn((file: IViewFileStat) => {
         if (file.isDir) {
             setCwd(file.uri);
@@ -100,7 +99,6 @@ export default function FilesviewRemote({
             posix={true}
             setCwd={setCwdUri}
             getDirs={getDirs}
-            getQuickLinks={getQuickLinks}
             getHome={getHome}
             getCwdFiles={getCwdFiles}
             onContextMenu={(files, evt) => {

@@ -13,6 +13,7 @@ pub struct Model {
     pub target_id: i32,
     pub name: String,
     pub path: String,
+    pub is_default: bool,
     pub created_at: i64,
 }
 

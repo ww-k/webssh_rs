@@ -16,6 +16,7 @@ pub use handlers::{
     cp, ls, mkdir, rename, rm, rm_rf, show_in_folder, stat, user_dir_download, user_dir_home,
     user_dirs,
 };
+pub(crate) use service::user_dirs as discover_user_dirs;
 
 pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
     Router::new()

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, io::SeekFrom, pin::pin, sync::Arc};
+use std::{io::SeekFrom, pin::pin, sync::Arc};
 
 use axum::{
     Json,
@@ -27,11 +27,11 @@ use crate::{
     },
     consts::services_err_code::*,
     map_db_err, map_ssh_err,
-    sftp_client::{FastSftpClient, SftpAttrs, SftpFileType, SftpOpenOptions},
+    sftp_client::{SftpAttrs, SftpFileType, SftpOpenOptions},
     ssh_connection_pool::ChannelMode,
 };
 
-use super::service::{get_file_name, normalize_user_dir_home, parse_file_uri, user_dirs_from_home};
+use super::service::{discover_user_dirs, get_file_name, parse_file_uri, resolve_user_dir_home};
 
 const WINDOWS: &str = "windows";
 const CHUNK_SIZE: usize = 8192;
@@ -204,37 +204,9 @@ pub async fn user_dirs(
 ) -> Result<Json<Vec<SftpUserDir>>, ApiErr> {
     info!("@sftp_user_dirs {:?}", payload);
 
-    let sftp = map_ssh_err!(
-        state
-            .connection_pool
-            .sftp(payload.target_id, ChannelMode::Shared)
-            .await
-    )?;
-    let home = resolve_user_dir_home(&sftp).await?;
-    let entries = map_ssh_err!(sftp.read_dir(&home).await)?;
-    let available_dirs = entries
-        .into_iter()
-        .filter_map(|entry| {
-            let (name, attrs) = entry.into_parts();
-            (attrs.file_type() == SftpFileType::Dir).then_some(name)
-        })
-        .collect::<HashSet<_>>();
-
-    Ok(Json(user_dirs_from_home(&home, &available_dirs)))
-}
-
-async fn resolve_user_dir_home(sftp: &FastSftpClient) -> Result<String, ApiErr> {
-    match sftp.realpath(".").await {
-        Ok(path) => Ok(normalize_user_dir_home(&path)),
-        Err(err) if err.is_operation_unsupported() => {
-            debug!("SFTP REALPATH is unsupported, falling back to root");
-            Ok("/".to_string())
-        }
-        Err(err) => Err(ApiErr {
-            code: ERR_CODE_SSH_ERR,
-            message: err.to_string(),
-        }),
-    }
+    Ok(Json(
+        discover_user_dirs(&state.connection_pool, payload.target_id).await?,
+    ))
 }
 
 #[utoipa::path(

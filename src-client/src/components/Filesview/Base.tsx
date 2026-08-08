@@ -2,7 +2,7 @@ import { useMemoizedFn } from "ahooks";
 import { Spin } from "antd";
 import { useEffect, useMemo } from "react";
 
-import Pathbar, { type IQuickLink } from "@/components/Pathbar";
+import Pathbar from "@/components/Pathbar";
 import { isSearchUri } from "@/components/Pathbar/search";
 
 import "./Base.css";
@@ -25,7 +25,6 @@ type IProps = {
     setCwd: (cwd: string) => void;
     getHome: () => Promise<string>;
     getDirs?: (fileUrlOrPath: string) => Promise<IViewFileStat[]>;
-    getQuickLinks?: () => Promise<IQuickLink[]>;
     getCwdFiles: () => Promise<IViewFileStat[]>;
     multiple?: boolean;
     isFileSelectable?: (file: IViewFileStat) => boolean;
@@ -51,7 +50,6 @@ export default function FilesviewBase({
     setCwd,
     getHome,
     getDirs,
-    getQuickLinks,
     getCwdFiles,
     ...restProps
 }: IProps) {
@@ -92,7 +90,6 @@ export default function FilesviewBase({
                 history={history}
                 enableSearch={false}
                 getDirs={getDirs}
-                getQuickLinks={getQuickLinks}
                 getCwdFiles={getCwdFiles}
                 onChange={onPathChange}
             />

@@ -9,9 +9,9 @@ use axum::{
     routing::{get, post},
 };
 
-use crate::AppBaseState;
+use crate::AppState;
 
-pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
+pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route("/list", get(handlers::favorite_directory_list))
         .route("/add", post(handlers::favorite_directory_add))

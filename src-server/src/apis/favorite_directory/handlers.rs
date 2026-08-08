@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{Json, extract::Query, extract::State};
 
 use crate::{
-    AppBaseState,
+    AppState,
     apis::{
         ApiErr, InternalErrorResponse, ValidJson,
         favorite_directory::{
@@ -30,10 +30,12 @@ use crate::{
     )
 )]
 pub async fn favorite_directory_list(
-    State(state): State<Arc<AppBaseState>>,
+    State(state): State<Arc<AppState>>,
     Query(payload): Query<FavoriteDirectoryListQuery>,
 ) -> Result<Json<Vec<favorite_directory::Model>>, ApiErr> {
-    Ok(Json(service::list(&state.db, payload.target_id).await?))
+    Ok(Json(
+        service::list(&state.db, &state.connection_pool, payload.target_id).await?,
+    ))
 }
 
 #[utoipa::path(
@@ -49,7 +51,7 @@ pub async fn favorite_directory_list(
     )
 )]
 pub async fn favorite_directory_add(
-    State(state): State<Arc<AppBaseState>>,
+    State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<FavoriteDirectoryAddPayload>,
 ) -> Result<Json<favorite_directory::Model>, ApiErr> {
     Ok(Json(service::add(&state.db, payload).await?))
@@ -68,7 +70,7 @@ pub async fn favorite_directory_add(
     )
 )]
 pub async fn favorite_directory_remove(
-    State(state): State<Arc<AppBaseState>>,
+    State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<FavoriteDirectoryRemovePayload>,
 ) -> Result<(), ApiErr> {
     service::remove(&state.db, payload.target_id, &payload.path).await

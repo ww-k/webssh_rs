@@ -5,6 +5,7 @@ export interface IFavoriteDirectory {
     target_id: number;
     name: string;
     path: string;
+    is_default: boolean;
     created_at: number;
 }
 

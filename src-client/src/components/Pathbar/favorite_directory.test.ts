@@ -1,7 +1,9 @@
 import { expect, test } from "@rstest/core";
 
 import {
-    favoriteDirectoryToQuickLink,
+    appendFavoriteDirectoryMenuItem,
+    favoriteDirectoryToMenuItem,
+    getFavoriteDirectoryDefaultKind,
     getFavoriteDirectoryDefaultName,
     getFavoriteDirectoryLocation,
 } from "./favorite_directory";
@@ -23,19 +25,27 @@ test("[Pathbar] restores a navigable path from a favorite directory", () => {
         target_id: 7,
         name: "/var/log",
         path: "/var/log",
+        is_default: false,
         created_at: 1,
     };
 
-    expect(favoriteDirectoryToQuickLink(favoriteDirectory)).toEqual({
+    expect(favoriteDirectoryToMenuItem(favoriteDirectory)).toEqual({
         name: "/var/log",
         path: "sftp:7:/var/log",
+        isDefault: false,
     });
     expect(
-        favoriteDirectoryToQuickLink({
+        favoriteDirectoryToMenuItem({
             ...favoriteDirectory,
             target_id: 0,
         }).path,
     ).toBe("/var/log");
+    expect(
+        favoriteDirectoryToMenuItem({
+            ...favoriteDirectory,
+            is_default: true,
+        }).isDefault,
+    ).toBe(true);
 });
 
 test("[Pathbar] uses the directory name as the default favorite directory name", () => {
@@ -43,4 +53,34 @@ test("[Pathbar] uses the directory name as the default favorite directory name",
     expect(getFavoriteDirectoryDefaultName("sftp:7:/var/log/")).toBe("log");
     expect(getFavoriteDirectoryDefaultName("C:\\Users\\test\\")).toBe("test");
     expect(getFavoriteDirectoryDefaultName("/")).toBe("/");
+});
+
+test("[Pathbar] only recognizes generated favorites as default directories", () => {
+    expect(
+        getFavoriteDirectoryDefaultKind({ name: "Home", isDefault: true }),
+    ).toBe("Home");
+    expect(
+        getFavoriteDirectoryDefaultKind({ name: "Home", isDefault: false }),
+    ).toBeNull();
+    expect(
+        getFavoriteDirectoryDefaultKind({ name: "Custom", isDefault: true }),
+    ).toBeNull();
+});
+
+test("[Pathbar] does not append the same favorite directory twice", () => {
+    const existing = {
+        name: "Logs",
+        path: "sftp:7:/var/log",
+        isDefault: false,
+    };
+    const items = [existing];
+
+    expect(appendFavoriteDirectoryMenuItem(items, existing)).toBe(items);
+    expect(
+        appendFavoriteDirectoryMenuItem(items, {
+            name: "Home",
+            path: "sftp:7:/home/test",
+            isDefault: true,
+        }),
+    ).toHaveLength(2);
 });

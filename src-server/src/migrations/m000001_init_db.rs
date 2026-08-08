@@ -76,6 +76,7 @@ impl MigrationTrait for Migration {
             .col(integer(FavoriteDirectory::TargetId))
             .col(string(FavoriteDirectory::Name))
             .col(text(FavoriteDirectory::Path))
+            .col(boolean(FavoriteDirectory::IsDefault))
             .col(big_integer(FavoriteDirectory::CreatedAt))
             .index(
                 Index::create()
@@ -87,7 +88,20 @@ impl MigrationTrait for Migration {
             )
             .to_owned();
 
-        for statement in [target, ssh_known_host, transfer_task, favorite_directory] {
+        let favorite_directory_initialization = Table::create()
+            .table(FavoriteDirectoryInitialization::Table)
+            .if_not_exists()
+            .col(integer(FavoriteDirectoryInitialization::TargetId).primary_key())
+            .col(big_integer(FavoriteDirectoryInitialization::InitializedAt))
+            .to_owned();
+
+        for statement in [
+            target,
+            ssh_known_host,
+            transfer_task,
+            favorite_directory,
+            favorite_directory_initialization,
+        ] {
             println!("SQL: {}", manager.get_database_backend().build(&statement));
             manager.create_table(statement).await?;
         }
@@ -97,6 +111,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for table in [
+            FavoriteDirectoryInitialization::Table.into_iden(),
             FavoriteDirectory::Table.into_iden(),
             TransferTask::Table.into_iden(),
             SshKnownHost::Table.into_iden(),
@@ -164,13 +179,21 @@ enum FavoriteDirectory {
     TargetId,
     Name,
     Path,
+    IsDefault,
     CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum FavoriteDirectoryInitialization {
+    Table,
+    TargetId,
+    InitializedAt,
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        entities::{favorite_directory, ssh_known_host},
+        entities::{favorite_directory, favorite_directory_initialization, ssh_known_host},
         migrations::Migrator,
     };
     use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database};
@@ -219,10 +242,24 @@ mod tests {
             target_id: Set(0),
             name: Set("Temp".to_string()),
             path: Set("/tmp".to_string()),
+            is_default: Set(false),
             created_at: Set(1),
         };
 
         favorite_directory.clone().insert(&db).await.unwrap();
         assert!(favorite_directory.insert(&db).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn init_db_enforces_one_favorite_directory_initialization_per_target() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        Migrator::up(&db, None).await.unwrap();
+
+        let initialization = favorite_directory_initialization::ActiveModel {
+            target_id: Set(0),
+            initialized_at: Set(1),
+        };
+        initialization.clone().insert(&db).await.unwrap();
+        assert!(initialization.insert(&db).await.is_err());
     }
 }
