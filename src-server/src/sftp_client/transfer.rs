@@ -17,6 +17,8 @@ pub type ProgressCallback = Arc<dyn Fn(TransferRange) -> ProgressFuture + Send +
 pub const DEFAULT_PIPELINE_CHUNK_SIZE: usize = 255 * 1024;
 pub const DEFAULT_READ_PIPELINE_CHUNK_SIZE: usize = 128 * 1024;
 pub const DEFAULT_READ_MAX_IN_FLIGHT: usize = 40;
+pub const DEFAULT_READ_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
+pub const DEFAULT_PROGRESS_INTERVAL: Duration = Duration::from_secs(1);
 pub const DEFAULT_WRITE_MAX_IN_FLIGHT: usize = 64;
 pub const DEFAULT_WRITE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(2);
 

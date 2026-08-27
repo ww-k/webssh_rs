@@ -1,4 +1,10 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
 
 use axum::{
     extract::{Query, State},
@@ -19,6 +25,10 @@ use crate::{
     entities::target::{self, TargetAuthMethod},
     migrations::Migrator,
     repositories::target as target_repository,
+    sftp_client::{
+        download::{DownloadOptions, run_download},
+        transfer::{DEFAULT_PIPELINE_CHUNK_SIZE, TransferProgress},
+    },
     tests::sftp_server,
 };
 
@@ -125,6 +135,12 @@ async fn connection_pool_regressions() {
     )
     .await
     .expect("download body lifecycle scenario timed out");
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        pipeline_download_handles_short_reads(&context),
+    )
+    .await
+    .expect("short SFTP read scenario timed out");
     tokio::time::timeout(
         Duration::from_secs(10),
         target_expiry_rejects_a_channel_opened_after_expiry(&context),
@@ -351,6 +367,47 @@ async fn download_body_releases_its_sftp_lease(context: &TestContext) {
     assert_eq!(active_channel_count(&pool).await, 1);
     drop(body);
     wait_until_no_active_channels(&pool).await;
+}
+
+async fn pipeline_download_handles_short_reads(context: &TestContext) {
+    let pool = connection_pool(context, 1, 1);
+    let sftp = pool.sftp(1, ChannelMode::Dedicated).await.unwrap();
+    let local_path =
+        std::env::temp_dir().join(format!("webssh-rs-short-read-{}.bin", std::process::id()));
+    let mut options = DownloadOptions::new(
+        sftp.clone(),
+        sftp_server::DOWNLOAD_FILE_PATH.to_string(),
+        local_path.clone(),
+        sftp_server::DOWNLOAD_FILE_SIZE as u64,
+        Arc::new(AtomicBool::new(false)),
+        vec![[0, sftp_server::DOWNLOAD_FILE_SIZE as i64 - 1]],
+    );
+    options.chunk_size = DEFAULT_PIPELINE_CHUNK_SIZE;
+    options.progress_chunk_size = usize::MAX;
+    options.progress_interval = Duration::ZERO;
+    let progress_updates = Arc::new(AtomicUsize::new(0));
+    let callback_updates = Arc::clone(&progress_updates);
+    options.progress = TransferProgress::new(move |_| {
+        let callback_updates = Arc::clone(&callback_updates);
+        async move {
+            callback_updates.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
+    });
+
+    run_download(options).await.unwrap();
+    sftp.shutdown().await;
+
+    let downloaded = tokio::fs::read(&local_path).await.unwrap();
+    let _ = tokio::fs::remove_file(&local_path).await;
+    assert_eq!(downloaded.len(), sftp_server::DOWNLOAD_FILE_SIZE);
+    assert!(progress_updates.load(Ordering::Relaxed) > 1);
+    assert!(
+        downloaded
+            .iter()
+            .enumerate()
+            .all(|(index, byte)| *byte == (index % 251) as u8)
+    );
 }
 
 fn download_app_state(context: &TestContext) -> (Arc<SshConnectionPool>, Arc<AppState>) {

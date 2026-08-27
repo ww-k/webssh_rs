@@ -16,6 +16,7 @@ use tracing::{debug, error, info};
 
 pub(crate) const DOWNLOAD_FILE_SIZE: usize = 20_000;
 pub(crate) const DOWNLOAD_FILE_PATH: &str = "/download.bin";
+pub(crate) const DOWNLOAD_READ_LIMIT: usize = 4 * 1024;
 
 #[derive(Clone)]
 pub(crate) struct ChannelOpenControl {
@@ -317,7 +318,9 @@ impl russh_sftp::server::Handler for SftpServerSession {
             return Err(StatusCode::Eof);
         }
         let len = usize::try_from(len).map_err(|_| StatusCode::Failure)?;
-        let end = offset.saturating_add(len).min(DOWNLOAD_FILE_SIZE);
+        let end = offset
+            .saturating_add(len.min(DOWNLOAD_READ_LIMIT))
+            .min(DOWNLOAD_FILE_SIZE);
         let data = (offset..end).map(|index| (index % 251) as u8).collect();
         Ok(Data { id, data })
     }

@@ -12,7 +12,8 @@ use crate::{
     sftp_client::{
         download::{DownloadOptions, run_download},
         transfer::{
-            DEFAULT_PIPELINE_CHUNK_SIZE, DEFAULT_READ_MAX_IN_FLIGHT, DEFAULT_WRITE_MAX_IN_FLIGHT,
+            DEFAULT_PIPELINE_CHUNK_SIZE, DEFAULT_READ_MAX_IN_FLIGHT,
+            DEFAULT_READ_PIPELINE_CHUNK_SIZE, DEFAULT_WRITE_MAX_IN_FLIGHT,
             DEFAULT_WRITE_RESPONSE_TIMEOUT, TransferProgress,
         },
         upload::{UploadOptions, run_upload},
@@ -111,7 +112,7 @@ impl TransferService {
             abort,
             ranges,
         );
-        options.chunk_size = DEFAULT_PIPELINE_CHUNK_SIZE;
+        options.chunk_size = DEFAULT_READ_PIPELINE_CHUNK_SIZE;
         options.max_in_flight = DEFAULT_READ_MAX_IN_FLIGHT;
         options.progress_chunk_size = self.transfer_chunk_size;
         options.progress = transfer_progress(self.clone(), id.to_string());

@@ -478,12 +478,27 @@ impl TransferService {
     }
 
     async fn run_task(&self, id: String, abort: Arc<AtomicBool>) {
+        if let Ok(task) = self.get_task_model(&id).await {
+            tracing::info!(
+                task_id = %id,
+                task_type = ?task.r#type,
+                target_id = ?task.target_id,
+                name = %task.name,
+                local_path = ?task.local_path,
+                target_uri = ?task.target_uri,
+                total = task.total,
+                "transfer task started"
+            );
+        } else {
+            tracing::info!(task_id = %id, "transfer task started");
+        }
         let result = self.run_task_inner(&id, abort.clone()).await;
 
         self.running_tasks.lock().await.remove(&id);
         self.scheduler_notify.notify_one();
 
         if let Err(err) = result {
+            tracing::error!(task_id = %id, error = %err.message, "transfer task failed");
             let task = TransferTaskEntity::find_by_id(id.clone())
                 .one(&self.db)
                 .await;
@@ -502,8 +517,22 @@ impl TransferService {
                 active.estimated_time = Set(None);
                 active.updated_at = Set(now);
                 active.ended_at = Set(Some(now));
-                let _ = active.update(&self.db).await;
+                if let Err(update_err) = active.update(&self.db).await {
+                    tracing::error!(
+                        task_id = %id,
+                        error = %update_err,
+                        "failed to persist transfer task failure"
+                    );
+                }
             }
+        } else if let Ok(task) = self.get_task_model(&id).await {
+            tracing::info!(
+                task_id = %id,
+                status = ?task.status,
+                loaded = task.loaded,
+                total = task.total,
+                "transfer task stopped"
+            );
         }
     }
 
@@ -566,6 +595,14 @@ impl TransferService {
         } else {
             100.0
         };
+        tracing::debug!(
+            task_id = %id,
+            loaded,
+            total = task.total,
+            percent,
+            speed,
+            "transfer task progress"
+        );
 
         let mut active: ActiveModel = task.into();
         active.ranges = Set(ranges_to_json(&ranges)?);
