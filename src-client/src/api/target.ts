@@ -9,6 +9,7 @@ export interface ITarget {
     key?: string;
     password?: string;
     system?: string;
+    jump_host_id?: number;
 }
 
 export async function getTargetList() {

@@ -15,6 +15,7 @@ pub async fn list(db: &DatabaseConnection) -> Result<Vec<target::Model>, ApiErr>
 }
 
 pub async fn add(db: &DatabaseConnection, payload: target::Model) -> Result<target::Model, ApiErr> {
+    validate_jump_host(db, payload.id, payload.jump_host_id).await?;
     let target = map_db_err!(target_repository::insert(db, payload).await)?;
     Ok(target)
 }
@@ -25,6 +26,7 @@ pub async fn update(
     payload: TargetUpdatePayload,
 ) -> Result<target::Model, ApiErr> {
     let target_id = payload.id;
+    validate_jump_host(db, target_id, payload.jump_host_id).await?;
     let active_model = target::ActiveModel::from(payload);
     let target = map_db_err!(
         connection_pool
@@ -49,6 +51,42 @@ pub async fn remove(
             .await
     )?;
     Ok(())
+}
+
+async fn validate_jump_host(
+    db: &DatabaseConnection,
+    target_id: i32,
+    jump_host_id: Option<i32>,
+) -> Result<(), ApiErr> {
+    let Some(mut current) = jump_host_id else {
+        return Ok(());
+    };
+    if current == target_id {
+        return Err(ApiErr {
+            code: ERR_CODE_DB_ERR,
+            message: "a target cannot jump through itself".into(),
+        });
+    }
+    let mut visited = std::collections::HashSet::from([target_id]);
+    loop {
+        if !visited.insert(current) {
+            return Err(ApiErr {
+                code: ERR_CODE_DB_ERR,
+                message: "jump-host cycle detected".into(),
+            });
+        }
+        let host =
+            map_db_err!(target_repository::find_by_id(db, current).await)?.ok_or_else(|| {
+                ApiErr {
+                    code: ERR_CODE_DB_ERR,
+                    message: format!("jump host {current} not found"),
+                }
+            })?;
+        match host.jump_host_id {
+            Some(next) => current = next,
+            None => return Ok(()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -80,6 +118,7 @@ mod tests {
                 key: None,
                 password: Some("password".to_string()),
                 system: None,
+                jump_host_id: None,
             },
         )
         .await

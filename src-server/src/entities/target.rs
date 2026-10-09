@@ -95,6 +95,8 @@ pub struct Model {
     pub password: Option<String>,
     /// 操作系统类型（如 windows、linux 等）
     pub system: Option<String>,
+    /// Optional SSH target to use as a bastion/jump host.
+    pub jump_host_id: Option<i32>,
 }
 
 impl std::fmt::Debug for Model {

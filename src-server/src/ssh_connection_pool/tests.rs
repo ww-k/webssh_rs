@@ -67,6 +67,7 @@ fn test_target() -> target::Model {
         key: None,
         password: Some("123456".to_string()),
         system: Some("linux".to_string()),
+        jump_host_id: None,
     }
 }
 
@@ -561,6 +562,7 @@ async fn target_update_is_not_blocked_by_a_capacity_waiter(context: &TestContext
         key: current.key,
         password: current.password,
         system: Some(updated_system.clone()),
+        jump_host_id: None,
     };
 
     let updated = tokio::time::timeout(

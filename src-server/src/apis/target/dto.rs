@@ -21,6 +21,8 @@ pub struct TargetUpdatePayload {
     pub password: Option<String>,
     /// 操作系统类型
     pub system: Option<String>,
+    /// Optional bastion/jump-host target ID.
+    pub jump_host_id: Option<i32>,
 }
 
 impl From<TargetUpdatePayload> for target::ActiveModel {
@@ -34,6 +36,7 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
             key: Set(p.key),
             password: Set(p.password),
             system: Set(p.system),
+            jump_host_id: Set(p.jump_host_id),
         }
     }
 }

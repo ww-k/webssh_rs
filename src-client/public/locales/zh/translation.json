@@ -22,6 +22,8 @@
     "pathbar_search_displayname": "“{{target}}”中的搜索结果",
     "target_edit": "编辑目标",
     "target_host": "主机",
+    "target_jump_host": "SSH 跳板主机",
+    "target_jump_host_placeholder": "可选，例如 user@bastion.example.com:22",
     "target_method": "验证方式",
     "target_new": "创建目标",
     "target_password": "密码",

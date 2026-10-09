@@ -21,7 +21,7 @@ use tokio::{
     sync::oneshot,
     time::{Instant, Sleep},
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
 use super::{
     error::{SshPoolError, SshPoolResult},
@@ -29,6 +29,9 @@ use super::{
 };
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+trait SshStream: AsyncRead + AsyncWrite + Unpin + Send {}
+impl<T: AsyncRead + AsyncWrite + Unpin + Send> SshStream for T {}
 
 #[derive(Clone)]
 struct ConnectDeadline {
@@ -211,6 +214,7 @@ pub(crate) struct SshConnectionSpec {
     host: String,
     port: u16,
     auth: SshAuth,
+    jump_host: Option<Box<SshConnectionSpec>>,
 }
 
 impl SshConnectionSpec {
@@ -227,7 +231,13 @@ impl SshConnectionSpec {
             host,
             port,
             auth,
+            jump_host: None,
         }
+    }
+
+    pub(crate) fn with_jump_host(mut self, jump_host: SshConnectionSpec) -> Self {
+        self.jump_host = Some(Box::new(jump_host));
+        self
     }
 
     pub(crate) fn target_id(&self) -> i32 {
@@ -243,12 +253,18 @@ impl fmt::Debug for SshConnectionSpec {
             .field("host", &self.host)
             .field("port", &self.port)
             .field("auth", &self.auth.kind())
+            .field(
+                "jump_host",
+                &self.jump_host.as_ref().map(|host| host.target_id),
+            )
             .finish()
     }
 }
 
 pub(crate) struct ConnectedSsh {
     pub(crate) handle: russh::client::Handle<SshClientHandler>,
+    // Keep upstream handles alive while the destination transport uses their channels.
+    pub(crate) upstream_handles: Vec<russh::client::Handle<SshClientHandler>>,
     pub(crate) disconnected: oneshot::Receiver<()>,
 }
 
@@ -308,24 +324,48 @@ impl SshConnector {
             connect_deadline: deadline.clone(),
         };
 
-        let socket = match tokio::time::timeout_at(
-            deadline.at(),
-            TcpStream::connect((spec.host.as_str(), spec.port)),
-        )
-        .await
-        {
-            Ok(Ok(socket)) => socket,
-            Ok(Err(err)) => return Err(russh::Error::from(err).into()),
-            Err(_) => {
-                deadline.mark_timed_out();
-                return Err(deadline.pool_error());
-            }
-        };
-        if config.nodelay
-            && let Err(err) = socket.set_nodelay(true)
-        {
-            warn!(?err, "failed to enable TCP_NODELAY for SSH connection");
-        }
+        let (socket, upstream_handles): (Box<dyn SshStream>, Vec<_>) =
+            if let Some(jump_host) = &spec.jump_host {
+                let bastion = Box::pin(self.connect_inner(jump_host, deadline.clone())).await?;
+                let channel = deadline
+                    .run(async {
+                        Ok(bastion
+                            .handle
+                            .channel_open_direct_tcpip(
+                                spec.host.clone(),
+                                spec.port as u32,
+                                "127.0.0.1".to_string(),
+                                0,
+                            )
+                            .await?)
+                    })
+                    .await?;
+                let stream = channel.into_stream();
+                let mut handles = bastion.upstream_handles;
+                handles.push(bastion.handle);
+                (Box::new(stream), handles)
+            } else {
+                (
+                    Box::new(
+                        match tokio::time::timeout_at(
+                            deadline.at(),
+                            TcpStream::connect((spec.host.as_str(), spec.port)),
+                        )
+                        .await
+                        {
+                            Ok(Ok(socket)) => socket,
+                            Ok(Err(err)) => return Err(russh::Error::from(err).into()),
+                            Err(_) => {
+                                deadline.mark_timed_out();
+                                return Err(deadline.pool_error());
+                            }
+                        },
+                    ),
+                    Vec::new(),
+                )
+            };
+        // TCP_NODELAY is applied by direct callers where the concrete socket is available;
+        // forwarded channels do not expose that socket option.
         let stream = DeadlineStream::new(socket, deadline.clone());
         let handle_result = russh::client::connect_stream(Arc::new(config), stream, handler).await;
         let mut handle = deadline.map_result(handle_result)?;
@@ -364,6 +404,7 @@ impl SshConnector {
 
         Ok(ConnectedSsh {
             handle,
+            upstream_handles,
             disconnected: disconnect_rx,
         })
     }

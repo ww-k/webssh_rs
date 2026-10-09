@@ -39,6 +39,13 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 key: "host",
             },
             {
+                title: t("target_jump_host"),
+                dataIndex: "jump_host_id",
+                key: "jump_host_id",
+                render: (text) =>
+                    text || <div className="targetListTablePlaceholder">—</div>,
+            },
+            {
                 title: t("target_port"),
                 dataIndex: "port",
                 key: "port",

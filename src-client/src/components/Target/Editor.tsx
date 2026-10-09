@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import "./Editor.css";
 
-import { postTargetAdd, postTargetUpdate } from "@/api";
+import { getTargetList, postTargetAdd, postTargetUpdate } from "@/api";
 import { validateCertContent } from "@/helpers/validateCertContent";
 
 import InputTextFromFile from "../InputTextFromFile";
@@ -27,8 +27,14 @@ export default function TargetEditor({
     const [form] = Form.useForm();
     const method = Form.useWatch("method", form);
     const [requirePassword, setRequirePassword] = useState(false);
+    const [targets, setTargets] = useState<ITarget[]>([]);
 
     useEffect(() => {
+        if (open) {
+            getTargetList()
+                .then(setTargets)
+                .catch(() => setTargets([]));
+        }
         if (open && data) {
             form.setFieldsValue(data);
         } else {
@@ -145,6 +151,18 @@ export default function TargetEditor({
                     ]}
                 >
                     <Input.Password placeholder={t("target_password")} />
+                </Form.Item>
+                <Form.Item name="jump_host_id" label={t("target_jump_host")}>
+                    <Select
+                        allowClear
+                        placeholder={t("target_jump_host_placeholder")}
+                        options={targets
+                            .filter((target) => target.id !== data?.id)
+                            .map((target) => ({
+                                label: `${target.user}@${target.host}:${target.port || 22}`,
+                                value: target.id,
+                            }))}
+                    />
                 </Form.Item>
                 <Form.Item name="port" label={t("target_port")}>
                     <InputNumber

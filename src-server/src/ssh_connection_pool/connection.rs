@@ -34,6 +34,8 @@ impl ConnectionState {
 pub(crate) struct SshConnection {
     id: String,
     handle: russh::client::Handle<SshClientHandler>,
+    // Keep bastion sessions alive for forwarded destination channels.
+    _upstream_handles: Vec<russh::client::Handle<SshClientHandler>>,
     permits: Arc<Semaphore>,
     max_channels: usize,
     state: AtomicU8,
@@ -51,6 +53,7 @@ impl SshConnection {
         let connection = Arc::new(Self {
             id: nanoid::nanoid!(),
             handle: connected.handle,
+            _upstream_handles: connected.upstream_handles,
             permits: Arc::new(Semaphore::new(max_channels)),
             max_channels,
             state: AtomicU8::new(ConnectionState::Active as u8),

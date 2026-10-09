@@ -1,13 +1,17 @@
 pub use sea_orm_migration::prelude::*;
 
 mod m000001_init_db;
+mod m000002_target_jump_host;
 
 pub struct Migrator;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(m000001_init_db::Migration)]
+        vec![
+            Box::new(m000001_init_db::Migration),
+            Box::new(m000002_target_jump_host::Migration),
+        ]
     }
 }
 
@@ -33,7 +37,7 @@ mod tests {
                 .await
                 .expect("Database connection failed");
 
-            Migrator::up(&db, Some(1)).await.unwrap();
+            Migrator::up(&db, None).await.unwrap();
 
             let stmt = Statement::from_string(
                 db.get_database_backend(),
@@ -67,6 +71,7 @@ mod tests {
                 key: None,
                 password: Some("123456".to_string()),
                 system: Some("windows".to_string()),
+                jump_host_id: None,
             });
             let target1 = active_model.insert(&db).await.unwrap();
             assert_eq!(
@@ -76,7 +81,7 @@ mod tests {
                 target1
             );
 
-            Migrator::down(&db, Some(1)).await.unwrap();
+            Migrator::down(&db, None).await.unwrap();
             let rows = TableName::find_by_statement(stmt2).all(&db).await.unwrap();
             assert_eq!(rows.len(), 1);
             assert_eq!(

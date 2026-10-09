@@ -9,6 +9,7 @@ pub enum SshPoolError {
         timeout: Duration,
     },
     UnsupportedAuthMethod,
+    InvalidConfiguration(String),
     AuthenticationFailed,
     ConnectionExpired {
         connection_id: String,
@@ -40,6 +41,9 @@ impl fmt::Display for SshPoolError {
                 write!(f, "SSH connection timed out after {timeout:?}")
             }
             Self::UnsupportedAuthMethod => f.write_str("unsupported SSH authentication method"),
+            Self::InvalidConfiguration(message) => {
+                write!(f, "invalid SSH configuration: {message}")
+            }
             Self::AuthenticationFailed => f.write_str("SSH authentication failed"),
             Self::ConnectionExpired { connection_id } => {
                 write!(f, "SSH connection {connection_id} is no longer active")
