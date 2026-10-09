@@ -32,11 +32,23 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 title: t("target_user"),
                 dataIndex: "user",
                 key: "user",
+                width: 100,
             },
             {
                 title: t("target_host"),
                 dataIndex: "host",
                 key: "host",
+                width: 130,
+            },
+            {
+                title: t("target_port"),
+                dataIndex: "port",
+                key: "port",
+                width: 60,
+                render: (text) =>
+                    text || (
+                        <div className="targetListTablePlaceholder">22</div>
+                    ),
             },
             {
                 title: t("target_jump_host"),
@@ -44,16 +56,6 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 key: "jump_host_id",
                 render: (text) =>
                     text || <div className="targetListTablePlaceholder">—</div>,
-            },
-            {
-                title: t("target_port"),
-                dataIndex: "port",
-                key: "port",
-                width: 80,
-                render: (text) =>
-                    text || (
-                        <div className="targetListTablePlaceholder">22</div>
-                    ),
             },
             {
                 title: t("target_system"),
