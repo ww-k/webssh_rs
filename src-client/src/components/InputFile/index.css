@@ -1,0 +1,118 @@
+.inputFile {
+    position: relative;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 32px;
+    padding: 4px 32px 4px 11px;
+    overflow: hidden;
+    color: var(--ant-color-text, rgba(0, 0, 0, 0.88));
+    background: var(--ant-color-bg-container, #fff);
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: 6px;
+    cursor: pointer;
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s,
+        background-color 0.2s;
+}
+
+.inputFile:hover,
+.inputFile--dragging {
+    border-color: var(--ant-color-primary, #1677ff);
+}
+
+.inputFile:focus-visible {
+    outline: 0;
+    border-color: var(--ant-color-primary, #1677ff);
+    box-shadow: 0 0 0 2px var(--ant-color-primary-bg, rgba(5, 145, 255, 0.1));
+}
+
+.inputFile--dragging {
+    background: var(--ant-color-primary-bg, rgba(5, 145, 255, 0.04));
+}
+
+.inputFile__content {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+    min-height: 22px;
+    overflow: hidden;
+}
+
+.inputFile__placeholder {
+    overflow: hidden;
+    color: var(--ant-color-text-placeholder, rgba(0, 0, 0, 0.25));
+    line-height: 22px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inputFile__file {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0 4px 0 8px;
+    line-height: 22px;
+    background: var(--ant-color-fill-secondary, rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: 4px;
+}
+
+.inputFile__file-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inputFile__remove,
+.inputFile__clear {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--ant-color-text-quaternary, rgba(0, 0, 0, 0.45));
+    font-size: 11px;
+    line-height: 1;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.inputFile__remove {
+    width: 18px;
+    height: 22px;
+    margin-left: 2px;
+}
+
+.inputFile__remove:hover,
+.inputFile__clear:hover {
+    color: var(--ant-color-text, rgba(0, 0, 0, 0.88));
+}
+
+.inputFile__icon {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ant-color-text-tertiary, rgba(0, 0, 0, 0.45));
+    line-height: 1;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.inputFile__clear {
+    position: absolute;
+    top: 50%;
+    right: 30px;
+    width: 18px;
+    height: 18px;
+    transform: translateY(-50%);
+}

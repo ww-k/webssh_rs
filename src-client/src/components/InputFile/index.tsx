@@ -7,6 +7,10 @@ import { useEffect, useState } from "react";
 
 import openNativeFileSelector from "@/helpers/openNativeFileSelector";
 
+import type { DragEvent, KeyboardEvent } from "react";
+
+import "./index.css";
+
 export interface IInputFileProps {
     value?: File[];
     allowClear?: boolean;
@@ -28,13 +32,18 @@ export default function InputFile({
     onChange,
 }: IInputFileProps) {
     const [files, setFiles] = useState<File[]>(value || []);
+    const [isDragging, setIsDragging] = useState(false);
     const handleOpenFileSelector = async () => {
         const option = {
             multiple,
             directory,
         };
-        const files1: File[] = await openNativeFileSelector(option);
-        inputFiles(files1);
+        try {
+            const files1: File[] = await openNativeFileSelector(option);
+            inputFiles(files1);
+        } catch {
+            // The native picker rejects when the user closes it without selecting a file.
+        }
     };
 
     function validate(files1?: File[]) {
@@ -61,11 +70,32 @@ export default function InputFile({
         setFiles(files2);
     }
 
-    function onDropHandle(evt: React.DragEvent) {
+    function onDropHandle(evt: DragEvent<HTMLDivElement>) {
         evt.stopPropagation();
         evt.preventDefault();
+        setIsDragging(false);
         inputFiles(Array.from(evt.dataTransfer.files), multiple);
     }
+
+    function onDragOverHandle(evt: DragEvent<HTMLDivElement>) {
+        evt.stopPropagation();
+        evt.preventDefault();
+        setIsDragging(true);
+    }
+
+    function onDragLeaveHandle(evt: DragEvent<HTMLDivElement>) {
+        if (evt.currentTarget === evt.target) {
+            setIsDragging(false);
+        }
+    }
+
+    function onKeyDownHandle(evt: KeyboardEvent<HTMLDivElement>) {
+        if (evt.key === "Enter" || evt.key === " ") {
+            evt.preventDefault();
+            void handleOpenFileSelector();
+        }
+    }
+
     function onFileRemoveHandle(file: File) {
         const _files = files.filter((_file) => _file !== file);
         inputFiles(_files);
@@ -80,71 +110,64 @@ export default function InputFile({
 
     return (
         <div
-            className="ant-select ant-select-outlined ant-select-in-form-item css-var-r1 ant-select-css-var ant-select-multiple ant-select-show-arrow ant-select-show-search"
+            className={`inputFile${files.length > 0 ? " inputFile--has-value" : ""}${
+                isDragging ? " inputFile--dragging" : ""
+            }`}
+            role="group"
+            tabIndex={0}
+            aria-label={placeholder || "Choose a file"}
             onDrop={onDropHandle}
+            onDragOver={onDragOverHandle}
+            onDragLeave={onDragLeaveHandle}
             onClick={handleOpenFileSelector}
+            onKeyDown={onKeyDownHandle}
         >
-            <div className="ant-select-selector">
-                <span className="ant-select-selection-wrap">
-                    <div className="ant-select-selection-overflow">
-                        {files.map((file) => (
-                            <div
-                                key={`${file.webkitRelativePath}${file.name}`}
-                                className="ant-select-selection-overflow-item"
+            <div className="inputFile__content">
+                {files.length > 0 ? (
+                    files.map((file) => (
+                        <span
+                            key={`${file.webkitRelativePath}${file.name}`}
+                            className="inputFile__file"
+                            title={file.name}
+                        >
+                            <span className="inputFile__file-name">
+                                {file.name}
+                            </span>
+                            <button
+                                type="button"
+                                className="inputFile__remove"
+                                aria-label={`Remove ${file.name}`}
+                                onClick={(evt) => {
+                                    evt.stopPropagation();
+                                    onFileRemoveHandle(file);
+                                }}
+                                onKeyDown={(evt) => evt.stopPropagation()}
                             >
-                                <span className="ant-select-selection-item">
-                                    <span className="ant-select-selection-item-content">
-                                        {file.name}
-                                    </span>
-                                    <span className="ant-select-selection-item-remove">
-                                        <CloseOutlined
-                                            onClick={(evt) => {
-                                                evt.stopPropagation();
-                                                onFileRemoveHandle(file);
-                                            }}
-                                        />
-                                    </span>
-                                </span>
-                            </div>
-                        ))}
-                        <div className="ant-select-selection-overflow-item ant-select-selection-overflow-item-suffix">
-                            <div
-                                className="ant-select-selection-search"
-                                style={{ width: 4 }}
-                            >
-                                <input
-                                    type="search"
-                                    autoComplete="off"
-                                    className="ant-select-selection-search-input"
-                                    role="combobox"
-                                    value=""
-                                />
-                                <span className="ant-select-selection-search-mirror">
-                                    &nbsp;
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    {files.length === 0 && (
-                        <span className="ant-select-selection-placeholder">
-                            {placeholder || "Click to select or drag a file in"}
+                                <CloseOutlined />
+                            </button>
                         </span>
-                    )}
-                </span>
+                    ))
+                ) : (
+                    <span className="inputFile__placeholder">
+                        {placeholder || "Click to select or drag a file in"}
+                    </span>
+                )}
             </div>
-            <div className="ant-select-arrow">
+            <span className="inputFile__icon" aria-hidden="true">
                 <FolderOutlined />
-            </div>
+            </span>
             {allowClear && files.length > 0 && (
-                <div
-                    className="ant-select-clear"
+                <button
+                    type="button"
+                    className="inputFile__clear"
+                    aria-label="Clear files"
                     onClick={(evt) => {
                         evt.stopPropagation();
                         inputFiles([]);
                     }}
                 >
                     <CloseCircleFilled />
-                </div>
+                </button>
             )}
         </div>
     );
