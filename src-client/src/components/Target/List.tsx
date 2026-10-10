@@ -1,6 +1,6 @@
 import { useMount } from "ahooks";
 import { Button, Modal, Space, Table } from "antd";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getTargetList, postTargetRemove } from "@/api";
@@ -19,13 +19,13 @@ export default function TargetList({ tab }: { tab: ITab }) {
     const { setTabPath } = useAppStore();
     const [editorOpen, setEditorOpen] = useState(false);
     const [editorData, setEditorData] = useState<ITarget>();
+    const [dataSource, setDataSource] = useState<ITarget[]>([]);
 
-    async function refresh() {
+    const refresh = useCallback(async () => {
         const res = await getTargetList();
         setDataSource(res);
-    }
+    }, []);
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies: 没用到可能变化的状态
     const columns: ColumnsType<ITarget> = useMemo(
         () => [
             {
@@ -51,11 +51,19 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     ),
             },
             {
-                title: t("target_jump_host"),
+                title: t("target_jump_host_list"),
                 dataIndex: "jump_host_id",
                 key: "jump_host_id",
-                render: (text) =>
-                    text || <div className="targetListTablePlaceholder">—</div>,
+                render: (jumpHostId: number | undefined) => {
+                    const jumpHost = dataSource.find(
+                        (target) => target.id === jumpHostId,
+                    );
+                    return jumpHost ? (
+                        `${jumpHost.user}@${jumpHost.host}:${jumpHost.port ?? 22}`
+                    ) : (
+                        <div className="targetListTablePlaceholder">—</div>
+                    );
+                },
             },
             {
                 title: t("target_system"),
@@ -120,9 +128,8 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 ),
             },
         ],
-        [],
+        [dataSource, refresh, setTabPath, t, tab.key],
     );
-    const [dataSource, setDataSource] = useState<ITarget[]>([]);
 
     useMount(refresh);
 
