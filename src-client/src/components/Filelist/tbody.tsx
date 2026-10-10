@@ -178,6 +178,8 @@ export default class Tbody extends Component<IProps, IState> {
         } = this.state;
         if (
             data !== nextState.data ||
+            props.data !== nextProps.data ||
+            props.layoutContainerHeight !== nextProps.layoutContainerHeight ||
             columns !== nextProps.columns ||
             multiple !== nextProps.multiple ||
             props.isFileSelectable !== nextProps.isFileSelectable
@@ -187,6 +189,8 @@ export default class Tbody extends Component<IProps, IState> {
 
         if (
             data !== nextState.data ||
+            props.data !== nextProps.data ||
+            props.layoutContainerHeight !== nextProps.layoutContainerHeight ||
             activeKey !== nextState.activeKey ||
             selected !== nextState.selected ||
             dragFiles !== nextState.dragFiles ||
