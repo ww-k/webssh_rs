@@ -24,7 +24,9 @@ bytes = "1.12.1"
 dirs = "6.0.0"
 utoipa = { version = "5.4.0", features = ["axum_extras"] }
 futures-util = "0.3.31"
+include_dir = "0.7.4"
 hex = "0.4.3"
+mime_guess = "2.0.5"
 nanoid = "0.4.0"
 russh = { version = "0.62.2", default-features = false, features = [
     "flate2",
@@ -50,7 +52,7 @@ socketioxide = { version = "0.17.0", features = [
 ] }
 tokio = { version = "1.44.2", features = ["full"] }
 tokio-util = { version = "0.7.13", features = ["io"] }
-tower-http = { version = "0.6.2", features = ["fs"] }
+tower-http = { version = "0.6.2", features = ["cors", "fs"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 

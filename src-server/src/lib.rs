@@ -12,9 +12,16 @@ mod tests;
 
 use std::{ops::Deref, sync::Arc};
 
-use axum::{Router, http::StatusCode, routing::any};
+use axum::{
+    Router,
+    body::Body,
+    http::{StatusCode, header},
+    response::Response,
+    routing::get,
+};
 use config::Config;
 use sea_orm::{Database, DatabaseConnection};
+use tower_http::cors::CorsLayer;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use apis::{favorite_directory, fs, sftp, ssh, ssh_connection, target, transfer};
@@ -22,6 +29,9 @@ use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
 
 use crate::{api_doc::ApiDoc, ssh_connection_pool::SshConnectionPool};
+
+static CLIENT_DIST: include_dir::Dir<'static> =
+    include_dir::include_dir!("$CARGO_MANIFEST_DIR/../src-client/dist");
 
 pub struct AppBaseState {
     db: DatabaseConnection,
@@ -56,7 +66,10 @@ pub async fn run_server() {
 
     let config = Config::load_config().await.unwrap();
 
-    let db = Database::connect("sqlite:target/db.sqlite?mode=rwc")
+    let db_path =
+        std::env::var("WEBSSH_RS_DB_PATH").unwrap_or_else(|_| "target/db.sqlite".to_string());
+    let db_url = format!("sqlite:{db_path}?mode=rwc");
+    let db = Database::connect(&db_url)
         .await
         .expect("Database connection failed");
 
@@ -80,6 +93,10 @@ pub async fn run_server() {
     });
 
     let app = Router::new()
+        .route(
+            "/api/health",
+            get(|| async { axum::Json(serde_json::json!({ "status": "ok" })) }),
+        )
         .nest(
             "/api/ssh_connection",
             ssh_connection::router_builder(connection_pool.clone()),
@@ -101,7 +118,8 @@ pub async fn run_server() {
             "/api-docs",
             axum::routing::get(|| async { axum::response::Html(include_str!("../redoc.html")) }),
         )
-        .fallback(any(|| async { (StatusCode::NOT_FOUND, "404 Not Found") }));
+        .fallback(serve_client)
+        .layer(CorsLayer::permissive());
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
         .await
@@ -110,4 +128,36 @@ pub async fn run_server() {
     println!("Listening on http://{}", listener.local_addr().unwrap());
 
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn serve_client(uri: axum::http::Uri) -> Response<Body> {
+    let path = uri.path().trim_start_matches('/');
+    let file = if path.is_empty() { "index.html" } else { path };
+
+    if let Some(file) = CLIENT_DIST.get_file(file) {
+        let content_type = mime_guess::from_path(file.path())
+            .first_or_octet_stream()
+            .as_ref()
+            .to_string();
+        return Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, content_type)
+            .body(Body::from(file.contents().to_vec()))
+            .expect("valid static file response");
+    }
+
+    if !path.starts_with("api/") {
+        if let Some(index) = CLIENT_DIST.get_file("index.html") {
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+                .body(Body::from(index.contents().to_vec()))
+                .expect("valid index response");
+        }
+    }
+
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::from("404 Not Found"))
+        .expect("valid not found response")
 }

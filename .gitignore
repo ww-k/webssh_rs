@@ -2,12 +2,7 @@
 .vscode/*
 
 # build output
-dist/*
-build/*
-server/target
-
-# generated docs
-src-server/docs
+/build/
 
 # npm
 npm-debug.log*
