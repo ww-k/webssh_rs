@@ -72,7 +72,7 @@ pub fn init_logging() {
 
 fn default_db_path() -> PathBuf {
     dirs::data_dir()
-        .map(|path| path.join("webssh_rs_server").join("db.sqlite"))
+        .map(|path| path.join(env!("CARGO_PKG_NAME")).join("db.sqlite"))
         .unwrap_or_else(|| PathBuf::from("target/db.sqlite"))
 }
 
