@@ -10,7 +10,7 @@ pub mod ssh_connection_pool;
 #[cfg(test)]
 mod tests;
 
-use std::{ops::Deref, sync::Arc};
+use std::{future::Future, ops::Deref, sync::Arc};
 
 use axum::{
     Router,
@@ -53,15 +53,27 @@ impl Deref for AppState {
 }
 
 pub async fn run_server() {
+    init_logging();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
+        .await
+        .unwrap();
+    run_server_with_listener(listener, std::future::pending()).await;
+}
+
+pub fn init_logging() {
     let env_log =
         std::env::var("RUST_LOG").unwrap_or_else(|_| "webssh_rs_server=debug,off".to_string());
     let subscriber = FmtSubscriber::builder()
-        // 优先使用RUST_LOG环境变量，没有则用默认
         .with_env_filter(EnvFilter::new(env_log))
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber).unwrap();
+    let _ = tracing::subscriber::set_global_default(subscriber);
+}
 
+pub async fn run_server_with_listener<F>(listener: tokio::net::TcpListener, shutdown: F)
+where
+    F: Future<Output = ()> + Send + 'static,
+{
     println!("Starting server...");
 
     let config = Config::load_config().await.unwrap();
@@ -121,13 +133,12 @@ pub async fn run_server() {
         .fallback(serve_client)
         .layer(CorsLayer::permissive());
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
-        .await
-        .unwrap();
-
     println!("Listening on http://{}", listener.local_addr().unwrap());
 
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown)
+        .await
+        .unwrap();
 }
 
 async fn serve_client(uri: axum::http::Uri) -> Response<Body> {

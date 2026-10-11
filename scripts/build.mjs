@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, lstatSync, mkdirSync } from "node:fs";
+import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,47 +48,6 @@ run("npm", ["run", "build"], {
   cwd: resolve(projectRoot, "./src-client"),
   env,
 });
-
-// Build the API server and bundle it as a Tauri resource.
-const rustTargetResult = spawnSync("rustc", ["-vV"], {
-  cwd: projectRoot,
-  env,
-  encoding: "utf8",
-});
-if (rustTargetResult.status !== 0) {
-  console.error("Failed to determine the Rust target triple");
-  process.exit(rustTargetResult.status ?? 1);
-}
-const rustTarget = rustTargetResult.stdout
-  .split(/\r?\n/)
-  .find((line) => line.startsWith("host:"))
-  ?.slice("host:".length)
-  .trim();
-if (!rustTarget) {
-  console.error("Could not find the Rust host target triple");
-  process.exit(1);
-}
-
-run("cargo", ["build", "--release", "--target", rustTarget], {
-  cwd: resolve(projectRoot, "./src-server"),
-  env,
-});
-
-const executable =
-  process.platform === "win32" ? "webssh_rs_server.exe" : "webssh_rs_server";
-const sidecarName =
-  process.platform === "win32"
-    ? `webssh_rs_server-${rustTarget}.exe`
-    : `webssh_rs_server-${rustTarget}`;
-const targetDir = resolve(
-  projectRoot,
-  "./src-server/target",
-  rustTarget,
-  "release",
-);
-const resourceDir = resolve(projectRoot, "./src-tauri/binaries");
-mkdirSync(resourceDir, { recursive: true });
-copyFileSync(resolve(targetDir, executable), resolve(resourceDir, sidecarName));
 
 // Build and bundle the Tauri application.
 run("tauri", tauriBuildArgs, {
