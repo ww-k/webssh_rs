@@ -10,7 +10,7 @@ pub mod ssh_connection_pool;
 #[cfg(test)]
 mod tests;
 
-use std::{future::Future, ops::Deref, sync::Arc};
+use std::{future::Future, ops::Deref, path::PathBuf, sync::Arc};
 
 use axum::{
     Router,
@@ -70,6 +70,12 @@ pub fn init_logging() {
     let _ = tracing::subscriber::set_global_default(subscriber);
 }
 
+fn default_db_path() -> PathBuf {
+    dirs::data_dir()
+        .map(|path| path.join("webssh_rs_server").join("db.sqlite"))
+        .unwrap_or_else(|| PathBuf::from("target/db.sqlite"))
+}
+
 pub async fn run_server_with_listener<F>(listener: tokio::net::TcpListener, shutdown: F)
 where
     F: Future<Output = ()> + Send + 'static,
@@ -78,9 +84,13 @@ where
 
     let config = Config::load_config().await.unwrap();
 
-    let db_path =
-        std::env::var("WEBSSH_RS_DB_PATH").unwrap_or_else(|_| "target/db.sqlite".to_string());
-    let db_url = format!("sqlite:{db_path}?mode=rwc");
+    let db_path = std::env::var_os("WEBSSH_RS_DB_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(default_db_path);
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent).expect("Failed to create database directory");
+    }
+    let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
     let db = Database::connect(&db_url)
         .await
         .expect("Database connection failed");
