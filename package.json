@@ -5,6 +5,7 @@
         "dev": "node scripts/dev.mjs",
         "dev:browser": "node scripts/dev.mjs --mode=browser",
         "build": "node scripts/build.mjs",
+        "build:nobundle": "node scripts/build.mjs --no-bundle",
         "gen-docs": "cd src-server && cargo run --bin gen-docs"
     },
     "author": "",
