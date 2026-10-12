@@ -26,12 +26,7 @@ export default function Home({ active }: { active: boolean }) {
                         );
                         break;
                     case tab.path.startsWith("/filesview/"):
-                        children = (
-                            <Filesview
-                                active={activeTabKey === tab.key}
-                                tab={tab}
-                            />
-                        );
+                        children = <Filesview tab={tab} />;
                         break;
                     default:
                         children = <TargetSelector tab={tab} />;

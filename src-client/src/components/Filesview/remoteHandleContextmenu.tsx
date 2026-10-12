@@ -21,6 +21,7 @@ import {
     handleMkdir,
     handlePaste,
     handleRename,
+    handleViewEdit,
 } from "./remoteActions";
 
 import type { IViewFileStat } from "@/types";
@@ -63,15 +64,14 @@ export default function remoteHandleContextmenu(
         });
         menus.push({
             label: "查看/编辑",
-            disabled: true,
-            // disabled: !(
-            //     Array.isArray(files) &&
-            //     files.length === 1 &&
-            //     files[0].type === "f" &&
-            //     files[0].size < 20971520
-            // ),
-            click: () => {
-                // TODO:
+            disabled: !(
+                files.length === 1 &&
+                !files[0].isDir &&
+                files[0].type === "f" &&
+                files[0].size <= 20 * 1024 * 1024
+            ),
+            click: async () => {
+                await handleViewEdit(files[0]);
             },
             iconRender: () => <FileTextOutlined />,
         });

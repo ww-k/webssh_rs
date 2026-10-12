@@ -1,7 +1,7 @@
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    time::UNIX_EPOCH,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use tokio::fs;
@@ -155,6 +155,78 @@ pub async fn rm_rf(path: &str) -> Result<(), ApiErr> {
         fs::remove_dir_all(path).await.map_err(map_fs_io_err)
     } else {
         fs::remove_file(path).await.map_err(map_fs_io_err)
+    }
+}
+
+pub async fn open(file_name: &str, app: &str, content: &[u8]) -> Result<(), ApiErr> {
+    let safe_name = Path::new(file_name)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("remote-file");
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| ApiErr {
+            code: ERR_CODE_FS_IO_ERR,
+            message: err.to_string(),
+        })?
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("webssh-rs-{timestamp}-{safe_name}"));
+    fs::write(&path, content).await.map_err(map_fs_io_err)?;
+    let mut command = external_open_command(app, &path)?;
+    command.spawn().map_err(map_fs_io_err)?;
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn external_open_command(app: &str, path: &Path) -> Result<Command, ApiErr> {
+    let mut command = match app {
+        "vscode" => Command::new("code.cmd"),
+        "zed" => Command::new("zed.exe"),
+        "default" => {
+            let mut command = Command::new("cmd");
+            command.args(["/C", "start", ""]);
+            command
+        }
+        _ => return Err(invalid_external_app()),
+    };
+    command.arg(path);
+    Ok(command)
+}
+
+#[cfg(target_os = "macos")]
+fn external_open_command(app: &str, path: &Path) -> Result<Command, ApiErr> {
+    let mut command = match app {
+        "vscode" => Command::new("code"),
+        "zed" => Command::new("zed"),
+        "default" => Command::new("open"),
+        _ => return Err(invalid_external_app()),
+    };
+    command.arg(path);
+    Ok(command)
+}
+
+#[cfg(target_os = "linux")]
+fn external_open_command(app: &str, path: &Path) -> Result<Command, ApiErr> {
+    let mut command = match app {
+        "vscode" => Command::new("code"),
+        "zed" => Command::new("zed"),
+        "default" => Command::new("xdg-open"),
+        _ => return Err(invalid_external_app()),
+    };
+    command.arg(path);
+    Ok(command)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+fn external_open_command(_app: &str, _path: &Path) -> Result<Command, ApiErr> {
+    Err(invalid_external_app())
+}
+
+fn invalid_external_app() -> ApiErr {
+    ApiErr {
+        code: ERR_CODE_FS_INVALID_REQUEST,
+        message: "unsupported external app".to_string(),
     }
 }
 

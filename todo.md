@@ -1,3 +1,4 @@
+- [] [feat] sftp 编辑/查看功能增加系统编辑器打开
 - [] [feat] target 增加备注
 - [] [feat] 传输列表 增加删除所有历史记录
 - [] [feat] tauri app 支持动态端口启动服务

@@ -1,9 +1,9 @@
-use axum::{Json, extract::Query};
+use axum::{Json, body::Bytes, extract::Query};
 
 use crate::apis::{ApiErr, InternalErrorResponse};
 
 use super::{
-    dto::{FsFile, FsFileUriPayload, FsLsPayload, FsRenamePayload, FsUserDir},
+    dto::{FsFile, FsFileUriPayload, FsLsPayload, FsOpenPayload, FsRenamePayload, FsUserDir},
     service,
 };
 
@@ -178,4 +178,20 @@ pub async fn rm_rf(Query(payload): Query<FsFileUriPayload>) -> Result<(), ApiErr
 )]
 pub async fn show_in_folder(Query(payload): Query<FsFileUriPayload>) -> Result<(), ApiErr> {
     service::show_in_folder(&payload.uri).await
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/fs/open",
+    tag = "fs",
+    summary = "在外部应用中打开文件",
+    params(FsOpenPayload),
+    request_body(content = Vec<u8>, content_type = "application/octet-stream"),
+    responses(
+        (status = 200, description = "成功启动外部应用"),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn open(Query(payload): Query<FsOpenPayload>, body: Bytes) -> Result<(), ApiErr> {
+    service::open(&payload.file_name, &payload.app, &body).await
 }

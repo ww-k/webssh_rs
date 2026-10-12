@@ -1,12 +1,21 @@
-import { Modal } from "antd";
+import { DownOutlined } from "@ant-design/icons";
+import { json } from "@codemirror/lang-json";
+import { python } from "@codemirror/lang-python";
+import { xml } from "@codemirror/lang-xml";
+import { yaml } from "@codemirror/lang-yaml";
+import CodeMirror from "@uiw/react-codemirror";
+import { Button, Dropdown, Modal, Space } from "antd";
+import { forwardRef, useImperativeHandle, useState } from "react";
 
 import {
-    getSftpLs,
+    getSftpDownload,
+    postFsOpen,
     postSftpCp,
     postSftpMkdir,
     postSftpRename,
     postSftpRm,
     postSftpRmRf,
+    postSftpUpload,
 } from "@/api";
 import { getFilePath, parseSftpUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
@@ -16,10 +25,163 @@ import renderBatchTaskProgressModal from "../BatchTaskProgressModal/render";
 import filesConflictConfirm from "./filesConflictConfirm";
 import generateCopyNewName from "./generateCopyNewName";
 
+import type { Extension } from "@codemirror/state";
 import type { IViewFileStat } from "@/types";
 import type { IFileListCopyEvent } from "../Filelist/types";
 
 type IGetCwdFiles = () => Promise<IViewFileStat[]>;
+
+const MAX_EDITABLE_FILE_SIZE = 20 * 1024 * 1024;
+
+export interface IFileEditorRef {
+    getContent: () => string;
+}
+
+const SftpFileEditor = forwardRef<
+    IFileEditorRef,
+    { content: string; fileName: string }
+>(function SftpFileEditor({ content, fileName }, ref) {
+    const [value, setValue] = useState(content);
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            getContent: () => value,
+        }),
+        [value],
+    );
+
+    return (
+        <CodeMirror
+            aria-label={fileName}
+            value={value}
+            height="min(65vh, 600px)"
+            extensions={getLanguageExtensions(fileName)}
+            onChange={setValue}
+            basicSetup={{
+                foldGutter: true,
+                highlightActiveLine: true,
+                bracketMatching: true,
+                autocompletion: true,
+            }}
+        />
+    );
+});
+
+function getLanguageExtensions(fileName: string): Extension[] {
+    const name = fileName.toLowerCase();
+
+    if (name.endsWith(".json") || name.endsWith(".jsonc")) {
+        return [json()];
+    }
+    if (name.endsWith(".yaml") || name.endsWith(".yml")) {
+        return [yaml()];
+    }
+    if (name.endsWith(".xml")) {
+        return [xml()];
+    }
+    if (name.endsWith(".py")) {
+        return [python()];
+    }
+
+    // TOML, INI, .env and .properties currently have no sufficiently
+    // maintained CodeMirror 6 language package, so leave them as plain text.
+    return [];
+}
+
+async function openExternal(
+    file: IViewFileStat,
+    app: "vscode" | "zed" | "default",
+) {
+    const content = await getSftpDownload(file.uri);
+    await postFsOpen(file.name, app, content);
+}
+
+export async function handleViewEdit(file: IViewFileStat) {
+    if (file.isDir || file.type !== "f") {
+        return;
+    }
+    if (file.size > MAX_EDITABLE_FILE_SIZE) {
+        throw new Error("文件超过 20 MiB，无法在线查看/编辑");
+    }
+
+    const content = await (await getSftpDownload(file.uri)).text();
+    const editorRef = { current: null as IFileEditorRef | null };
+
+    return new Promise<void>((resolve, reject) => {
+        const modal = Modal.confirm({
+            title: `查看/编辑：${file.name}`,
+            width: 900,
+            icon: null,
+            content: (
+                <SftpFileEditor
+                    ref={editorRef}
+                    content={content}
+                    fileName={file.name}
+                />
+            ),
+            // footer: (_, { OkBtn, CancelBtn }) => (
+            //     <div
+            //         style={{
+            //             display: "flex",
+            //             justifyContent: "space-between",
+            //         }}
+            //     >
+            //         <Space.Compact>
+            //             <Button onClick={() => openExternal(file, "default")}>
+            //                 打开
+            //             </Button>
+            //             <Dropdown
+            //                 placement="bottomRight"
+            //                 menu={{
+            //                     items: [
+            //                         { key: "vscode", label: "VS Code" },
+            //                         { key: "zed", label: "Zed" },
+            //                         { key: "default", label: "默认 App" },
+            //                     ],
+            //                     onClick: ({ key }) =>
+            //                         openExternal(
+            //                             file,
+            //                             key as "vscode" | "zed" | "default",
+            //                         ),
+            //                 }}
+            //             >
+            //                 <Button
+            //                     icon={<DownOutlined />}
+            //                     style={{ marginInlineStart: -1 }}
+            //                 />
+            //             </Dropdown>
+            //         </Space.Compact>
+            //         <Space>
+            //             <CancelBtn />
+            //             <OkBtn />
+            //         </Space>
+            //     </div>
+            // ),
+            onOk: async () => {
+                try {
+                    if (!editorRef.current) {
+                        throw new Error("编辑器尚未准备完成");
+                    }
+                    await postSftpUpload(
+                        file.uri,
+                        new Blob([editorRef.current.getContent()], {
+                            type: "text/plain;charset=utf-8",
+                        }),
+                    );
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                    throw error;
+                }
+            },
+            onCancel: () => {
+                modal.destroy();
+                resolve();
+            },
+        });
+    });
+}
 
 export async function handleDelete(
     files: IViewFileStat[],

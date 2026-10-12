@@ -109,3 +109,20 @@ export async function postFsShowInFolder(uri: string) {
     });
     return true;
 }
+
+export async function postFsOpen(
+    fileName: string,
+    app: "vscode" | "zed" | "default",
+    content: Blob,
+) {
+    await axios.post<boolean>(
+        `/api/fs/open?file_name=${encodeURIComponent(fileName)}&app=${app}`,
+        content,
+        {
+            headers: {
+                "content-type": "application/octet-stream",
+            },
+        },
+    );
+    return true;
+}

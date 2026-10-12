@@ -13,7 +13,7 @@ use crate::AppBaseState;
 
 pub use dto::{FsFile, FsUserDir};
 pub use handlers::{
-    cp, ls, mkdir, rename, rm, rm_rf, show_in_folder, stat, user_dir_download, user_dir_home,
+    cp, ls, mkdir, open, rename, rm, rm_rf, show_in_folder, stat, user_dir_download, user_dir_home,
     user_dirs,
 };
 pub(crate) use service::user_dirs as discover_user_dirs;
@@ -31,5 +31,6 @@ pub(crate) fn router_builder(app_state: Arc<AppBaseState>) -> Router {
         .route("/rm", post(rm))
         .route("/rm/rf", post(rm_rf))
         .route("/show-in-folder", post(show_in_folder))
+        .route("/open", post(open))
         .with_state(app_state)
 }

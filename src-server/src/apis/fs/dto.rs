@@ -8,6 +8,14 @@ pub struct FsFileUriPayload {
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
+pub struct FsOpenPayload {
+    /// 临时文件名
+    pub file_name: String,
+    /// 外部应用：vscode、zed 或 default
+    pub app: String,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct FsLsPayload {
     /// 本机文件路径，使用 Unix 风格路径分隔符。传 / 时返回本机根目录/盘符入口。
     pub uri: String,

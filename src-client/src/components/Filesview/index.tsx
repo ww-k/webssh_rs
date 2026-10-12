@@ -7,10 +7,8 @@ import FilesviewRemote from "./Remote";
 import type { ITab } from "@/store";
 
 export default function Filesview({
-    active,
     tab,
 }: {
-    active: boolean;
     tab: ITab;
     [key: string]: unknown;
 }) {
