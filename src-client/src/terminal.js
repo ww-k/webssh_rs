@@ -61,7 +61,6 @@ function initTerm() {
                 console.log(new Date(), socket.id, "socket new connection");
 
                 fitAddon.fit();
-                socket.emit("resize", sizeCache);
                 term.writeln("");
             }
         }

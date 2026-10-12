@@ -138,8 +138,8 @@ impl SshTerminalSession {
 
         socket.on_disconnect({
             let channel_write_half = write_half_arc.clone();
-            async move |socket: SocketRef, reason: socketioxide::socket::DisconnectReason| {
-                info!("sid={} socket disconnect: {:?}", socket.id, reason);
+            async move |reason: socketioxide::socket::DisconnectReason| {
+                info!("sid={} socket disconnect: {:?}", sid, reason);
                 let _ = channel_write_half.close().await;
             }
         });
@@ -147,6 +147,7 @@ impl SshTerminalSession {
         socket.on("resize", {
             let channel_write_half = write_half_arc.clone();
             async move |Data::<Resize>(data)| {
+                debug!("sid={} socket resize: {:?}", sid, &data);
                 let _ = channel_write_half
                     .window_change(data.col, data.row, 0, 0)
                     .await;
