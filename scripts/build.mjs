@@ -34,14 +34,10 @@ const env = {
 };
 
 // 确保安装依赖
-try {
-  lstatSync(resolve(projectRoot, "./src-client/node_modules"));
-} catch (_err) {
-  run("pnpm", ["i"], {
-    cwd: resolve(projectRoot, "./src-client"),
-    env,
-  });
-}
+run("pnpm", ["i"], {
+  cwd: resolve(projectRoot, "./src-client"),
+  env,
+});
 
 // 构建Web前端
 run("npm", ["run", "build"], {
