@@ -126,7 +126,7 @@ cargo tauri build --target universal-apple-darwin
 ### Unified Development (Recommended)
 1. **Install Dependencies**: Run `npm install` in the project root
 2. **Start Development**: Run `npm run dev` to start all services simultaneously
-   - Starts the Rust server on port 8080
+   - Allocates an available local port for the Rust server
    - Starts the React development server with proxy
    - Launches the Tauri desktop application
    - To run only the server and client in a browser, use `pnpm run dev -- --mode=browser`, then open `http://localhost:3000`
@@ -134,14 +134,14 @@ cargo tauri build --target universal-apple-darwin
 
 ### Manual Component Development
 #### Web Application
-1. **Backend First**: Start the Rust server on port 8080
+1. **Backend First**: Start the Rust server (default port 8080, or set `WEBSSH_RS_SERVER_PORT`)
 2. **Frontend Development**: Use `pnpm dev` which proxies API calls to the backend
 3. **Database**: SQLite database is auto-created in `server/target/db.sqlite`
 
 #### Desktop Application
-1. **Backend First**: Start the Rust server on port 8080
+1. **Backend First**: Start the Rust server on a free local port
 2. **Build Frontend**: Run `pnpm build` in the client directory
-3. **Desktop Development**: Use `cargo tauri dev` for development or `cargo tauri build` for production
+3. **Desktop Development**: Use `pnpm dev` to start the frontend and Tauri app together. The script allocates an available local port for the embedded Rust server and passes it through `WEBSSH_RS_SERVER_PORT`. To run `cargo tauri dev` directly, start the frontend with the same `WEBSSH_RS_SERVER_PORT` value.
 
 ## Code Style and Standards
 

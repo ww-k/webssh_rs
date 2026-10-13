@@ -5,6 +5,18 @@ import { mockMiddlewares } from "./mock/server.mjs";
 
 // 配置是否启用 mock 服务时
 const enableMock = false;
+const configuredServerPort = Number.parseInt(
+    process.env.WEBSSH_RS_SERVER_PORT || "",
+    10,
+);
+const serverPort =
+    Number.isInteger(configuredServerPort) &&
+    configuredServerPort > 0 &&
+    configuredServerPort <= 65535
+        ? configuredServerPort
+        : 8080;
+const serverOrigin = `http://127.0.0.1:${serverPort}`;
+const serverWebSocketOrigin = `ws://127.0.0.1:${serverPort}`;
 
 export default defineConfig({
     source: {
@@ -31,7 +43,7 @@ export default defineConfig({
         ],
         proxy: {
             "/api/ssh": {
-                target: "ws://localhost:8080",
+                target: serverWebSocketOrigin,
                 ws: true,
                 changeOrigin: true,
             },
@@ -40,7 +52,7 @@ export default defineConfig({
                 changeOrigin: true,
                 pathRewrite: { "^/api": "/mock_api" },
             } : {
-                target: "http://localhost:8080",
+                target: serverOrigin,
                 changeOrigin: true,
             },
         },

@@ -54,7 +54,11 @@ impl Deref for AppState {
 
 pub async fn run_server() {
     init_logging();
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
+    let port = std::env::var("WEBSSH_RS_SERVER_PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(8080);
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
         .await
         .unwrap();
     run_server_with_listener(listener, std::future::pending()).await;

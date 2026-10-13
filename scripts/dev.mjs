@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { lstatSync } from "node:fs";
+import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,13 +14,40 @@ if (!new Set(["browser", "desktop"]).has(mode)) {
   process.exit(1);
 }
 
+const configuredServerPort = Number.parseInt(
+  process.env.WEBSSH_RS_SERVER_PORT || "",
+  10,
+);
+const serverPort =
+  Number.isInteger(configuredServerPort) &&
+  configuredServerPort > 0 &&
+  configuredServerPort <= 65535
+    ? configuredServerPort.toString()
+    : (await findAvailablePort()).toString();
 const env = {
   ...process.env,
+  WEBSSH_RS_SERVER_PORT: serverPort,
   FORCE_COLOR: "3", // 强制启用颜色
   COLOR: "1",
   NPM_CONFIG_COLOR: "always",
 };
 const isWin32 = process.platform === "win32";
+
+async function findAvailablePort() {
+  const server = createServer();
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  await new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+  if (!address || typeof address === "string") {
+    throw new Error("Failed to allocate a development server port");
+  }
+  return address.port;
+}
 
 // 确保安装依赖
 try {
@@ -55,7 +83,7 @@ const children = [serverChild, clientChild].filter(Boolean);
 
 if (mode === "browser") {
   console.log(
-    "[dev] Browser mode. Open http://localhost:3000 in your browser.",
+    `[dev] Browser mode. Open http://localhost:3000 in your browser (API server: ${serverPort}).`,
   );
   serverChild?.on("exit", shutdown);
   clientChild.on("exit", shutdown);
