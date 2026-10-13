@@ -8,5 +8,4 @@
   OSC 1337 ; CurrentDir=[current directory] ST
   "\u001b]1337;CurrentDir=/Users/root\u0007"
   ```
-- [] [优化] sftp查看文件功能，点击后，界面响应慢，体验不好。改为立即弹框，并展示loading。
 - [] [bug] 文件列表，路径栏上下拉查看目录中没有高亮当前路径的目录

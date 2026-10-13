@@ -4,7 +4,7 @@ import { python } from "@codemirror/lang-python";
 import { xml } from "@codemirror/lang-xml";
 import { yaml } from "@codemirror/lang-yaml";
 import CodeMirror from "@uiw/react-codemirror";
-import { Button, Dropdown, Modal, Space } from "antd";
+import { Button, Dropdown, Modal, Space, Spin } from "antd";
 import { forwardRef, useImperativeHandle, useState } from "react";
 
 import {
@@ -105,20 +105,26 @@ export async function handleViewEdit(file: IViewFileStat) {
         throw new Error("文件超过 20 MiB，无法在线查看/编辑");
     }
 
-    const content = await (await getSftpDownload(file.uri)).text();
     const editorRef = { current: null as IFileEditorRef | null };
 
     return new Promise<void>((resolve, reject) => {
+        let isModalClosed = false;
         const modal = Modal.confirm({
             title: `查看/编辑：${file.name}`,
             width: 900,
             icon: null,
+            okButtonProps: { disabled: true },
             content: (
-                <SftpFileEditor
-                    ref={editorRef}
-                    content={content}
-                    fileName={file.name}
-                />
+                <div
+                    style={{
+                        minHeight: 160,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                    }}
+                >
+                    <Spin tip="加载中..." />
+                </div>
             ),
             // footer: (_, { OkBtn, CancelBtn }) => (
             //     <div
@@ -176,10 +182,49 @@ export async function handleViewEdit(file: IViewFileStat) {
                 }
             },
             onCancel: () => {
+                isModalClosed = true;
                 modal.destroy();
                 resolve();
             },
         });
+
+        void getSftpDownload(file.uri)
+            .then((response) => response.text())
+            .then((content) => {
+                if (isModalClosed) {
+                    return;
+                }
+                modal.update({
+                    content: (
+                        <SftpFileEditor
+                            ref={editorRef}
+                            content={content}
+                            fileName={file.name}
+                        />
+                    ),
+                    okButtonProps: { disabled: false },
+                });
+            })
+            .catch((error) => {
+                if (isModalClosed) {
+                    return;
+                }
+                modal.update({
+                    content: (
+                        <div
+                            style={{
+                                minHeight: 160,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            加载失败
+                        </div>
+                    ),
+                });
+                reject(error);
+            });
     });
 }
 
