@@ -9,7 +9,7 @@ import type { ITab } from "@/store";
 export default function Filesview({
     tab,
 }: {
-    tab: ITab;
+    tab: ITab<{ cwd: string }>;
     [key: string]: unknown;
 }) {
     const { baseUrl, targetId } = useMemo(() => {
@@ -27,7 +27,12 @@ export default function Filesview({
 
     return (
         <div className="filesview">
-            <FilesviewRemote baseUrl={baseUrl} targetId={targetId} />
+            <FilesviewRemote
+                baseUrl={baseUrl}
+                initialCwd={tab.state?.cwd}
+                tabKey={tab.key}
+                targetId={targetId}
+            />
         </div>
     );
 }

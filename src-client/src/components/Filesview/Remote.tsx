@@ -17,13 +17,19 @@ import type { IViewFileStat } from "@/types";
 
 export default function FilesviewRemote({
     baseUrl,
+    initialCwd,
+    tabKey,
     targetId,
 }: {
     baseUrl: string;
+    initialCwd?: string;
+    tabKey: string;
     targetId: number;
 }) {
-    const { copyData, setCopyData } = useAppStore();
-    const [cwd, setCwd] = useState("");
+    const { copyData, setCopyData, setTabState } = useAppStore();
+    const [cwd, setCwd] = useState(
+        initialCwd?.startsWith(baseUrl) ? initialCwd : "",
+    );
     const [pathHistory, setPathHistory] = useState<string[]>([]);
 
     const pushPathHistory = useMemoizedFn((newPath: string) => {
@@ -40,13 +46,17 @@ export default function FilesviewRemote({
             return [newPath, ...history];
         });
     });
+    const changeCwd = useMemoizedFn((uri: string) => {
+        setCwd(uri);
+        setTabState(tabKey, { cwd: uri });
+        pushPathHistory(uri);
+    });
     const setCwdUri = useMemoizedFn((pathOrUri: string) => {
         let uri = pathOrUri;
         if (!isSearchUri(pathOrUri) && !isSftpFileUri(pathOrUri)) {
             uri = `${baseUrl}${pathOrUri}`;
         }
-        setCwd(uri);
-        pushPathHistory(uri);
+        changeCwd(uri);
     });
 
     const {
@@ -73,14 +83,12 @@ export default function FilesviewRemote({
     });
     const onFileDoubleClick = useMemoizedFn((file: IViewFileStat) => {
         if (file.isDir) {
-            setCwd(file.uri);
-            pushPathHistory(file.uri);
+            changeCwd(file.uri);
         }
     });
     const onEnter = useMemoizedFn((file: IViewFileStat) => {
         if (file.isDir) {
-            setCwd(file.uri);
-            pushPathHistory(file.uri);
+            changeCwd(file.uri);
         }
     });
     const onDelete = useMemoizedFn((files: IViewFileStat[]) => {
