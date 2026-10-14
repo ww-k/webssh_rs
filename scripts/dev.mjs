@@ -110,11 +110,26 @@ function shutdown(code) {
   }
   isShuttingDown = true;
   for (const child of children) {
-    if (!child.killed) {
-      child.kill();
-    }
+    terminateProcessTree(child);
   }
   process.exit(code ?? 0);
+}
+
+function terminateProcessTree(child) {
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+
+  if (isWin32) {
+    // npm and Tauri are launched through cmd.exe on Windows. Killing only the
+    // wrapper leaves Vite/Rsbuild running and keeps port 3000 occupied.
+    spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+      stdio: "ignore",
+    });
+    return;
+  }
+
+  child.kill("SIGTERM");
 }
 
 function processStdio(name, child) {
