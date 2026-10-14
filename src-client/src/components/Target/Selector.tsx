@@ -48,12 +48,14 @@ export default function TargetSelector({ tab }: { tab: ITab }) {
                     </Form.Item>
                     <Form.Item name="user" rules={[{ required: true }]}>
                         <Input
+                            autoComplete="off"
                             placeholder={t("target_user")}
                             style={{ width: 120 }}
                         />
                     </Form.Item>
                     <Form.Item name="password">
                         <Input.Password
+                            autoComplete="off"
                             placeholder={t("target_password")}
                             style={{ width: 120 }}
                         />

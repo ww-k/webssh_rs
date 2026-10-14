@@ -109,7 +109,7 @@ export default function TargetEditor({
                     label={t("target_user")}
                     rules={[{ required: true }]}
                 >
-                    <Input placeholder="Username" />
+                    <Input autoComplete="off" placeholder="Username" />
                 </Form.Item>
                 <Form.Item
                     name="key"
@@ -156,7 +156,7 @@ export default function TargetEditor({
                         },
                     ]}
                 >
-                    <Input.Password placeholder={t("target_password")} />
+                    <Input.Password autoComplete="off" placeholder={t("target_password")} />
                 </Form.Item>
                 <Form.Item name="jump_host_id" label={t("target_jump_host")}>
                     <Select
