@@ -2,6 +2,7 @@ pub use sea_orm_migration::prelude::*;
 
 mod m000001_init_db;
 mod m000002_target_jump_host;
+mod m000003_preferences;
 
 pub struct Migrator;
 
@@ -11,6 +12,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m000001_init_db::Migration),
             Box::new(m000002_target_jump_host::Migration),
+            Box::new(m000003_preferences::Migration),
         ]
     }
 }
@@ -47,7 +49,7 @@ mod tests {
             let stmt2 = stmt.clone();
             let rows = TableName::find_by_statement(stmt).all(&db).await.unwrap();
 
-            assert_eq!(rows.len(), 6, "Expected 6 tables, got {}", rows.len());
+            assert_eq!(rows.len(), 7, "Expected 7 tables, got {}", rows.len());
             assert_eq!(
                 Vec::from_iter(rows.iter().map(|row| row.name.as_str())),
                 vec![
@@ -56,7 +58,8 @@ mod tests {
                     "ssh_known_host",
                     "transfer_task",
                     "favorite_directory",
-                    "favorite_directory_initialization"
+                    "favorite_directory_initialization",
+                    "preference"
                 ],
                 "Unexpected tables: {:?}",
                 rows

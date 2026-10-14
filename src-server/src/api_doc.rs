@@ -7,6 +7,8 @@ use utoipa::OpenApi;
         crate::apis::target::handlers::target_add,
         crate::apis::target::handlers::target_update,
         crate::apis::target::handlers::target_remove,
+        crate::apis::preferences::handlers::get_preferences,
+        crate::apis::preferences::handlers::put_preferences,
         crate::apis::favorite_directory::handlers::favorite_directory_list,
         crate::apis::favorite_directory::handlers::favorite_directory_add,
         crate::apis::favorite_directory::handlers::favorite_directory_remove,
@@ -57,6 +59,8 @@ use utoipa::OpenApi;
             crate::apis::transfer::TransferTaskResponse,
             crate::entities::transfer_task::TransferTaskType,
             crate::entities::transfer_task::TransferTaskStatus,
+            crate::apis::preferences::dto::Preferences,
+            crate::apis::preferences::dto::PreferenceTab,
         ),
         responses(
             crate::apis::InternalErrorResponse

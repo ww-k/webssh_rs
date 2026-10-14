@@ -1,5 +1,6 @@
 pub mod favorite_directory;
 pub mod fs;
+pub mod preferences;
 pub mod sftp;
 pub mod ssh;
 pub mod ssh_connection;

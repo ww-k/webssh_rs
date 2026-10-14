@@ -1,3 +1,4 @@
+import axios from "axios";
 import { nanoid } from "nanoid";
 import { create } from "zustand";
 
@@ -30,12 +31,11 @@ type AppStore = {
     removeTab: (key: string) => void;
     setTabPath: (key: string, path: string, label?: string) => void;
     setTabState: (key: string, state: ITabState) => void;
+    hydrateTabs: () => Promise<void>;
 
     copyData?: IFileListCopyEvent;
     setCopyData: (data: IFileListCopyEvent) => void;
 };
-
-const TABS_STORAGE_KEY = "webssh_rs_tabs";
 
 function getInitialTabs() {
     const firstTabKey = nanoid();
@@ -50,52 +50,11 @@ function getInitialTabs() {
         ],
     };
 
-    if (typeof window === "undefined") return fallback;
-
-    try {
-        const stored = window.localStorage.getItem(TABS_STORAGE_KEY);
-        if (!stored) return fallback;
-
-        const parsed: unknown = JSON.parse(stored);
-        if (!parsed || typeof parsed !== "object") return fallback;
-
-        const saved = parsed as {
-            activeTabKey?: unknown;
-            tabs?: unknown;
-        };
-        if (!Array.isArray(saved.tabs)) return fallback;
-
-        const tabs = saved.tabs.filter(
-            (tab): tab is ITab & { cwd?: string } =>
-                !!tab &&
-                typeof tab === "object" &&
-                typeof tab.key === "string" &&
-                typeof tab.label === "string" &&
-                typeof tab.path === "string" &&
-                tab.path.startsWith("/") &&
-                (tab.state === undefined ||
-                    (typeof tab.state === "object" &&
-                        tab.state !== null &&
-                        (tab.state.cwd === undefined ||
-                            typeof tab.state.cwd === "string"))) &&
-                (tab.cwd === undefined || typeof tab.cwd === "string"),
-        );
-        if (!tabs.length) return fallback;
-
-        const normalizedTabs = tabs.map(({ cwd, ...tab }) => ({
-            ...tab,
-            ...(cwd !== undefined
-                ? { state: { ...tab.state, cwd } }
-                : {}),
-        }));
-        const activeTabKey = tabs.some((tab) => tab.key === saved.activeTabKey)
-            ? (saved.activeTabKey as string)
-            : normalizedTabs[0].key;
-        return { activeTabKey, tabs: normalizedTabs };
-    } catch {
-        return fallback;
-    }
+    return fallback;
 }
+
+let tabsHydrated = false;
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 const useAppStore = create<AppStore>((set) => {
     const initialTabs = getInitialTabs();
@@ -157,6 +116,38 @@ const useAppStore = create<AppStore>((set) => {
                         : tab,
                 ),
             })),
+        hydrateTabs: async () => {
+            try {
+                const response = await axios.get<{
+                    active_tab_key: string;
+                    tabs: ITab[];
+                } | null>("/api/preferences");
+                const saved = response.data;
+                if (saved?.tabs?.length) {
+                    const tabs = saved.tabs.filter(
+                        (tab) =>
+                            typeof tab.key === "string" &&
+                            typeof tab.label === "string" &&
+                            typeof tab.path === "string" &&
+                            tab.path.startsWith("/"),
+                    );
+                    if (tabs.length) {
+                        set({
+                            tabs,
+                            activeTabKey: tabs.some(
+                                (tab) => tab.key === saved.active_tab_key,
+                            )
+                                ? saved.active_tab_key
+                                : tabs[0].key,
+                        });
+                    }
+                }
+            } catch {
+                // Keep the default tab when preferences are unavailable.
+            } finally {
+                tabsHydrated = true;
+            }
+        },
 
         copyData: undefined,
         setCopyData: (data: IFileListCopyEvent) => set({ copyData: data }),
@@ -171,24 +162,21 @@ useAppStore.subscribe((state, previousState) => {
         return;
     }
 
-    if (typeof window === "undefined") return;
-
-    try {
-        window.localStorage.setItem(
-            TABS_STORAGE_KEY,
-            JSON.stringify({
-                activeTabKey: state.activeTabKey,
-                tabs: state.tabs.map(({ key, label, path, state: tabState }) => ({
-                    key,
-                    label,
-                    path,
-                    ...(tabState ? { state: tabState } : {}),
-                })),
-            }),
-        );
-    } catch {
-        // Tab state remains usable when browser storage is unavailable.
-    }
+    if (!tabsHydrated) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+        void axios.put("/api/preferences", {
+            active_tab_key: state.activeTabKey,
+            tabs: state.tabs.map(({ key, label, path, state: tabState }) => ({
+                key,
+                label,
+                path,
+                ...(tabState ? { state: tabState } : {}),
+            })),
+        }).catch(() => {
+            // Keep the current tabs available when saving fails.
+        });
+    }, 150);
 });
 
 export default useAppStore;

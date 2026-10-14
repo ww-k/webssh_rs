@@ -24,7 +24,7 @@ use sea_orm::{Database, DatabaseConnection};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use apis::{favorite_directory, fs, sftp, ssh, ssh_connection, target, transfer};
+use apis::{favorite_directory, fs, preferences, sftp, ssh, ssh_connection, target, transfer};
 use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
 
@@ -136,6 +136,7 @@ where
         )
         .nest("/api/transfer", transfer::router_builder(app_state.clone()))
         .nest("/api/target", target::router_builder(app_state.clone()))
+        .merge(preferences::router_builder(app_state.clone()))
         .route(
             "/api-docs/openapi.json",
             axum::routing::get(|| async { axum::Json(ApiDoc::openapi()) }),

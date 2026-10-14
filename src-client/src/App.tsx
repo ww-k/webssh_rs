@@ -85,7 +85,12 @@ export default function App() {
 
         activeMenuKey,
         setMenuKey,
+        hydrateTabs,
     } = useAppStore();
+
+    useEffect(() => {
+        void hydrateTabs();
+    }, [hydrateTabs]);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: setTheme不用加
     useEffect(() => {
