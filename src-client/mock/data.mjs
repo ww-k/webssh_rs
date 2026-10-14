@@ -6,6 +6,7 @@ const gibibytes = (value) => Math.round(value * GIBIBYTE);
 const createTargets = () => [
     {
         id: 1,
+        name: "Local password",
         host: "127.0.0.1",
         method: 1,
         user: "user1",
@@ -15,6 +16,7 @@ const createTargets = () => [
     },
     {
         id: 2,
+        name: "Local private key",
         host: "127.0.0.1",
         method: 2,
         user: "user2",
@@ -24,6 +26,7 @@ const createTargets = () => [
     },
     {
         id: 3,
+        name: "Windows server",
         host: "127.0.0.1",
         port: 2222,
         method: 1,

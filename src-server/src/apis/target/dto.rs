@@ -7,6 +7,9 @@ use crate::entities::target::{self, TargetAuthMethod};
 pub struct TargetUpdatePayload {
     /// 目标 ID
     pub id: i32,
+    /// SSH target name
+    #[serde(default)]
+    pub name: String,
     /// SSH 目标主机地址
     pub host: String,
     /// SSH 端口号
@@ -29,6 +32,7 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
     fn from(p: TargetUpdatePayload) -> Self {
         target::ActiveModel {
             id: Set(p.id),
+            name: Set(p.name),
             host: Set(p.host),
             port: Set(p.port),
             method: Set(p.method),

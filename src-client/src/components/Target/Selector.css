@@ -12,7 +12,8 @@
 }
 
 .targetSelectorCard {
-    width: 900px;
+    min-width: 750px;
+    max-width: 900px;
 }
 
 .targetSelectorAddForm.ant-form-inline .ant-form-item {

@@ -19,6 +19,7 @@
     "target_jump_host": "SSH jump host",
     "target_jump_host_list": "Jump Host",
     "target_jump_host_placeholder": "Optional, e.g. user@bastion.example.com:22",
+    "target_name": "Name",
     "transfer_action_more": "More actions",
     "transfer_action_pause": "Pause",
     "transfer_action_resume": "Resume",

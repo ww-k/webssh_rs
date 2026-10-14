@@ -80,6 +80,9 @@ pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
     pub id: i32,
+    /// SSH target name
+    #[serde(default)]
+    pub name: String,
     /// SSH 目标主机地址
     pub host: String,
     /// SSH 端口号，默认为 22
@@ -103,6 +106,7 @@ impl std::fmt::Debug for Model {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Model")
             .field("id", &self.id)
+            .field("name", &self.name)
             .field("host", &self.host)
             .field("port", &self.port)
             .field("method", &self.method)

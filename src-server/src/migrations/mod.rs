@@ -3,6 +3,7 @@ pub use sea_orm_migration::prelude::*;
 mod m000001_init_db;
 mod m000002_target_jump_host;
 mod m000003_preferences;
+mod m000004_target_name;
 
 pub struct Migrator;
 
@@ -13,6 +14,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000001_init_db::Migration),
             Box::new(m000002_target_jump_host::Migration),
             Box::new(m000003_preferences::Migration),
+            Box::new(m000004_target_name::Migration),
         ]
     }
 }
@@ -67,6 +69,7 @@ mod tests {
 
             let active_model = target::ActiveModel::from(target::Model {
                 id: 1,
+                name: "Test target".to_string(),
                 host: "127.0.0.1".to_string(),
                 port: None,
                 method: target::TargetAuthMethod::Password,

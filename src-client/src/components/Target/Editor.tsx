@@ -74,6 +74,12 @@ export default function TargetEditor({
                     <Input hidden />
                 </Form.Item>
                 <Form.Item
+                    name="name"
+                    label={t("target_name")}
+                >
+                    <Input placeholder={t("target_name")} />
+                </Form.Item>
+                <Form.Item
                     name="method"
                     label={t("target_method")}
                     rules={[{ required: true }]}

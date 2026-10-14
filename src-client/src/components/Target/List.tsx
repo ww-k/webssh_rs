@@ -29,51 +29,12 @@ export default function TargetList({ tab }: { tab: ITab }) {
     const columns: ColumnsType<ITarget> = useMemo(
         () => [
             {
-                title: t("target_user"),
-                dataIndex: "user",
-                key: "user",
-                width: 100,
-            },
-            {
-                title: t("target_host"),
-                dataIndex: "host",
-                key: "host",
-                width: 130,
-            },
-            {
-                title: t("target_port"),
-                dataIndex: "port",
-                key: "port",
-                width: 60,
-                render: (text) =>
-                    text || (
-                        <div className="targetListTablePlaceholder">22</div>
-                    ),
-            },
-            {
-                title: t("target_jump_host_list"),
-                dataIndex: "jump_host_id",
-                key: "jump_host_id",
-                render: (jumpHostId: number | undefined) => {
-                    const jumpHost = dataSource.find(
-                        (target) => target.id === jumpHostId,
-                    );
-                    return jumpHost ? (
-                        `${jumpHost.user}@${jumpHost.host}:${jumpHost.port ?? 22}`
-                    ) : (
-                        <div className="targetListTablePlaceholder">—</div>
-                    );
-                },
-            },
-            {
-                title: t("target_system"),
-                dataIndex: "system",
-                key: "system",
-                width: 100,
-                render: (text) =>
-                    text || (
-                        <div className="targetListTablePlaceholder">Linux</div>
-                    ),
+                title: t("target_name"),
+                dataIndex: "name",
+                key: "name",
+                render: (name: string | undefined, record) =>
+                    name ||
+                    `${record.user}@${record.host}${record.port ? `:${record.port}` : ""}`,
             },
             {
                 title: t("app_common_action"),
@@ -128,7 +89,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 ),
             },
         ],
-        [dataSource, refresh, setTabPath, t, tab.key],
+        [refresh, setTabPath, t, tab.key],
     );
 
     useMount(refresh);

@@ -26,6 +26,7 @@
     "target_jump_host_list": "跳板机",
     "target_jump_host_placeholder": "可选，例如 user@bastion.example.com:22",
     "target_method": "验证方式",
+    "target_name": "名称",
     "target_new": "创建目标",
     "target_password": "密码",
     "target_port": "端口",
