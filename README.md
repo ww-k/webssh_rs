@@ -30,6 +30,23 @@ The project is split into three main components:
 - **Build**: Uses the client's dist output as frontend distribution
 - **Configuration**: Window settings, bundling, and app metadata in `tauri.conf.json`
 
+### GitHub Release
+
+`.github/workflows/release.yml` 会在推送 `v*` 格式的 tag 后自动构建并发布桌面安装包：
+
+- macOS Apple Silicon：`.dmg`
+- Windows：`.msi` 和 `.exe`
+- Linux：`.AppImage`、`.deb` 和 `.rpm`
+
+发布新版本：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+构建完成后，在 GitHub 仓库的 **Releases** 页面下载。首次使用时，请在仓库 **Settings → Actions → General → Workflow permissions** 中允许 workflow 写入 repository contents；workflow 已声明 `contents: write` 权限。
+
 ## Key Components
 
 ### Client Architecture
