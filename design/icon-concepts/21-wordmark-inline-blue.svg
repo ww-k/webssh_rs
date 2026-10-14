@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Prompt WebSSH Inline Blue</title>
+  <desc id="desc">A two-color blue single-line terminal wordmark reading prompt WebSSH RS.</desc>
+  <rect width="512" height="512" rx="116" fill="#173B4A"/>
+  <rect x="62" y="151" width="388" height="210" rx="52" fill="none" stroke="#FFFFFF" stroke-width="18"/>
+  <text x="256" y="286" text-anchor="middle" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="42" font-weight="700" letter-spacing="0">&gt;_ WebSSH RS</text>
+  <path d="M121 188h45M346 188h45" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+</svg>

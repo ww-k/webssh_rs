@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">WebSSH Prompt Bracket</title>
+  <desc id="desc">A two-color bracketed terminal wordmark reading WebSSH prompt RS.</desc>
+  <rect width="512" height="512" rx="116" fill="#F4F0E8"/>
+  <path d="M164 88H112c-18 0-32 14-32 32v272c0 18 14 32 32 32h52M348 88h52c18 0 32 14 32 32v272c0 18-14 32-32 32h-52" fill="none" stroke="#244B42" stroke-width="24" stroke-linecap="round"/>
+  <text x="256" y="202" text-anchor="middle" fill="#244B42" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="51" font-weight="700" letter-spacing="1">WebSSH</text>
+  <text x="256" y="331" text-anchor="middle" fill="#244B42" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="51" font-weight="700" letter-spacing="4">&gt;_ RS</text>
+</svg>

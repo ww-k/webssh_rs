@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">WebSSH Prompt Stack</title>
+  <desc id="desc">A two-color terminal wordmark reading WebSSH prompt RS.</desc>
+  <rect width="512" height="512" rx="116" fill="#0D2530"/>
+  <rect x="76" y="76" width="360" height="360" rx="62" fill="none" stroke="#F4F0E8" stroke-width="16"/>
+  <path d="M76 164h360" stroke="#F4F0E8" stroke-width="16"/>
+  <circle cx="117" cy="120" r="9" fill="#F4F0E8"/>
+  <circle cx="149" cy="120" r="9" fill="#F4F0E8"/>
+  <text x="256" y="235" text-anchor="middle" fill="#F4F0E8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="50" font-weight="700" letter-spacing="2">WebSSH</text>
+  <text x="256" y="335" text-anchor="middle" fill="#F4F0E8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="50" font-weight="700" letter-spacing="4">&gt;_ RS</text>
+</svg>
