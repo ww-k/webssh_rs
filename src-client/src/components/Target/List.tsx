@@ -14,6 +14,13 @@ import type { ColumnsType } from "antd/es/table/interface";
 import type { ITarget } from "@/api";
 import type { ITab } from "@/store";
 
+function getTargetName(target: ITarget): string {
+    return (
+        target.name ||
+        `${target.user}@${target.host}${target.port ? `:${target.port}` : ""}`
+    );
+}
+
 export default function TargetList({ tab }: { tab: ITab }) {
     const { t } = useTranslation();
     const { setTabPath } = useAppStore();
@@ -32,9 +39,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 title: t("target_name"),
                 dataIndex: "name",
                 key: "name",
-                render: (name: string | undefined, record) =>
-                    name ||
-                    `${record.user}@${record.host}${record.port ? `:${record.port}` : ""}`,
+                render: (_, record) => getTargetName(record),
             },
             {
                 title: t("app_common_action"),
@@ -46,7 +51,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                                 setTabPath(
                                     tab.key,
                                     `/terminal/${record.id}`,
-                                    `${record.user}@${record.host}`,
+                                    `ssh ${getTargetName(record)}`,
                                 );
                             }}
                         >
@@ -57,7 +62,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                                 setTabPath(
                                     tab.key,
                                     `/filesview/${record.id}`,
-                                    `${record.user}@${record.host}`,
+                                    `sftp ${getTargetName(record)}`,
                                 );
                             }}
                         >
