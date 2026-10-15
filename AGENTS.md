@@ -1,250 +1,51 @@
-# WebSSH RS - Agent Development Guide
+# WebSSH RS 开发说明
 
-This file provides essential guidance for AI coding agents working in the WebSSH RS codebase.
+## 项目结构
 
-## Project Overview
+- `src-client/`：React 18 + TypeScript 前端，使用 Rsbuild、Ant Design、Zustand 和 Biome。
+- `src-server/`：Rust 后端，使用 Axum，提供 REST、WebSocket、SSH 和 SFTP 能力。
+- `src-tauri/`：Tauri 2 桌面应用壳。
+- `scripts/`：根目录的开发和构建编排脚本。
+- `agents/`：与具体 AI 工具无关的后端和前端开发角色说明。
 
-WebSSH RS is a web-based SSH client with file management capabilities, consisting of:
-- React/TypeScript frontend with xterm.js and SFTP file browser  
-- Rust backend using Axum, with SSH connection pooling and SQLite storage
-- Tauri desktop app wrapper for cross-platform distribution
+## 开发命令
 
-## Architecture
+根目录：
 
-### Components
-- **Client** (`/src-client/`): React 18 + TypeScript frontend
-- **Server** (`/src-server/`): Rust backend with Axum framework
-- **Desktop** (`/src-tauri/`): Tauri v2 desktop application
-
-### Key Integration Points
-- Frontend-backend communication via REST API (`/api/*`) and WebSocket (`/api/ssh/*`)
-- SQLite database at `src-server/target/db.sqlite` (auto-created)
-- SSH connection pooling in `src-server/src/ssh_connection_pool/`
-
-## Development Commands
-
-### Unified Development (Recommended)
 ```bash
-# Install dependencies (run once)
+pnpm dev                 # 启动桌面开发模式
+pnpm dev:browser         # 启动浏览器开发模式
+pnpm build               # 构建前端和桌面应用
+pnpm build:nobundle      # 构建但不打包桌面安装包
+pnpm gen-docs            # 生成后端 API 文档
+```
+
+前端：
+
+```bash
+cd src-client
 pnpm install
-
-# Start all services (server + client + desktop app)
-pnpm run dev
-
-# Build production version (client + desktop app)  
-pnpm run build
-
-# Generate API documentation
-pnpm run gen-docs
+pnpm dev
+pnpm build
+pnpm test
+pnpm check                  # Biome 检查并自动修复
+pnpm format                 # Biome 格式化
 ```
 
-### Component-Specific Commands
+后端：
 
-#### Frontend (`/src-client/`)
 ```bash
-pnpm install          # Install dependencies
-pnpm dev              # Development server with proxy to backend
-pnpm build            # Production build
-pnpm preview          # Preview production build
-pnpm format           # Biome formatter
-pnpm check            # Biome linter with auto-fix
-pnpm test             # Run tests with rstest
+cd src-server
+cargo run
+cargo test
+cargo fmt --check
 ```
 
-#### Backend (`/src-server/`)
-```bash
-cargo run             # Start development server (port 8080)
-cargo build --release # Production build
-cargo test            # Run tests
-cargo test <test_name> # Run single test
-```
+## 修改约定
 
-#### Desktop (`/src-tauri/`)
-```bash
-cargo tauri dev       # Development mode (requires server running)
-cargo tauri build     # Production build
-cargo tauri build --target <target> # Build for specific platform
-```
-
-## Code Style Guidelines
-
-### Frontend (TypeScript/React)
-
-#### Formatting & Linting
-- **Tool**: Biome formatter and linter
-- **Indentation**: 4 spaces, no tabs
-- **Quotes**: Double quotes for strings
-- **Semicolons**: Required
-
-#### Import Organization
-```typescript
-// Package imports
-import React from "react";
-import { Button } from "antd";
-
-// Local imports (with @ alias)
-import Component from "@/components/Component";
-import { SomeType } from "@/types";
-
-// Style imports
-import "./styles.css";
-
-// Type imports
-import type { SomeInterface } from "@/types";
-```
-
-#### Component Structure
-```typescript
-// Component files follow pattern: index.tsx + index.css
-import { useEffect, useMemo } from "react";
-
-import "./index.css";
-
-import useStore from "@/store";
-
-export default function ComponentName({ prop }: Props) {
-    const storeValue = useStore((state) => state.value);
-    
-    const computedValue = useMemo(() => {
-        // Computation
-    }, [dependencies]);
-    
-    useEffect(() => {
-        // Side effects
-    }, [dependencies]);
-    
-    return <div>{/* JSX */}</div>;
-}
-```
-
-#### State Management
-- Use Zustand for global state (`store.ts`)
-- Keep component state local when possible
-- Follow existing patterns for tab management and file operations
-
-### Backend (Rust)
-
-#### Code Organization
-- **Module structure**: `mod.rs` for module exports, handlers in separate files
-- **Error handling**: Use `anyhow::Result<T>` and custom `ApiErr` types
-- **Async patterns**: All handlers are async functions
-
-#### Naming Conventions
-```rust
-// Functions: snake_case
-pub async fn handler_name() -> Result<Json<Response>, ApiErr>
-
-// Structs: PascalCase
-#[derive(Debug, Deserialize)]
-pub struct RequestPayload
-
-// Constants: SCREAMING_SNAKE_CASE
-pub const ERROR_CODE: &str = "SOME_ERROR";
-```
-
-#### Error Handling Pattern
-```rust
-use crate::{apis::ApiErr, consts::services_err_code::*, map_ssh_err};
-
-pub async fn handler() -> Result<Json<Response>, ApiErr> {
-    let result = map_ssh_err!(some_operation().await)?;
-    Ok(Json(result))
-}
-```
-
-#### API Documentation
-- Use `utoipa` for OpenAPI documentation
-- Include detailed descriptions and examples
-- Follow existing patterns in `apis/handlers/`
-
-### Testing
-
-#### Frontend Testing
-- Framework: rstest
-- Test location: alongside components or in `__tests__/` directories
-- Run with: `pnpm test`
-
-#### Backend Testing  
-- Framework: Rust's built-in test framework
-- Test modules in `src/tests/`
-- Mock SSH server for testing SFTP operations
-- Run with: `cargo test` or `cargo test <test_name>`
-
-## Common Patterns
-
-### Component Structure
-- Main component in `index.tsx`
-- Styles in `index.css` (CSS modules enabled)
-- Complex logic in separate files within component directory
-- Type definitions in `types/` or inline
-
-### API Communication
-```typescript
-// Use centralized API layer
-import { apiRequest } from "@/api";
-
-// Type definitions for all requests/responses
-interface ApiResponse {
-    // Type definitions
-}
-```
-
-### State Management
-```typescript
-// Zustand store pattern
-type AppStore = {
-    state: string;
-    actions: () => void;
-};
-
-export default create<AppStore>((set) => ({
-    state: "initial",
-    actions: () => set({ state: "new" }),
-}));
-```
-
-## Configuration Files
-
-### Key Files
-- `biome.json`: Frontend formatting/linting configuration
-- `src-client/rsbuild.config.ts`: Frontend build setup with proxy
-- `src-server/Cargo.toml`: Rust dependencies and build config
-- `src-tauri/tauri.conf.json`: Desktop app configuration
-- `scripts/dev.mjs`: Unified development orchestration
-
-### Development Workflow
-1. Backend server must start first (port 8080)
-2. Frontend dev server includes proxy configuration
-3. Desktop app uses frontend build output
-
-## Integration Notes
-
-### Database
-- SQLite with Sea-ORM migrations
-- Migrations in `src-server/src/migrations/`
-- Database auto-created on first run
-
-### Socket.IO Communication
-- Terminal connections via WebSocket (`/api/ssh/*`)
-- File operations via REST API (`/api/sftp/*`)
-- Real-time bidirectional communication for terminal I/O
-
-### File Structure Patterns
-- **Components**: `src-client/src/components/ComponentName/`
-- **APIs**: `src-server/src/apis/` with handlers in subdirectories
-- **Types**: Centralized in `src-client/src/types/` and `src-server/src/entities/`
-
-## Security & Performance
-
-- Use proper error handling without exposing internal details
-- SSH connection pooling for resource efficiency
-- CSP configuration in Tauri for desktop security
-- Input validation on all API endpoints
-
-## Important Notes
-
-- Always run backend before frontend for development
-- Use unified `pnpm run dev` command for full stack development
-- Follow existing code patterns - consistency is key
-- Add appropriate OpenAPI documentation for new endpoints
-- Include error handling for all external operations
+- 修改前先阅读目标模块及其调用方，优先复用现有组件、服务、类型和错误处理方式。
+- 前端遵循 `biome.json`：4 空格缩进、双引号，并保持自动导入分组规则。
+- Rust 代码遵循现有模块结构、命名和错误处理模式；修改 API 时同步检查相关类型、路由和文档。
+- 新增功能时同时考虑前端、后端和 Tauri 集成边界，避免重复实现已有能力。
+- 不修改 `.env`、`node_modules/`、`target/`、`dist/` 等敏感或生成目录。
+- 提交前根据改动范围运行对应的格式检查、构建或测试命令。

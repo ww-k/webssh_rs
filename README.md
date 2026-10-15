@@ -1,189 +1,173 @@
-## Project Overview
+# WebSSH RS
 
-WebSSH RS is a web-based SSH client with file management capabilities, built with a React frontend and Rust backend. The application provides terminal access and SFTP file operations through a tabbed web interface. It can be deployed as a web application or as a desktop application using Tauri.
+WebSSH RS 是一个基于 Web 的 SSH 客户端，支持终端连接、远程文件管理、SFTP 文件传输和多目标配置。项目可以作为浏览器应用运行，也可以通过 Tauri 打包为桌面应用。
 
-## Architecture
+## 技术栈
 
-The project is split into three main components:
+- **前端**：React 18、TypeScript、Rsbuild、Ant Design、Zustand、xterm.js、Socket.IO Client
+- **后端**：Rust、Axum、Tokio、SeaORM、SQLite、russh、socketioxide
+- **桌面端**：Tauri 2，内嵌 Rust 后端并加载前端界面
+- **格式化与检查**：Biome
 
-### Client (`/client/`)
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Rsbuild with Less support
-- **State Management**: Zustand store
-- **UI Library**: Ant Design 5
-- **Terminal**: xterm.js with Socket.IO for real-time communication
-- **File Management**: Custom SFTP file browser with drag-and-drop support
-- **Internationalization**: i18next with English and Chinese translations
+## 项目结构
 
-### Server (`/server/`)
-- **Language**: Rust
-- **Framework**: Axum web framework
-- **Database**: SQLite with Sea-ORM
-- **SSH/SFTP**: russh and russh-sftp libraries
-- **Real-time**: Socket.IO integration via socketioxide
-- **Connection Management**: Custom SSH connection pooling
+```text
+.
+├── src-client/       # React 前端
+├── src-server/       # Axum 后端和 Rust 测试
+├── src-tauri/        # Tauri 桌面应用
+├── scripts/          # 根目录开发和构建编排脚本
+├── agents/           # 与具体 AI 工具无关的开发角色说明
+├── biome.json        # Biome 配置
+└── package.json      # 根目录命令
+```
 
-### Desktop App (`/src-tauri/`)
-- **Framework**: Tauri v2 for cross-platform desktop applications
-- **Language**: Rust
-- **Frontend Integration**: Serves the React client in a native window
-- **Build**: Uses the client's dist output as frontend distribution
-- **Configuration**: Window settings, bundling, and app metadata in `tauri.conf.json`
+后端的主要模块位于 `src-server/src/apis/`，包括 SSH、SFTP、本地文件系统、目标管理、收藏目录、偏好设置和传输任务。前端组件位于 `src-client/src/components/`。
 
-### GitHub Release
+## 环境要求
 
-`.github/workflows/release.yml` 会在推送 `v*` 格式的 tag 后自动构建并发布桌面安装包：
+- Node.js 22 或更高版本
+- pnpm 10 或更高版本
+- Rust stable toolchain
+- 桌面开发或打包需要满足 [Tauri 系统依赖](https://v2.tauri.app/start/prerequisites/)
+
+## 安装
+
+在仓库根目录执行：
+
+```bash
+pnpm install
+```
+
+根目录依赖包含 Tauri CLI，前端依赖单独安装在 `src-client/`。首次运行 `pnpm dev` 或 `pnpm build` 时，编排脚本也会检查并安装前端依赖。
+
+## 开发
+
+### 桌面模式
+
+启动前端开发服务器、Rust 后端和 Tauri 桌面窗口：
+
+```bash
+pnpm dev
+```
+
+### 浏览器模式
+
+只启动 Rust 后端和前端开发服务器，然后在浏览器访问 `http://localhost:3000`：
+
+```bash
+pnpm run dev:browser
+```
+
+开发脚本会为后端分配可用端口，并通过 `WEBSSH_RS_SERVER_PORT` 传给前端和后端。前端开发服务器默认使用 3000 端口，后端单独运行时默认使用 8080 端口。
+
+### 单独运行前端
+
+```bash
+cd src-client
+pnpm dev
+```
+
+单独运行前端时，默认会把 `/api` 和 `/api/ssh` 代理到 `127.0.0.1:8080`。如果后端使用其他端口，需要先设置环境变量：
+
+```bash
+WEBSSH_RS_SERVER_PORT=18080 pnpm dev
+```
+
+## 构建和检查
+
+根目录命令：
+
+```bash
+pnpm build                # 构建前端并打包 Tauri 应用
+pnpm build:nobundle       # 构建前端和 Tauri 二进制，但不生成安装包
+pnpm gen-docs             # 生成 OpenAPI 文档
+```
+
+前端命令：
+
+```bash
+cd src-client
+pnpm build                # 构建前端到 dist/
+pnpm preview              # 预览前端生产构建
+pnpm test                 # 运行前端测试
+pnpm check                # Biome 检查并自动修复
+pnpm format               # Biome 格式化
+```
+
+后端命令：
+
+```bash
+cd src-server
+cargo run                 # 启动后端，默认监听 127.0.0.1:8080
+cargo test                # 运行 Rust 测试
+cargo fmt --check         # 检查 Rust 格式
+```
+
+生产构建时，前端静态文件会被编译进 Rust 后端。构建后的后端可以直接提供前端页面和 API。
+
+## 配置
+
+后端支持以下环境变量：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `WEBSSH_RS_SERVER_PORT` | `8080` | 后端监听端口 |
+| `WEBSSH_RS_DB_PATH` | 系统数据目录下的 `webssh_rs_server/db.sqlite` | SQLite 数据库路径；Tauri 会使用应用数据目录中的 `db.sqlite` |
+| `WEBSSH_RS_CHECK_SERVER_KEY` | `accept-new` | SSH 主机密钥策略，可选 `accept-new`、`strict`、`disabled` |
+| `WEBSSH_RS_TRANSFER_TASK_CONCURRENCY` | `3` | 并行传输任务数量，必须是正整数 |
+| `WEBSSH_RS_TRANSFER_CHUNK_SIZE` | `10485760` | 传输分块大小，单位为字节，必须是正整数 |
+
+例如：
+
+```bash
+WEBSSH_RS_SERVER_PORT=18080 \
+WEBSSH_RS_CHECK_SERVER_KEY=strict \
+cargo run --manifest-path src-server/Cargo.toml
+```
+
+## API 和文档
+
+后端 API 统一使用 `/api` 前缀，主要接口分组如下：
+
+- `/api/health`：健康检查
+- `/api/ssh`：SSH 终端和命令执行
+- `/api/ssh_connection`：SSH 连接管理
+- `/api/sftp`：远程目录、文件和 SFTP 操作
+- `/api/fs`：本地文件系统操作
+- `/api/target`：SSH 目标配置
+- `/api/favorite_directory`：收藏目录
+- `/api/transfer`：上传、下载和传输任务
+- `/api/preferences`：用户偏好设置
+
+启动后端后，可以访问：
+
+- `http://127.0.0.1:8080/api-docs`：ReDoc API 文档
+- `http://127.0.0.1:8080/api-docs/openapi.json`：OpenAPI JSON
+
+如果端口通过 `WEBSSH_RS_SERVER_PORT` 修改，请将地址中的 `8080` 替换为实际端口。
+
+## 数据库和迁移
+
+后端使用 SQLite 和 SeaORM。服务启动时会自动创建数据库目录、连接数据库并执行迁移。迁移文件位于 `src-server/src/migrations/`。
+
+## 发布
+
+GitHub Actions 会在推送 `v*` 格式的 tag 后构建并创建 GitHub Release，构建目标包括：
 
 - macOS Apple Silicon：`.dmg`
 - Windows：`.msi` 和 `.exe`
 - Linux：`.AppImage`、`.deb` 和 `.rpm`
 
-发布新版本：
+发布示例：
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-构建完成后，在 GitHub 仓库的 **Releases** 页面下载。首次使用时，请在仓库 **Settings → Actions → General → Workflow permissions** 中允许 workflow 写入 repository contents；workflow 已声明 `contents: write` 权限。
+工作流文件位于 `.github/workflows/release.yml`。
 
-## Key Components
+## 许可证
 
-### Client Architecture
-- **App.tsx**: Main application with tabbed interface routing
-- **Store (store.ts)**: Central state management for tabs and application state
-- **Components**:
-  - `Terminal/`: xterm.js terminal with Socket.IO backend connection
-  - `Filesview/`: SFTP file browser with upload/download capabilities
-  - `Target/`: SSH connection target selection and management
-- **API Layer**: Axios-based API client with type definitions
-
-### Server Architecture
-- **Services**: Modular service architecture for SSH, SFTP, and target management
-- **Connection Pool**: SSH connection pooling for efficient resource management
-- **Database**: SQLite with Sea-ORM migrations for target storage
-- **WebSocket**: Socket.IO integration for real-time terminal communication
-
-### Desktop Architecture
-- **Tauri Core**: Rust-based native application wrapper
-- **Window Management**: Native window with configurable dimensions and properties
-- **Security**: CSP configuration and secure frontend-backend communication
-- **Distribution**: Cross-platform bundling for macOS, Windows, and Linux
-
-## Common Development Commands
-
-### Unified Development (Recommended)
-```bash
-# Install dependencies (run once)
-npm install
-
-# Start all services (server + client + desktop app)
-npm run dev
-
-# Build production version (client + desktop app)
-npm run build
-```
-
-### Component-Specific Development
-
-#### Client Development
-```bash
-# Navigate to client directory
-cd client
-
-# Install dependencies
-pnpm install
-
-# Start development server (with proxy to Rust backend)
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Preview production build
-pnpm preview
-
-# Code formatting and linting
-pnpm format  # Biome formatter
-pnpm check   # Biome linter with auto-fix
-```
-
-#### Server Development
-```bash
-# Navigate to server directory
-cd server
-
-# Run development server
-cargo run
-
-# Build for production
-cargo build --release
-
-# Run tests
-cargo test
-```
-
-#### Desktop Development
-```bash
-# Navigate to Tauri directory
-cd src-tauri
-
-# Run desktop app in development mode (requires server to be running)
-cargo tauri dev
-
-# Build desktop app for production
-cargo tauri build
-
-# Build desktop app with specific target
-cargo tauri build --target universal-apple-darwin
-```
-
-## Development Workflow
-
-### Unified Development (Recommended)
-1. **Install Dependencies**: Run `npm install` in the project root
-2. **Start Development**: Run `npm run dev` to start all services simultaneously
-   - Allocates an available local port for the Rust server
-   - Starts the React development server with proxy
-   - Launches the Tauri desktop application
-   - To run only the server and client in a browser, use `pnpm run dev -- --mode=browser`, then open `http://localhost:3000`
-3. **Build Production**: Run `npm run build` to build both web and desktop versions
-
-### Manual Component Development
-#### Web Application
-1. **Backend First**: Start the Rust server (default port 8080, or set `WEBSSH_RS_SERVER_PORT`)
-2. **Frontend Development**: Use `pnpm dev` which proxies API calls to the backend
-3. **Database**: SQLite database is auto-created in `server/target/db.sqlite`
-
-#### Desktop Application
-1. **Backend First**: Start the Rust server on a free local port
-2. **Build Frontend**: Run `pnpm build` in the client directory
-3. **Desktop Development**: Use `pnpm dev` to start the frontend and Tauri app together. The script allocates an available local port for the embedded Rust server and passes it through `WEBSSH_RS_SERVER_PORT`. To run `cargo tauri dev` directly, start the frontend with the same `WEBSSH_RS_SERVER_PORT` value.
-
-## Code Style and Standards
-
-- **Frontend**: Uses Biome for formatting (4-space indentation, double quotes)
-- **Import Organization**: Automatic import grouping with blank lines between package, local, and type imports
-- **CSS Modules**: Enabled for component-scoped styling
-- **Type Safety**: Full TypeScript coverage on frontend, strong typing on backend
-
-## Key Configuration Files
-
-- `package.json`: Root package file with unified development and build scripts
-- `scripts/dev.mjs`: Development orchestration script (starts all services)
-- `scripts/build.mjs`: Production build orchestration script
-- `client/rsbuild.config.ts`: Frontend build configuration with proxy setup
-- `biome.json`: Code formatting and linting rules
-- `server/Cargo.toml`: Rust dependencies and build configuration
-- `src-tauri/tauri.conf.json`: Tauri desktop app configuration
-- `src-tauri/Cargo.toml`: Desktop app dependencies and metadata
-
-## API Structure
-
-- `/api/ssh/*`: WebSocket-based terminal connections
-- `/api/sftp/*`: File system operations (list, upload, download, delete)
-- `/api/target/*`: SSH target management (CRUD operations)
-
-## Database
-
-Uses SQLite with Sea-ORM migrations. Database schema is managed through the `migrations/` directory in the server codebase.
+许可证信息见仓库根目录的 [LICENSE](LICENSE) 文件。
