@@ -1,6 +1,5 @@
 - [] [feat] sftp 编辑/查看功能增加系统编辑器打开
 - [] [feat] sftp 编辑/查看功能 不使用全app级别的模态框，放到在tab页内或者新建tab页
-- [] [feat] target 增加备注
 - [] [feat] 传输列表 增加删除所有历史记录
 - [] [feat] 增加ssh连接管理，可以过期连接，关闭连接
 - [] [feat] 与sftp联动, support [detect CurrentDir](https://iterm2.com/documentation-escape-codes.html)

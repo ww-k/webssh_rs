@@ -1,0 +1,26 @@
+.targetEditorForm {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+}
+
+.targetEditorForm > .ant-form-item {
+    min-width: 0;
+    margin-bottom: 12px;
+}
+
+.targetEditorFormActions {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+}
+
+@media (max-width: 600px) {
+    .targetEditorForm {
+        grid-template-columns: minmax(0, 1fr);
+        column-gap: 0;
+    }
+
+    .targetEditorFormActions {
+        grid-column: auto;
+    }
+}

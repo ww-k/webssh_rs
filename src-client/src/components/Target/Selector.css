@@ -1,21 +1,26 @@
 .targetSelector {
-    position: relative;
+    display: flex;
+    justify-content: flex-start;
+    min-width: 0;
     width: 100%;
     height: 100%;
     overflow: auto;
 }
 .targetSelector > .ant-card {
-    margin: 0 auto;
-    top: 50%;
-    transform: translateY(-55%);
+    flex: 0 0 auto;
+    margin: auto;
     box-shadow: 0 3px 8px 0 rgba(0, 0, 0, 0.2);
 }
 
 .targetSelectorCard {
-    min-width: 750px;
-    max-width: 900px;
+    max-width: 724px;
 }
 
 .targetSelectorAddForm.ant-form-inline .ant-form-item {
     margin-bottom: var(--ant-form-item-margin-bottom);
+}
+
+.targetSelectorAddForm.ant-form-inline > .ant-form-item:last-child {
+    margin-inline-end: 0;
+    padding-inline-end: 0;
 }
