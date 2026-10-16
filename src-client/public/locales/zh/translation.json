@@ -41,6 +41,7 @@
     "target_private_key_tooltip": "支持 OpenSSH、PEM/PKCS#8 和 PuTTY 私钥格式",
     "target_save_and_connect": "保存并连接",
     "target_select": "选择目标",
+    "target_search_placeholder": "按名称、用户或主机搜索",
     "target_user": "用户",
     "target_system": "系统",
     "transfer_action_more": "更多操作",

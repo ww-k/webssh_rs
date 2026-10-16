@@ -7,6 +7,5 @@
   OSC 1337 ; CurrentDir=[current directory] ST
   "\u001b]1337;CurrentDir=/Users/root\u0007"
   ```
-- [] [feat] target list上增加搜索框，可通过名称、用户、host搜索
 - [] [feat] target 增加tag，target list上增加通过tag过滤
 - [] [bug] 文件列表，路径栏上下拉查看目录中没有高亮当前路径的目录

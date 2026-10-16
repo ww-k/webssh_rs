@@ -29,6 +29,7 @@
     "target_private_key": "Private key",
     "target_private_key_tooltip": "Supports OpenSSH, PEM/PKCS#8, and PuTTY private key formats",
     "target_name": "Name",
+    "target_search_placeholder": "Search by name, user, or host",
     "transfer_action_more": "More actions",
     "transfer_action_pause": "Pause",
     "transfer_action_resume": "Resume",

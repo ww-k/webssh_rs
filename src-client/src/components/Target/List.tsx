@@ -1,5 +1,6 @@
+import { ReloadOutlined } from "@ant-design/icons";
 import { useMount } from "ahooks";
-import { Button, Modal, Space, Table } from "antd";
+import { Button, Input, Modal, Space, Table } from "antd";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,6 +28,20 @@ export default function TargetList({ tab }: { tab: ITab }) {
     const [editorOpen, setEditorOpen] = useState(false);
     const [editorData, setEditorData] = useState<ITarget>();
     const [dataSource, setDataSource] = useState<ITarget[]>([]);
+    const [searchValue, setSearchValue] = useState("");
+
+    const filteredDataSource = useMemo(() => {
+        const search = searchValue.trim().toLocaleLowerCase();
+        if (!search) {
+            return dataSource;
+        }
+
+        return dataSource.filter((target) =>
+            [target.name, target.user, target.host].some((value) =>
+                value?.toLocaleLowerCase().includes(search),
+            ),
+        );
+    }, [dataSource, searchValue]);
 
     const refresh = useCallback(async () => {
         const res = await getTargetList();
@@ -102,21 +117,36 @@ export default function TargetList({ tab }: { tab: ITab }) {
     return (
         <>
             <div className="targetListToolbar">
-                <Button
-                    onClick={() => {
-                        setEditorData(undefined);
-                        setEditorOpen(true);
-                    }}
-                >
-                    {t("target_new")}
-                </Button>
-                <Button onClick={refresh}>{t("app_btn_refresh")}</Button>
+                <Space>
+                    <Button
+                        onClick={() => {
+                            setEditorData(undefined);
+                            setEditorOpen(true);
+                        }}
+                    >
+                        {t("target_new")}
+                    </Button>
+                </Space>
+                <Space className="targetListSearch">
+                    <Input
+                        allowClear
+                        onChange={(event) => setSearchValue(event.target.value)}
+                        placeholder={t("target_search_placeholder")}
+                        value={searchValue}
+                    />
+                    <Button
+                        aria-label={t("app_btn_refresh")}
+                        icon={<ReloadOutlined />}
+                        onClick={refresh}
+                        title={t("app_btn_refresh")}
+                    />
+                </Space>
             </div>
             <Table
                 className="targetListTable"
                 rowKey="id"
                 columns={columns}
-                dataSource={dataSource}
+                dataSource={filteredDataSource}
                 size="small"
                 scroll={{ y: 390 }}
                 pagination={false}
