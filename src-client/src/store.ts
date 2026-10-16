@@ -29,6 +29,9 @@ type AppStore = {
     setActiveTabKey: (key: string) => void;
     addTab: () => void;
     removeTab: (key: string) => void;
+    removeTabs: (keys: string[]) => void;
+    renameTab: (key: string, label: string) => void;
+    duplicateTab: (key: string) => void;
     setTabPath: (key: string, path: string, label?: string) => void;
     setTabState: (key: string, state: ITabState) => void;
     hydrateTabs: () => Promise<void>;
@@ -97,6 +100,61 @@ const useAppStore = create<AppStore>((set) => {
                     }
                 }
                 return { activeTabKey: newActiveKey, tabs: newTabs };
+            }),
+        removeTabs: (keys: string[]) =>
+            set((state) => {
+                const keysToRemove = new Set(keys);
+                if (keysToRemove.size === 0) return state;
+
+                const removedIndexes = state.tabs
+                    .map((tab, index) =>
+                        keysToRemove.has(tab.key) ? index : -1,
+                    )
+                    .filter((index) => index >= 0);
+                const newTabs = state.tabs.filter(
+                    (tab) => !keysToRemove.has(tab.key),
+                );
+
+                if (
+                    newTabs.length === 0 ||
+                    !keysToRemove.has(state.activeTabKey)
+                ) {
+                    return { tabs: newTabs };
+                }
+
+                const firstRemovedIndex = removedIndexes[0];
+                const previousTab = state.tabs
+                    .slice(0, firstRemovedIndex)
+                    .reverse()
+                    .find((tab) => !keysToRemove.has(tab.key));
+
+                return {
+                    tabs: newTabs,
+                    activeTabKey: previousTab?.key ?? newTabs[0].key,
+                };
+            }),
+        renameTab: (key: string, label: string) =>
+            set((state) => ({
+                tabs: state.tabs.map((tab) =>
+                    tab.key === key ? { ...tab, label } : tab,
+                ),
+            })),
+        duplicateTab: (key: string) =>
+            set((state) => {
+                const tab = state.tabs.find((item) => item.key === key);
+                if (!tab) return state;
+
+                const newTab = {
+                    ...tab,
+                    key: nanoid(),
+                    state: tab.state ? { ...tab.state } : undefined,
+                };
+                const tabIndex = state.tabs.findIndex(
+                    (item) => item.key === key,
+                );
+                const tabs = [...state.tabs];
+                tabs.splice(tabIndex + 1, 0, newTab);
+                return { activeTabKey: newTab.key, tabs };
             }),
         setTabPath: (key: string, path: string, label?: string) =>
             set((state) => {
