@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Circular Geometric Prompt</title>
+  <desc id="desc">A three-color circular frame around a geometric cyan prompt mark.</desc>
+  <rect width="512" height="512" rx="116" fill="#0D2530"/>
+  <circle cx="256" cy="256" r="178" fill="none" stroke="#F4F0E8" stroke-width="16"/>
+  <g id="prompt-left-chevron">
+    <path d="M126 194 241 256 126 318 198 256z" fill="#58D6D1"/>
+  </g>
+  <g id="prompt-right-chevron">
+    <path d="M386 194 271 256 386 318 314 256z" fill="#58D6D1"/>
+  </g>
+  <g id="prompt-underscore">
+    <rect x="209" y="316" width="89" height="26" rx="13" fill="#58D6D1"/>
+  </g>
+</svg>

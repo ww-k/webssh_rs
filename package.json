@@ -6,6 +6,7 @@
         "dev:browser": "node scripts/dev.mjs --mode=browser",
         "build": "node scripts/build.mjs",
         "build:nobundle": "node scripts/build.mjs --no-bundle",
+        "gen-icons": "node scripts/generate-icons.mjs",
         "gen-docs": "cd src-server && cargo run --bin gen-docs"
     },
     "author": "",

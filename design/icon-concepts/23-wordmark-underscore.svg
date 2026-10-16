@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">WebSSH Underscore Prompt</title>
+  <desc id="desc">A three-color terminal frame with a cyan &gt;_&lt; prompt.</desc>
+  <rect width="512" height="512" rx="116" fill="#0D2530"/>
+  <rect x="76" y="76" width="360" height="360" rx="62" fill="none" stroke="#F4F0E8" stroke-width="16"/>
+  <path d="M76 164h360" stroke="#F4F0E8" stroke-width="16"/>
+  <circle cx="117" cy="120" r="9" fill="#F4F0E8"/>
+  <circle cx="149" cy="120" r="9" fill="#F4F0E8"/>
+  <text x="256" y="338" text-anchor="middle" fill="#58D6D1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="132" font-weight="700" letter-spacing="8">&gt;_&lt;</text>
+</svg>
