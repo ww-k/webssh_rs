@@ -69,6 +69,16 @@
     white-space: nowrap;
 }
 
+.inputFile__file[role="button"] {
+    cursor: pointer;
+}
+
+.inputFile__file[role="button"]:hover,
+.inputFile__file[role="button"]:focus-visible {
+    border-color: var(--ant-color-primary, #1677ff);
+    outline: 0;
+}
+
 .inputFile__remove,
 .inputFile__clear {
     display: inline-flex;

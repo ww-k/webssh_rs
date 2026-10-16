@@ -20,6 +20,7 @@ export interface IInputFileProps {
     directory?: boolean;
     placeholder?: string;
     onChange?: (files: File[]) => void;
+    onFileClick?: (file: File) => void;
     getPopupContainer?: () => HTMLElement;
 }
 
@@ -30,6 +31,7 @@ export default function InputFile({
     directory = false,
     placeholder,
     onChange,
+    onFileClick,
 }: IInputFileProps) {
     const [files, setFiles] = useState<File[]>(value || []);
     const [isDragging, setIsDragging] = useState(false);
@@ -129,6 +131,21 @@ export default function InputFile({
                             key={`${file.webkitRelativePath}${file.name}`}
                             className="inputFile__file"
                             title={file.name}
+                            role={onFileClick ? "button" : undefined}
+                            tabIndex={onFileClick ? 0 : undefined}
+                            onClick={(evt) => {
+                                if (!onFileClick) return;
+                                evt.stopPropagation();
+                                onFileClick(file);
+                            }}
+                            onKeyDown={(evt) => {
+                                if (!onFileClick) return;
+                                evt.stopPropagation();
+                                if (evt.key === "Enter" || evt.key === " ") {
+                                    evt.preventDefault();
+                                    onFileClick(file);
+                                }
+                            }}
                         >
                             <span className="inputFile__file-name">
                                 {file.name}
