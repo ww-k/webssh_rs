@@ -21,7 +21,6 @@ import {
     handleMkdir,
     handlePaste,
     handleRename,
-    handleViewEdit,
 } from "./remoteActions";
 
 import type { IViewFileStat } from "@/types";
@@ -36,6 +35,7 @@ export default function remoteHandleContextmenu(
         fileUri: string;
         getCwdFiles: () => Promise<IViewFileStat[]>;
         setCopyData: (data: IFileListCopyEvent) => void;
+        onViewEdit: (file: IViewFileStat) => void;
     },
 ) {
     const menus: IContextmenuDataItem[] = [];
@@ -71,7 +71,7 @@ export default function remoteHandleContextmenu(
                 files[0].size <= 20 * 1024 * 1024
             ),
             click: async () => {
-                await handleViewEdit(files[0]);
+                context.onViewEdit(files[0]);
             },
             iconRender: () => <FileTextOutlined />,
         });

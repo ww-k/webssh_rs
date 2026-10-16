@@ -11,6 +11,7 @@ import useAppStore from "@/store";
 
 import Filelist from "../Filelist";
 import { handlePaste } from "./remoteActions";
+import FileEditorPanel from "./FileEditorPanel";
 
 import type { IViewFileStat } from "@/types";
 
@@ -37,6 +38,8 @@ type IProps = {
     onEnter?: (file: IViewFileStat) => void;
     onDelete?: (files: IViewFileStat[]) => void;
     onRename?: (file: IViewFileStat) => void;
+    editingFile?: IViewFileStat;
+    onCloseEditor?: () => void;
 };
 
 export default function FilesviewBase({
@@ -51,6 +54,8 @@ export default function FilesviewBase({
     getHome,
     getDirs,
     getCwdFiles,
+    editingFile,
+    onCloseEditor,
     ...restProps
 }: IProps) {
     const { copyData, setCopyData } = useAppStore();
@@ -93,17 +98,25 @@ export default function FilesviewBase({
                 getCwdFiles={getCwdFiles}
                 onChange={onPathChange}
             />
-            <Filelist
-                className="filesviewBaseFilelist"
-                posix={posix}
-                cwd={cwd}
-                data={files}
-                enableParentFile={!searching}
-                loading={loading}
-                onCopy={setCopyData}
-                onPaste={onPaste}
-                {...restProps}
-            />
+            <div className="filesviewBaseContent">
+                <Filelist
+                    className="filesviewBaseFilelist"
+                    posix={posix}
+                    cwd={cwd}
+                    data={files}
+                    enableParentFile={!searching}
+                    loading={loading}
+                    onCopy={setCopyData}
+                    onPaste={onPaste}
+                    {...restProps}
+                />
+                {editingFile && onCloseEditor && (
+                    <FileEditorPanel
+                        file={editingFile}
+                        onClose={onCloseEditor}
+                    />
+                )}
+            </div>
             {loading && (
                 <div className="filesviewBaseLoadLayer">
                     <Spin spinning={loading} />

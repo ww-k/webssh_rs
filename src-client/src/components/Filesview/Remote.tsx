@@ -31,6 +31,7 @@ export default function FilesviewRemote({
         initialCwd?.startsWith(baseUrl) ? initialCwd : "",
     );
     const [pathHistory, setPathHistory] = useState<string[]>([]);
+    const [editingFile, setEditingFile] = useState<IViewFileStat>();
 
     const pushPathHistory = useMemoizedFn((newPath: string) => {
         setPathHistory((history) => {
@@ -109,12 +110,15 @@ export default function FilesviewRemote({
             getDirs={getDirs}
             getHome={getHome}
             getCwdFiles={getCwdFiles}
+            editingFile={editingFile}
+            onCloseEditor={() => setEditingFile(undefined)}
             onContextMenu={(files, evt) => {
                 handleContextmenu(files, evt, {
                     fileUri: cwd,
                     copyData,
                     getCwdFiles,
                     setCopyData,
+                    onViewEdit: setEditingFile,
                 });
             }}
             onFileDoubleClick={onFileDoubleClick}
