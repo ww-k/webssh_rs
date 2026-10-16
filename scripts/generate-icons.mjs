@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const projectRoot = resolve(fileURLToPath(import.meta.url), "../..");
 const defaultSource = resolve(
   projectRoot,
-  "design/icon-concepts/16-wordmark-stack.svg",
+  "design/icon-concepts/33-underscore-circle.svg",
 );
 const defaultOutput = resolve(projectRoot, "src-tauri/icons");
 const args = process.argv.slice(2);
