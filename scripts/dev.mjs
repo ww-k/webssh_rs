@@ -98,8 +98,9 @@ if (mode === "browser") {
 } else {
   // 启动桌面应用
   const tauriChild = spawn(
-    "tauri",
+    process.execPath,
     [
+      resolve(projectRoot, "node_modules/@tauri-apps/cli/tauri.js"),
       "dev",
       "--config",
       JSON.stringify({
@@ -109,7 +110,6 @@ if (mode === "browser") {
     {
       cwd: projectRoot,
       env,
-      shell: isWin32,
     },
   );
   processStdio("tauri", tauriChild);

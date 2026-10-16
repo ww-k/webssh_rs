@@ -41,7 +41,18 @@ pub fn run() {
                     .ok()
                     .and_then(|value| value.parse::<u16>().ok())
                     .unwrap_or(3000);
-                let port = 0;
+                // In desktop development, the frontend proxy targets the port
+                // allocated by scripts/dev.mjs. Keep a random port for the
+                // bundled app, which navigates directly to the server.
+                let port = if cfg!(debug_assertions) {
+                    std::env::var("WEBSSH_RS_SERVER_PORT")
+                        .ok()
+                        .and_then(|value| value.parse::<u16>().ok())
+                        .filter(|port| *port > 0)
+                        .unwrap_or(0)
+                } else {
+                    0
+                };
                 let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
                     .await
                     .expect("failed to bind embedded server");
