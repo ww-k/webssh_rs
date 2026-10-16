@@ -53,13 +53,15 @@ pnpm dev
 
 ### 浏览器模式
 
-只启动 Rust 后端和前端开发服务器，然后在浏览器访问 `http://localhost:3000`：
+只启动 Rust 后端和前端开发服务器，然后在浏览器访问 `http://localhost:<客户端端口>`：
 
 ```bash
 pnpm run dev:browser
 ```
 
-开发脚本会为后端分配可用端口，并通过 `WEBSSH_RS_SERVER_PORT` 传给前端和后端。前端开发服务器默认使用 3000 端口，后端单独运行时默认使用 8080 端口。
+如需修改前端开发端口，可复制 `.env.template` 为根目录的 `.env` 后调整 `WEBSSH_RS_CLIENT_PORT`。
+
+开发脚本会加载项目根目录的 `.env` 文件，为后端始终分配动态可用端口，并通过环境变量传给前端和后端。开发启动时不会使用 `WEBSSH_RS_SERVER_PORT`。前端开发服务器默认使用 3000 端口，也可以通过 `WEBSSH_RS_CLIENT_PORT` 修改；后端单独运行时默认使用 8080 端口。
 
 ### 单独运行前端
 
@@ -113,6 +115,7 @@ cargo fmt --check         # 检查 Rust 格式
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `WEBSSH_RS_SERVER_PORT` | `8080` | 后端监听端口 |
+| `WEBSSH_RS_CLIENT_PORT` | `3000` | 前端开发服务器端口（`pnpm dev`） |
 | `WEBSSH_RS_DB_PATH` | 系统数据目录下的 `webssh_rs_server/db.sqlite` | SQLite 数据库路径；Tauri 会使用应用数据目录中的 `db.sqlite` |
 | `WEBSSH_RS_CHECK_SERVER_KEY` | `accept-new` | SSH 主机密钥策略，可选 `accept-new`、`strict`、`disabled` |
 | `WEBSSH_RS_TRANSFER_TASK_CONCURRENCY` | `3` | 并行传输任务数量，必须是正整数 |

@@ -17,6 +17,16 @@ const serverPort =
         : 8080;
 const serverOrigin = `http://127.0.0.1:${serverPort}`;
 const serverWebSocketOrigin = `ws://127.0.0.1:${serverPort}`;
+const configuredClientPort = Number.parseInt(
+    process.env.WEBSSH_RS_CLIENT_PORT || "",
+    10,
+);
+const clientPort =
+    Number.isInteger(configuredClientPort) &&
+    configuredClientPort > 0 &&
+    configuredClientPort <= 65535
+        ? configuredClientPort
+        : 3000;
 
 export default defineConfig({
     source: {
@@ -29,7 +39,7 @@ export default defineConfig({
         template: "./src/template.html",
     },
     server: {
-        port: 3000,
+        port: clientPort,
         strictPort: true,
         setup: ({ action, server }) => {
             if (action === "dev") {
@@ -47,14 +57,16 @@ export default defineConfig({
                 ws: true,
                 changeOrigin: true,
             },
-            "/api": enableMock ? {
-                target: "http://localhost:3000",
-                changeOrigin: true,
-                pathRewrite: { "^/api": "/mock_api" },
-            } : {
-                target: serverOrigin,
-                changeOrigin: true,
-            },
+            "/api": enableMock
+                ? {
+                      target: `http://localhost:${clientPort}`,
+                      changeOrigin: true,
+                      pathRewrite: { "^/api": "/mock_api" },
+                  }
+                : {
+                      target: serverOrigin,
+                      changeOrigin: true,
+                  },
         },
     },
     output: {

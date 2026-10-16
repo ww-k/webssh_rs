@@ -37,10 +37,11 @@ pub fn run() {
                 .expect("main window is not configured");
 
             tauri::async_runtime::spawn(async move {
-                let port = std::env::var("WEBSSH_RS_SERVER_PORT")
+                let client_port = std::env::var("WEBSSH_RS_CLIENT_PORT")
                     .ok()
                     .and_then(|value| value.parse::<u16>().ok())
-                    .unwrap_or(0);
+                    .unwrap_or(3000);
+                let port = 0;
                 let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
                     .await
                     .expect("failed to bind embedded server");
@@ -56,23 +57,24 @@ pub fn run() {
                 });
 
                 for _ in 1..=100 {
-                    let (server_ready, frontend_ready) = tauri::async_runtime::spawn_blocking(move || {
-                        let server_ready = TcpStream::connect(address).is_ok();
-                        let frontend_ready = !cfg!(debug_assertions)
-                            || TcpStream::connect(("localhost", 3000)).is_ok();
-                        (server_ready, frontend_ready)
-                    })
-                    .await
-                    .unwrap_or((false, false));
+                    let (server_ready, frontend_ready) =
+                        tauri::async_runtime::spawn_blocking(move || {
+                            let server_ready = TcpStream::connect(address).is_ok();
+                            let frontend_ready = !cfg!(debug_assertions)
+                                || TcpStream::connect(("localhost", client_port)).is_ok();
+                            (server_ready, frontend_ready)
+                        })
+                        .await
+                        .unwrap_or((false, false));
 
                     if server_ready && frontend_ready {
                         let app_url = if cfg!(debug_assertions) {
-                            "http://localhost:3000/".to_string()
+                            format!("http://localhost:{client_port}/")
                         } else {
                             format!("http://{address}/")
                         };
-                        let _ = window
-                            .navigate(app_url.parse().expect("valid embedded server URL"));
+                        let _ =
+                            window.navigate(app_url.parse().expect("valid embedded server URL"));
                         return;
                     }
                     tokio::time::sleep(Duration::from_millis(100)).await;

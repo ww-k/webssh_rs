@@ -1,10 +1,15 @@
 import { spawn, spawnSync } from "node:child_process";
-import { lstatSync } from "node:fs";
+import { existsSync, lstatSync } from "node:fs";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(fileURLToPath(import.meta.url), "../..");
+
+if (existsSync(resolve(projectRoot, ".env"))) {
+  process.loadEnvFile(resolve(projectRoot, ".env"));
+}
+
 const args = process.argv.slice(2);
 const modeArgument = args.find((argument) => argument.startsWith("--mode="));
 const mode = modeArgument?.slice("--mode=".length) || "desktop";
@@ -14,19 +19,22 @@ if (!new Set(["browser", "desktop"]).has(mode)) {
   process.exit(1);
 }
 
-const configuredServerPort = Number.parseInt(
-  process.env.WEBSSH_RS_SERVER_PORT || "",
+// 开发模式始终使用系统分配的动态端口，不读取 WEBSSH_RS_SERVER_PORT。
+const serverPort = (await findAvailablePort()).toString();
+const configuredClientPort = Number.parseInt(
+  process.env.WEBSSH_RS_CLIENT_PORT || "",
   10,
 );
-const serverPort =
-  Number.isInteger(configuredServerPort) &&
-  configuredServerPort > 0 &&
-  configuredServerPort <= 65535
-    ? configuredServerPort.toString()
-    : (await findAvailablePort()).toString();
+const clientPort =
+  Number.isInteger(configuredClientPort) &&
+  configuredClientPort > 0 &&
+  configuredClientPort <= 65535
+    ? configuredClientPort.toString()
+    : "3000";
 const env = {
   ...process.env,
   WEBSSH_RS_SERVER_PORT: serverPort,
+  WEBSSH_RS_CLIENT_PORT: clientPort,
   FORCE_COLOR: "3", // 强制启用颜色
   COLOR: "1",
   NPM_CONFIG_COLOR: "always",
@@ -83,17 +91,27 @@ const children = [serverChild, clientChild].filter(Boolean);
 
 if (mode === "browser") {
   console.log(
-    `[dev] Browser mode. Open http://localhost:3000 in your browser (API server: ${serverPort}).`,
+    `[dev] Browser mode. Open http://localhost:${clientPort} in your browser (API server: ${serverPort}).`,
   );
   serverChild?.on("exit", shutdown);
   clientChild.on("exit", shutdown);
 } else {
   // 启动桌面应用
-  const tauriChild = spawn("tauri", ["dev"], {
-    cwd: projectRoot,
-    env,
-    shell: isWin32,
-  });
+  const tauriChild = spawn(
+    "tauri",
+    [
+      "dev",
+      "--config",
+      JSON.stringify({
+        build: { devUrl: `http://localhost:${clientPort}` },
+      }),
+    ],
+    {
+      cwd: projectRoot,
+      env,
+      shell: isWin32,
+    },
+  );
   processStdio("tauri", tauriChild);
   children.push(tauriChild);
   tauriChild.on("exit", shutdown);
