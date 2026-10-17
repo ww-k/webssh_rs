@@ -429,7 +429,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                         <div
                                             className={classNames({
                                                 pathbarDropdownMenuDirMenuSelect:
-                                                    item.name === activedPath,
+                                                    item.uri === activedPath,
                                             })}
                                         >
                                             <FolderTwoTone />
@@ -918,7 +918,7 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     handleClickDir(dir: IViewFileStat) {
-        if (dir.name === this.state.activedPath) {
+        if (dir.uri === this.state.activedPath) {
             return;
         }
 

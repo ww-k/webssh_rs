@@ -8,4 +8,3 @@
   "\u001b]1337;CurrentDir=/Users/root\u0007"
   ```
 - [] [feat] target 增加tag，target list上增加通过tag过滤
-- [] [bug] 文件列表，路径栏上下拉查看目录中没有高亮当前路径的目录
