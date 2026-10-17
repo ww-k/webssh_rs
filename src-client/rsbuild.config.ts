@@ -3,6 +3,9 @@ import { pluginReact } from "@rsbuild/plugin-react";
 
 import { mockMiddlewares } from "./mock/server.mjs";
 
+// fix ts typechecking errors
+declare const process: any;
+
 // 配置是否启用 mock 服务时
 const enableMock = false;
 const configuredServerPort = Number.parseInt(

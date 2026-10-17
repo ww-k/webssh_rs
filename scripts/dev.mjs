@@ -1,6 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, lstatSync } from "node:fs";
-import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,8 +18,6 @@ if (!new Set(["browser", "desktop"]).has(mode)) {
   process.exit(1);
 }
 
-// 开发模式始终使用系统分配的动态端口，不读取 WEBSSH_RS_SERVER_PORT。
-const serverPort = (await findAvailablePort()).toString();
 const configuredClientPort = Number.parseInt(
   process.env.WEBSSH_RS_CLIENT_PORT || "",
   10,
@@ -31,9 +28,11 @@ const clientPort =
   configuredClientPort <= 65535
     ? configuredClientPort.toString()
     : "3000";
-const env = {
+const baseEnv = {
   ...process.env,
-  WEBSSH_RS_SERVER_PORT: serverPort,
+  // Let the server choose an unused port. The actual port is read from its
+  // startup log before the frontend process is launched.
+  WEBSSH_RS_SERVER_PORT: "0",
   WEBSSH_RS_CLIENT_PORT: clientPort,
   FORCE_COLOR: "3", // 强制启用颜色
   COLOR: "1",
@@ -41,86 +40,63 @@ const env = {
 };
 const isWin32 = process.platform === "win32";
 
-async function findAvailablePort() {
-  const server = createServer();
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const address = server.address();
-  await new Promise((resolve, reject) => {
-    server.close((error) => (error ? reject(error) : resolve()));
-  });
-  if (!address || typeof address === "string") {
-    throw new Error("Failed to allocate a development server port");
-  }
-  return address.port;
-}
-
 // 确保安装依赖
 try {
   lstatSync(resolve(projectRoot, "./src-client/node_modules"));
 } catch (_err) {
   spawnSync("pnpm", ["install"], {
     cwd: resolve(projectRoot, "./src-client"),
-    env,
+    env: baseEnv,
   });
 }
 
-// 浏览器模式由脚本启动独立 server；桌面模式由 Tauri 内嵌启动 server。
-const serverChild =
-  mode === "browser"
-    ? spawn("cargo", ["run"], {
-        cwd: resolve(projectRoot, "./src-server"),
-        env,
-      })
-    : null;
-if (serverChild) {
-  processStdio("server", serverChild);
+const children = [];
+let isShuttingDown = false;
+
+process.on("SIGINT", () => shutdown(0));
+process.on("SIGTERM", () => shutdown(0));
+
+// Browser mode runs the server directly; desktop mode starts the embedded
+// server through Tauri. Both servers bind port 0 and report their actual port
+// through the same startup log.
+const serverName = mode === "browser" ? "server" : "tauri";
+const serverChild = startServer(mode, serverName);
+children.push(serverChild);
+
+let serverPort;
+try {
+  serverPort = await waitForServerPort(serverChild);
+} catch (error) {
+  console.error(`[dev] Failed to start ${serverName}: ${error.message}`);
+  shutdown(1);
 }
 
-// 启动前端服务
+// Rsbuild reads WEBSSH_RS_SERVER_PORT while its config is evaluated, so it
+// must be started only after the server has reported its selected port.
+const clientEnv = {
+  ...baseEnv,
+  WEBSSH_RS_SERVER_PORT: String(serverPort),
+};
 const clientChild = spawn("npm", ["run", "dev"], {
   cwd: resolve(projectRoot, "./src-client"),
-  env,
+  env: clientEnv,
   shell: isWin32,
 });
 processStdio("client", clientChild);
-
-const children = [serverChild, clientChild].filter(Boolean);
+children.push(clientChild);
 
 if (mode === "browser") {
   console.log(
     `[dev] Browser mode. Open http://localhost:${clientPort} in your browser (API server: ${serverPort}).`,
   );
-  serverChild?.on("exit", shutdown);
-  clientChild.on("exit", shutdown);
 } else {
-  // 启动桌面应用
-  const tauriChild = spawn(
-    process.execPath,
-    [
-      resolve(projectRoot, "node_modules/@tauri-apps/cli/tauri.js"),
-      "dev",
-      "--config",
-      JSON.stringify({
-        build: { devUrl: `http://localhost:${clientPort}` },
-      }),
-    ],
-    {
-      cwd: projectRoot,
-      env,
-    },
+  console.log(
+    `[dev] Desktop mode. Tauri server: http://127.0.0.1:${serverPort}.`,
   );
-  processStdio("tauri", tauriChild);
-  children.push(tauriChild);
-  tauriChild.on("exit", shutdown);
 }
 
-process.on("SIGINT", () => shutdown(0));
-process.on("SIGTERM", () => shutdown(0));
-
-let isShuttingDown = false;
+serverChild.on("exit", shutdown);
+clientChild.on("exit", shutdown);
 
 function shutdown(code) {
   if (isShuttingDown) {
@@ -166,4 +142,83 @@ function processStdio(name, child) {
     console.error(`[${name}] Failed`, error);
   });
   return child;
+}
+
+function startServer(mode, name) {
+  const child =
+    mode === "browser"
+      ? spawn("cargo", ["run"], {
+          cwd: resolve(projectRoot, "./src-server"),
+          env: baseEnv,
+        })
+      : spawn(
+          process.execPath,
+          [
+            resolve(projectRoot, "node_modules/@tauri-apps/cli/tauri.js"),
+            "dev",
+          ],
+          {
+            cwd: projectRoot,
+            env: baseEnv,
+          },
+        );
+  processStdio(name, child);
+  return child;
+}
+
+function waitForServerPort(child) {
+  return new Promise((resolve, reject) => {
+    let output = "";
+    let settled = false;
+    const timeout = setTimeout(() => {
+      finish(new Error("timed out waiting for the Listening log"));
+    }, 60_000);
+
+    const onOutput = (data) => {
+      output += data.toString();
+      const match = output.match(
+        /Listening on http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):(\d{1,5})/i,
+      );
+      if (!match) {
+        // Keep enough trailing output to match a log line split across chunks.
+        output = output.slice(-4096);
+        return;
+      }
+
+      const port = Number.parseInt(match[1], 10);
+      if (port > 0 && port <= 65535) {
+        finish(null, port);
+      }
+    };
+    const onExit = (code, signal) => {
+      finish(
+        new Error(
+          `process exited before reporting its port (code=${code}, signal=${signal})`,
+        ),
+      );
+    };
+    const onError = (error) => finish(error);
+
+    child.stdout.on("data", onOutput);
+    child.stderr.on("data", onOutput);
+    child.once("exit", onExit);
+    child.once("error", onError);
+
+    function finish(error, port) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      child.stdout.off("data", onOutput);
+      child.stderr.off("data", onOutput);
+      child.off("exit", onExit);
+      child.off("error", onError);
+      if (error) {
+        reject(error);
+      } else {
+        resolve(port);
+      }
+    }
+  });
 }

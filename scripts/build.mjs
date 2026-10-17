@@ -21,7 +21,10 @@ const run = (name, args, options) => {
 };
 
 const projectRoot = resolve(fileURLToPath(import.meta.url), "../..");
-const tauriBuildArgs = ["build"];
+const tauriBuildArgs = [
+  resolve(projectRoot, "node_modules/@tauri-apps/cli/tauri.js"),
+  "build",
+];
 if (process.argv.includes("--no-bundle")) {
   tauriBuildArgs.push("--no-bundle");
 }
@@ -46,7 +49,7 @@ run("npm", ["run", "build"], {
 });
 
 // Build and bundle the Tauri application.
-run("tauri", tauriBuildArgs, {
+run(process.execPath, tauriBuildArgs, {
   cwd: projectRoot,
   env,
 });

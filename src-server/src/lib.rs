@@ -57,7 +57,7 @@ pub async fn run_server() {
     let port = std::env::var("WEBSSH_RS_SERVER_PORT")
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
-        .unwrap_or(8080);
+        .unwrap_or(0);
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
         .await
         .unwrap();
