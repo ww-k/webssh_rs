@@ -2,8 +2,8 @@ import { json } from "@codemirror/lang-json";
 import { python } from "@codemirror/lang-python";
 import { xml } from "@codemirror/lang-xml";
 import { yaml } from "@codemirror/lang-yaml";
-import CodeMirror from "@uiw/react-codemirror";
-import { Button, Spin } from "antd";
+import CodeMirror, { EditorView } from "@uiw/react-codemirror";
+import { Button, Spin, Switch } from "antd";
 import { useEffect, useState } from "react";
 
 import { getSftpDownload, postSftpUpload } from "@/api";
@@ -22,6 +22,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [lineWrapping, setLineWrapping] = useState(true);
     const [error, setError] = useState<string>();
 
     useEffect(() => {
@@ -67,6 +68,15 @@ export default function FileEditorPanel({ file, onClose }: Props) {
             <header className="filesviewFileEditorHeader">
                 <strong title={file.name}>{file.name}</strong>
                 <div className="filesviewFileEditorActions">
+                    <label className="filesviewFileEditorWrapToggle">
+                        <span>自动换行</span>
+                        <Switch
+                            size="small"
+                            checked={lineWrapping}
+                            onChange={setLineWrapping}
+                            aria-label="自动换行"
+                        />
+                    </label>
                     <Button
                         type="primary"
                         loading={saving}
@@ -90,7 +100,14 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                         aria-label={file.name}
                         value={content}
                         height="100%"
-                        extensions={getLanguageExtensions(file.name)}
+                        extensions={
+                            lineWrapping
+                                ? [
+                                      ...getLanguageExtensions(file.name),
+                                      EditorView.lineWrapping,
+                                  ]
+                                : getLanguageExtensions(file.name)
+                        }
                         onChange={setContent}
                         basicSetup={{
                             foldGutter: true,
