@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Open Line Prompt</title>
+  <desc id="desc">A bold line-based cyan prompt mark without the circular border.</desc>
+  <rect width="512" height="512" rx="116" fill="#0D2530"/>
+  <path d="M96 160 224 256 96 352" fill="none" stroke="#58D6D1" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M416 160 288 256 416 352" fill="none" stroke="#58D6D1" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M192 400H320" fill="none" stroke="#58D6D1" stroke-width="48" stroke-linecap="round"/>
+</svg>

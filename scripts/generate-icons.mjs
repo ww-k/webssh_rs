@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const projectRoot = resolve(fileURLToPath(import.meta.url), "../..");
 const defaultSource = resolve(
   projectRoot,
-  "design/icon-concepts/33-underscore-circle.svg",
+  "design/icon-concepts/34-underscore-open.svg",
 );
 const defaultOutput = resolve(projectRoot, "src-tauri/icons");
 const args = process.argv.slice(2);
@@ -25,7 +25,7 @@ const output = resolve(
 
 if (args.includes("--help") || args.includes("-h")) {
   console.log("Usage: pnpm icons [source.svg] [--output=directory]");
-  console.log("Default source: design/icon-concepts/33-underscore-circle.svg");
+  console.log("Default source: design/icon-concepts/34-underscore-open.svg");
   process.exit(0);
 }
 
