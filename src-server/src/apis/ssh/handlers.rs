@@ -95,9 +95,13 @@ impl SshTerminalSession {
             anyhow::bail!("Failed to parse query parameters: {:?}", err);
         }
         let params = result.unwrap();
-        let result = connection_pool
-            .channel(params.target_id, ChannelMode::Shared)
-            .await;
+        let context = connection_pool.context(params.target_id).await;
+        if let Err(err) = context {
+            anyhow::bail!("Failed to get channel: {:?}", err);
+        }
+        let context = context.unwrap();
+        let target_system = context.target().system.clone();
+        let result = context.channel(ChannelMode::Shared).await;
         if let Err(err) = result {
             anyhow::bail!("Failed to get channel: {:?}", err);
         }
@@ -113,7 +117,7 @@ impl SshTerminalSession {
 
         let term_session = SshTerminalSession { socket };
         let result = term_session
-            .open_session_channel_request_pty_shell(channel)
+            .open_session_channel_request_pty_shell(channel, target_system.as_deref())
             .await;
         if let Err(err) = result {
             anyhow::bail!(
@@ -199,7 +203,13 @@ impl SshTerminalSession {
     async fn open_session_channel_request_pty_shell(
         &self,
         channel: SshChannelGuard,
+        target_system: Option<&str>,
     ) -> Result<SshChannelGuard> {
+        // Set PROMPT_COMMAND inside the remote shell process instead of using
+        // SSH env requests, which are commonly rejected by sshd AcceptEnv.
+        // The child shell inherits it and Bash executes it before each prompt.
+        const SHELL_BOOTSTRAP: &str = r#"if [ -n "$BASH_VERSION" ]; then export PROMPT_COMMAND="printf '\\033]7;file://webssh%s\\007' \"\$PWD\""; fi; exec "${SHELL:-/bin/sh}" -il"#;
+
         channel
             .request_pty(false, "xterm-256color", 80, 25, 0, 0, &[])
             .await?;
@@ -210,7 +220,11 @@ impl SshTerminalSession {
                 env::var("LANG").unwrap_or("zh_CN.UTF-8".to_string()),
             )
             .await?;
-        channel.request_shell(true).await?;
+        if target_system == Some("windows") {
+            channel.request_shell(true).await?;
+        } else {
+            channel.exec(true, SHELL_BOOTSTRAP).await?;
+        }
 
         anyhow::Ok(channel)
     }

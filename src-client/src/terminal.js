@@ -3,6 +3,8 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { io } from "socket.io-client";
 
+import { parseTerminalCwd } from "./helpers/terminal_cwd";
+
 import "@xterm/xterm/css/xterm.css";
 import "./terminal.css";
 
@@ -53,7 +55,7 @@ function initTerm() {
 
     socket.on("connect", () => {
         if (!term) {
-            createTerminal(socket);
+            createTerminal(socket, Number.parseInt(query.target_id, 10));
         } else {
             if (socket.recovered) {
                 console.log(new Date(), socket.id, "socket recovered");
@@ -99,7 +101,7 @@ function initTerm() {
  * @param {import('socket.io-client').Socket} socket
  * @returns
  */
-function createTerminal(socket) {
+function createTerminal(socket, targetId) {
     terminalContainer.innerHTML = "";
 
     term = new Terminal();
@@ -107,6 +109,21 @@ function createTerminal(socket) {
     clipboardAddon = new ClipboardAddon();
     term.loadAddon(fitAddon);
     term.loadAddon(clipboardAddon);
+    term.parser.registerOscHandler(7, (payload) => {
+        console.log(`OSC 7: ${payload}`);
+        const cwd = parseTerminalCwd(payload);
+        if (cwd) {
+            window.parent.postMessage(
+                {
+                    type: "webssh:terminal-cwd",
+                    targetId,
+                    cwd,
+                },
+                window.location.origin,
+            );
+        }
+        return true;
+    });
 
     term.open(terminalContainer);
 
@@ -140,6 +157,7 @@ function createTerminal(socket) {
     window.addEventListener(
         "message",
         function receiveMessage(event) {
+            if (event.origin !== window.location.origin) return;
             var data = event.data;
 
             if (typeof term !== "object") return;

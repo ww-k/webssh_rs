@@ -15,6 +15,7 @@
     "app_tab_rename": "重命名",
     "app_tab_rename_prompt": "请输入标签名称",
     "app_title": "WebSSH",
+    "terminal_open_sftp": "在SFTP中打开",
     "pathbar_favorite_directory_add": "添加收藏目录",
     "pathbar_favorite_directory_default_/": "此电脑",
     "pathbar_favorite_directory_default_Desktop": "桌面",

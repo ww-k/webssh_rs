@@ -34,6 +34,7 @@ type AppStore = {
     duplicateTab: (key: string) => void;
     setTabPath: (key: string, path: string, label?: string) => void;
     setTabState: (key: string, state: ITabState) => void;
+    openSftpAt: (targetId: number, cwd: string, terminalTabKey: string) => void;
     hydrateTabs: () => Promise<void>;
 
     copyData?: IFileListCopyEvent;
@@ -174,6 +175,42 @@ const useAppStore = create<AppStore>((set) => {
                         : tab,
                 ),
             })),
+        openSftpAt: (targetId: number, cwd: string, terminalTabKey: string) =>
+            set((state) => {
+                const normalizedCwd =
+                    cwd.length > 1 ? cwd.replace(/\/+$/, "") : cwd;
+                const fileUri = `sftp:${targetId}:${normalizedCwd}`;
+                const existingTab = state.tabs.find((tab) => {
+                    if (tab.path !== `/filesview/${targetId}`) return false;
+                    const tabState = tab.state as { cwd?: unknown } | undefined;
+                    return tabState?.cwd === fileUri;
+                });
+
+                if (existingTab) {
+                    return { activeTabKey: existingTab.key };
+                }
+
+                const terminalTab = state.tabs.find(
+                    (tab) => tab.key === terminalTabKey,
+                );
+                const label = terminalTab?.label
+                    ? terminalTab.label.replace(/^ssh\s/i, "sftp ")
+                    : `sftp ${targetId}`;
+                const newTab = {
+                    key: nanoid(),
+                    label,
+                    path: `/filesview/${targetId}`,
+                    state: {
+                        cwd: fileUri,
+                        linkedTerminalKey: terminalTabKey,
+                    },
+                };
+
+                return {
+                    activeTabKey: newTab.key,
+                    tabs: [...state.tabs, newTab],
+                };
+            }),
         hydrateTabs: async () => {
             try {
                 const response = await axios.get<{
