@@ -10,6 +10,23 @@ import useAppStore, { type ITab } from "@/store";
 
 const terminalMessageType = "webssh:terminal-cwd";
 
+const terminalThemes = {
+    dark: {
+        background: "#0f1115",
+        foreground: "#f5f7fa",
+        cursor: "#f5f7fa",
+        selectionBackground: "#3a4352",
+        scrollbarThumb: "rgba(255, 255, 255, 0.3)",
+    },
+    light: {
+        background: "#ffffff",
+        foreground: "#1f2328",
+        cursor: "#1f2328",
+        selectionBackground: "#add6ff",
+        scrollbarThumb: "rgba(0, 0, 0, 0.25)",
+    },
+} as const;
+
 export default function Terminal({
     active,
     tab,
@@ -19,6 +36,7 @@ export default function Terminal({
 }) {
     const { t } = useTranslation();
     const openSftpAt = useAppStore((state) => state.openSftpAt);
+    const theme = useAppStore((state) => state.theme);
     const [cwd, setCwd] = useState<string>();
     const url = useMemo(
         () => tab.path.replace("/terminal/", "terminal.html?target_id="),
@@ -62,11 +80,33 @@ export default function Terminal({
         openSftpAt(targetId, cwd, tab.key);
     }, [cwd, openSftpAt, tab.key, targetId]);
 
+    const syncTerminal = useCallback(() => {
+        const contentWindow = iframeRef.current?.contentWindow;
+        if (!contentWindow) return;
+
+        contentWindow.postMessage(
+            { command: "setTheme", args: terminalThemes[theme] },
+            window.location.origin,
+        );
+    }, [theme]);
+
+    const handleTerminalLoad = useCallback(() => {
+        syncTerminal();
+        if (active) {
+            iframeRef.current?.contentWindow?.postMessage(
+                { command: "focus" },
+                window.location.origin,
+            );
+        }
+    }, [active, syncTerminal]);
+
     useEffect(() => {
         setTimeout(() => {
-            if (!(active && iframeRef.current?.contentWindow)) {
+            if (!iframeRef.current?.contentWindow) {
                 return;
             }
+            syncTerminal();
+            if (!active) return;
             console.log("Terminal active", active);
             iframeRef.current.focus();
             iframeRef.current.contentWindow.focus();
@@ -75,7 +115,7 @@ export default function Terminal({
                 window.location.origin,
             );
         }, 100);
-    }, [active]);
+    }, [active, syncTerminal]);
 
     return (
         <div className="terminalView">
@@ -97,6 +137,7 @@ export default function Terminal({
                 src={url}
                 className="terminalIframe"
                 title="terminal"
+                onLoad={handleTerminalLoad}
             />
         </div>
     );

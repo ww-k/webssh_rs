@@ -18,6 +18,15 @@ var fitAddon;
 var clipboardAddon;
 var sizeCache;
 var maxDisconnectionDuration = 5 * 60000;
+var pendingTheme;
+
+const defaultTheme = {
+    background: "#0f1115",
+    foreground: "#f5f7fa",
+    cursor: "#f5f7fa",
+    selectionBackground: "#3a4352",
+    scrollbarThumb: "rgba(255, 255, 255, 0.3)",
+};
 
 function init() {
     const preventDefault = (evt) => {
@@ -29,8 +38,51 @@ function init() {
 
     document.body.addEventListener("dragover", preventDefault, false);
     document.body.addEventListener("drop", preventDefault, false);
+    window.addEventListener("message", receiveMessage, false);
 
     initTerm();
+}
+
+function receiveMessage(event) {
+    if (event.origin !== window.location.origin) return;
+
+    var data = event.data;
+    if (!data || typeof data.command !== "string") return;
+
+    switch (data.command) {
+        case "focus":
+            if (term) {
+                fitAddon.fit();
+                term.focus();
+            }
+            break;
+        case "setTheme":
+            if (data.args && typeof data.args === "object") {
+                pendingTheme = {
+                    ...(term?.options.theme || defaultTheme),
+                    ...data.args,
+                };
+                applyTerminalTheme(pendingTheme);
+            }
+            break;
+        default:
+            console.log("unknown command", data);
+            break;
+    }
+}
+
+function applyTerminalTheme(theme) {
+    document.documentElement.style.setProperty(
+        "--terminal-background",
+        theme.background || defaultTheme.background,
+    );
+    document.documentElement.style.setProperty(
+        "--terminal-scrollbar-thumb",
+        theme.scrollbarThumb || defaultTheme.scrollbarThumb,
+    );
+    if (term) {
+        term.options.theme = theme;
+    }
 }
 
 function initTerm() {
@@ -104,7 +156,7 @@ function initTerm() {
 function createTerminal(socket, targetId) {
     terminalContainer.innerHTML = "";
 
-    term = new Terminal();
+    term = new Terminal({ theme: pendingTheme || defaultTheme });
     fitAddon = new FitAddon();
     clipboardAddon = new ClipboardAddon();
     term.loadAddon(fitAddon);
@@ -126,6 +178,7 @@ function createTerminal(socket, targetId) {
     });
 
     term.open(terminalContainer);
+    applyTerminalTheme(term.options.theme);
 
     term.onResize((size) => {
         if (!sizeCache) {
@@ -153,32 +206,6 @@ function createTerminal(socket, targetId) {
     window.addEventListener("resize", () => {
         fitAddon.fit();
     });
-
-    window.addEventListener(
-        "message",
-        function receiveMessage(event) {
-            if (event.origin !== window.location.origin) return;
-            var data = event.data;
-
-            if (typeof term !== "object") return;
-            switch (data.command) {
-                case "focus":
-                    fitAddon.fit();
-                    term.focus();
-                    break;
-                case "setTheme":
-                    term.options.theme = {
-                        ...term.options.theme,
-                        ...data.args,
-                    };
-                    break;
-                default:
-                    console.log("unknown command", data);
-                    break;
-            }
-        },
-        false,
-    );
 
     return term;
 }
