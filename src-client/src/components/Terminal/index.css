@@ -16,20 +16,17 @@
     background: var(--ant-color-bg-container);
 }
 
-.terminalCwd {
-    min-width: 0;
+.terminalContainer {
+    display: flex;
+    border: 1px solid var(--ant-color-border);
+    border-radius: 6px;
+    margin: 10px;
+    padding: 10px 0 10px 10px;
+    min-height: 0;
     flex: 1;
-    overflow: hidden;
-    color: var(--ant-color-text-secondary);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--ant-font-family-code);
-    font-size: 12px;
 }
 
 .terminalIframe {
-    width: 100%;
-    height: auto;
     min-height: 0;
     flex: 1;
     border: 0;

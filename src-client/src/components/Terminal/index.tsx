@@ -132,13 +132,15 @@ export default function Terminal({
                     </Button>
                 )}
             </div>
-            <iframe
-                ref={iframeRef}
-                src={url}
-                className="terminalIframe"
-                title="terminal"
-                onLoad={handleTerminalLoad}
-            />
+            <div className="terminalContainer">
+                <iframe
+                    ref={iframeRef}
+                    src={url}
+                    className="terminalIframe"
+                    title="terminal"
+                    onLoad={handleTerminalLoad}
+                />
+            </div>
         </div>
     );
 }
