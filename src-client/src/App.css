@@ -48,9 +48,28 @@ body,
     opacity: 1;
 }
 
+.WebSSH-Root-Sider .ant-layout-sider-children {
+    display: flex;
+    flex-direction: column;
+}
+
+.WebSSH-Root-Menu {
+    flex: 1;
+}
+
+.WebSSH-Root-SettingsMenu {
+    flex: none;
+}
+
+.WebSSH-Root-Menu,
+.WebSSH-Root-SettingsMenu {
+    border-inline-end: none;
+}
+
 .WebSSH-Root-Content {
     min-width: 0;
     position: relative;
     overflow: hidden;
     border-left: 1px solid var(--ant-color-border);
+    background: var(--ant-color-bg-container);
 }

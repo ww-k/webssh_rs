@@ -9,6 +9,9 @@ import type { IFileListCopyEvent } from "./components/Filelist/types";
 
 export type ITabState = Record<string, unknown>;
 
+export type ThemeMode = "light" | "dark" | "system";
+export type ResolvedTheme = "light" | "dark";
+
 export interface ITab<T = ITabState>
     extends Omit<TabPaneProps, "tab" | "children" | "closeIcon" | "icon"> {
     key: string;
@@ -18,8 +21,12 @@ export interface ITab<T = ITabState>
 }
 
 type AppStore = {
-    theme: "light" | "dark";
-    setTheme: (theme: "light" | "dark") => void;
+    theme: ResolvedTheme;
+    themeMode: ThemeMode;
+    setTheme: (theme: ThemeMode) => void;
+
+    sidebarCollapsed: boolean;
+    setSidebarCollapsed: (collapsed: boolean) => void;
 
     activeMenuKey: string;
     setMenuKey: (key: string) => void;
@@ -60,11 +67,51 @@ function getInitialTabs() {
 let tabsHydrated = false;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
+const THEME_MODE_STORAGE_KEY = "webssh.theme-mode";
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "webssh.sidebar-collapsed";
+
+function getSystemTheme(): ResolvedTheme {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+}
+
+function getInitialThemeMode(): ThemeMode {
+    const stored = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
+    return stored === "light" || stored === "dark" || stored === "system"
+        ? stored
+        : "system";
+}
+
+function getInitialSidebarCollapsed() {
+    return (
+        window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) !== "false"
+    );
+}
+
 const useAppStore = create<AppStore>((set) => {
     const initialTabs = getInitialTabs();
+    const initialThemeMode = getInitialThemeMode();
     return {
-        theme: "light",
-        setTheme: (theme: "light" | "dark") => set({ theme }),
+        theme:
+            initialThemeMode === "system" ? getSystemTheme() : initialThemeMode,
+        themeMode: initialThemeMode,
+        setTheme: (themeMode: ThemeMode) => {
+            window.localStorage.setItem(THEME_MODE_STORAGE_KEY, themeMode);
+            set({
+                themeMode,
+                theme: themeMode === "system" ? getSystemTheme() : themeMode,
+            });
+        },
+
+        sidebarCollapsed: getInitialSidebarCollapsed(),
+        setSidebarCollapsed: (collapsed: boolean) => {
+            window.localStorage.setItem(
+                SIDEBAR_COLLAPSED_STORAGE_KEY,
+                String(collapsed),
+            );
+            set({ sidebarCollapsed: collapsed });
+        },
 
         activeMenuKey: "home",
         setMenuKey: (key: string) => set({ activeMenuKey: key }),
@@ -260,17 +307,21 @@ useAppStore.subscribe((state, previousState) => {
     if (!tabsHydrated) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-        void axios.put("/api/preferences", {
-            active_tab_key: state.activeTabKey,
-            tabs: state.tabs.map(({ key, label, path, state: tabState }) => ({
-                key,
-                label,
-                path,
-                ...(tabState ? { state: tabState } : {}),
-            })),
-        }).catch(() => {
-            // Keep the current tabs available when saving fails.
-        });
+        void axios
+            .put("/api/preferences", {
+                active_tab_key: state.activeTabKey,
+                tabs: state.tabs.map(
+                    ({ key, label, path, state: tabState }) => ({
+                        key,
+                        label,
+                        path,
+                        ...(tabState ? { state: tabState } : {}),
+                    }),
+                ),
+            })
+            .catch(() => {
+                // Keep the current tabs available when saving fails.
+            });
     }, 150);
 });
 

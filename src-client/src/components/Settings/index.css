@@ -1,0 +1,81 @@
+.WebSSH-Settings {
+    box-sizing: border-box;
+    width: min(900px, 100%);
+    height: 100%;
+    padding: 40px 48px 64px;
+    margin: 0 auto;
+    overflow: auto;
+    position: absolute;
+    inset: 0;
+}
+
+.WebSSH-Settings-Header {
+    margin-bottom: 32px;
+}
+
+.WebSSH-Settings-Header .ant-typography {
+    margin-bottom: 8px;
+}
+
+.WebSSH-Settings-Section {
+    padding: 24px 0;
+    border-top: 1px solid var(--ant-color-border-secondary);
+}
+
+.WebSSH-Settings-SectionHeading {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.WebSSH-Settings-SectionHeading .ant-typography {
+    display: block;
+    margin: 0;
+}
+
+.WebSSH-Settings-SectionIcon {
+    display: grid;
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+    color: var(--ant-color-primary);
+    font-size: 17px;
+    place-items: center;
+    background: var(--ant-color-primary-bg);
+    border-radius: 8px;
+}
+
+.WebSSH-Settings-Row {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 68px;
+    padding: 12px 0 12px 48px;
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.WebSSH-Settings-Row:last-child {
+    border-bottom: 0;
+}
+
+.WebSSH-Settings-RowText {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+}
+
+@media (max-width: 720px) {
+    .WebSSH-Settings {
+        padding: 28px 20px 48px;
+    }
+
+    .WebSSH-Settings-Row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 12px;
+        padding-left: 0;
+    }
+}

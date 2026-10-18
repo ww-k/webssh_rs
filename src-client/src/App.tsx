@@ -3,11 +3,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import "./App.css";
 
-import { HomeOutlined, SwapOutlined } from "@ant-design/icons";
+import { HomeOutlined, SettingOutlined, SwapOutlined } from "@ant-design/icons";
+import enUS from "antd/locale/en_US";
+import zhCN from "antd/locale/zh_CN";
+import { useTranslation } from "react-i18next";
 
 import useAppStore from "@/store";
 
 import Home from "./components/Home";
+import Settings from "./components/Settings";
 import Transfer from "./components/Transfer";
 import transferService from "./services/transfer";
 
@@ -24,7 +28,16 @@ const UNFINISHED_TRANSFER_STATUSES = new Set<ITransferTask["status"]>([
 ]);
 
 export default function App() {
-    const [siderCollapsed, setSiderCollapsed] = useState(true);
+    const { t, i18n } = useTranslation();
+    const {
+        theme,
+        setTheme,
+        sidebarCollapsed,
+        setSidebarCollapsed,
+        activeMenuKey,
+        setMenuKey,
+        hydrateTabs,
+    } = useAppStore();
     const pageOpenedAt = useRef(Date.now());
     const [lastTransferMenuClickAt, setLastTransferMenuClickAt] = useState(0);
     const [transferTasks, setTransferTasks] = useState<ITransferTask[]>(() =>
@@ -46,11 +59,11 @@ export default function App() {
             {
                 key: "home",
                 icon: <HomeOutlined />,
-                label: "主页",
+                label: t("app_menu_home"),
             },
             {
                 key: "transfer",
-                icon: siderCollapsed ? (
+                icon: sidebarCollapsed ? (
                     <span className="WebSSH-Root-TransferMenuIcon">
                         <SwapOutlined
                             className="ant-menu-item-icon"
@@ -67,32 +80,33 @@ export default function App() {
                 ) : (
                     <SwapOutlined style={{ transform: "rotate(90deg)" }} />
                 ),
-                label: "传输",
-                extra: !siderCollapsed ? (
+                label: t("app_menu_transfer"),
+                extra: !sidebarCollapsed ? (
                     <Badge count={newTransferCount}></Badge>
                 ) : undefined,
             },
         ];
-    }, [newTransferCount, siderCollapsed]);
+    }, [newTransferCount, sidebarCollapsed, t]);
+
+    const settingsMenuItems = useMemo<Required<MenuProps>["items"]>(
+        () => [
+            {
+                key: "settings",
+                icon: <SettingOutlined />,
+                label: t("app_menu_settings"),
+            },
+        ],
+        [t],
+    );
 
     useEffect(() => {
         return transferService.subscribe(setTransferTasks);
     }, []);
 
-    const {
-        theme,
-        setTheme,
-
-        activeMenuKey,
-        setMenuKey,
-        hydrateTabs,
-    } = useAppStore();
-
     useEffect(() => {
         void hydrateTabs();
     }, [hydrateTabs]);
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies: setTheme不用加
     useEffect(() => {
         console.log("App init");
         window.onkeydown = (evt) => {
@@ -119,12 +133,12 @@ export default function App() {
             "(prefers-color-scheme: dark)",
         );
         // 处理系统偏好变化的回调函数
-        const handleSystemThemeChange = (event: MediaQueryListEvent) => {
-            setTheme(event.matches ? "dark" : "light");
+        const handleSystemThemeChange = () => {
+            if (useAppStore.getState().themeMode === "system") {
+                setTheme("system");
+            }
         };
 
-        // 初始化设置主题
-        setTheme(systemPrefersDark.matches ? "dark" : "light");
         systemPrefersDark.addEventListener("change", handleSystemThemeChange);
 
         return () => {
@@ -135,7 +149,7 @@ export default function App() {
                 handleSystemThemeChange,
             );
         };
-    }, []);
+    }, [setTheme]);
 
     const handleMenuClick = useCallback(
         (evt: { key: string }) => {
@@ -149,6 +163,7 @@ export default function App() {
 
     return (
         <ConfigProvider
+            locale={i18n.resolvedLanguage?.startsWith("zh") ? zhCN : enUS}
             theme={{
                 cssVar: {},
                 hashed: false,
@@ -160,9 +175,9 @@ export default function App() {
                     className="WebSSH-Root-Sider"
                     theme={theme}
                     collapsible={true}
-                    collapsed={siderCollapsed}
+                    collapsed={sidebarCollapsed}
                     collapsedWidth={60}
-                    onCollapse={setSiderCollapsed}
+                    onCollapse={setSidebarCollapsed}
                 >
                     <Menu
                         className="WebSSH-Root-Menu"
@@ -173,10 +188,21 @@ export default function App() {
                         items={menusItems}
                         onClick={handleMenuClick}
                     />
+                    <Menu
+                        className="WebSSH-Root-SettingsMenu"
+                        theme={theme}
+                        mode="inline"
+                        selectedKeys={
+                            activeMenuKey === "settings" ? ["settings"] : []
+                        }
+                        items={settingsMenuItems}
+                        onClick={handleMenuClick}
+                    />
                 </Sider>
                 <Content className="WebSSH-Root-Content">
                     <Home active={activeMenuKey === "home"} />
                     {activeMenuKey === "transfer" && <Transfer />}
+                    {activeMenuKey === "settings" && <Settings />}
                 </Content>
             </Layout>
         </ConfigProvider>
