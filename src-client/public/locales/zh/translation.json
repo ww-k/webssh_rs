@@ -97,6 +97,8 @@
     "file_editor_save_failed": "保存文件失败",
     "file_editor_aria_label": "编辑 {{name}}",
     "file_editor_line_wrap": "自动换行",
+    "file_editor_expand": "放大编辑器",
+    "file_editor_collapse": "缩小编辑器",
     "file_editor_loading": "加载中...",
     "files_conflict_content": "目标包含 {{count}} 个同名文件，是否覆盖或跳过？",
     "files_conflict_overwrite": "覆盖",

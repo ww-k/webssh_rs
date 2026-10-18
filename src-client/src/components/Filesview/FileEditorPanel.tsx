@@ -1,9 +1,14 @@
+import {
+    CloseOutlined,
+    ColumnWidthOutlined,
+    EnterOutlined,
+} from "@ant-design/icons";
 import { json } from "@codemirror/lang-json";
 import { python } from "@codemirror/lang-python";
 import { xml } from "@codemirror/lang-xml";
 import { yaml } from "@codemirror/lang-yaml";
 import CodeMirror, { EditorView } from "@uiw/react-codemirror";
-import { Button, Spin, Switch } from "antd";
+import { Button, Spin } from "antd";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,12 +32,14 @@ export default function FileEditorPanel({ file, onClose }: Props) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [lineWrapping, setLineWrapping] = useState(true);
+    const [expanded, setExpanded] = useState(false);
     const [error, setError] = useState<string>();
 
     useEffect(() => {
         let disposed = false;
         setLoading(true);
         setError(undefined);
+        setExpanded(false);
         getSftpDownload(file.uri)
             .then((response) => response.text())
             .then((text) => {
@@ -66,30 +73,42 @@ export default function FileEditorPanel({ file, onClose }: Props) {
 
     return (
         <section
-            className="filesviewFileEditor"
+            className={`filesviewFileEditor${expanded ? " filesviewFileEditorExpanded" : ""}`}
             aria-label={t("file_editor_aria_label", { name: file.name })}
         >
             <header className="filesviewFileEditorHeader">
                 <strong title={file.name}>{file.name}</strong>
                 <div className="filesviewFileEditorActions">
-                    <label className="filesviewFileEditorWrapToggle">
-                        <span>{t("file_editor_line_wrap")}</span>
-                        <Switch
-                            size="small"
-                            checked={lineWrapping}
-                            onChange={setLineWrapping}
-                            aria-label={t("file_editor_line_wrap")}
-                        />
-                    </label>
                     <Button
-                        type="primary"
-                        loading={saving}
-                        disabled={loading || Boolean(error)}
-                        onClick={save}
-                    >
-                        {t("app_btn_save")}
-                    </Button>
-                    <Button onClick={onClose}>{t("app_btn_cancel")}</Button>
+                        type={lineWrapping ? "default" : "text"}
+                        icon={<EnterOutlined />}
+                        aria-label={t("file_editor_line_wrap")}
+                        aria-pressed={lineWrapping}
+                        title={t("file_editor_line_wrap")}
+                        onClick={() => setLineWrapping((value) => !value)}
+                    />
+                    <Button
+                        type={expanded ? "default" : "text"}
+                        icon={<ColumnWidthOutlined />}
+                        aria-label={t(
+                            expanded
+                                ? "file_editor_collapse"
+                                : "file_editor_expand",
+                        )}
+                        title={t(
+                            expanded
+                                ? "file_editor_collapse"
+                                : "file_editor_expand",
+                        )}
+                        onClick={() => setExpanded((value) => !value)}
+                    />
+                    <Button
+                        type="text"
+                        icon={<CloseOutlined />}
+                        aria-label={t("app_btn_cancel")}
+                        title={t("app_btn_cancel")}
+                        onClick={onClose}
+                    />
                 </div>
             </header>
             <div className="filesviewFileEditorBody">
@@ -123,6 +142,20 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                     />
                 )}
             </div>
+            <footer className="filesviewFileEditorFooter">
+                <div className="filesviewFileEditorActions">
+                    <Button
+                        type="primary"
+                        loading={saving}
+                        disabled={loading || Boolean(error)}
+                        onClick={save}
+                        aria-label={t("app_btn_save")}
+                        title={t("app_btn_save")}
+                    >
+                        {t("app_btn_save")}
+                    </Button>
+                </div>
+            </footer>
         </section>
     );
 }

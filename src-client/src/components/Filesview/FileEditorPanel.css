@@ -31,13 +31,11 @@
     gap: 8px;
 }
 
-.filesviewFileEditorWrapToggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-    color: var(--ant-color-text-secondary, #666);
-    font-size: 13px;
+.filesviewFileEditorExpanded {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-left: 0;
 }
 
 .filesviewFileEditorBody {
@@ -46,6 +44,16 @@
     min-height: 0;
     flex: 1;
     overflow: hidden;
+}
+
+.filesviewFileEditorFooter {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    align-items: center;
+    min-height: 48px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--ant-color-border, #d9d9d9);
 }
 
 .filesviewFileEditorBody > div {

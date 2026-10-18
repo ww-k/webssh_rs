@@ -107,6 +107,8 @@
     "file_editor_save_failed": "Failed to save file",
     "file_editor_aria_label": "Edit {{name}}",
     "file_editor_line_wrap": "Wrap lines",
+    "file_editor_expand": "Expand editor",
+    "file_editor_collapse": "Restore editor size",
     "file_editor_loading": "Loading...",
     "files_conflict_content": "The target contains {{count}} files with the same name. Overwrite or skip?",
     "files_conflict_overwrite": "Overwrite",
