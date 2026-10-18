@@ -1,9 +1,27 @@
-import { LayoutOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
-import { Segmented, Select, Switch, Typography } from "antd";
+import {
+    DatabaseOutlined,
+    DownloadOutlined,
+    LayoutOutlined,
+    MoonOutlined,
+    SunOutlined,
+    UploadOutlined,
+} from "@ant-design/icons";
+import {
+    Button,
+    message,
+    Segmented,
+    Select,
+    Space,
+    Switch,
+    Typography,
+} from "antd";
+import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
 
+import fileSave from "@/helpers/fileSave";
+import { createUserDataExport, importUserData } from "@/services/userData";
 import useAppStore, { type ThemeMode } from "@/store";
 
 const { Paragraph, Text, Title } = Typography;
@@ -12,7 +30,50 @@ export default function Settings() {
     const { i18n, t } = useTranslation();
     const { themeMode, setTheme, sidebarCollapsed, setSidebarCollapsed } =
         useAppStore();
+    const importInputRef = useRef<HTMLInputElement>(null);
     const language = i18n.resolvedLanguage?.startsWith("zh") ? "zh" : "en";
+
+    const handleExport = async () => {
+        try {
+            const data = await createUserDataExport({
+                theme_mode: themeMode,
+                sidebar_collapsed: sidebarCollapsed,
+                language,
+            });
+            fileSave(
+                new Blob([JSON.stringify(data, null, 2)], {
+                    type: "application/json",
+                }),
+                {
+                    fileName: `webssh-user-data-${new Date().toISOString().slice(0, 10)}.json`,
+                },
+            );
+            message.success(t("settings_data_export_success"));
+        } catch {
+            message.error(t("settings_data_export_failed"));
+        }
+    };
+
+    const handleImport = async (file: File) => {
+        try {
+            const data = JSON.parse(await file.text()) as unknown;
+            const result = await importUserData(data);
+            setTheme(result.settings.theme_mode);
+            setSidebarCollapsed(result.settings.sidebar_collapsed);
+            await i18n.changeLanguage(result.settings.language);
+            message.success(
+                t("settings_data_import_success", {
+                    added: result.addedTargets,
+                    skipped: result.skippedTargets,
+                    favorites: result.importedFavorites,
+                }),
+            );
+        } catch {
+            message.error(t("settings_data_import_failed"));
+        } finally {
+            if (importInputRef.current) importInputRef.current.value = "";
+        }
+    };
 
     return (
         <main className="WebSSH-Settings">
@@ -111,6 +172,53 @@ export default function Settings() {
                         checked={sidebarCollapsed}
                         onChange={setSidebarCollapsed}
                     />
+                </div>
+            </section>
+
+            <section className="WebSSH-Settings-Section">
+                <div className="WebSSH-Settings-SectionHeading">
+                    <div className="WebSSH-Settings-SectionIcon">
+                        <DatabaseOutlined />
+                    </div>
+                    <div>
+                        <Title level={4}>{t("settings_data")}</Title>
+                        <Text type="secondary">
+                            {t("settings_data_description")}
+                        </Text>
+                    </div>
+                </div>
+
+                <div className="WebSSH-Settings-Row">
+                    <div className="WebSSH-Settings-RowText">
+                        <Text strong>{t("settings_data_transfer")}</Text>
+                        <Text type="secondary">
+                            {t("settings_data_transfer_help")}
+                        </Text>
+                    </div>
+                    <Space wrap>
+                        <Button
+                            icon={<DownloadOutlined />}
+                            onClick={() => void handleExport()}
+                        >
+                            {t("settings_data_export")}
+                        </Button>
+                        <Button
+                            icon={<UploadOutlined />}
+                            onClick={() => importInputRef.current?.click()}
+                        >
+                            {t("settings_data_import")}
+                        </Button>
+                        <input
+                            ref={importInputRef}
+                            type="file"
+                            accept="application/json,.json"
+                            hidden
+                            onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                if (file) void handleImport(file);
+                            }}
+                        />
+                    </Space>
                 </div>
             </section>
         </main>

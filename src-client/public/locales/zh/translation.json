@@ -119,5 +119,15 @@
     "filelist_column_modified_time": "最近修改时间",
     "filelist_column_size": "文件大小",
     "settings_language_zh": "中文",
+    "settings_data": "用户数据",
+    "settings_data_description": "备份 SSH 目标、收藏目录和工作区偏好设置。",
+    "settings_data_transfer": "导入和导出",
+    "settings_data_transfer_help": "导入时会添加缺少的目标和目录，并保留已有数据。",
+    "settings_data_export": "导出数据",
+    "settings_data_import": "导入数据",
+    "settings_data_export_success": "用户数据已导出。",
+    "settings_data_export_failed": "无法导出用户数据。",
+    "settings_data_import_success": "已导入 {{added}} 个目标和 {{favorites}} 个收藏目录，保留 {{skipped}} 个已有目标。",
+    "settings_data_import_failed": "无法导入此用户数据文件。",
     "files_app_image_preview": "图片预览"
 }

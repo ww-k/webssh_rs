@@ -19,12 +19,12 @@ export async function getTargetList() {
 }
 
 export async function postTargetAdd(data: Omit<ITarget, "id">) {
-    const response = await axios.post<ITarget[]>("/api/target/add", data);
+    const response = await axios.post<ITarget>("/api/target/add", data);
     return response.data;
 }
 
 export async function postTargetUpdate(data: ITarget) {
-    const response = await axios.post<ITarget[]>("/api/target/update", data);
+    const response = await axios.post<ITarget>("/api/target/update", data);
     return response.data;
 }
 
