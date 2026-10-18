@@ -898,10 +898,7 @@ export default class Tbody extends Component<IProps, IState> {
                     };
 
                     if (file?.isDir) {
-                        console.debug(
-                            "Filelist/Tbody: upload 到 file 中",
-                            file,
-                        );
+                        console.debug("Filelist/Tbody: upload to file", file);
                         dragEvent.dropTarget = {
                             fileUri: file.uri,
                         };

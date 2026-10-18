@@ -12,6 +12,7 @@ import {
 } from "@ant-design/icons";
 
 import { isMac } from "@/helpers/platform";
+import i18n from "@/i18n";
 import transferService from "@/services/transfer";
 
 import popContextMenu from "../Contextmenu";
@@ -43,13 +44,13 @@ export default function remoteHandleContextmenu(
     console.log("Filesview/handleContextmenu:", files);
     if (Array.isArray(files) && files.length > 0) {
         menus.push({
-            label: "下载",
+            label: i18n.t("files_menu_download"),
             disabled: !(Array.isArray(files) && files.length > 0),
             click: async () => {
                 const [localDir] = await renderFsSelector({
                     mode: "directory",
                     defaultDirectory: "downloads",
-                    title: "选择下载目录",
+                    title: i18n.t("files_menu_select_download_directory"),
                 });
                 const allPromises = files.map((file) => {
                     return transferService.download({
@@ -63,7 +64,7 @@ export default function remoteHandleContextmenu(
             iconRender: () => <DownloadOutlined />,
         });
         menus.push({
-            label: "查看/编辑",
+            label: i18n.t("files_menu_view_edit"),
             disabled: !(
                 files.length === 1 &&
                 !files[0].isDir &&
@@ -76,7 +77,7 @@ export default function remoteHandleContextmenu(
             iconRender: () => <FileTextOutlined />,
         });
         menus.push({
-            label: "剪切",
+            label: i18n.t("files_menu_cut"),
             click: () => {
                 context.setCopyData({
                     fileUri: context.fileUri,
@@ -88,7 +89,7 @@ export default function remoteHandleContextmenu(
             tooltip: isMac ? "⌘+X" : "Ctrl+X",
         });
         menus.push({
-            label: "复制",
+            label: i18n.t("files_menu_copy"),
             click: () => {
                 context.setCopyData({
                     fileUri: context.fileUri,
@@ -100,7 +101,7 @@ export default function remoteHandleContextmenu(
             tooltip: isMac ? "⌘+C" : "Ctrl+C",
         });
         menus.push({
-            label: "删除",
+            label: i18n.t("app_btn_delete"),
             disabled: !files,
             click: async () => {
                 handleDelete(files, context.getCwdFiles);
@@ -109,7 +110,7 @@ export default function remoteHandleContextmenu(
             tooltip: "Delete",
         });
         menus.push({
-            label: "重命名",
+            label: i18n.t("files_menu_rename"),
             disabled: !(Array.isArray(files) && files.length === 1),
             click: async () => {
                 handleRename(files[0], context.getCwdFiles);
@@ -119,12 +120,12 @@ export default function remoteHandleContextmenu(
         });
     } else {
         menus.push({
-            label: "上传",
+            label: i18n.t("files_menu_upload"),
             click: async () => {
                 const localPaths = await renderFsSelector({
                     mode: "file",
                     multiple: true,
-                    title: "选择上传文件",
+                    title: i18n.t("files_menu_select_upload_file"),
                 });
                 const allPromises = localPaths.map((localPath) => {
                     const fileName =
@@ -140,19 +141,19 @@ export default function remoteHandleContextmenu(
             iconRender: () => <UploadOutlined />,
         });
         menus.push({
-            label: "刷新",
+            label: i18n.t("app_btn_refresh"),
             click: context.getCwdFiles,
             iconRender: () => <ReloadOutlined />,
         });
         menus.push({
-            label: "创建文件夹",
+            label: i18n.t("files_menu_create_folder"),
             click: () => {
                 handleMkdir(context.fileUri, context.getCwdFiles);
             },
             iconRender: () => <FolderAddOutlined />,
         });
         menus.push({
-            label: "粘贴",
+            label: i18n.t("files_menu_paste"),
             disabled: !(
                 context.copyData &&
                 Array.isArray(context.copyData.files) &&

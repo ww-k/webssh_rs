@@ -1,5 +1,6 @@
 import { Button, Modal, Space } from "antd";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import FilesviewLocal from "../Filesview/Local";
 import {
@@ -33,6 +34,7 @@ export default function FsSelector({
     onCancel: () => void;
     onOk: (paths: string[]) => void;
 }) {
+    const { t } = useTranslation();
     const [initialCwd] = useState(getLastLocalDirectory);
     const [cwd, setCwd] = useState(initialCwd || "/");
     const [selectedFiles, setSelectedFiles] = useState<IViewFileStat[]>([]);
@@ -66,9 +68,9 @@ export default function FsSelector({
             onCancel={onCancel}
             footer={
                 <Space>
-                    <Button onClick={onCancel}>取消</Button>
+                    <Button onClick={onCancel}>{t("app_btn_cancel")}</Button>
                     <Button type="primary" disabled={!canOk} onClick={handleOk}>
-                        确定
+                        {t("app_btn_ok")}
                     </Button>
                 </Space>
             }

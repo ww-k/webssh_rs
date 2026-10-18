@@ -91,7 +91,7 @@ export default function BatchTaskProgressModal<T>({
 
     return (
         <Modal
-            title="批处理任务进度"
+            title={t("batch_task_progress_title")}
             {...modalProps}
             transitionName=""
             maskTransitionName=""
@@ -127,10 +127,9 @@ export default function BatchTaskProgressModal<T>({
             >
                 <WarningOutlined />
                 <span>
-                    {"{{count}} 个任务失败".replace(
-                        "{{count}}",
-                        `${failsResult.length}`,
-                    )}
+                    {t("batch_task_failed_count", {
+                        count: failsResult.length,
+                    })}
                 </span>
             </div>
             <div style={{ display: showErrMsg ? "block" : "none" }}>

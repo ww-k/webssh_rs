@@ -5,6 +5,7 @@ import { yaml } from "@codemirror/lang-yaml";
 import CodeMirror, { EditorView } from "@uiw/react-codemirror";
 import { Button, Spin, Switch } from "antd";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { getSftpDownload, postSftpUpload } from "@/api";
 
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export default function FileEditorPanel({ file, onClose }: Props) {
+    const { t } = useTranslation();
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -35,7 +37,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                 if (!disposed) setContent(text);
             })
             .catch(() => {
-                if (!disposed) setError("加载文件失败");
+                if (!disposed) setError(t("file_editor_load_failed"));
             })
             .finally(() => {
                 if (!disposed) setLoading(false);
@@ -43,7 +45,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
         return () => {
             disposed = true;
         };
-    }, [file.uri]);
+    }, [file.uri, t]);
 
     async function save() {
         setSaving(true);
@@ -54,7 +56,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                 new Blob([content], { type: "text/plain;charset=utf-8" }),
             );
         } catch {
-            setError("保存文件失败");
+            setError(t("file_editor_save_failed"));
         } finally {
             setSaving(false);
         }
@@ -63,18 +65,18 @@ export default function FileEditorPanel({ file, onClose }: Props) {
     return (
         <section
             className="filesviewFileEditor"
-            aria-label={`编辑 ${file.name}`}
+            aria-label={t("file_editor_aria_label", { name: file.name })}
         >
             <header className="filesviewFileEditorHeader">
                 <strong title={file.name}>{file.name}</strong>
                 <div className="filesviewFileEditorActions">
                     <label className="filesviewFileEditorWrapToggle">
-                        <span>自动换行</span>
+                        <span>{t("file_editor_line_wrap")}</span>
                         <Switch
                             size="small"
                             checked={lineWrapping}
                             onChange={setLineWrapping}
-                            aria-label="自动换行"
+                            aria-label={t("file_editor_line_wrap")}
                         />
                     </label>
                     <Button
@@ -83,15 +85,15 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                         disabled={loading || Boolean(error)}
                         onClick={save}
                     >
-                        保存
+                        {t("app_btn_save")}
                     </Button>
-                    <Button onClick={onClose}>关闭</Button>
+                    <Button onClick={onClose}>{t("app_btn_cancel")}</Button>
                 </div>
             </header>
             <div className="filesviewFileEditorBody">
                 {loading ? (
                     <div className="filesviewFileEditorState">
-                        <Spin tip="加载中..." />
+                        <Spin tip={t("file_editor_loading")} />
                     </div>
                 ) : error ? (
                     <div className="filesviewFileEditorState">{error}</div>

@@ -1,6 +1,8 @@
+import i18n from "@/i18n";
+
 const ImgPreview = {
     id: "imgpreview",
-    name: "图片预览",
+    name: i18n.t("files_app_image_preview"),
     localOpen: true,
 };
 export default {

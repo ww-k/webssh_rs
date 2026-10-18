@@ -10,6 +10,7 @@ import {
 import { getFilePath, parseSftpUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
 import { posix } from "@/helpers/path";
+import i18n from "@/i18n";
 
 import renderBatchTaskProgressModal from "../BatchTaskProgressModal/render";
 import filesConflictConfirm from "./filesConflictConfirm";
@@ -33,9 +34,9 @@ export async function handleDelete(
     }
     return new Promise<void>((resolve, reject) => {
         const modal = Modal.confirm({
-            content: "删除后将不可恢复，确认删除吗?",
-            okText: "删除",
-            cancelText: "取消",
+            content: i18n.t("files_action_delete_content"),
+            okText: i18n.t("app_btn_delete"),
+            cancelText: i18n.t("app_btn_cancel"),
             okType: "danger",
             onOk: async () => {
                 try {
@@ -46,7 +47,8 @@ export async function handleDelete(
                         await renderBatchTaskProgressModal<IViewFileStat>({
                             data: files,
                             action: (file) => deleteFile(file),
-                            failsRender: () => "批量操作失败",
+                            failsRender: () =>
+                                i18n.t("files_action_batch_failed"),
                         });
                     }
                     await getCwdFiles();
@@ -64,7 +66,10 @@ export async function handleRename(
     file: IViewFileStat,
     getCwdFiles: IGetCwdFiles,
 ) {
-    const newName = window.prompt("请输入文件名", file.name);
+    const newName = window.prompt(
+        i18n.t("files_action_rename_file_prompt"),
+        file.name,
+    );
     if (!newName) {
         return;
     }
@@ -76,7 +81,10 @@ export async function handleRename(
 }
 
 export async function handleMkdir(fileUri: string, getCwdFiles: IGetCwdFiles) {
-    const newName = window.prompt("请输入文件夹名", "");
+    const newName = window.prompt(
+        i18n.t("files_action_rename_folder_prompt"),
+        "",
+    );
     if (!newName) {
         return;
     }
@@ -114,7 +122,7 @@ export async function handlePaste(
                     action: (file) => {
                         return postSftpCp(file.uri, generateCopyNewPath(file));
                     },
-                    failsRender: () => "批量操作失败",
+                    failsRender: () => i18n.t("files_action_batch_failed"),
                 });
             }
             break;
@@ -131,7 +139,7 @@ export async function handlePaste(
                 await renderBatchTaskProgressModal<IViewFileStat>({
                     data: files,
                     action: (file) => postSftpCp(file.uri, pasteUri.path),
-                    failsRender: () => "批量操作失败",
+                    failsRender: () => i18n.t("files_action_batch_failed"),
                 });
             }
             break;
@@ -151,7 +159,7 @@ export async function handlePaste(
                             file.uri,
                             `${pasteUri.path}/${file.name}`,
                         ),
-                    failsRender: () => "批量操作失败",
+                    failsRender: () => i18n.t("files_action_batch_failed"),
                 });
             }
             break;

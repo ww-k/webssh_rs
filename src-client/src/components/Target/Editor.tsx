@@ -82,11 +82,8 @@ export default function TargetEditor({
                 <Form.Item name="id" hidden>
                     <Input hidden />
                 </Form.Item>
-                <Form.Item
-                    name="name"
-                    label={t("target_name")}
-                >
-                    <Input placeholder="默认为user@host[:port]" />
+                <Form.Item name="name" label={t("target_name")}>
+                    <Input placeholder={t("target_name_placeholder")} />
                 </Form.Item>
                 <Form.Item
                     name="method"
@@ -132,7 +129,7 @@ export default function TargetEditor({
                     name="key"
                     label={
                         <span>
-                            {t("target_private_key")} {" "}
+                            {t("target_private_key")}{" "}
                             <Tooltip title={t("target_private_key_tooltip")}>
                                 <InfoCircleOutlined />
                             </Tooltip>
@@ -144,7 +141,8 @@ export default function TargetEditor({
                         {
                             validator: async (_, value) => {
                                 if (!value) return Promise.resolve();
-                                if (value instanceof Error) return Promise.reject(value.message);
+                                if (value instanceof Error)
+                                    return Promise.reject(value.message);
                                 const result = validateCertContent(value);
                                 return result === 0
                                     ? Promise.reject(

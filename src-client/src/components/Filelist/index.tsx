@@ -5,6 +5,7 @@ import { Component, createRef } from "react";
 import "./index.css";
 
 import { getParentDirUri } from "@/helpers/file_uri";
+import i18n from "@/i18n";
 
 import getColumns from "./getColumns";
 import Tbody from "./tbody";
@@ -83,6 +84,7 @@ export default class Filelist extends Component<IProps, IState> {
     guessKeybordInput: (keyCode: number) => string;
     _active_path: string | null = null;
     _resizeObserver?: ResizeObserver;
+    _onLanguageChanged?: () => void;
     __support_sticky_position__: boolean | undefined;
 
     constructor(props: IProps) {
@@ -219,6 +221,18 @@ export default class Filelist extends Component<IProps, IState> {
     }
 
     componentDidMount() {
+        this._onLanguageChanged = () => {
+            const columns = getColumns();
+            this.setState({
+                columns,
+                layoutTableWidth: this.caculatelayoutTableWidth(
+                    columns,
+                    this.props.multiple,
+                ),
+            });
+        };
+        i18n.on("languageChanged", this._onLanguageChanged);
+
         const update = (size: DOMRectReadOnly) => {
             const rootEl = this.rootElRef.current;
             const theader = this.listTheaderRef.current?.getRootDom();
@@ -257,6 +271,10 @@ export default class Filelist extends Component<IProps, IState> {
     }
 
     componentWillUnmount() {
+        if (this._onLanguageChanged) {
+            i18n.off("languageChanged", this._onLanguageChanged);
+            this._onLanguageChanged = undefined;
+        }
         if (this._resizeObserver) {
             this._resizeObserver.disconnect();
             this._resizeObserver = undefined;

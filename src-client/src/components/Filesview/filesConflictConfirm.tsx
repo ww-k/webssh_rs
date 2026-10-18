@@ -1,5 +1,7 @@
 import { Modal } from "antd";
 
+import i18n from "@/i18n";
+
 import filesConflictFilter from "./filesConflictFilter";
 
 import type { IViewFileStat } from "@/types";
@@ -14,12 +16,9 @@ export default function filesConflictConfirm<T = File | IViewFileStat>(
 
         if (sameLen > 0) {
             Modal.confirm({
-                content: "目标包含 s% 个同名文件，是否覆盖或跳过?".replace(
-                    "s%",
-                    `${sameLen}`,
-                ),
-                okText: "覆盖",
-                cancelText: "跳过",
+                content: i18n.t("files_conflict_content", { count: sameLen }),
+                okText: i18n.t("files_conflict_overwrite"),
+                cancelText: i18n.t("files_conflict_skip"),
                 onOk() {
                     return resolve(files);
                 },

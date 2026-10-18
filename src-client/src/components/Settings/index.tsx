@@ -74,7 +74,10 @@ export default function Settings() {
                         value={language}
                         style={{ width: 160 }}
                         options={[
-                            { value: "zh", label: "中文" },
+                            {
+                                value: "zh",
+                                label: t("settings_language_zh"),
+                            },
                             { value: "en", label: "English" },
                         ]}
                         onChange={(value: string) =>

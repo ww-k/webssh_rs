@@ -1,6 +1,7 @@
 import moment from "moment";
 
 import flowFormatter from "@/helpers/flowFormatter";
+import i18n from "@/i18n";
 
 import type { IViewFileStat } from "@/types";
 import type { IFileListColumn } from "./types";
@@ -17,7 +18,7 @@ const fileIconMap: Record<IViewFileStat["type"], string> = {
 export default function getColumns() {
     const columns: IFileListColumn[] = [
         {
-            title: "文件名",
+            title: i18n.t("filelist_column_filename"),
             className: "filelistTableCellColName",
             dataIndex: "name",
             sortKey: "sortName",
@@ -28,7 +29,7 @@ export default function getColumns() {
                 `${fileIconMap[record.type] || fileIcon}<span title="${record.name}" draggable="false">${record.name}</span>`,
         },
         {
-            title: "最近修改时间",
+            title: i18n.t("filelist_column_modified_time"),
             className: "filelistTableCellColMtime",
             dataIndex: "mtime",
             width: 145,
@@ -40,7 +41,7 @@ export default function getColumns() {
                     : "",
         },
         {
-            title: "文件大小",
+            title: i18n.t("filelist_column_size"),
             className: "filelistTableCellColSize",
             dataIndex: "size",
             sortKey: "size",
