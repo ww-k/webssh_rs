@@ -73,3 +73,13 @@ body,
     border-left: 1px solid var(--ant-color-border);
     background: var(--ant-color-bg-container);
 }
+
+.ant-tabs-card >.ant-tabs-nav .ant-tabs-tab,
+.ant-tabs-card >div>.ant-tabs-nav .ant-tabs-tab {
+    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
+    background: var(--ant-color-border-secondary);
+}
+.ant-tabs-card >.ant-tabs-nav .ant-tabs-tab-active,
+.ant-tabs-card >div>.ant-tabs-nav .ant-tabs-tab-active{
+    background: var(--ant-color-bg-container);
+}
