@@ -11,6 +11,7 @@ import {
 import type { ITransferTask } from "@/api";
 
 const ACTIVE_STATUSES = new Set(["WAIT", "RUN"]);
+const FINISHED_STATUSES = new Set(["SUCCESS", "FAIL", "CANCEL"]);
 const SYNC_INTERVAL = 1000;
 
 type TransferTasksListener = (tasks: ITransferTask[]) => void;
@@ -134,7 +135,12 @@ class TransferService {
 
     resumeAll() {}
 
-    removeAll() {}
+    async removeAll() {
+        const tasks = this.#tasks.filter((task) =>
+            FINISHED_STATUSES.has(task.status),
+        );
+        await Promise.all(tasks.map((task) => this.remove(task.id)));
+    }
 
     #ensureSyncTimer(task?: ITransferTask) {
         if (task && !ACTIVE_STATUSES.has(task.status)) {

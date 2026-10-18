@@ -407,10 +407,35 @@ const TransferTable = ({ type }: { type: "ALL" | ITransferTask["type"] }) => {
 export default function Transfer() {
     const { i18n, t } = useTranslation();
     const antdLocale = i18n.resolvedLanguage?.startsWith("en") ? enUS : zhCN;
+    const [finishedTaskCount, setFinishedTaskCount] = useState(
+        () =>
+            transferService
+                .getTasks()
+                .filter((task) =>
+                    ["SUCCESS", "FAIL", "CANCEL"].includes(task.status),
+                ).length,
+    );
 
     useEffect(() => {
-        transferService.syncTasks();
+        return transferService.subscribe((tasks) =>
+            setFinishedTaskCount(
+                tasks.filter((task) =>
+                    ["SUCCESS", "FAIL", "CANCEL"].includes(task.status),
+                ).length,
+            ),
+        );
     }, []);
+
+    const handleRemoveAll = () => {
+        Modal.confirm({
+            title: t("transfer_confirm_delete_all_title"),
+            content: t("transfer_confirm_delete_all_content"),
+            okText: t("app_btn_ok"),
+            cancelText: t("app_btn_cancel"),
+            okButtonProps: { danger: true },
+            onOk: () => transferService.removeAll(),
+        });
+    };
 
     return (
         <ConfigProvider locale={antdLocale}>
@@ -418,6 +443,16 @@ export default function Transfer() {
                 className="WebSSH-Transfer"
                 tabBarGutter={28}
                 defaultActiveKey="all"
+                tabBarExtraContent={
+                    <Button
+                        danger
+                        disabled={finishedTaskCount === 0}
+                        icon={<DeleteOutlined />}
+                        onClick={handleRemoveAll}
+                    >
+                        {t("transfer_action_delete_all_history")}
+                    </Button>
+                }
                 items={[
                     {
                         key: "all",
