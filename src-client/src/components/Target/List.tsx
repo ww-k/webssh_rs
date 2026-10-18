@@ -59,6 +59,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
             {
                 title: t("app_common_action"),
                 key: "action",
+                width: 250,
                 render: (_, record) => (
                     <Space size="middle">
                         <a
@@ -148,7 +149,6 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 columns={columns}
                 dataSource={filteredDataSource}
                 size="small"
-                scroll={{ y: 390 }}
                 pagination={false}
             />
             <TargetEditor

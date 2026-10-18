@@ -4,24 +4,7 @@
     padding-bottom: 20px;
 }
 
-@media (max-width: 600px) {
-    .targetListToolbar {
-        align-items: stretch;
-        flex-direction: column;
-        gap: 12px;
-    }
-}
-
-.targetListTable .ant-empty-normal {
-    height: calc(
-        389px -
-        2 *
-        var(--ant-table-cell-padding-block-sm) -
-        2 *
-        var(--ant-margin-xl)
-    );
-}
-
-.targetListTablePlaceholder {
-    color: #9e9e9e;
+.targetListTable {
+    flex: 1;
+    overflow: auto;
 }
