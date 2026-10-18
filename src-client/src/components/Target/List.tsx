@@ -1,7 +1,6 @@
 import { ReloadOutlined } from "@ant-design/icons";
-import { useMount } from "ahooks";
 import { Button, Input, Modal, Space, Table } from "antd";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getTargetList, postTargetRemove } from "@/api";
@@ -22,7 +21,13 @@ function getTargetName(target: ITarget): string {
     );
 }
 
-export default function TargetList({ tab }: { tab: ITab }) {
+export default function TargetList({
+    tab,
+    refreshKey,
+}: {
+    tab: ITab;
+    refreshKey?: number;
+}) {
     const { t } = useTranslation();
     const { setTabPath } = useAppStore();
     const [editorOpen, setEditorOpen] = useState(false);
@@ -113,7 +118,15 @@ export default function TargetList({ tab }: { tab: ITab }) {
         [refresh, setTabPath, t, tab.key],
     );
 
-    useMount(refresh);
+    useEffect(() => {
+        void refresh();
+    }, [refresh]);
+
+    useEffect(() => {
+        if (refreshKey && refreshKey > 0) {
+            void refresh();
+        }
+    }, [refresh, refreshKey]);
 
     return (
         <>

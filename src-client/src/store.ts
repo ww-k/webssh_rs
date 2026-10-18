@@ -34,7 +34,7 @@ type AppStore = {
     activeTabKey: string;
     tabs: ITab[];
     setActiveTabKey: (key: string) => void;
-    addTab: () => void;
+    addTab: () => string;
     removeTab: (key: string) => void;
     removeTabs: (keys: string[]) => void;
     renameTab: (key: string, label: string) => void;
@@ -118,17 +118,21 @@ const useAppStore = create<AppStore>((set) => {
 
         ...initialTabs,
         setActiveTabKey: (key: string) => set({ activeTabKey: key }),
-        addTab: () =>
+        addTab: () => {
+            let newTabKey = "";
             set((state) => {
                 const newTab = {
                     key: nanoid(),
                     label: "New Tab",
                     path: "/",
                 };
+                newTabKey = newTab.key;
                 const newTabs = [...state.tabs];
                 newTabs.push(newTab);
                 return { activeTabKey: newTab.key, tabs: newTabs };
-            }),
+            });
+            return newTabKey;
+        },
         removeTab: (key: string) =>
             set((state) => {
                 const items = state.tabs;

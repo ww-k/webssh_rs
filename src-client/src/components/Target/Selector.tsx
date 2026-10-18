@@ -1,7 +1,9 @@
 import { Button, Card, Form, Input, InputNumber } from "antd";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { postTargetAdd } from "@/api";
+import useAppStore from "@/store";
 import "./Selector.css";
 
 import TargetList from "./List";
@@ -12,12 +14,27 @@ import type { ITab } from "@/store";
 export default function TargetSelector({ tab }: { tab: ITab }) {
     const { t } = useTranslation();
     const [form] = Form.useForm();
+    const [refreshKey, setRefreshKey] = useState(0);
+    const addTab = useAppStore((state) => state.addTab);
+    const setTabPath = useAppStore((state) => state.setTabPath);
 
     const onFinish: FormProps["onFinish"] = async (values) => {
-        await postTargetAdd({
+        const target = await postTargetAdd({
             ...values,
             method: 1,
         });
+        setRefreshKey((key) => key + 1);
+        form.resetFields();
+
+        const terminalTabKey = addTab();
+        const targetName =
+            target.name ||
+            `${target.user}@${target.host}${target.port ? `:${target.port}` : ""}`;
+        setTabPath(
+            terminalTabKey,
+            `/terminal/${target.id}`,
+            `ssh ${targetName}`,
+        );
     };
 
     const onFinishFailed: FormProps["onFinishFailed"] = ({
@@ -74,7 +91,7 @@ export default function TargetSelector({ tab }: { tab: ITab }) {
                         </Button>
                     </Form.Item>
                 </Form>
-                <TargetList tab={tab} />
+                <TargetList tab={tab} refreshKey={refreshKey} />
             </Card>
         </div>
     );
