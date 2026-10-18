@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getSftpDownload, postSftpUpload } from "@/api";
+import useAppStore from "@/store";
 
 import type { Extension } from "@codemirror/state";
 import type { IViewFileStat } from "@/types";
@@ -21,6 +22,7 @@ type Props = {
 
 export default function FileEditorPanel({ file, onClose }: Props) {
     const { t } = useTranslation();
+    const theme = useAppStore((state) => state.theme);
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -101,6 +103,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                     <CodeMirror
                         aria-label={file.name}
                         value={content}
+                        theme={theme}
                         height="100%"
                         extensions={
                             lineWrapping

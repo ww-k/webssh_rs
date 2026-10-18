@@ -16,12 +16,20 @@
     font-size: 12px;
     text-align: left;
     list-style: none;
+    color: #333;
     background-color: #fff;
     background-clip: padding-box;
     border: 1px solid #ccc;
     border-radius: 5px;
     -webkit-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+}
+.pcd-contextmenu-dark {
+    color: rgba(255, 255, 255, 0.85);
+    background-color: #1f1f1f;
+    border-color: #424242;
+    -webkit-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
 }
 .pcd-contextmenu li {
     margin: 0;
@@ -45,6 +53,9 @@
     text-decoration: none;
     background-color: #f5f5f5;
 }
+.pcd-contextmenu-dark > li > div:hover {
+    background-color: #303030;
+}
 .pcd-contextmenu > li > div .key-tooltip {
     right: 0;
     float: right;
@@ -54,6 +65,12 @@
 .pcd-contextmenu > li > div span {
     color: #333;
     font-size: 12px;
+}
+.pcd-contextmenu-dark > li > div span {
+    color: rgba(255, 255, 255, 0.85);
+}
+.pcd-contextmenu-dark > li > div .key-tooltip {
+    color: rgba(255, 255, 255, 0.45);
 }
 .pcd-contextmenu > li > div span.anticon {
     font-size: 14px;
@@ -70,8 +87,14 @@
     line-height: 1.5;
     content: "\25B6";
 }
+.pcd-contextmenu-dark > li > div .submenu-indicator:before {
+    color: rgba(255, 255, 255, 0.55);
+}
 .pcd-contextmenu > li.disabled > div span {
     color: #dfdfdf;
+}
+.pcd-contextmenu-dark > li.disabled > div span {
+    color: rgba(255, 255, 255, 0.25);
 }
 .pcd-contextmenu > li.disabled > div:hover {
     background: transparent;
@@ -91,4 +114,7 @@
     margin: 0;
     overflow: hidden;
     background-color: #dfdfdf;
+}
+.pcd-contextmenu-dark .divider {
+    background-color: rgba(255, 255, 255, 0.12);
 }

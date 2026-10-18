@@ -2,6 +2,8 @@ import classNames from "clsx";
 
 import "./index.css";
 
+import useAppStore from "@/store";
+
 import { popupCreator } from "./popupCreator";
 import useContextMenuCore from "./useContextMenuCore";
 
@@ -23,6 +25,7 @@ function Contextmenu(props: {
     y: number;
     destroy: () => void;
 }) {
+    const theme = useAppStore((state) => state.theme);
     const {
         menuList,
         menusActiveInfo,
@@ -42,7 +45,10 @@ function Contextmenu(props: {
                     <ul
                         ref={setMenuElRef.bind(null, menu.id)}
                         key={menu.id}
-                        className="pcd-contextmenu"
+                        className={classNames(
+                            "pcd-contextmenu",
+                            `pcd-contextmenu-${theme}`,
+                        )}
                         style={{
                             left: info.x,
                             top: info.y,
