@@ -47,6 +47,8 @@ use utoipa::OpenApi;
         crate::apis::transfer::handlers::resume_task,
         crate::apis::transfer::handlers::cancel_task,
         crate::apis::transfer::handlers::delete_task,
+        crate::apis::user_data::handlers::user_data_export,
+        crate::apis::user_data::handlers::user_data_import,
     ),
     components(
         schemas(
@@ -62,12 +64,18 @@ use utoipa::OpenApi;
             crate::entities::transfer_task::TransferTaskStatus,
             crate::apis::preferences::dto::Preferences,
             crate::apis::preferences::dto::PreferenceTab,
+            crate::apis::user_data::dto::UserDataExport,
+            crate::apis::user_data::dto::UserDataImportPayload,
+            crate::apis::user_data::dto::UserDataImportResult,
+            crate::apis::user_data::dto::UserDataTarget,
+            crate::apis::user_data::dto::UserDataFavoriteDirectory,
         ),
         responses(
             crate::apis::InternalErrorResponse
         )
     ),
     tags(
+        (name = "user_data", description = "User data import/export API"),
         (name = "target", description = "SSH 目标管理 API"),
         (name = "favorite_directory", description = "收藏目录 API"),
         (name = "ssh_connection", description = "SSH 连接管理 API"),

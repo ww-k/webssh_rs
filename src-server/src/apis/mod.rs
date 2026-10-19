@@ -6,6 +6,7 @@ pub mod ssh;
 pub mod ssh_connection;
 pub mod target;
 pub mod transfer;
+pub mod user_data;
 
 use axum::{
     extract::{FromRequest, rejection::JsonRejection},
