@@ -7,6 +7,8 @@
     overflow: auto;
     position: absolute;
     inset: 0;
+    z-index: 1;
+    background: var(--ant-color-bg-container);
 }
 
 .WebSSH-Settings-Header {
