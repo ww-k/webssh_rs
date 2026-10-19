@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 
 import "./index.css";
 
+import renderPrompt from "@/helpers/renderPrompt";
 import useAppStore from "@/store";
 
 import popContextMenu from "../Contextmenu";
@@ -60,10 +61,15 @@ export default function Home({ active }: { active: boolean }) {
             const closeAllTabs = () => removeTabs(tabs.map((tab) => tab.key));
             const rename = () => {
                 const tab = tabs[tabIndex];
-                const label = window
-                    .prompt(t("app_tab_rename_prompt"), tab.label)
-                    ?.trim();
-                if (label) renameTab(tabKey, label);
+                void renderPrompt({
+                    title: t("app_tab_rename_prompt"),
+                    defaultValue: tab.label,
+                    okText: t("app_btn_ok"),
+                    cancelText: t("app_btn_cancel"),
+                }).then((value) => {
+                    const label = value?.trim();
+                    if (label) renameTab(tabKey, label);
+                });
             };
             const duplicate = () => duplicateTab(tabKey);
 

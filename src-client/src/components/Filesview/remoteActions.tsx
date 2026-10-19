@@ -10,6 +10,7 @@ import {
 import { getFilePath, parseSftpUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
 import { posix } from "@/helpers/path";
+import renderPrompt from "@/helpers/renderPrompt";
 import i18n from "@/i18n";
 
 import renderBatchTaskProgressModal from "../BatchTaskProgressModal/render";
@@ -66,10 +67,12 @@ export async function handleRename(
     file: IViewFileStat,
     getCwdFiles: IGetCwdFiles,
 ) {
-    const newName = window.prompt(
-        i18n.t("files_action_rename_file_prompt"),
-        file.name,
-    );
+    const newName = await renderPrompt({
+        title: i18n.t("files_action_rename_file_prompt"),
+        defaultValue: file.name,
+        okText: i18n.t("app_btn_ok"),
+        cancelText: i18n.t("app_btn_cancel"),
+    });
     if (!newName) {
         return;
     }
@@ -81,10 +84,11 @@ export async function handleRename(
 }
 
 export async function handleMkdir(fileUri: string, getCwdFiles: IGetCwdFiles) {
-    const newName = window.prompt(
-        i18n.t("files_action_rename_folder_prompt"),
-        "",
-    );
+    const newName = await renderPrompt({
+        title: i18n.t("files_action_rename_folder_prompt"),
+        okText: i18n.t("app_btn_ok"),
+        cancelText: i18n.t("app_btn_cancel"),
+    });
     if (!newName) {
         return;
     }
