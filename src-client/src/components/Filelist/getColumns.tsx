@@ -22,7 +22,7 @@ export default function getColumns() {
             className: "filelistTableCellColName",
             dataIndex: "name",
             sortKey: "sortName",
-            width: 200,
+            width: 400,
             sorter: true,
             display: true,
             render: (_, record) =>
