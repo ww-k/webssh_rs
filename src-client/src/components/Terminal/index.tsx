@@ -1,5 +1,5 @@
-import { FolderOpenOutlined } from "@ant-design/icons";
-import { Button } from "antd";
+import { FolderOutlined } from "@ant-design/icons";
+import { Button, Tooltip } from "antd";
 import {
     useCallback,
     useEffect,
@@ -142,15 +142,14 @@ export default function Terminal({
         <div className="terminalView">
             <div className="terminalToolbar">
                 {cwd && targetId !== undefined && (
-                    <Button
-                        icon={<FolderOpenOutlined />}
-                        onClick={openSftp}
-                        size="small"
-                        title={t("terminal_open_sftp")}
-                        type="text"
-                    >
-                        {t("terminal_open_sftp")}
-                    </Button>
+                    <Tooltip title={t("terminal_open_sftp")}>
+                        <Button
+                            icon={<FolderOutlined />}
+                            onClick={openSftp}
+                            size="small"
+                            type="text"
+                        />
+                    </Tooltip>
                 )}
             </div>
             <div className="terminalContainer">

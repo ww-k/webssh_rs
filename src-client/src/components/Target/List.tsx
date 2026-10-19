@@ -2,7 +2,7 @@ import {
     CodeOutlined,
     DeleteOutlined,
     EditOutlined,
-    FolderOpenOutlined,
+    FolderOutlined,
     ReloadOutlined,
 } from "@ant-design/icons";
 import { Button, Input, Modal, Space, Table, Tooltip } from "antd";
@@ -90,7 +90,7 @@ export default function TargetList({
                         <Tooltip title="SFTP">
                             <Button
                                 aria-label="SFTP"
-                                icon={<FolderOpenOutlined />}
+                                icon={<FolderOutlined />}
                                 type="text"
                                 onClick={() => {
                                     setTabPath(

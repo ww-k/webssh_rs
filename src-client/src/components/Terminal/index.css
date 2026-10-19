@@ -11,9 +11,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 0 8px;
-    border-bottom: 1px solid var(--ant-color-border);
-    background: var(--ant-color-bg-container);
+    padding: 0 10px;
+    margin-top: 10px;
 }
 
 .terminalContainer {
