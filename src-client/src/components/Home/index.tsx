@@ -178,6 +178,7 @@ export default function Home({ active }: { active: boolean }) {
     return (
         <Tabs
             style={{ visibility: active ? "visible" : "hidden" }}
+            size="small"
             activeKey={activeTabKey}
             className="WebSSH-Home-Tabs"
             items={tabsItems}
