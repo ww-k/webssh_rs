@@ -1,6 +1,13 @@
 import { FolderOpenOutlined } from "@ant-design/icons";
 import { Button } from "antd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
@@ -90,18 +97,30 @@ export default function Terminal({
         );
     }, [theme]);
 
+    const syncTerminalActive = useCallback(() => {
+        iframeRef.current?.contentWindow?.postMessage(
+            { command: "setActive", args: active },
+            window.location.origin,
+        );
+    }, [active]);
+
+    useLayoutEffect(() => {
+        syncTerminalActive();
+    }, [syncTerminalActive]);
+
     const handleTerminalLoad = useCallback(() => {
         syncTerminal();
+        syncTerminalActive();
         if (active) {
             iframeRef.current?.contentWindow?.postMessage(
                 { command: "focus" },
                 window.location.origin,
             );
         }
-    }, [active, syncTerminal]);
+    }, [active, syncTerminal, syncTerminalActive]);
 
     useEffect(() => {
-        setTimeout(() => {
+        const timeoutId = window.setTimeout(() => {
             if (!iframeRef.current?.contentWindow) {
                 return;
             }
@@ -115,6 +134,8 @@ export default function Terminal({
                 window.location.origin,
             );
         }, 100);
+
+        return () => window.clearTimeout(timeoutId);
     }, [active, syncTerminal]);
 
     return (

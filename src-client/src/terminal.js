@@ -17,6 +17,7 @@ var fitAddon;
 /** @type {import('@xterm/addon-clipboard').ClipboardAddon} */
 var clipboardAddon;
 var sizeCache;
+var terminalActive = false;
 var maxDisconnectionDuration = 5 * 60000;
 var pendingTheme;
 
@@ -52,9 +53,13 @@ function receiveMessage(event) {
     switch (data.command) {
         case "focus":
             if (term) {
-                fitAddon.fit();
+                fitTerminal();
                 term.focus();
             }
+            break;
+        case "setActive":
+            terminalActive = data.args === true;
+            console.log("setActive terminalActive", terminalActive);
             break;
         case "setTheme":
             if (data.args && typeof data.args === "object") {
@@ -114,7 +119,7 @@ function initTerm() {
             } else {
                 console.log(new Date(), socket.id, "socket new connection");
 
-                fitAddon.fit();
+                fitTerminal();
                 term.writeln("");
             }
         }
@@ -135,7 +140,7 @@ function initTerm() {
         }
 
         setTimeout(() => {
-            fitAddon.fit();
+            fitTerminal();
         }, 0);
     });
 
@@ -204,10 +209,16 @@ function createTerminal(socket, targetId) {
     term.focus();
 
     window.addEventListener("resize", () => {
-        fitAddon.fit();
+        fitTerminal();
     });
 
     return term;
+}
+
+function fitTerminal() {
+    if (!term) return;
+    console.log("fitTerminal terminalActive", terminalActive);
+    fitAddon.fit();
 }
 
 function decodeQueryParam(searchStr) {
