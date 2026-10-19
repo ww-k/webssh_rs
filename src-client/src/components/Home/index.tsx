@@ -1,8 +1,10 @@
 import {
     CloseCircleOutlined,
     CloseOutlined,
+    CodeOutlined,
     CopyOutlined,
     EditOutlined,
+    FolderOutlined,
     VerticalRightOutlined,
 } from "@ant-design/icons";
 import { Tabs } from "antd";
@@ -140,10 +142,17 @@ export default function Home({ active }: { active: boolean }) {
                     ...tab,
                     label: (
                         <span
+                            className="WebSSH-Home-TabLabel"
                             onContextMenu={(evt) =>
                                 onTabContextMenu(evt, tab.key)
                             }
                         >
+                            {tab.path.startsWith("/terminal/") && (
+                                <CodeOutlined aria-hidden="true" />
+                            )}
+                            {tab.path.startsWith("/filesview/") && (
+                                <FolderOutlined aria-hidden="true" />
+                            )}
                             {tab.label}
                         </span>
                     ),

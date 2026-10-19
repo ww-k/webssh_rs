@@ -1,5 +1,11 @@
-import { ReloadOutlined } from "@ant-design/icons";
-import { Button, Input, Modal, Space, Table } from "antd";
+import {
+    CodeOutlined,
+    DeleteOutlined,
+    EditOutlined,
+    FolderOpenOutlined,
+    ReloadOutlined,
+} from "@ant-design/icons";
+import { Button, Input, Modal, Space, Table, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -64,53 +70,66 @@ export default function TargetList({
             {
                 title: t("app_common_action"),
                 key: "action",
-                width: 250,
+                width: 180,
                 render: (_, record) => (
-                    <Space size="middle">
-                        <a
-                            onClick={() => {
-                                setTabPath(
-                                    tab.key,
-                                    `/terminal/${record.id}`,
-                                    `ssh ${getTargetName(record)}`,
-                                );
-                            }}
-                        >
-                            SSH
-                        </a>
-                        <a
-                            onClick={() => {
-                                setTabPath(
-                                    tab.key,
-                                    `/filesview/${record.id}`,
-                                    `sftp ${getTargetName(record)}`,
-                                );
-                            }}
-                        >
-                            SFTP
-                        </a>
-                        <a
-                            onClick={() => {
-                                setEditorData(record);
-                                setEditorOpen(true);
-                                refresh();
-                            }}
-                        >
-                            {t("app_btn_edit")}
-                        </a>
-                        <a
-                            onClick={() => {
-                                Modal.confirm({
-                                    content: "Confirm to delete?",
-                                    async onOk() {
-                                        await postTargetRemove(record.id);
-                                        await refresh();
-                                    },
-                                });
-                            }}
-                        >
-                            {t("app_btn_delete")}
-                        </a>
+                    <Space size="small">
+                        <Tooltip title="SSH">
+                            <Button
+                                aria-label="SSH"
+                                icon={<CodeOutlined />}
+                                type="text"
+                                onClick={() => {
+                                    setTabPath(
+                                        tab.key,
+                                        `/terminal/${record.id}`,
+                                        `${getTargetName(record)}`,
+                                    );
+                                }}
+                            />
+                        </Tooltip>
+                        <Tooltip title="SFTP">
+                            <Button
+                                aria-label="SFTP"
+                                icon={<FolderOpenOutlined />}
+                                type="text"
+                                onClick={() => {
+                                    setTabPath(
+                                        tab.key,
+                                        `/filesview/${record.id}`,
+                                        `${getTargetName(record)}`,
+                                    );
+                                }}
+                            />
+                        </Tooltip>
+                        <Tooltip title={t("app_btn_edit")}>
+                            <Button
+                                aria-label={t("app_btn_edit")}
+                                icon={<EditOutlined />}
+                                type="text"
+                                onClick={() => {
+                                    setEditorData(record);
+                                    setEditorOpen(true);
+                                    refresh();
+                                }}
+                            />
+                        </Tooltip>
+                        <Tooltip title={t("app_btn_delete")}>
+                            <Button
+                                aria-label={t("app_btn_delete")}
+                                danger
+                                icon={<DeleteOutlined />}
+                                type="text"
+                                onClick={() => {
+                                    Modal.confirm({
+                                        content: "Confirm to delete?",
+                                        async onOk() {
+                                            await postTargetRemove(record.id);
+                                            await refresh();
+                                        },
+                                    });
+                                }}
+                            />
+                        </Tooltip>
                     </Space>
                 ),
             },

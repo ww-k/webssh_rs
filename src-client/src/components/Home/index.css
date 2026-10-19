@@ -10,3 +10,9 @@
     margin: 0;
     overflow: hidden;
 }
+
+.WebSSH-Home-TabLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
