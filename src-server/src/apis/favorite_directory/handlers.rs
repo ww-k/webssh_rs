@@ -33,9 +33,26 @@ pub async fn favorite_directory_list(
     State(state): State<Arc<AppState>>,
     Query(payload): Query<FavoriteDirectoryListQuery>,
 ) -> Result<Json<Vec<favorite_directory::Model>>, ApiErr> {
-    Ok(Json(
-        service::list(&state.db, &state.connection_pool, payload.target_id).await?,
-    ))
+    Ok(Json(service::list(&state.db, payload.target_id).await?))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/favorite_directory/initialize",
+    tag = "favorite_directory",
+    summary = "初始化收藏目录",
+    operation_id = "favorite_directory_initialize",
+    params(FavoriteDirectoryListQuery),
+    responses(
+        (status = 200, description = "成功初始化收藏目录"),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn favorite_directory_initialize(
+    State(state): State<Arc<AppState>>,
+    Query(payload): Query<FavoriteDirectoryListQuery>,
+) -> Result<(), ApiErr> {
+    service::initialize(&state.db, &state.connection_pool, payload.target_id).await
 }
 
 #[utoipa::path(

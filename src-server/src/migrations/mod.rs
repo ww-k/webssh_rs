@@ -4,6 +4,7 @@ mod m000001_init_db;
 mod m000002_target_jump_host;
 mod m000003_preferences;
 mod m000004_target_name;
+mod m000005_ssh_known_host_endpoint;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000002_target_jump_host::Migration),
             Box::new(m000003_preferences::Migration),
             Box::new(m000004_target_name::Migration),
+            Box::new(m000005_ssh_known_host_endpoint::Migration),
         ]
     }
 }

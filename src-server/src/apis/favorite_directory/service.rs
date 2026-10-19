@@ -1,8 +1,5 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use sea_orm::{ActiveValue::NotSet, ActiveValue::Set, DatabaseConnection};
-use tracing::warn;
-
 use crate::{
     apis::{ApiErr, favorite_directory::dto::FavoriteDirectoryAddPayload, fs, sftp},
     consts::services_err_code::{ERR_CODE_DB_ERR, ERR_CODE_FAVORITE_DIRECTORY_INVALID_REQUEST},
@@ -11,49 +8,49 @@ use crate::{
     repositories::favorite_directory as favorite_directory_repository,
     ssh_connection_pool::SshConnectionPool,
 };
+use sea_orm::{ActiveValue::NotSet, ActiveValue::Set, DatabaseConnection};
 
 pub async fn list(
     db: &DatabaseConnection,
-    connection_pool: &SshConnectionPool,
     target_id: i32,
 ) -> Result<Vec<favorite_directory::Model>, ApiErr> {
     validate_target_id(target_id)?;
-    if !map_db_err!(favorite_directory_repository::is_initialized(db, target_id).await)? {
-        let defaults = match discover_default_directories(connection_pool, target_id).await {
-            Ok(defaults) => defaults,
-            Err(err) => {
-                warn!(
-                    target_id,
-                    error = %err,
-                    "failed to discover default favorite directories"
-                );
-                return stored_list(db, target_id).await;
-            }
-        };
-        let initialized_at = now_ms();
-        let defaults = defaults
-            .into_iter()
-            .map(|(name, path)| favorite_directory::ActiveModel {
-                id: NotSet,
-                target_id: Set(target_id),
-                name: Set(name),
-                path: Set(path),
-                is_default: Set(true),
-                created_at: Set(initialized_at),
-            })
-            .collect();
-        map_db_err!(
-            favorite_directory_repository::initialize_defaults(
-                db,
-                target_id,
-                initialized_at,
-                defaults,
-            )
-            .await
-        )?;
+    stored_list(db, target_id).await
+}
+
+pub async fn initialize(
+    db: &DatabaseConnection,
+    connection_pool: &SshConnectionPool,
+    target_id: i32,
+) -> Result<(), ApiErr> {
+    validate_target_id(target_id)?;
+    if map_db_err!(favorite_directory_repository::is_initialized(db, target_id).await)? {
+        return Ok(());
     }
 
-    stored_list(db, target_id).await
+    let initialized_at = now_ms();
+    let defaults = discover_default_directories(connection_pool, target_id)
+        .await?
+        .into_iter()
+        .map(|(name, path)| favorite_directory::ActiveModel {
+            id: NotSet,
+            target_id: Set(target_id),
+            name: Set(name),
+            path: Set(path),
+            is_default: Set(true),
+            created_at: Set(initialized_at),
+        })
+        .collect();
+    map_db_err!(
+        favorite_directory_repository::initialize_defaults(
+            db,
+            target_id,
+            initialized_at,
+            defaults,
+        )
+        .await
+    )?;
+    Ok(())
 }
 
 async fn stored_list(
@@ -215,7 +212,6 @@ mod tests {
     #[tokio::test]
     async fn favorite_directories_are_idempotent_and_isolated_by_target() {
         let db = test_db().await;
-        let connection_pool = connection_pool(&db);
         favorite_directory_repository::initialize_defaults(&db, 0, 1, Vec::new())
             .await
             .unwrap();
@@ -252,12 +248,12 @@ mod tests {
 
         assert_eq!(first.id, duplicate.id);
         assert!(!first.is_default);
-        assert_eq!(list(&db, &connection_pool, 0).await.unwrap().len(), 1);
-        assert_eq!(list(&db, &connection_pool, 1).await.unwrap().len(), 1);
+        assert_eq!(list(&db, 0).await.unwrap().len(), 1);
+        assert_eq!(list(&db, 1).await.unwrap().len(), 1);
 
         remove(&db, 0, "/tmp").await.unwrap();
-        assert!(list(&db, &connection_pool, 0).await.unwrap().is_empty());
-        assert_eq!(list(&db, &connection_pool, 1).await.unwrap().len(), 1);
+        assert!(list(&db, 0).await.unwrap().is_empty());
+        assert_eq!(list(&db, 1).await.unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -266,7 +262,8 @@ mod tests {
         let connection_pool = connection_pool(&db);
         let expected = fs::discover_user_dirs();
 
-        let initialized = list(&db, &connection_pool, 0).await.unwrap();
+        initialize(&db, &connection_pool, 0).await.unwrap();
+        let initialized = list(&db, 0).await.unwrap();
         assert_eq!(initialized.len(), expected.len());
         assert!(initialized.iter().all(|directory| directory.is_default));
         assert_eq!(
@@ -283,7 +280,7 @@ mod tests {
         for directory in initialized {
             remove(&db, 0, &directory.path).await.unwrap();
         }
-        assert!(list(&db, &connection_pool, 0).await.unwrap().is_empty());
+        assert!(list(&db, 0).await.unwrap().is_empty());
         assert!(
             favorite_directory_repository::is_initialized(&db, 0)
                 .await
@@ -308,7 +305,8 @@ mod tests {
         .await
         .unwrap();
 
-        let initialized = list(&db, &connection_pool, 0).await.unwrap();
+        initialize(&db, &connection_pool, 0).await.unwrap();
+        let initialized = list(&db, 0).await.unwrap();
         assert_eq!(initialized.len(), expected.len());
         let existing = initialized
             .iter()
@@ -319,9 +317,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remote_discovery_failure_returns_stored_directories_without_marker() {
+    async fn list_returns_stored_directories_without_initializing() {
         let db = test_db().await;
-        let connection_pool = connection_pool(&db);
         let stored = add(
             &db,
             FavoriteDirectoryAddPayload {
@@ -333,10 +330,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(
-            list(&db, &connection_pool, 999).await.unwrap(),
-            vec![stored]
-        );
+        assert_eq!(list(&db, 999).await.unwrap(), vec![stored]);
         assert!(
             !favorite_directory_repository::is_initialized(&db, 999)
                 .await
@@ -347,9 +341,8 @@ mod tests {
     #[tokio::test]
     async fn favorite_directories_reject_invalid_payloads() {
         let db = test_db().await;
-        let connection_pool = connection_pool(&db);
 
-        assert!(list(&db, &connection_pool, -1).await.is_err());
+        assert!(list(&db, -1).await.is_err());
         assert!(
             add(
                 &db,

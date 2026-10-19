@@ -1,8 +1,10 @@
 import { useMemoizedFn, useRequest } from "ahooks";
-import { useState } from "react";
+import { Spin } from "antd";
+import { useEffect, useState } from "react";
 
 import "./index.css";
 
+import { postFavoriteDirectoryInitialize } from "@/api";
 import { getSftpUserDirHome } from "@/api/sftp";
 import { isSftpFileUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
@@ -26,6 +28,21 @@ export default function FilesviewRemote({
     tabKey: string;
     targetId: number;
 }) {
+    const [favoriteDirectoriesInitialized, setFavoriteDirectoriesInitialized] =
+        useState(false);
+    useEffect(() => {
+        setFavoriteDirectoriesInitialized(false);
+        let active = true;
+        postFavoriteDirectoryInitialize(targetId)
+            .catch(() => undefined)
+            .finally(() => {
+                if (active) setFavoriteDirectoriesInitialized(true);
+            });
+        return () => {
+            active = false;
+        };
+    }, [targetId]);
+
     const { copyData, setCopyData, setTabState } = useAppStore();
     const [cwd, setCwd] = useState(
         initialCwd?.startsWith(baseUrl) ? initialCwd : "",
@@ -98,6 +115,14 @@ export default function FilesviewRemote({
     const onRename = useMemoizedFn((file: IViewFileStat) => {
         handleRename(file, getCwdFiles);
     });
+
+    if (!favoriteDirectoriesInitialized) {
+        return (
+            <div className="filesviewInitializing">
+                <Spin />
+            </div>
+        );
+    }
 
     return (
         <FilesviewBase

@@ -1,7 +1,14 @@
 import { useMemoizedFn, useRequest } from "ahooks";
-import { useState } from "react";
+import { Spin } from "antd";
+import { useEffect, useState } from "react";
 
-import { getFsUserDirDownload, getFsUserDirHome } from "@/api";
+import "./index.css";
+
+import {
+    getFsUserDirDownload,
+    getFsUserDirHome,
+    postFavoriteDirectoryInitialize,
+} from "@/api";
 import getFsLsMapFiles, { normalizeLocalPath } from "@/helpers/getFsLsMapFiles";
 import { isMSWindows } from "@/helpers/platform";
 
@@ -30,6 +37,20 @@ export default function FilesviewLocal({
     onCwdChange?: (cwd: string) => void;
     onSelecteChange?: (files: IViewFileStat[]) => void;
 }) {
+    const [favoriteDirectoriesInitialized, setFavoriteDirectoriesInitialized] =
+        useState(false);
+    useEffect(() => {
+        let active = true;
+        postFavoriteDirectoryInitialize(0)
+            .catch(() => undefined)
+            .finally(() => {
+                if (active) setFavoriteDirectoriesInitialized(true);
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+
     const [cwd, setCwd] = useState(() => normalizeLocalPath(initialCwd || ""));
     const [pathHistory, setPathHistory] = useState<string[]>([]);
 
@@ -84,6 +105,14 @@ export default function FilesviewLocal({
             setCwdPath(file.uri);
         }
     });
+
+    if (!favoriteDirectoriesInitialized) {
+        return (
+            <div className="filesviewInitializing">
+                <Spin />
+            </div>
+        );
+    }
 
     return (
         <FilesviewBase

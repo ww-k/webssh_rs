@@ -10,6 +10,7 @@ use utoipa::OpenApi;
         crate::apis::preferences::handlers::get_preferences,
         crate::apis::preferences::handlers::put_preferences,
         crate::apis::favorite_directory::handlers::favorite_directory_list,
+        crate::apis::favorite_directory::handlers::favorite_directory_initialize,
         crate::apis::favorite_directory::handlers::favorite_directory_add,
         crate::apis::favorite_directory::handlers::favorite_directory_remove,
         crate::apis::ssh_connection::handlers::list,

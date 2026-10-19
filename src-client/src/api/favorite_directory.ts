@@ -19,6 +19,12 @@ export async function getFavoriteDirectoryList(targetId: number) {
     return response.data;
 }
 
+export async function postFavoriteDirectoryInitialize(targetId: number) {
+    await axios.post<void>("/api/favorite_directory/initialize", null, {
+        params: { target_id: targetId },
+    });
+}
+
 export async function postFavoriteDirectoryAdd(payload: {
     target_id: number;
     name: string;
