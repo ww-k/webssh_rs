@@ -15,6 +15,7 @@ use utoipa::OpenApi;
         crate::apis::favorite_directory::handlers::favorite_directory_remove,
         crate::apis::ssh_connection::handlers::list,
         crate::apis::ssh_connection::handlers::expire,
+        crate::apis::ssh_connection::handlers::close,
         crate::apis::ssh::handlers::exec_handler,
         crate::apis::sftp::handlers::ls,
         crate::apis::sftp::handlers::mkdir,

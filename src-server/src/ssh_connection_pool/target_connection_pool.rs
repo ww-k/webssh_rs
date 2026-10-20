@@ -226,6 +226,22 @@ impl TargetConnectionPool {
         }
     }
 
+    pub(crate) async fn close_connection(&self, connection_id: &str) -> bool {
+        let connection = self
+            .connections
+            .lock()
+            .await
+            .iter()
+            .find(|connection| connection.id() == connection_id)
+            .cloned();
+        if let Some(connection) = connection {
+            connection.close().await;
+            true
+        } else {
+            false
+        }
+    }
+
     pub(crate) async fn snapshots(&self) -> Vec<ConnectionSnapshot> {
         let connections = self.connections.lock().await;
         connections

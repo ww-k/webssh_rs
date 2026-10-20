@@ -140,6 +140,33 @@ impl SshConnectionPool {
         false
     }
 
+    pub(crate) async fn close_connection(&self, target_id: i32, connection_id: &str) -> bool {
+        let mut target_connection_pools = Vec::new();
+        if let Some(target_connection_pool) = self
+            .target_connection_pools
+            .lock()
+            .await
+            .get(&target_id)
+            .cloned()
+        {
+            target_connection_pools.push(target_connection_pool);
+        }
+        target_connection_pools.extend(
+            self.expired_connection_pools
+                .lock()
+                .await
+                .iter()
+                .filter(|pool| pool.target_id() == target_id)
+                .cloned(),
+        );
+        for target_connection_pool in target_connection_pools {
+            if target_connection_pool.close_connection(connection_id).await {
+                return true;
+            }
+        }
+        false
+    }
+
     pub(crate) async fn connection_snapshots(
         &self,
         target_filter: Option<i32>,

@@ -17,3 +17,9 @@ pub async fn expire(connection_pool: &SshConnectionPool, target_id: i32, connect
         .expire_connection(target_id, connection_id)
         .await;
 }
+
+pub async fn close(connection_pool: &SshConnectionPool, target_id: i32, connection_id: &str) {
+    let _ = connection_pool
+        .close_connection(target_id, connection_id)
+        .await;
+}

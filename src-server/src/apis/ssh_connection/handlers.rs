@@ -76,3 +76,35 @@ pub(crate) async fn expire(
     debug!("@ssh_connection done {:?}", payload);
     Ok(())
 }
+
+#[utoipa::path(
+    post,
+    path = "/api/ssh_connection/close",
+    tag = "ssh_connection",
+    summary = "Close an SSH connection",
+    description = "Immediately closes the selected SSH connection, including active channels",
+    operation_id = "ssh_connection_close",
+    params(
+        SshConnectionExpirePayload
+    ),
+    responses(
+        (status = 200, description = "SSH connection closed"),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub(crate) async fn close(
+    State(connection_pool): State<Arc<SshConnectionPool>>,
+    Query(payload): Query<SshConnectionExpirePayload>,
+) -> Result<(), ApiErr> {
+    info!("@ssh_connection close {:?}", payload);
+
+    service::close(
+        &connection_pool,
+        payload.target_id,
+        payload.connection_id.as_str(),
+    )
+    .await;
+
+    debug!("@ssh_connection close done {:?}", payload);
+    Ok(())
+}

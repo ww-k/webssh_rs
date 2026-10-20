@@ -15,17 +15,11 @@ import useAppStore from "@/store";
 import "./List.css";
 
 import TargetEditor from "./Editor";
+import getTargetName from "./getTargetName";
 
 import type { ColumnsType } from "antd/es/table/interface";
 import type { ITarget } from "@/api";
 import type { ITab } from "@/store";
-
-function getTargetName(target: ITarget): string {
-    return (
-        target.name ||
-        `${target.user}@${target.host}${target.port ? `:${target.port}` : ""}`
-    );
-}
 
 export default function TargetList({
     tab,

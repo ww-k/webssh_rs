@@ -172,7 +172,7 @@ function waitForServerPort(child) {
     let settled = false;
     const timeout = setTimeout(() => {
       finish(new Error("timed out waiting for the Listening log"));
-    }, 60_000);
+    }, 120_000);
 
     const onOutput = (data) => {
       output += data.toString();

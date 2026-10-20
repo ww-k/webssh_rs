@@ -1,4 +1,2 @@
 - [] [feat] sftp 编辑/查看功能增加系统编辑器打开
-- [] [feat] 传输列表 增加删除所有历史记录
-- [] [feat] 增加ssh连接管理，可以过期连接，关闭连接
 - [] [feat] target 增加tag，target list上增加通过tag过滤

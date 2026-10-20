@@ -11,12 +11,13 @@ use axum::{
 
 use crate::ssh_connection_pool::SshConnectionPool;
 
-pub(crate) use handlers::{expire, list};
+pub(crate) use handlers::{close, expire, list};
 
 pub(crate) fn router_builder(connection_pool: Arc<SshConnectionPool>) -> Router {
     Router::new()
         .route("/list", get(list))
         .route("/expire", post(expire))
+        .route("/close", post(close))
         .fallback(|| async { "not supported" })
         .with_state(connection_pool)
 }

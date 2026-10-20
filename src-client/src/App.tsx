@@ -3,7 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import "./App.css";
 
-import { HomeOutlined, SettingOutlined, SwapOutlined } from "@ant-design/icons";
+import {
+    DisconnectOutlined,
+    HomeOutlined,
+    SettingOutlined,
+    SwapOutlined,
+} from "@ant-design/icons";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import { useTranslation } from "react-i18next";
@@ -12,6 +17,7 @@ import useAppStore from "@/store";
 
 import Home from "./components/Home";
 import Settings from "./components/Settings";
+import SshConnections from "./components/SshConnections";
 import Transfer from "./components/Transfer";
 import transferService from "./services/transfer";
 
@@ -84,6 +90,11 @@ export default function App() {
                 extra: !sidebarCollapsed ? (
                     <Badge count={newTransferCount}></Badge>
                 ) : undefined,
+            },
+            {
+                key: "ssh_connections",
+                icon: <DisconnectOutlined />,
+                label: t("app_menu_ssh_connections"),
             },
         ];
     }, [newTransferCount, sidebarCollapsed, t]);
@@ -202,6 +213,7 @@ export default function App() {
                 <Content className="WebSSH-Root-Content">
                     <Home active={activeMenuKey === "home"} />
                     {activeMenuKey === "transfer" && <Transfer />}
+                    {activeMenuKey === "ssh_connections" && <SshConnections />}
                     {activeMenuKey === "settings" && <Settings />}
                 </Content>
             </Layout>

@@ -142,7 +142,7 @@ impl SshConnection {
         }
     }
 
-    async fn close(self: Arc<Self>) {
+    pub(crate) async fn close(self: Arc<Self>) {
         if self
             .state
             .swap(ConnectionState::Closed as u8, Ordering::AcqRel)

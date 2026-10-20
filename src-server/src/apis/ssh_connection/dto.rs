@@ -18,10 +18,10 @@ pub struct ConnectionInfo {
     pub expired: bool,
     /// 连接是否已关闭
     pub closed: bool,
-    /// 连接类型名称
-    pub type_name: String,
     /// 关联的 SSH 目标 ID
     pub target_id: i32,
+    /// Current active channel count
+    pub active_channels: usize,
 }
 
 impl From<ConnectionSnapshot> for ConnectionInfo {
@@ -30,8 +30,8 @@ impl From<ConnectionSnapshot> for ConnectionInfo {
             id: snapshot.id,
             expired: snapshot.state != ConnectionState::Active,
             closed: snapshot.state == ConnectionState::Closed,
-            type_name: "SSH".to_string(),
             target_id: snapshot.target_id,
+            active_channels: snapshot.active_channels,
         }
     }
 }
