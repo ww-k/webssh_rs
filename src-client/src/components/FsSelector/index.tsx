@@ -64,7 +64,8 @@ export default function FsSelector({
         <Modal
             open={open}
             title={title}
-            width={860}
+            width={800}
+            centered
             onCancel={onCancel}
             footer={
                 <Space>
@@ -76,7 +77,7 @@ export default function FsSelector({
             }
         >
             <FilesviewLocal
-                style={{ height: 420 }}
+                style={{ height: "min(420px, calc(100vh - 200px))" }}
                 initialCwd={initialCwd}
                 defaultDirectory={defaultDirectory}
                 multiple={multiple}

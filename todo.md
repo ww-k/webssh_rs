@@ -1,3 +1,2 @@
 - [] [feat] sftp 编辑/查看功能增加系统编辑器打开
 - [] [feat] target 增加tag，target list上增加通过tag过滤
-- [] [bug] sftp下载时弹出的本地文件选择框，在tauri初始尺寸下，位置偏下
