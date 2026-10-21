@@ -1,3 +1,4 @@
 - [] [feat] sftp 编辑/查看功能增加系统编辑器打开
 - [] [feat] target 增加tag，target list上增加通过tag过滤
 - [] [bug] 关闭一个启动了ssh terminal的连接，terminal就没有任何响应了，应该有一些界面变化，需要设计一下。例如显示一个连接已断开提示，并给一个重新连接按钮
+- [] [bug] sftp下载时弹出的本地文件选择框，在tauri初始尺寸下，位置偏下
