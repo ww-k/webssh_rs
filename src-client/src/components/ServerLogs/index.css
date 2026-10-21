@@ -1,0 +1,79 @@
+.WebSSH-ServerLogs {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    padding: 12px 20px 16px;
+    overflow: hidden;
+    background: var(--ant-color-bg-container);
+}
+
+.WebSSH-ServerLogs-Header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.WebSSH-ServerLogs-Header .ant-typography {
+    margin: 0;
+}
+
+.WebSSH-ServerLogs-Filter {
+    width: min(280px, 42vw);
+}
+
+.WebSSH-ServerLogs-LevelFilter {
+    width: 112px;
+}
+
+.WebSSH-ServerLogs-Output {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    padding: 12px;
+    overflow: auto;
+    color: var(--ant-color-text);
+    font-family: var(--ant-font-family);
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: var(--ant-color-fill-quaternary);
+    border: 1px solid var(--ant-color-border);
+    border-radius: 4px;
+}
+
+.WebSSH-ServerLogs-Empty {
+    display: grid;
+    min-height: 100%;
+    align-content: center;
+    justify-items: center;
+    gap: 8px;
+    color: var(--ant-color-text-tertiary);
+}
+
+.WebSSH-ServerLogs-Empty .ant-empty {
+    margin: 0;
+}
+
+@media (max-width: 600px) {
+    .WebSSH-ServerLogs {
+        padding: 16px;
+    }
+
+    .WebSSH-ServerLogs-Header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .WebSSH-ServerLogs-Filter {
+        width: min(240px, calc(100vw - 150px));
+    }
+
+    .WebSSH-ServerLogs-LevelFilter {
+        width: 104px;
+    }
+}

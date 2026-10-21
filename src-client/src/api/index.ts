@@ -46,6 +46,7 @@ axios.interceptors.response.use(
 );
 
 export * from "./favorite_directory";
+export * from "./logs";
 export * from "./fs";
 export * from "./sftp";
 export * from "./ssh_connection";

@@ -5,6 +5,7 @@ import "./App.css";
 
 import {
     DisconnectOutlined,
+    FileTextOutlined,
     HomeOutlined,
     SettingOutlined,
     SwapOutlined,
@@ -18,6 +19,7 @@ import useAppStore from "@/store";
 import Home from "./components/Home";
 import Settings from "./components/Settings";
 import SshConnections from "./components/SshConnections";
+import ServerLogs from "./components/ServerLogs";
 import Transfer from "./components/Transfer";
 import transferService from "./services/transfer";
 
@@ -95,6 +97,11 @@ export default function App() {
                 key: "ssh_connections",
                 icon: <DisconnectOutlined />,
                 label: t("app_menu_ssh_connections"),
+            },
+            {
+                key: "server_logs",
+                icon: <FileTextOutlined />,
+                label: t("app_menu_server_logs"),
             },
         ];
     }, [newTransferCount, sidebarCollapsed, t]);
@@ -214,6 +221,7 @@ export default function App() {
                     <Home active={activeMenuKey === "home"} />
                     {activeMenuKey === "transfer" && <Transfer />}
                     {activeMenuKey === "ssh_connections" && <SshConnections />}
+                    {activeMenuKey === "server_logs" && <ServerLogs />}
                     {activeMenuKey === "settings" && <Settings />}
                 </Content>
             </Layout>

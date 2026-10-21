@@ -3,6 +3,7 @@ pub mod apis;
 mod config;
 mod consts;
 pub mod entities;
+pub mod log_buffer;
 mod migrations;
 mod repositories;
 pub mod sftp_client;
@@ -71,6 +72,7 @@ pub fn init_logging() {
         std::env::var("RUST_LOG").unwrap_or_else(|_| "webssh_rs_server=debug,off".to_string());
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(EnvFilter::new(env_log))
+        .with_writer(log_buffer::LogWriter::new(log_buffer::log_buffer()))
         .finish();
 
     let _ = tracing::subscriber::set_global_default(subscriber);
@@ -86,7 +88,7 @@ pub async fn run_server_with_listener<F>(listener: tokio::net::TcpListener, shut
 where
     F: Future<Output = ()> + Send + 'static,
 {
-    println!("Starting server...");
+    tracing::info!("Starting server...");
 
     let config = Config::load_config().await.unwrap();
 
@@ -98,7 +100,7 @@ where
     }
     let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
 
-    println!("db_url {}", db_url);
+    tracing::info!(db_url = %db_url, "Database configured");
 
     let db = Database::connect(&db_url)
         .await
@@ -124,6 +126,7 @@ where
     });
 
     let app = Router::new()
+        .route("/api/logs", get(get_logs))
         .route(
             "/api/health",
             get(|| async { axum::Json(serde_json::json!({ "status": "ok" })) }),
@@ -157,12 +160,25 @@ where
         .fallback(serve_client)
         .layer(CorsLayer::permissive());
 
-    println!("Listening on http://{}", listener.local_addr().unwrap());
+    tracing::info!("Listening on http://{}", listener.local_addr().unwrap());
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown)
         .await
         .unwrap();
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/logs",
+    tag = "server_logs",
+    summary = "获取服务端日志",
+    responses(
+        (status = 200, description = "最近的服务端日志", body = [String])
+    )
+)]
+pub async fn get_logs() -> axum::Json<Vec<String>> {
+    axum::Json(log_buffer::log_buffer().lines())
 }
 
 async fn serve_client(uri: axum::http::Uri) -> Response<Body> {
