@@ -85,7 +85,6 @@ export default function BatchTaskProgressModal<T>({
         });
         return () => {
             abortControllerRef.current?.abort();
-            modalProps.onCancel?.();
         };
     }, []);
 
