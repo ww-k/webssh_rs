@@ -127,6 +127,12 @@ async fn connection_pool_regressions() {
     .expect("dedicated SFTP cleanup scenario timed out");
     tokio::time::timeout(
         Duration::from_secs(10),
+        shared_sftp_client_is_reused(&context),
+    )
+    .await
+    .expect("shared SFTP client reuse scenario timed out");
+    tokio::time::timeout(
+        Duration::from_secs(10),
         hard_aborting_dedicated_sftp_releases_its_connection(&context),
     )
     .await
@@ -315,6 +321,23 @@ async fn dropping_dedicated_sftp_releases_its_connection(context: &TestContext) 
         .expect("dropping the SFTP guard should close its dedicated connection")
         .unwrap();
     drop(shared);
+}
+
+async fn shared_sftp_client_is_reused(context: &TestContext) {
+    let pool = connection_pool(context, 2, 2);
+    let first = pool.sftp(1, ChannelMode::Shared).await.unwrap();
+    let second = pool.sftp(1, ChannelMode::Shared).await.unwrap();
+
+    assert_eq!(
+        pool.connection_snapshots(Some(1)).await[0].active_channels,
+        1
+    );
+    drop(first);
+    drop(second);
+
+    let connection_id = pool.connection_snapshots(Some(1)).await[0].id.clone();
+    assert!(pool.expire_connection(1, &connection_id).await);
+    wait_until_connection_is_removed(&pool, &connection_id).await;
 }
 
 async fn hard_aborting_dedicated_sftp_releases_its_connection(context: &TestContext) {

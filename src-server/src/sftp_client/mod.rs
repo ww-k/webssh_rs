@@ -7,6 +7,7 @@ use std::{
     io::SeekFrom,
     ops::BitOr,
     sync::{Arc, atomic::AtomicU32},
+    time::Instant,
 };
 
 use bytes::Bytes;
@@ -19,6 +20,7 @@ use tokio::{
     sync::{Mutex, mpsc, oneshot},
     task::JoinHandle,
 };
+use tracing::debug;
 
 use crate::ssh_connection_pool::{SshChannelGuard, SshChannelTransferGuard};
 
@@ -502,12 +504,21 @@ pub struct FastSftpClient {
 
 pub struct SftpClientGuard {
     client: Option<FastSftpClient>,
+    abort_on_drop: bool,
 }
 
 impl SftpClientGuard {
     pub(crate) fn new(client: FastSftpClient) -> Self {
         Self {
             client: Some(client),
+            abort_on_drop: true,
+        }
+    }
+
+    pub(crate) fn cached(client: FastSftpClient) -> Self {
+        Self {
+            client: Some(client),
+            abort_on_drop: false,
         }
     }
 
@@ -532,6 +543,9 @@ impl std::ops::Deref for SftpClientGuard {
 
 impl Drop for SftpClientGuard {
     fn drop(&mut self) {
+        if !self.abort_on_drop {
+            return;
+        }
         let Some(client) = self.client.take() else {
             return;
         };
@@ -639,8 +653,21 @@ impl ResponsePacket {
 }
 
 impl FastSftpClient {
+    pub(crate) async fn is_usable(&self) -> bool {
+        self.read_task
+            .lock()
+            .await
+            .as_ref()
+            .is_some_and(|task| !task.is_finished())
+    }
+
     pub async fn new(channel: SshChannelGuard) -> SftpResult<Self> {
+        let started = Instant::now();
         channel.request_subsystem(true, "sftp").await?;
+        debug!(
+            elapsed_us = started.elapsed().as_micros() as u64,
+            "sftp subsystem request completed"
+        );
         let (reader, writer, channel_guard) = channel
             .into_split()
             .ok_or_else(|| SftpError::Protocol("missing ssh channel".to_string()))?;
@@ -648,7 +675,12 @@ impl FastSftpClient {
     }
 
     pub async fn new_from_channel(channel: Channel<Msg>) -> SftpResult<Self> {
+        let started = Instant::now();
         channel.request_subsystem(true, "sftp").await?;
+        debug!(
+            elapsed_us = started.elapsed().as_micros() as u64,
+            "sftp subsystem request completed"
+        );
         let (reader, writer) = channel.split();
         Self::new_with_channel(reader, writer, None).await
     }
@@ -684,6 +716,7 @@ impl FastSftpClient {
         mut writer: AsyncSftpWriter,
         mut channel_control: Option<SftpChannelControl>,
     ) -> SftpResult<Self> {
+        let started = Instant::now();
         if let Err(err) = write_raw_packet_to(&mut writer, SSH_FXP_INIT, &[0, 0, 0, 3]).await {
             close_sftp_channel(&mut channel_control).await;
             return Err(err);
@@ -702,6 +735,10 @@ impl FastSftpClient {
                 actual: version_packet.packet_type,
             });
         }
+        debug!(
+            elapsed_us = started.elapsed().as_micros() as u64,
+            "sftp init/version completed"
+        );
 
         let inner = Arc::new(FastSftpInner {
             writer: Mutex::new(writer),
@@ -719,38 +756,73 @@ impl FastSftpClient {
     }
 
     pub async fn read_dir<T: Into<String>>(&self, path: T) -> SftpResult<Vec<SftpDirEntry>> {
+        let started = Instant::now();
+        let path = path.into();
         let mut payload = Vec::new();
-        put_string(&mut payload, path.into().as_bytes());
+        put_string(&mut payload, path.as_bytes());
+        let opendir_started = Instant::now();
         let handle = self.open_handle_for(SSH_FXP_OPENDIR, payload).await?;
+        debug!(path = %path, elapsed_us = opendir_started.elapsed().as_micros() as u64, "sftp opendir completed");
         let handle = Arc::<[u8]>::from(handle);
         let mut entries = Vec::new();
 
         loop {
-            let mut payload = Vec::new();
-            put_string(&mut payload, handle.as_ref());
-            let response = self.request(SSH_FXP_READDIR, payload).await?;
+            let batch_started = Instant::now();
+            let mut pending = Vec::with_capacity(2);
+            for _ in 0..2 {
+                let mut payload = Vec::new();
+                put_string(&mut payload, handle.as_ref());
+                pending.push(self.request_pending(SSH_FXP_READDIR, payload).await?);
+            }
 
-            match response.packet_type {
-                SSH_FXP_NAME => {
-                    entries.extend(parse_name_entries(response.payload())?);
-                }
-                SSH_FXP_STATUS => {
-                    let status = parse_status_packet(response.payload())?;
-                    if status.code == SSH_FX_EOF {
-                        break;
+            let mut eof = false;
+            let entries_before = entries.len();
+            for request in pending {
+                let response = request.wait().await?;
+                match response.packet_type {
+                    SSH_FXP_NAME => {
+                        entries.extend(parse_name_entries(response.payload())?);
                     }
-                    return Err(status.into());
+                    SSH_FXP_STATUS => {
+                        let status = parse_status_packet(response.payload())?;
+                        if status.code == SSH_FX_EOF {
+                            eof = true;
+                        } else {
+                            return Err(status.into());
+                        }
+                    }
+                    packet_type => {
+                        return Err(SftpError::UnexpectedPacket {
+                            expected: "NAME",
+                            actual: packet_type,
+                        });
+                    }
                 }
-                packet_type => {
-                    return Err(SftpError::UnexpectedPacket {
-                        expected: "NAME",
-                        actual: packet_type,
-                    });
-                }
+            }
+            debug!(
+                path = %path,
+                request_count = 2,
+                entries = entries.len() - entries_before,
+                eof,
+                elapsed_us = batch_started.elapsed().as_micros() as u64,
+                "sftp readdir batch completed"
+            );
+            if eof {
+                break;
             }
         }
 
-        self.close_arc(handle).await?;
+        let mut payload = Vec::new();
+        put_string(&mut payload, handle.as_ref());
+        let close_started = Instant::now();
+        self.request_untracked(SSH_FXP_CLOSE, payload).await?;
+        debug!(
+            path = %path,
+            entries = entries.len(),
+            close_write_us = close_started.elapsed().as_micros() as u64,
+            elapsed_us = started.elapsed().as_micros() as u64,
+            "sftp read_dir completed"
+        );
         Ok(entries)
     }
 
@@ -1038,6 +1110,14 @@ impl FastSftpClient {
             .await?
             .wait()
             .await
+    }
+
+    async fn request_untracked(&self, packet_type: u8, mut payload: Vec<u8>) -> SftpResult<()> {
+        let id = self.next_id();
+        let mut body = Vec::with_capacity(payload.len() + 4);
+        put_u32(&mut body, id);
+        body.append(&mut payload);
+        write_raw_packet(&self.inner.writer, packet_type, &body).await
     }
 
     async fn request_pending(

@@ -6,6 +6,8 @@ use std::sync::{
 use tokio::sync::{Mutex, Notify};
 use tracing::debug;
 
+use crate::sftp_client::{FastSftpClient, SftpClientGuard};
+
 use super::{
     ChannelMode, ConnectionSnapshot,
     connection::{ChannelPermit, ConnectionState, SshConnection},
@@ -23,6 +25,8 @@ pub(crate) struct TargetConnectionPool {
     max_connections: usize,
     max_channels_per_connection: usize,
     expired: AtomicBool,
+    sftp_client: Mutex<Option<FastSftpClient>>,
+    sftp_init_lock: Mutex<()>,
 }
 
 impl TargetConnectionPool {
@@ -41,6 +45,8 @@ impl TargetConnectionPool {
             max_connections,
             max_channels_per_connection,
             expired: AtomicBool::new(false),
+            sftp_client: Mutex::new(None),
+            sftp_init_lock: Mutex::new(()),
         }
     }
 
@@ -130,6 +136,54 @@ impl TargetConnectionPool {
         }
     }
 
+    pub(crate) async fn sftp(
+        self: &Arc<Self>,
+        mode: ChannelMode,
+    ) -> anyhow::Result<SftpClientGuard> {
+        if mode != ChannelMode::Shared
+            || self.max_connections <= 1
+            || self.max_channels_per_connection <= 1
+        {
+            let channel = self.acquire(mode).await?;
+            return Ok(SftpClientGuard::new(FastSftpClient::new(channel).await?));
+        }
+
+        let _init_guard = self.sftp_init_lock.lock().await;
+        self.ensure_active()?;
+        let mut cached = self.sftp_client.lock().await;
+        if let Some(client) = cached.as_ref() {
+            if client.is_usable().await {
+                return Ok(SftpClientGuard::cached(client.clone()));
+            }
+            let stale = cached.take();
+            drop(cached);
+            if let Some(stale) = stale {
+                stale.abort().await;
+            }
+            cached = self.sftp_client.lock().await;
+            self.ensure_active()?;
+        }
+
+        let channel = self.acquire(ChannelMode::Shared).await?;
+        let client = FastSftpClient::new(channel).await?;
+        if let Err(err) = self.ensure_active() {
+            client.abort().await;
+            return Err(err.into());
+        }
+        *cached = Some(client.clone());
+        debug!(
+            target_id = self.spec.target_id(),
+            "cached shared SFTP client"
+        );
+        Ok(SftpClientGuard::cached(client))
+    }
+
+    async fn clear_sftp_client(&self) {
+        if let Some(client) = self.sftp_client.lock().await.take() {
+            client.shutdown().await;
+        }
+    }
+
     async fn try_existing(&self, mode: ChannelMode) -> Option<(Arc<SshConnection>, ChannelPermit)> {
         let mut connections = self.connections.lock().await;
         connections.retain(|connection| connection.state() != ConnectionState::Closed);
@@ -203,6 +257,7 @@ impl TargetConnectionPool {
         if self.expired.swap(true, Ordering::AcqRel) {
             return;
         }
+        self.clear_sftp_client().await;
         let connections = self.connections.lock().await.clone();
         for connection in connections {
             connection.expire();
@@ -219,6 +274,7 @@ impl TargetConnectionPool {
             .find(|connection| connection.id() == connection_id)
             .cloned();
         if let Some(connection) = connection {
+            self.clear_sftp_client().await;
             connection.expire();
             true
         } else {
@@ -235,6 +291,7 @@ impl TargetConnectionPool {
             .find(|connection| connection.id() == connection_id)
             .cloned();
         if let Some(connection) = connection {
+            self.clear_sftp_client().await;
             connection.close().await;
             true
         } else {

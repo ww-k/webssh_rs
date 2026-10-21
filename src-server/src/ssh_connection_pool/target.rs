@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use crate::{
     entities::target::{self, TargetAuthMethod},
     repositories::target as target_repository,
-    sftp_client::{FastSftpClient, SftpClientGuard},
+    sftp_client::SftpClientGuard,
 };
 
 use super::{
@@ -56,9 +56,7 @@ impl SshConnectionPool {
     }
 
     pub(crate) async fn sftp(&self, target_id: i32, mode: ChannelMode) -> Result<SftpClientGuard> {
-        let channel = self.channel(target_id, mode).await?;
-        let client = FastSftpClient::new(channel).await?;
-        Ok(SftpClientGuard::new(client))
+        self.context(target_id).await?.sftp(mode).await
     }
 
     pub(crate) async fn with_target_mutation<T, E, F, Fut>(
@@ -85,6 +83,11 @@ impl TargetSshContext {
     pub(crate) async fn channel(self, mode: ChannelMode) -> Result<SshChannelGuard> {
         let connection_pool = self.connection_pool?;
         Ok(connection_pool.acquire(mode).await?)
+    }
+
+    async fn sftp(self, mode: ChannelMode) -> Result<SftpClientGuard> {
+        let connection_pool = self.connection_pool?;
+        connection_pool.sftp(mode).await
     }
 }
 
