@@ -68,6 +68,12 @@ export default function Terminal({
     const copyNotificationHoveredRef = useRef(false);
     const copyNotificationExpiresAtRef = useRef(0);
     const copyNotificationRemainingRef = useRef(2200);
+    const initialCwd = useMemo(() => {
+        const value = tab.state?.initialCwd;
+        return typeof value === "string" && value.startsWith("/")
+            ? value
+            : undefined;
+    }, [tab.state?.initialCwd]);
     const url = useMemo(
         () => tab.path.replace("/terminal/", "terminal.html?target_id="),
         [tab.path],
@@ -217,13 +223,20 @@ export default function Terminal({
     const handleTerminalLoad = useCallback(() => {
         syncTerminal();
         syncTerminalActive();
+        if (initialCwd) {
+            const escapedCwd = initialCwd.replaceAll("'", "'\\''");
+            iframeRef.current?.contentWindow?.postMessage(
+                { command: "input", args: `cd '${escapedCwd}'\n` },
+                window.location.origin,
+            );
+        }
         if (active) {
             iframeRef.current?.contentWindow?.postMessage(
                 { command: "focus" },
                 window.location.origin,
             );
         }
-    }, [active, syncTerminal, syncTerminalActive]);
+    }, [active, initialCwd, syncTerminal, syncTerminalActive]);
 
     const reconnect = useCallback(() => {
         setConnectionStatus("connecting");

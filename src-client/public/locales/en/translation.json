@@ -67,6 +67,7 @@
     "settings_data_import_success": "Imported {{added}} targets and {{favorites}} favorite directories; {{skipped}} existing targets were kept.",
     "settings_data_import_failed": "Unable to import this user data file.",
     "terminal_open_sftp": "Open in SFTP",
+    "filesview_open_terminal": "Open in SSH",
     "terminal_disconnected": "SSH connection disconnected",
     "terminal_reconnect": "Reconnect",
     "terminal_copy_success": "Text copied",

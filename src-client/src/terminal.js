@@ -20,6 +20,9 @@ var sizeCache;
 var terminalActive = false;
 var maxDisconnectionDuration = 5 * 60000;
 var pendingTheme;
+var terminalSocket;
+var terminalReady = false;
+var pendingTerminalInputs = [];
 
 function postConnectionStatus(targetId, status) {
     window.parent.postMessage(
@@ -81,6 +84,14 @@ function receiveMessage(event) {
                 applyTerminalTheme(pendingTheme);
             }
             break;
+        case "input":
+            if (typeof data.args !== "string") break;
+            if (terminalSocket?.connected && terminalReady) {
+                terminalSocket.emit("input", data.args);
+            } else {
+                pendingTerminalInputs.push(data.args);
+            }
+            break;
         default:
             console.log("unknown command", data);
             break;
@@ -119,9 +130,11 @@ function initTerm() {
         transports:
             "WebSocket" in window ? ["websocket"] : ["polling", "websocket"],
     });
+    terminalSocket = socket;
     var buf = "";
 
     socket.on("connect", () => {
+        terminalReady = false;
         postConnectionStatus(Number.parseInt(query.target_id, 10), "connected");
         if (!term) {
             createTerminal(socket, Number.parseInt(query.target_id, 10));
@@ -144,6 +157,7 @@ function initTerm() {
 
     socket.on("disconnect", (reason) => {
         console.log("disconnect", reason);
+        terminalReady = false;
         postConnectionStatus(
             Number.parseInt(query.target_id, 10),
             "disconnected",
@@ -159,6 +173,11 @@ function initTerm() {
     });
 
     socket.on("server_ready", (option) => {
+        terminalReady = true;
+        for (const input of pendingTerminalInputs) {
+            socket.emit("input", input);
+        }
+        pendingTerminalInputs = [];
         if (typeof option.maxDisconnectionDuration === "number") {
             maxDisconnectionDuration = option.maxDisconnectionDuration;
         }

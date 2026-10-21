@@ -45,6 +45,11 @@ type AppStore = {
     setTabPath: (key: string, path: string, label?: string) => void;
     setTabState: (key: string, state: ITabState) => void;
     openSftpAt: (targetId: number, cwd: string, terminalTabKey: string) => void;
+    openTerminalAt: (
+        targetId: number,
+        cwd: string | undefined,
+        filesviewTabKey: string,
+    ) => void;
     hydrateTabs: () => Promise<void>;
 
     copyData?: IFileListCopyEvent;
@@ -276,6 +281,29 @@ const useAppStore = create<AppStore>((set) => {
                         cwd: fileUri,
                         linkedTerminalKey: terminalTabKey,
                     },
+                };
+
+                return {
+                    activeTabKey: newTab.key,
+                    tabs: [...state.tabs, newTab],
+                };
+            }),
+        openTerminalAt: (
+            targetId: number,
+            cwd: string | undefined,
+            filesviewTabKey: string,
+        ) =>
+            set((state) => {
+                const filesviewTab = state.tabs.find(
+                    (tab) => tab.key === filesviewTabKey,
+                );
+                const sourceLabel = filesviewTab?.label || `SSH ${targetId}`;
+                const targetLabel = sourceLabel.replace(/^(sftp|ssh)\s+/i, "");
+                const newTab = {
+                    key: nanoid(),
+                    label: `ssh ${targetLabel}`,
+                    path: `/terminal/${targetId}`,
+                    state: cwd ? { initialCwd: cwd } : undefined,
                 };
 
                 return {
