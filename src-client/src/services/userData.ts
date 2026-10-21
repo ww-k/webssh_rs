@@ -12,6 +12,7 @@ export interface UserDataExport {
     settings: {
         theme_mode: ThemeMode;
         sidebar_collapsed: boolean;
+        show_terminal_copy_notification: boolean;
         language: string;
     };
 }
@@ -28,6 +29,7 @@ function readSettings(value: unknown): UserDataExport["settings"] {
         return {
             theme_mode: "system",
             sidebar_collapsed: true,
+            show_terminal_copy_notification: true,
             language: "zh",
         };
     }
@@ -40,6 +42,7 @@ function readSettings(value: unknown): UserDataExport["settings"] {
         return {
             theme_mode: "system",
             sidebar_collapsed: true,
+            show_terminal_copy_notification: true,
             language: "zh",
         };
     }
@@ -48,6 +51,10 @@ function readSettings(value: unknown): UserDataExport["settings"] {
         sidebar_collapsed:
             typeof settings.sidebar_collapsed === "boolean"
                 ? settings.sidebar_collapsed
+                : true,
+        show_terminal_copy_notification:
+            typeof settings.show_terminal_copy_notification === "boolean"
+                ? settings.show_terminal_copy_notification
                 : true,
         language:
             settings.language === "en" || settings.language === "zh"

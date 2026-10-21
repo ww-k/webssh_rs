@@ -1,4 +1,9 @@
-import { FolderOutlined, ReloadOutlined } from "@ant-design/icons";
+import {
+    CloseOutlined,
+    EyeInvisibleOutlined,
+    FolderOutlined,
+    ReloadOutlined,
+} from "@ant-design/icons";
 import { Button, Tooltip } from "antd";
 import {
     useCallback,
@@ -17,6 +22,7 @@ import useAppStore, { type ITab } from "@/store";
 
 const terminalMessageType = "webssh:terminal-cwd";
 const terminalStatusMessageType = "webssh:terminal-status";
+const terminalCopyMessageType = "webssh:terminal-copy";
 
 const terminalThemes = {
     dark: {
@@ -45,11 +51,23 @@ export default function Terminal({
     const { t } = useTranslation();
     const openSftpAt = useAppStore((state) => state.openSftpAt);
     const theme = useAppStore((state) => state.theme);
+    const showTerminalCopyNotification = useAppStore(
+        (state) => state.showTerminalCopyNotification,
+    );
+    const setShowTerminalCopyNotification = useAppStore(
+        (state) => state.setShowTerminalCopyNotification,
+    );
     const [cwd, setCwd] = useState<string>();
     const [connectionStatus, setConnectionStatus] = useState<
         "connected" | "disconnected" | "connecting"
     >("connecting");
     const [iframeKey, setIframeKey] = useState(0);
+    const [copyNotificationVisible, setCopyNotificationVisible] =
+        useState(false);
+    const copyNotificationTimerRef = useRef<number>();
+    const copyNotificationHoveredRef = useRef(false);
+    const copyNotificationExpiresAtRef = useRef(0);
+    const copyNotificationRemainingRef = useRef(2200);
     const url = useMemo(
         () => tab.path.replace("/terminal/", "terminal.html?target_id="),
         [tab.path],
@@ -59,6 +77,26 @@ export default function Terminal({
         const match = tab.path.match(/^\/terminal\/(\d+)/);
         return match ? Number.parseInt(match[1], 10) : undefined;
     }, [tab.path]);
+
+    const clearCopyNotificationTimer = useCallback(() => {
+        if (copyNotificationTimerRef.current) {
+            window.clearTimeout(copyNotificationTimerRef.current);
+            copyNotificationTimerRef.current = undefined;
+        }
+    }, []);
+
+    const scheduleCopyNotification = useCallback(() => {
+        clearCopyNotificationTimer();
+        if (copyNotificationHoveredRef.current) return;
+
+        const remaining = copyNotificationRemainingRef.current;
+        copyNotificationExpiresAtRef.current = Date.now() + remaining;
+        copyNotificationTimerRef.current = window.setTimeout(() => {
+            setCopyNotificationVisible(false);
+            copyNotificationRemainingRef.current = 0;
+            copyNotificationTimerRef.current = undefined;
+        }, remaining);
+    }, [clearCopyNotificationTimer]);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -80,6 +118,17 @@ export default function Terminal({
             }
 
             if (
+                data?.type === terminalCopyMessageType &&
+                data.targetId === targetId
+            ) {
+                if (!showTerminalCopyNotification) return;
+                setCopyNotificationVisible(true);
+                copyNotificationRemainingRef.current = 2200;
+                scheduleCopyNotification();
+                return;
+            }
+
+            if (
                 !data ||
                 data.type !== terminalMessageType ||
                 data.targetId !== targetId ||
@@ -94,7 +143,50 @@ export default function Terminal({
 
         window.addEventListener("message", handleMessage);
         return () => window.removeEventListener("message", handleMessage);
-    }, [targetId]);
+    }, [scheduleCopyNotification, showTerminalCopyNotification, targetId]);
+
+    useEffect(() => {
+        if (!showTerminalCopyNotification) {
+            setCopyNotificationVisible(false);
+            clearCopyNotificationTimer();
+        }
+    }, [clearCopyNotificationTimer, showTerminalCopyNotification]);
+
+    useEffect(() => {
+        return () => {
+            clearCopyNotificationTimer();
+        };
+    }, [clearCopyNotificationTimer]);
+
+    const handleCopyNotificationMouseEnter = useCallback(() => {
+        copyNotificationHoveredRef.current = true;
+        if (copyNotificationTimerRef.current) {
+            const remaining = Math.max(
+                0,
+                copyNotificationExpiresAtRef.current - Date.now(),
+            );
+            copyNotificationRemainingRef.current = remaining;
+        }
+        clearCopyNotificationTimer();
+    }, [clearCopyNotificationTimer]);
+
+    const handleCopyNotificationMouseLeave = useCallback(() => {
+        copyNotificationHoveredRef.current = false;
+        if (copyNotificationVisible) {
+            scheduleCopyNotification();
+        }
+    }, [copyNotificationVisible, scheduleCopyNotification]);
+
+    const closeCopyNotification = useCallback(() => {
+        setCopyNotificationVisible(false);
+        clearCopyNotificationTimer();
+        copyNotificationRemainingRef.current = 0;
+    }, [clearCopyNotificationTimer]);
+
+    const disableCopyNotification = useCallback(() => {
+        setShowTerminalCopyNotification(false);
+        closeCopyNotification();
+    }, [closeCopyNotification, setShowTerminalCopyNotification]);
 
     const openSftp = useCallback(() => {
         if (targetId === undefined || !cwd) return;
@@ -192,6 +284,36 @@ export default function Terminal({
                         >
                             {t("terminal_reconnect")}
                         </Button>
+                    </div>
+                )}
+                {copyNotificationVisible && (
+                    <div
+                        className="terminalCopyNotification"
+                        onMouseEnter={handleCopyNotificationMouseEnter}
+                        onMouseLeave={handleCopyNotificationMouseLeave}
+                        role="status"
+                    >
+                        <span>{t("terminal_copy_success")}</span>
+                        <div className="terminalCopyNotificationActions">
+                            <Tooltip title={t("app_btn_close")}>
+                                <Button
+                                    aria-label={t("app_btn_close")}
+                                    icon={<CloseOutlined />}
+                                    onClick={closeCopyNotification}
+                                    size="small"
+                                    type="text"
+                                />
+                            </Tooltip>
+                            <Tooltip title={t("app_btn_never_tip")}>
+                                <Button
+                                    aria-label={t("app_btn_never_tip")}
+                                    icon={<EyeInvisibleOutlined />}
+                                    onClick={disableCopyNotification}
+                                    size="small"
+                                    type="text"
+                                />
+                            </Tooltip>
+                        </div>
                     </div>
                 )}
             </div>

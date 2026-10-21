@@ -30,6 +30,8 @@ export default function Settings() {
     const { i18n, t } = useTranslation();
     const { themeMode, setTheme, sidebarCollapsed, setSidebarCollapsed } =
         useAppStore();
+    const { showTerminalCopyNotification, setShowTerminalCopyNotification } =
+        useAppStore();
     const importInputRef = useRef<HTMLInputElement>(null);
     const language = i18n.resolvedLanguage?.startsWith("zh") ? "zh" : "en";
 
@@ -38,6 +40,7 @@ export default function Settings() {
             const data = await createUserDataExport({
                 theme_mode: themeMode,
                 sidebar_collapsed: sidebarCollapsed,
+                show_terminal_copy_notification: showTerminalCopyNotification,
                 language,
             });
             fileSave(
@@ -60,6 +63,9 @@ export default function Settings() {
             const result = await importUserData(data);
             setTheme(result.settings.theme_mode);
             setSidebarCollapsed(result.settings.sidebar_collapsed);
+            setShowTerminalCopyNotification(
+                result.settings.show_terminal_copy_notification,
+            );
             await i18n.changeLanguage(result.settings.language);
             message.success(
                 t("settings_data_import_success", {
@@ -144,6 +150,21 @@ export default function Settings() {
                         onChange={(value: string) =>
                             void i18n.changeLanguage(value)
                         }
+                    />
+                </div>
+
+                <div className="WebSSH-Settings-Row">
+                    <div className="WebSSH-Settings-RowText">
+                        <Text strong>
+                            {t("settings_terminal_copy_notification")}
+                        </Text>
+                        <Text type="secondary">
+                            {t("settings_terminal_copy_notification_help")}
+                        </Text>
+                    </div>
+                    <Switch
+                        checked={showTerminalCopyNotification}
+                        onChange={setShowTerminalCopyNotification}
                     />
                 </div>
             </section>

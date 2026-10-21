@@ -231,7 +231,7 @@ function createTerminal(socket, targetId) {
         }
     });
 
-    enhanceMouseCopyPaste(term);
+    enhanceMouseCopyPaste(term, targetId);
     manuallyRetryPlugin.apply(socket, term);
 
     term.focus();
@@ -352,13 +352,22 @@ var manuallyRetryPlugin = {
  * - 实现自动复制选中文本
  * - 实现鼠标中键和右键粘贴当前terminal中选中的文本
  * @param {import('@xterm/xterm').Terminal} term
+ * @param {number} targetId
  */
-function enhanceMouseCopyPaste(term) {
+function enhanceMouseCopyPaste(term, targetId) {
     term.onSelectionChange((_evt) => {
         const text = term.getSelection() || "";
         console.log(`selection and copy: ${text}`);
         if (text !== "") {
-            navigator.clipboard.writeText(text);
+            navigator.clipboard.writeText(text).then(() => {
+                window.parent.postMessage(
+                    {
+                        type: "webssh:terminal-copy",
+                        targetId,
+                    },
+                    window.location.origin,
+                );
+            });
         }
     });
 

@@ -28,6 +28,9 @@ type AppStore = {
     sidebarCollapsed: boolean;
     setSidebarCollapsed: (collapsed: boolean) => void;
 
+    showTerminalCopyNotification: boolean;
+    setShowTerminalCopyNotification: (show: boolean) => void;
+
     activeMenuKey: string;
     setMenuKey: (key: string) => void;
 
@@ -69,6 +72,8 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 const THEME_MODE_STORAGE_KEY = "webssh.theme-mode";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "webssh.sidebar-collapsed";
+const TERMINAL_COPY_NOTIFICATION_STORAGE_KEY =
+    "webssh.terminal-copy-notification";
 
 function getSystemTheme(): ResolvedTheme {
     return window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -86,6 +91,13 @@ function getInitialThemeMode(): ThemeMode {
 function getInitialSidebarCollapsed() {
     return (
         window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) !== "false"
+    );
+}
+
+function getInitialShowTerminalCopyNotification() {
+    return (
+        window.localStorage.getItem(TERMINAL_COPY_NOTIFICATION_STORAGE_KEY) !==
+        "false"
     );
 }
 
@@ -111,6 +123,15 @@ const useAppStore = create<AppStore>((set) => {
                 String(collapsed),
             );
             set({ sidebarCollapsed: collapsed });
+        },
+
+        showTerminalCopyNotification: getInitialShowTerminalCopyNotification(),
+        setShowTerminalCopyNotification: (show: boolean) => {
+            window.localStorage.setItem(
+                TERMINAL_COPY_NOTIFICATION_STORAGE_KEY,
+                String(show),
+            );
+            set({ showTerminalCopyNotification: show });
         },
 
         activeMenuKey: "home",

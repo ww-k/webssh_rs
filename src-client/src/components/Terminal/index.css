@@ -43,6 +43,30 @@
     font-size: 16px;
 }
 
+.terminalCopyNotification {
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    max-width: calc(100% - 36px);
+    gap: 10px;
+    padding: 4px 8px 4px 12px;
+    color: var(--ant-color-text);
+    font-size: 13px;
+    background: var(--ant-color-bg-elevated);
+    border: 1px solid var(--ant-color-border-secondary);
+    border-radius: 6px;
+    box-shadow: var(--ant-box-shadow-secondary);
+    transform: translate(-50%, -50%);
+}
+
+.terminalCopyNotificationActions {
+    display: flex;
+    gap: 2px;
+}
+
 .terminalIframe {
     min-height: 0;
     flex: 1;
