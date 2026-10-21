@@ -236,7 +236,20 @@ pub async fn cp(
     let channel = map_ssh_err!(context.channel(ChannelMode::Shared).await)?;
 
     if is_windows {
-        todo!();
+        let source_path = windows_path(uri.path);
+        let target_path = windows_path(&payload.target_path);
+        let script = format!(
+            "try {{ Copy-Item -LiteralPath '{}' -Destination '{}' -Recurse -Force -ErrorAction Stop; exit 0 }} catch {{ [Console]::Error.WriteLine($_); exit 1 }}",
+            powershell_literal(&source_path),
+            powershell_literal(&target_path),
+        );
+        let encoded_script = encode_powershell_command(&script);
+        crate::apis::ssh::exec(
+            channel,
+            format!("powershell.exe -NoProfile -NonInteractive -EncodedCommand {encoded_script}")
+                .as_str(),
+        )
+        .await?;
     } else {
         crate::apis::ssh::exec(
             channel,
@@ -248,6 +261,47 @@ pub async fn cp(
     debug!("@sftp_cp done {:?}", payload);
 
     Ok(())
+}
+
+fn windows_path(path: &str) -> String {
+    path.strip_prefix('/').unwrap_or(path).replace('/', "\\")
+}
+
+fn powershell_literal(value: &str) -> String {
+    value.replace('\'', "''")
+}
+
+fn encode_powershell_command(command: &str) -> String {
+    const BASE64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    let bytes = command
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
+
+    for chunk in bytes.chunks(3) {
+        let first = chunk[0];
+        let second = chunk.get(1).copied();
+        let third = chunk.get(2).copied();
+        encoded.push(BASE64[(first >> 2) as usize] as char);
+        encoded.push(
+            BASE64[(((first & 0b11) << 4) | (second.unwrap_or_default() >> 4)) as usize] as char,
+        );
+        encoded.push(match second {
+            Some(second) => {
+                BASE64[(((second & 0b1111) << 2) | (third.unwrap_or_default() >> 6)) as usize]
+                    as char
+            }
+            None => '=',
+        });
+        encoded.push(match third {
+            Some(third) => BASE64[(third & 0b0011_1111) as usize] as char,
+            None => '=',
+        });
+    }
+
+    encoded
 }
 
 #[utoipa::path(
