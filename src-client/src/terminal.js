@@ -21,6 +21,17 @@ var terminalActive = false;
 var maxDisconnectionDuration = 5 * 60000;
 var pendingTheme;
 
+function postConnectionStatus(targetId, status) {
+    window.parent.postMessage(
+        {
+            type: "webssh:terminal-status",
+            targetId,
+            status,
+        },
+        window.location.origin,
+    );
+}
+
 const defaultTheme = {
     background: "#0f1115",
     foreground: "#f5f7fa",
@@ -111,6 +122,7 @@ function initTerm() {
     var buf = "";
 
     socket.on("connect", () => {
+        postConnectionStatus(Number.parseInt(query.target_id, 10), "connected");
         if (!term) {
             createTerminal(socket, Number.parseInt(query.target_id, 10));
         } else {
@@ -128,6 +140,22 @@ function initTerm() {
             term.write(buf);
             buf = "";
         }
+    });
+
+    socket.on("disconnect", (reason) => {
+        console.log("disconnect", reason);
+        postConnectionStatus(
+            Number.parseInt(query.target_id, 10),
+            "disconnected",
+        );
+    });
+
+    socket.on("connect_error", (error) => {
+        console.log("connect_error", error);
+        postConnectionStatus(
+            Number.parseInt(query.target_id, 10),
+            "disconnected",
+        );
     });
 
     socket.on("server_ready", (option) => {

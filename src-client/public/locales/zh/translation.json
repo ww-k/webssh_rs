@@ -53,6 +53,8 @@
     "settings_sidebar_collapsed": "默认折叠侧栏",
     "settings_sidebar_collapsed_help": "启动时折叠侧栏，为内容留出更多空间。",
     "terminal_open_sftp": "在SFTP中打开",
+    "terminal_disconnected": "SSH 连接已断开",
+    "terminal_reconnect": "重新连接",
     "pathbar_favorite_directory_add": "添加收藏目录",
     "pathbar_favorite_directory_default_/": "此电脑",
     "pathbar_favorite_directory_default_Desktop": "桌面",

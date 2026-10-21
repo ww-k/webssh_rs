@@ -63,6 +63,8 @@
     "settings_data_import_success": "Imported {{added}} targets and {{favorites}} favorite directories; {{skipped}} existing targets were kept.",
     "settings_data_import_failed": "Unable to import this user data file.",
     "terminal_open_sftp": "Open in SFTP",
+    "terminal_disconnected": "SSH connection disconnected",
+    "terminal_reconnect": "Reconnect",
     "pathbar_favorite_directory_add": "Add favorite directory",
     "pathbar_favorite_directory_default_/": "This PC",
     "pathbar_favorite_directory_default_Desktop": "Desktop",

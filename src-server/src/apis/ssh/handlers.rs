@@ -198,6 +198,10 @@ impl SshTerminalSession {
             drop(channel_lease);
         });
         let _ = cleanup.await;
+        // The SSH channel can close independently of the browser socket, for
+        // example when its parent connection is closed from the connection
+        // manager. Notify the client so it can offer a reconnect action.
+        let _ = socket.disconnect();
     }
 
     async fn open_session_channel_request_pty_shell(

@@ -1,4 +1,4 @@
-import { FolderOutlined } from "@ant-design/icons";
+import { FolderOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Button, Tooltip } from "antd";
 import {
     useCallback,
@@ -16,6 +16,7 @@ import { normalizeTerminalCwd } from "@/helpers/terminal_cwd";
 import useAppStore, { type ITab } from "@/store";
 
 const terminalMessageType = "webssh:terminal-cwd";
+const terminalStatusMessageType = "webssh:terminal-status";
 
 const terminalThemes = {
     dark: {
@@ -45,6 +46,10 @@ export default function Terminal({
     const openSftpAt = useAppStore((state) => state.openSftpAt);
     const theme = useAppStore((state) => state.theme);
     const [cwd, setCwd] = useState<string>();
+    const [connectionStatus, setConnectionStatus] = useState<
+        "connected" | "disconnected" | "connecting"
+    >("connecting");
+    const [iframeKey, setIframeKey] = useState(0);
     const url = useMemo(
         () => tab.path.replace("/terminal/", "terminal.html?target_id="),
         [tab.path],
@@ -65,6 +70,15 @@ export default function Terminal({
             }
 
             const data = event.data;
+            if (
+                data?.type === terminalStatusMessageType &&
+                data.targetId === targetId &&
+                (data.status === "connected" || data.status === "disconnected")
+            ) {
+                setConnectionStatus(data.status);
+                return;
+            }
+
             if (
                 !data ||
                 data.type !== terminalMessageType ||
@@ -119,6 +133,11 @@ export default function Terminal({
         }
     }, [active, syncTerminal, syncTerminalActive]);
 
+    const reconnect = useCallback(() => {
+        setConnectionStatus("connecting");
+        setIframeKey((key) => key + 1);
+    }, []);
+
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
             if (!iframeRef.current?.contentWindow) {
@@ -154,12 +173,27 @@ export default function Terminal({
             </div>
             <div className="terminalContainer">
                 <iframe
+                    key={iframeKey}
                     ref={iframeRef}
                     src={url}
                     className="terminalIframe"
                     title="terminal"
                     onLoad={handleTerminalLoad}
                 />
+                {connectionStatus === "disconnected" && (
+                    <div className="terminalDisconnected" role="alert">
+                        <div className="terminalDisconnectedTitle">
+                            {t("terminal_disconnected")}
+                        </div>
+                        <Button
+                            icon={<ReloadOutlined />}
+                            onClick={reconnect}
+                            type="primary"
+                        >
+                            {t("terminal_reconnect")}
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );
