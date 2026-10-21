@@ -97,6 +97,9 @@ where
         std::fs::create_dir_all(parent).expect("Failed to create database directory");
     }
     let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
+
+    println!("db_url {}", db_url);
+
     let db = Database::connect(&db_url)
         .await
         .expect("Database connection failed");
