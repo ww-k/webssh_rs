@@ -8,7 +8,7 @@ import { python } from "@codemirror/lang-python";
 import { xml } from "@codemirror/lang-xml";
 import { yaml } from "@codemirror/lang-yaml";
 import CodeMirror, { EditorView } from "@uiw/react-codemirror";
-import { Button, Spin } from "antd";
+import { Button, message, Spin } from "antd";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -64,6 +64,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                 file.uri,
                 new Blob([content], { type: "text/plain;charset=utf-8" }),
             );
+            message.success(t("file_editor_save_success"));
         } catch {
             setError(t("file_editor_save_failed"));
         } finally {

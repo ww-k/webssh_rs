@@ -127,6 +127,7 @@
     "batch_task_failed_count": "{{count}} 个任务失败",
     "file_editor_load_failed": "加载文件失败",
     "file_editor_save_failed": "保存文件失败",
+    "file_editor_save_success": "文件保存成功",
     "file_editor_aria_label": "编辑 {{name}}",
     "file_editor_line_wrap": "自动换行",
     "file_editor_expand": "放大编辑器",

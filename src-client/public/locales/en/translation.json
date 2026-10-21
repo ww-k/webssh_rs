@@ -137,6 +137,7 @@
     "batch_task_failed_count": "{{count}} tasks failed",
     "file_editor_load_failed": "Failed to load file",
     "file_editor_save_failed": "Failed to save file",
+    "file_editor_save_success": "File saved successfully",
     "file_editor_aria_label": "Edit {{name}}",
     "file_editor_line_wrap": "Wrap lines",
     "file_editor_expand": "Expand editor",
