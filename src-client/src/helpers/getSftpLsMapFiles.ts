@@ -3,8 +3,11 @@ import { joinFileUri } from "@/helpers/file_uri";
 
 import type { IViewFileStat } from "@/types";
 
-export default async function getSftpLsMapFiles(fileUri: string) {
-    const sftpFiles = await getSftpLs(fileUri);
+export default async function getSftpLsMapFiles(
+    fileUri: string,
+    all?: boolean,
+) {
+    const sftpFiles = await getSftpLs(fileUri, all);
     const files: IViewFileStat[] = sftpFiles.map((item) => ({
         ...item,
         mtime: item.mtime * 1000,

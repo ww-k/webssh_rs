@@ -1,6 +1,6 @@
-import { CodeOutlined } from "@ant-design/icons";
+import { CodeOutlined, EyeOutlined } from "@ant-design/icons";
 import { Button, Tooltip } from "antd";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
@@ -20,6 +20,7 @@ export default function Filesview({
 }) {
     const { t } = useTranslation();
     const openTerminalAt = useAppStore((state) => state.openTerminalAt);
+    const [showAllFiles, setShowAllFiles] = useState(false);
     const { baseUrl, targetId } = useMemo(() => {
         // 从路径中解析 target ID: /filesview/123 -> targetId: 123
         const match = tab.path.match(/\/filesview\/(\d+)/);
@@ -57,6 +58,36 @@ export default function Filesview({
                         type="text"
                     />
                 </Tooltip>
+                <Tooltip
+                    title={t(
+                        showAllFiles
+                            ? "filesview_hide_hidden_files"
+                            : "filesview_show_all_files",
+                    )}
+                >
+                    <Button
+                        aria-label={t(
+                            showAllFiles
+                                ? "filesview_hide_hidden_files"
+                                : "filesview_show_all_files",
+                        )}
+                        aria-pressed={showAllFiles}
+                        icon={<EyeOutlined />}
+                        onClick={() => setShowAllFiles((value) => !value)}
+                        size="small"
+                        style={
+                            showAllFiles
+                                ? { color: "var(--ant-color-primary)" }
+                                : undefined
+                        }
+                        title={t(
+                            showAllFiles
+                                ? "filesview_hide_hidden_files"
+                                : "filesview_show_all_files",
+                        )}
+                        type={showAllFiles ? "default" : "text"}
+                    />
+                </Tooltip>
             </div>
             <FilesviewRemote
                 baseUrl={baseUrl}
@@ -67,6 +98,7 @@ export default function Filesview({
                 }
                 tabKey={tab.key}
                 targetId={targetId}
+                showAllFiles={showAllFiles}
             />
         </div>
     );

@@ -68,6 +68,8 @@
     "settings_data_import_failed": "Unable to import this user data file.",
     "terminal_open_sftp": "Open in SFTP",
     "filesview_open_terminal": "Open in SSH",
+    "filesview_show_all_files": "Show all files",
+    "filesview_hide_hidden_files": "Hide hidden files",
     "terminal_disconnected": "SSH connection disconnected",
     "terminal_reconnect": "Reconnect",
     "terminal_copy_success": "Text copied",

@@ -22,11 +22,13 @@ export default function FilesviewRemote({
     initialCwd,
     tabKey,
     targetId,
+    showAllFiles = false,
 }: {
     baseUrl: string;
     initialCwd?: string;
     tabKey: string;
     targetId: number;
+    showAllFiles?: boolean;
 }) {
     const [favoriteDirectoriesInitialized, setFavoriteDirectoriesInitialized] =
         useState(false);
@@ -87,12 +89,21 @@ export default function FilesviewRemote({
                 //TODO:
                 return [];
             }
-            return await getSftpLsMapFiles(cwd);
+            return await getSftpLsMapFiles(cwd, showAllFiles);
         },
         {
             manual: true,
         },
     );
+
+    // Re-fetch the current directory when the hidden-file visibility changes.
+    // The base view already fetches when the path changes.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: only refresh when the toggle changes
+    useEffect(() => {
+        if (cwd) {
+            void getCwdFiles();
+        }
+    }, [showAllFiles]);
 
     const getHome = useMemoizedFn(() => getSftpUserDirHome(targetId));
     const getDirs = useMemoizedFn(async (fileUrl: string) => {

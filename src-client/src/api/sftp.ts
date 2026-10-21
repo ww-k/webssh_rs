@@ -26,10 +26,11 @@ export interface ISftpUserDir {
     path: string;
 }
 
-export async function getSftpLs(uri: string) {
+export async function getSftpLs(uri: string, all?: boolean) {
     const response = await axios.get<ISftpFileStat[]>("/api/sftp/ls", {
         params: {
             uri,
+            all,
         },
     });
     return response.data;

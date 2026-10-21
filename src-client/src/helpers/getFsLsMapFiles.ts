@@ -5,9 +5,9 @@ import { isMSWindows } from "@/helpers/platform";
 
 import type { IViewFileStat } from "@/types";
 
-export default async function getFsLsMapFiles(path: string) {
+export default async function getFsLsMapFiles(path: string, all?: boolean) {
     const cwd = normalizeLocalPath(getFilePath(path));
-    const fsFiles = await getFsLs(cwd);
+    const fsFiles = await getFsLs(cwd, all);
     const files: IViewFileStat[] = fsFiles.map((item) => ({
         ...item,
         size: item.size || 0,
