@@ -2,11 +2,9 @@ import { Button, Modal, Space } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import useAppStore from "@/store";
+
 import FilesviewLocal from "../Filesview/Local";
-import {
-    getLastLocalDirectory,
-    setLastLocalDirectory,
-} from "./lastLocalDirectory";
 
 import type { IViewFileStat } from "@/types";
 import type { LocalDefaultDirectory } from "../Filesview/Local";
@@ -35,7 +33,11 @@ export default function FsSelector({
     onOk: (paths: string[]) => void;
 }) {
     const { t } = useTranslation();
-    const [initialCwd] = useState(getLastLocalDirectory);
+    const lastLocalDirectory = useAppStore((state) => state.lastLocalDirectory);
+    const setLastLocalDirectory = useAppStore(
+        (state) => state.setLastLocalDirectory,
+    );
+    const [initialCwd] = useState(lastLocalDirectory);
     const [cwd, setCwd] = useState(initialCwd || "/");
     const [selectedFiles, setSelectedFiles] = useState<IViewFileStat[]>([]);
 

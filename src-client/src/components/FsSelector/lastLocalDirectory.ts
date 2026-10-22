@@ -4,33 +4,28 @@ const LAST_LOCAL_DIRECTORY_STORAGE_KEY =
 type StorageReader = Pick<Storage, "getItem">;
 type StorageWriter = Pick<Storage, "setItem">;
 
-export function getLastLocalDirectory(
-    storage: StorageReader | undefined = getLocalStorage(),
-) {
+let inMemoryDirectory: string | undefined;
+
+export function getLastLocalDirectory(storage?: StorageReader) {
     try {
-        return storage?.getItem(LAST_LOCAL_DIRECTORY_STORAGE_KEY) || undefined;
+        return storage
+            ? storage.getItem(LAST_LOCAL_DIRECTORY_STORAGE_KEY) || undefined
+            : inMemoryDirectory;
     } catch {
         return undefined;
     }
 }
 
-export function setLastLocalDirectory(
-    path: string,
-    storage: StorageWriter | undefined = getLocalStorage(),
-) {
+export function setLastLocalDirectory(path: string, storage?: StorageWriter) {
     if (!path) return;
 
     try {
-        storage?.setItem(LAST_LOCAL_DIRECTORY_STORAGE_KEY, path);
+        if (storage) {
+            storage.setItem(LAST_LOCAL_DIRECTORY_STORAGE_KEY, path);
+        } else {
+            inMemoryDirectory = path;
+        }
     } catch {
         // The file selector still works when browser storage is unavailable.
-    }
-}
-
-function getLocalStorage() {
-    try {
-        return window.localStorage;
-    } catch {
-        return undefined;
     }
 }

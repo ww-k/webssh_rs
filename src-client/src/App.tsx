@@ -17,9 +17,9 @@ import { useTranslation } from "react-i18next";
 import useAppStore from "@/store";
 
 import Home from "./components/Home";
+import ServerLogs from "./components/ServerLogs";
 import Settings from "./components/Settings";
 import SshConnections from "./components/SshConnections";
-import ServerLogs from "./components/ServerLogs";
 import Transfer from "./components/Transfer";
 import transferService from "./services/transfer";
 
@@ -44,7 +44,6 @@ export default function App() {
         setSidebarCollapsed,
         activeMenuKey,
         setMenuKey,
-        hydrateTabs,
     } = useAppStore();
     const pageOpenedAt = useRef(Date.now());
     const [lastTransferMenuClickAt, setLastTransferMenuClickAt] = useState(0);
@@ -120,10 +119,6 @@ export default function App() {
     useEffect(() => {
         return transferService.subscribe(setTransferTasks);
     }, []);
-
-    useEffect(() => {
-        void hydrateTabs();
-    }, [hydrateTabs]);
 
     useEffect(() => {
         console.log("App init");

@@ -66,6 +66,7 @@ use utoipa::OpenApi;
             crate::entities::transfer_task::TransferTaskStatus,
             crate::apis::preferences::dto::Preferences,
             crate::apis::preferences::dto::PreferenceTab,
+            crate::apis::preferences::dto::PreferenceSettings,
             crate::apis::user_data::dto::UserDataExport,
             crate::apis::user_data::dto::UserDataImportPayload,
             crate::apis::user_data::dto::UserDataImportResult,

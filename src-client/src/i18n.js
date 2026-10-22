@@ -17,6 +17,7 @@ i18n
     // init i18next
     // for all options read: https://www.i18next.com/overview/configuration-options
     .init({
+        lng: "zh",
         fallbackLng: "zh",
         debug: true,
         // 预加载默认语言
@@ -28,6 +29,10 @@ i18n
             zh: {
                 translation,
             },
+        },
+        detection: {
+            order: [],
+            caches: [],
         },
     });
 

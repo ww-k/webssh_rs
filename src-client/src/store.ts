@@ -11,6 +11,7 @@ export type ITabState = Record<string, unknown>;
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
+export type Language = "zh" | "en";
 
 export interface ITab<T = ITabState>
     extends Omit<TabPaneProps, "tab" | "children" | "closeIcon" | "icon"> {
@@ -31,6 +32,12 @@ type AppStore = {
     showTerminalCopyNotification: boolean;
     setShowTerminalCopyNotification: (show: boolean) => void;
 
+    language: Language;
+    setLanguage: (language: Language) => void;
+
+    lastLocalDirectory?: string;
+    setLastLocalDirectory: (path: string) => void;
+
     activeMenuKey: string;
     setMenuKey: (key: string) => void;
 
@@ -50,7 +57,7 @@ type AppStore = {
         cwd: string | undefined,
         filesviewTabKey: string,
     ) => void;
-    hydrateTabs: () => Promise<void>;
+    loadPreferences: () => Promise<void>;
 
     copyData?: IFileListCopyEvent;
     setCopyData: (data: IFileListCopyEvent) => void;
@@ -75,11 +82,6 @@ function getInitialTabs() {
 let tabsHydrated = false;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
-const THEME_MODE_STORAGE_KEY = "webssh.theme-mode";
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "webssh.sidebar-collapsed";
-const TERMINAL_COPY_NOTIFICATION_STORAGE_KEY =
-    "webssh.terminal-copy-notification";
-
 function getSystemTheme(): ResolvedTheme {
     return window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
@@ -87,23 +89,15 @@ function getSystemTheme(): ResolvedTheme {
 }
 
 function getInitialThemeMode(): ThemeMode {
-    const stored = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
-    return stored === "light" || stored === "dark" || stored === "system"
-        ? stored
-        : "system";
+    return "system";
 }
 
 function getInitialSidebarCollapsed() {
-    return (
-        window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) !== "false"
-    );
+    return true;
 }
 
 function getInitialShowTerminalCopyNotification() {
-    return (
-        window.localStorage.getItem(TERMINAL_COPY_NOTIFICATION_STORAGE_KEY) !==
-        "false"
-    );
+    return true;
 }
 
 const useAppStore = create<AppStore>((set) => {
@@ -114,7 +108,6 @@ const useAppStore = create<AppStore>((set) => {
             initialThemeMode === "system" ? getSystemTheme() : initialThemeMode,
         themeMode: initialThemeMode,
         setTheme: (themeMode: ThemeMode) => {
-            window.localStorage.setItem(THEME_MODE_STORAGE_KEY, themeMode);
             set({
                 themeMode,
                 theme: themeMode === "system" ? getSystemTheme() : themeMode,
@@ -123,20 +116,23 @@ const useAppStore = create<AppStore>((set) => {
 
         sidebarCollapsed: getInitialSidebarCollapsed(),
         setSidebarCollapsed: (collapsed: boolean) => {
-            window.localStorage.setItem(
-                SIDEBAR_COLLAPSED_STORAGE_KEY,
-                String(collapsed),
-            );
             set({ sidebarCollapsed: collapsed });
         },
 
         showTerminalCopyNotification: getInitialShowTerminalCopyNotification(),
         setShowTerminalCopyNotification: (show: boolean) => {
-            window.localStorage.setItem(
-                TERMINAL_COPY_NOTIFICATION_STORAGE_KEY,
-                String(show),
-            );
             set({ showTerminalCopyNotification: show });
+        },
+
+        language: "zh",
+        setLanguage: (language: Language) => {
+            void i18n.changeLanguage(language);
+            set({ language });
+        },
+
+        lastLocalDirectory: undefined,
+        setLastLocalDirectory: (path: string) => {
+            if (path) set({ lastLocalDirectory: path });
         },
 
         activeMenuKey: "home",
@@ -311,13 +307,57 @@ const useAppStore = create<AppStore>((set) => {
                     tabs: [...state.tabs, newTab],
                 };
             }),
-        hydrateTabs: async () => {
+        loadPreferences: async () => {
             try {
                 const response = await axios.get<{
                     active_tab_key: string;
                     tabs: ITab[];
+                    settings?: {
+                        theme_mode?: string;
+                        sidebar_collapsed?: boolean;
+                        show_terminal_copy_notification?: boolean;
+                        language?: string;
+                        last_local_directory?: string | null;
+                    };
                 } | null>("/api/preferences");
                 const saved = response.data;
+                const settings = saved?.settings;
+                const themeMode = settings?.theme_mode;
+                const language = settings?.language;
+                set({
+                    ...(themeMode === "light" ||
+                    themeMode === "dark" ||
+                    themeMode === "system"
+                        ? {
+                              themeMode,
+                              theme:
+                                  themeMode === "system"
+                                      ? getSystemTheme()
+                                      : themeMode,
+                          }
+                        : {}),
+                    ...(typeof settings?.sidebar_collapsed === "boolean"
+                        ? { sidebarCollapsed: settings.sidebar_collapsed }
+                        : {}),
+                    ...(typeof settings?.show_terminal_copy_notification ===
+                    "boolean"
+                        ? {
+                              showTerminalCopyNotification:
+                                  settings.show_terminal_copy_notification,
+                          }
+                        : {}),
+                    ...(language === "zh" || language === "en"
+                        ? { language }
+                        : {}),
+                    ...(typeof settings?.last_local_directory === "string"
+                        ? {
+                              lastLocalDirectory: settings.last_local_directory,
+                          }
+                        : {}),
+                });
+                if (language === "zh" || language === "en") {
+                    await i18n.changeLanguage(language);
+                }
                 if (saved?.tabs?.length) {
                     const tabs = saved.tabs.filter(
                         (tab) =>
@@ -352,7 +392,13 @@ const useAppStore = create<AppStore>((set) => {
 useAppStore.subscribe((state, previousState) => {
     if (
         state.tabs === previousState.tabs &&
-        state.activeTabKey === previousState.activeTabKey
+        state.activeTabKey === previousState.activeTabKey &&
+        state.themeMode === previousState.themeMode &&
+        state.sidebarCollapsed === previousState.sidebarCollapsed &&
+        state.showTerminalCopyNotification ===
+            previousState.showTerminalCopyNotification &&
+        state.language === previousState.language &&
+        state.lastLocalDirectory === previousState.lastLocalDirectory
     ) {
         return;
     }
@@ -360,10 +406,11 @@ useAppStore.subscribe((state, previousState) => {
     if (!tabsHydrated) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
+        const current = useAppStore.getState();
         void axios
             .put("/api/preferences", {
-                active_tab_key: state.activeTabKey,
-                tabs: state.tabs.map(
+                active_tab_key: current.activeTabKey,
+                tabs: current.tabs.map(
                     ({ key, label, path, state: tabState }) => ({
                         key,
                         label,
@@ -371,6 +418,14 @@ useAppStore.subscribe((state, previousState) => {
                         ...(tabState ? { state: tabState } : {}),
                     }),
                 ),
+                settings: {
+                    theme_mode: current.themeMode,
+                    sidebar_collapsed: current.sidebarCollapsed,
+                    show_terminal_copy_notification:
+                        current.showTerminalCopyNotification,
+                    language: current.language,
+                    last_local_directory: current.lastLocalDirectory ?? null,
+                },
             })
             .catch(() => {
                 // Keep the current tabs available when saving fails.

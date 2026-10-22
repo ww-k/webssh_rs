@@ -297,14 +297,7 @@ function _getConfig(configPath) {
     if (!configPath) {
         return defaultOption;
     }
-    var config;
-    try {
-        config = JSON.parse(localStorage.getItem(configPath));
-        return config;
-    } catch (error) {
-        console.warn(error);
-        return defaultOption;
-    }
+    return defaultOption;
 }
 
 var manuallyRetryPlugin = {

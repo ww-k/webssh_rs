@@ -27,14 +27,16 @@ import useAppStore, { type ThemeMode } from "@/store";
 const { Paragraph, Text, Title } = Typography;
 
 export default function Settings() {
-    const { i18n, t } = useTranslation();
+    const { t } = useTranslation();
     const { themeMode, setTheme, sidebarCollapsed, setSidebarCollapsed } =
         useAppStore();
-    const { showTerminalCopyNotification, setShowTerminalCopyNotification } =
-        useAppStore();
+    const {
+        showTerminalCopyNotification,
+        setShowTerminalCopyNotification,
+        language,
+        setLanguage,
+    } = useAppStore();
     const importInputRef = useRef<HTMLInputElement>(null);
-    const language = i18n.resolvedLanguage?.startsWith("zh") ? "zh" : "en";
-
     const handleExport = async () => {
         try {
             const data = await createUserDataExport({
@@ -66,7 +68,7 @@ export default function Settings() {
             setShowTerminalCopyNotification(
                 result.settings.show_terminal_copy_notification,
             );
-            await i18n.changeLanguage(result.settings.language);
+            setLanguage(result.settings.language as "zh" | "en");
             message.success(
                 t("settings_data_import_success", {
                     added: result.addedTargets,
@@ -148,7 +150,7 @@ export default function Settings() {
                             { value: "en", label: "English" },
                         ]}
                         onChange={(value: string) =>
-                            void i18n.changeLanguage(value)
+                            setLanguage(value as "zh" | "en")
                         }
                     />
                 </div>
