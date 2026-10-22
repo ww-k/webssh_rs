@@ -23,6 +23,7 @@ var pendingTheme;
 var terminalSocket;
 var terminalReady = false;
 var pendingTerminalInputs = [];
+var pendingTerminalHistory = "";
 
 function postConnectionStatus(targetId, status) {
     window.parent.postMessage(
@@ -90,6 +91,14 @@ function receiveMessage(event) {
                 terminalSocket.emit("input", data.args);
             } else {
                 pendingTerminalInputs.push(data.args);
+            }
+            break;
+        case "restoreHistory":
+            if (typeof data.args !== "string") break;
+            pendingTerminalHistory = data.args;
+            if (term) {
+                term.write(pendingTerminalHistory);
+                pendingTerminalHistory = "";
             }
             break;
         default:
@@ -194,10 +203,17 @@ function initTerm() {
     socket.on("output", (data) => {
         if (!term) {
             buf += data;
-            return;
+        } else {
+            term.write(data);
         }
-
-        term.write(data);
+        window.parent.postMessage(
+            {
+                type: "webssh:terminal-output",
+                targetId: Number.parseInt(query.target_id, 10),
+                data,
+            },
+            window.location.origin,
+        );
     });
 }
 
@@ -231,6 +247,10 @@ function createTerminal(socket, targetId) {
 
     term.open(terminalContainer);
     applyTerminalTheme(term.options.theme);
+    if (pendingTerminalHistory) {
+        term.write(pendingTerminalHistory);
+        pendingTerminalHistory = "";
+    }
 
     term.onResize((size) => {
         if (!sizeCache) {

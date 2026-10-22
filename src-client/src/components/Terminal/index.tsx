@@ -23,6 +23,24 @@ import useAppStore, { type ITab } from "@/store";
 const terminalMessageType = "webssh:terminal-cwd";
 const terminalStatusMessageType = "webssh:terminal-status";
 const terminalCopyMessageType = "webssh:terminal-copy";
+const terminalOutputMessageType = "webssh:terminal-output";
+const maxTerminalHistoryLength = 256 * 1024;
+
+function appendTerminalHistory(
+    chunks: string[],
+    data: string,
+    length: number,
+) {
+    chunks.push(data);
+    let nextLength = length + data.length;
+
+    while (nextLength > maxTerminalHistoryLength && chunks.length > 1) {
+        const removed = chunks.shift();
+        nextLength -= removed?.length || 0;
+    }
+
+    return nextLength;
+}
 
 const terminalThemes = {
     dark: {
@@ -68,6 +86,7 @@ export default function Terminal({
     const copyNotificationHoveredRef = useRef(false);
     const copyNotificationExpiresAtRef = useRef(0);
     const copyNotificationRemainingRef = useRef(2200);
+
     const initialCwd = useMemo(() => {
         const value = tab.state?.initialCwd;
         return typeof value === "string" && value.startsWith("/")
@@ -79,6 +98,8 @@ export default function Terminal({
         [tab.path],
     );
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    const terminalHistoryChunksRef = useRef<string[]>([]);
+    const terminalHistoryLengthRef = useRef(0);
     const targetId = useMemo(() => {
         const match = tab.path.match(/^\/terminal\/(\d+)/);
         return match ? Number.parseInt(match[1], 10) : undefined;
@@ -106,7 +127,8 @@ export default function Terminal({
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-            if (
+          if (
+                !event.data ||
                 event.origin !== window.location.origin ||
                 event.source !== iframeRef.current?.contentWindow
             ) {
@@ -115,7 +137,7 @@ export default function Terminal({
 
             const data = event.data;
             if (
-                data?.type === terminalStatusMessageType &&
+                data.type === terminalStatusMessageType &&
                 data.targetId === targetId &&
                 (data.status === "connected" || data.status === "disconnected")
             ) {
@@ -124,7 +146,20 @@ export default function Terminal({
             }
 
             if (
-                data?.type === terminalCopyMessageType &&
+                data.type === terminalOutputMessageType &&
+                data.targetId === targetId &&
+                typeof data.data === "string"
+            ) {
+                terminalHistoryLengthRef.current = appendTerminalHistory(
+                    terminalHistoryChunksRef.current,
+                    data.data,
+                    terminalHistoryLengthRef.current,
+                );
+                return;
+            }
+
+            if (
+                data.type === terminalCopyMessageType &&
                 data.targetId === targetId
             ) {
                 if (!showTerminalCopyNotification) return;
@@ -135,16 +170,13 @@ export default function Terminal({
             }
 
             if (
-                !data ||
-                data.type !== terminalMessageType ||
-                data.targetId !== targetId ||
-                typeof data.cwd !== "string"
+                data.type != terminalMessageType &&
+                data.targetId != targetId &&
+                typeof data.cwd == "string"
             ) {
-                return;
+                const nextCwd = normalizeTerminalCwd(data.cwd);
+                if (nextCwd) setCwd(nextCwd);
             }
-
-            const nextCwd = normalizeTerminalCwd(data.cwd);
-            if (nextCwd) setCwd(nextCwd);
         };
 
         window.addEventListener("message", handleMessage);
@@ -223,20 +255,32 @@ export default function Terminal({
     const handleTerminalLoad = useCallback(() => {
         syncTerminal();
         syncTerminalActive();
-        if (initialCwd) {
-            const escapedCwd = initialCwd.replaceAll("'", "'\\''");
+        if (terminalHistoryChunksRef.current.length > 0) {
+            iframeRef.current?.contentWindow?.postMessage(
+                {
+                    command: "restoreHistory",
+                    args: `${terminalHistoryChunksRef.current.join("")}\r\n[Session history restored]\r\n`,
+                },
+                window.location.origin,
+            );
+        }
+
+        const restoreCwd = cwd || initialCwd;
+        if (restoreCwd) {
+            const escapedCwd = restoreCwd.replaceAll("'", "'\\''");
             iframeRef.current?.contentWindow?.postMessage(
                 { command: "input", args: `cd '${escapedCwd}'\n` },
                 window.location.origin,
             );
         }
+
         if (active) {
             iframeRef.current?.contentWindow?.postMessage(
                 { command: "focus" },
                 window.location.origin,
             );
         }
-    }, [active, initialCwd, syncTerminal, syncTerminalActive]);
+    }, [active, cwd, initialCwd, syncTerminal, syncTerminalActive]);
 
     const reconnect = useCallback(() => {
         setConnectionStatus("connecting");
