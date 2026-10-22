@@ -4,6 +4,7 @@ pub mod preferences;
 pub mod sftp;
 pub mod ssh;
 pub mod ssh_connection;
+pub mod ssh_known_host;
 pub mod target;
 pub mod transfer;
 pub mod user_data;

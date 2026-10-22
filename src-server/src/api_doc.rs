@@ -17,6 +17,8 @@ use utoipa::OpenApi;
         crate::apis::ssh_connection::handlers::list,
         crate::apis::ssh_connection::handlers::expire,
         crate::apis::ssh_connection::handlers::close,
+        crate::apis::ssh_known_host::handlers::list,
+        crate::apis::ssh_known_host::handlers::remove,
         crate::apis::ssh::handlers::exec_handler,
         crate::apis::sftp::handlers::ls,
         crate::apis::sftp::handlers::mkdir,
@@ -72,6 +74,7 @@ use utoipa::OpenApi;
             crate::apis::user_data::dto::UserDataImportResult,
             crate::apis::user_data::dto::UserDataTarget,
             crate::apis::user_data::dto::UserDataFavoriteDirectory,
+            crate::entities::ssh_known_host::Model,
         ),
         responses(
             crate::apis::InternalErrorResponse
@@ -82,6 +85,7 @@ use utoipa::OpenApi;
         (name = "target", description = "SSH 目标管理 API"),
         (name = "favorite_directory", description = "收藏目录 API"),
         (name = "ssh_connection", description = "SSH 连接管理 API"),
+        (name = "ssh_known_host", description = "SSH 主机密钥管理 API"),
         (name = "ssh", description = "SSH 命令执行 API"),
         (name = "sftp", description = "SFTP 文件管理 API"),
         (name = "fs", description = "本机文件管理 API"),

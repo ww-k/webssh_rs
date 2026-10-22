@@ -173,9 +173,6 @@ export default function SshConnections() {
             <div className="WebSSH-SshConnections-Header">
                 <div>
                     <Title level={2}>{t("ssh_connections_title")}</Title>
-                    <Text type="secondary">
-                        {t("ssh_connections_description")}
-                    </Text>
                 </div>
                 <Button
                     icon={<ReloadOutlined />}

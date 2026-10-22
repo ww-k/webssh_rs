@@ -183,13 +183,7 @@ export default function ServerLogs() {
         <main className="WebSSH-ServerLogs">
             <div className="WebSSH-ServerLogs-Header">
                 <div>
-                    <Title level={2}>{t("server_logs_title")}</Title>
-                    <Text type="secondary">
-                        {t("server_logs_count", {
-                            count: logs.length,
-                            visible: visibleLogs.length,
-                        })}
-                    </Text>
+                    <Title level={2}>{t("app_menu_server_logs")}</Title>
                 </div>
                 <Space>
                     <Select<LogLevel | "ALL">

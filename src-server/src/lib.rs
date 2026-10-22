@@ -26,7 +26,8 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use apis::{
-    favorite_directory, fs, preferences, sftp, ssh, ssh_connection, target, transfer, user_data,
+    favorite_directory, fs, preferences, sftp, ssh, ssh_connection, ssh_known_host, target,
+    transfer, user_data,
 };
 use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
@@ -127,6 +128,10 @@ where
 
     let app = Router::new()
         .route("/api/logs", get(get_logs))
+        .nest(
+            "/api/ssh_known_host",
+            ssh_known_host::router_builder(app_state.clone()),
+        )
         .route(
             "/api/health",
             get(|| async { axum::Json(serde_json::json!({ "status": "ok" })) }),

@@ -46,10 +46,11 @@ axios.interceptors.response.use(
 );
 
 export * from "./favorite_directory";
-export * from "./logs";
 export * from "./fs";
+export * from "./logs";
 export * from "./sftp";
 export * from "./ssh_connection";
+export * from "./ssh_known_host";
 export * from "./target";
 export * from "./transfer";
 export * from "./user_data";

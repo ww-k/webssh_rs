@@ -1,0 +1,35 @@
+.WebSSH-SshKnownHosts {
+    box-sizing: border-box;
+    width: min(1200px, 100%);
+    height: 100%;
+    padding: 40px 48px 64px;
+    margin: 0 auto;
+    overflow: auto;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: var(--ant-color-bg-container);
+}
+
+.WebSSH-SshKnownHosts-Header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.WebSSH-SshKnownHosts-Header .ant-typography {
+    margin: 0;
+}
+
+@media (max-width: 720px) {
+    .WebSSH-SshKnownHosts {
+        padding: 28px 20px 48px;
+    }
+
+    .WebSSH-SshKnownHosts-Header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

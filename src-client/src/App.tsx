@@ -7,6 +7,7 @@ import {
     DisconnectOutlined,
     FileTextOutlined,
     HomeOutlined,
+    KeyOutlined,
     SettingOutlined,
     SwapOutlined,
 } from "@ant-design/icons";
@@ -20,6 +21,7 @@ import Home from "./components/Home";
 import ServerLogs from "./components/ServerLogs";
 import Settings from "./components/Settings";
 import SshConnections from "./components/SshConnections";
+import SshKnownHosts from "./components/SshKnownHosts";
 import Transfer from "./components/Transfer";
 import transferService from "./services/transfer";
 
@@ -96,6 +98,11 @@ export default function App() {
                 key: "ssh_connections",
                 icon: <DisconnectOutlined />,
                 label: t("app_menu_ssh_connections"),
+            },
+            {
+                key: "ssh_known_hosts",
+                icon: <KeyOutlined />,
+                label: t("app_menu_ssh_known_hosts"),
             },
             {
                 key: "server_logs",
@@ -217,6 +224,7 @@ export default function App() {
                     {activeMenuKey === "transfer" && <Transfer />}
                     {activeMenuKey === "ssh_connections" && <SshConnections />}
                     {activeMenuKey === "server_logs" && <ServerLogs />}
+                    {activeMenuKey === "ssh_known_hosts" && <SshKnownHosts />}
                     {activeMenuKey === "settings" && <Settings />}
                 </Content>
             </Layout>
