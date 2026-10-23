@@ -335,7 +335,7 @@ export default function Terminal({
 
         const restoreCwd = cwd || initialCwd;
         if (restoreCwd) {
-            const escapedCwd = restoreCwd.replaceAll("'", "'\\''");
+            const escapedCwd = restoreCwd.replace(/'/g, "'\\''");
             iframeRef.current?.contentWindow?.postMessage(
                 { command: "input", args: `cd '${escapedCwd}'\n` },
                 window.location.origin,
