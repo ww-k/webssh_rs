@@ -26,11 +26,7 @@ const terminalCopyMessageType = "webssh:terminal-copy";
 const terminalOutputMessageType = "webssh:terminal-output";
 const maxTerminalHistoryLength = 256 * 1024;
 
-function appendTerminalHistory(
-    chunks: string[],
-    data: string,
-    length: number,
-) {
+function appendTerminalHistory(chunks: string[], data: string, length: number) {
     chunks.push(data);
     let nextLength = length + data.length;
 
@@ -127,7 +123,7 @@ export default function Terminal({
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-          if (
+            if (
                 !event.data ||
                 event.origin !== window.location.origin ||
                 event.source !== iframeRef.current?.contentWindow
@@ -170,12 +166,13 @@ export default function Terminal({
             }
 
             if (
-                data.type != terminalMessageType &&
-                data.targetId != targetId &&
-                typeof data.cwd == "string"
+                data.type === terminalMessageType &&
+                data.targetId === targetId &&
+                typeof data.cwd === "string"
             ) {
                 const nextCwd = normalizeTerminalCwd(data.cwd);
                 if (nextCwd) setCwd(nextCwd);
+                return;
             }
         };
 
