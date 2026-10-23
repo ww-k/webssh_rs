@@ -13,6 +13,9 @@ export interface UserDataExport {
         theme_mode: ThemeMode;
         sidebar_collapsed: boolean;
         show_terminal_copy_notification: boolean;
+        terminal_selection_copy_enabled: boolean;
+        terminal_right_click_paste_enabled: boolean;
+        terminal_middle_click_paste_enabled: boolean;
         language: string;
     };
 }
@@ -30,6 +33,9 @@ function readSettings(value: unknown): UserDataExport["settings"] {
             theme_mode: "system",
             sidebar_collapsed: true,
             show_terminal_copy_notification: true,
+            terminal_selection_copy_enabled: true,
+            terminal_right_click_paste_enabled: true,
+            terminal_middle_click_paste_enabled: true,
             language: "zh",
         };
     }
@@ -43,6 +49,9 @@ function readSettings(value: unknown): UserDataExport["settings"] {
             theme_mode: "system",
             sidebar_collapsed: true,
             show_terminal_copy_notification: true,
+            terminal_selection_copy_enabled: true,
+            terminal_right_click_paste_enabled: true,
+            terminal_middle_click_paste_enabled: true,
             language: "zh",
         };
     }
@@ -55,6 +64,18 @@ function readSettings(value: unknown): UserDataExport["settings"] {
         show_terminal_copy_notification:
             typeof settings.show_terminal_copy_notification === "boolean"
                 ? settings.show_terminal_copy_notification
+                : true,
+        terminal_selection_copy_enabled:
+            typeof settings.terminal_selection_copy_enabled === "boolean"
+                ? settings.terminal_selection_copy_enabled
+                : true,
+        terminal_right_click_paste_enabled:
+            typeof settings.terminal_right_click_paste_enabled === "boolean"
+                ? settings.terminal_right_click_paste_enabled
+                : true,
+        terminal_middle_click_paste_enabled:
+            typeof settings.terminal_middle_click_paste_enabled === "boolean"
+                ? settings.terminal_middle_click_paste_enabled
                 : true,
         language:
             settings.language === "en" || settings.language === "zh"

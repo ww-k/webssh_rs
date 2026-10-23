@@ -24,6 +24,13 @@ var terminalSocket;
 var terminalReady = false;
 var pendingTerminalInputs = [];
 var pendingTerminalHistory = "";
+var terminalContextMenuMessageType = "webssh:terminal-contextmenu";
+var terminalContextMenuSelection = "";
+var clipboardOptions = {
+    selectionCopyEnabled: true,
+    rightClickPasteEnabled: true,
+    middleClickPasteEnabled: true,
+};
 
 function postConnectionStatus(targetId, status) {
     window.parent.postMessage(
@@ -85,6 +92,14 @@ function receiveMessage(event) {
                 applyTerminalTheme(pendingTheme);
             }
             break;
+        case "setClipboardOptions":
+            if (data.args && typeof data.args === "object") {
+                clipboardOptions = {
+                    ...clipboardOptions,
+                    ...data.args,
+                };
+            }
+            break;
         case "input":
             if (typeof data.args !== "string") break;
             if (terminalSocket?.connected && terminalReady) {
@@ -101,10 +116,28 @@ function receiveMessage(event) {
                 pendingTerminalHistory = "";
             }
             break;
+        case "copy":
+            copyTerminalSelection(
+                term,
+                targetIdFromQuery(),
+                terminalContextMenuSelection,
+            );
+            break;
+        case "paste":
+            pasteFromClipboard(term);
+            break;
+        case "clear":
+            term?.clear();
+            break;
         default:
             console.log("unknown command", data);
             break;
     }
+}
+
+function targetIdFromQuery() {
+    const query = decodeQueryParam(location.search);
+    return query.target_id ? Number.parseInt(query.target_id, 10) : undefined;
 }
 
 function applyTerminalTheme(theme) {
@@ -388,28 +421,61 @@ var manuallyRetryPlugin = {
  */
 function enhanceMouseCopyPaste(term, targetId) {
     term.onSelectionChange((_evt) => {
-        const text = term.getSelection() || "";
-        console.log(`selection and copy: ${text}`);
-        if (text !== "") {
-            navigator.clipboard.writeText(text).then(() => {
-                window.parent.postMessage(
-                    {
-                        type: "webssh:terminal-copy",
-                        targetId,
-                    },
-                    window.location.origin,
-                );
-            });
-        }
+        if (!clipboardOptions.selectionCopyEnabled) return;
+        copyTerminalSelection(term, targetId);
     });
 
-    document.addEventListener("pointerdown", (evt) => {
-        if (evt.button === 1 || evt.button === 2) {
-            navigator.clipboard.readText().then((text) => {
-                console.log(`paste: ${text}`);
-                term.paste(text);
-            });
-        }
+    document.addEventListener(
+        "pointerdown",
+        (evt) => {
+            if (evt.button === 2) {
+                terminalContextMenuSelection = term.getSelection() || "";
+            }
+            if (
+                (evt.button === 1 &&
+                    clipboardOptions.middleClickPasteEnabled) ||
+                (evt.button === 2 && clipboardOptions.rightClickPasteEnabled)
+            ) {
+                pasteFromClipboard(term);
+            }
+        },
+        true,
+    );
+
+    document.addEventListener("contextmenu", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        window.parent.postMessage(
+            {
+                type: terminalContextMenuMessageType,
+                targetId,
+                x: evt.clientX,
+                y: evt.clientY,
+                hasSelection:
+                    term.hasSelection() || terminalContextMenuSelection !== "",
+            },
+            window.location.origin,
+        );
+    });
+}
+
+function copyTerminalSelection(term, targetId, fallback = "") {
+    const text = term?.getSelection() || fallback;
+    if (text === "") return;
+    navigator.clipboard.writeText(text).then(() => {
+        window.parent.postMessage(
+            {
+                type: "webssh:terminal-copy",
+                targetId,
+            },
+            window.location.origin,
+        );
+    });
+}
+
+function pasteFromClipboard(term) {
+    navigator.clipboard.readText().then((text) => {
+        term.paste(text);
     });
 }
 

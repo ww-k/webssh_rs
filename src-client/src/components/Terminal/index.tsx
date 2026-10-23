@@ -1,8 +1,11 @@
 import {
+    ClearOutlined,
     CloseOutlined,
+    CopyOutlined,
     EyeInvisibleOutlined,
     FolderOutlined,
     ReloadOutlined,
+    SnippetsOutlined,
 } from "@ant-design/icons";
 import { Button, Tooltip } from "antd";
 import {
@@ -20,10 +23,15 @@ import "./index.css";
 import { normalizeTerminalCwd } from "@/helpers/terminal_cwd";
 import useAppStore, { type ITab } from "@/store";
 
+import popContextMenu from "../Contextmenu";
+
+import type { IContextmenuDataItem } from "../Contextmenu/typings";
+
 const terminalMessageType = "webssh:terminal-cwd";
 const terminalStatusMessageType = "webssh:terminal-status";
 const terminalCopyMessageType = "webssh:terminal-copy";
 const terminalOutputMessageType = "webssh:terminal-output";
+const terminalContextMenuMessageType = "webssh:terminal-contextmenu";
 const maxTerminalHistoryLength = 256 * 1024;
 
 function appendTerminalHistory(chunks: string[], data: string, length: number) {
@@ -65,6 +73,15 @@ export default function Terminal({
     const { t } = useTranslation();
     const openSftpAt = useAppStore((state) => state.openSftpAt);
     const theme = useAppStore((state) => state.theme);
+    const terminalSelectionCopyEnabled = useAppStore(
+        (state) => state.terminalSelectionCopyEnabled,
+    );
+    const terminalRightClickPasteEnabled = useAppStore(
+        (state) => state.terminalRightClickPasteEnabled,
+    );
+    const terminalMiddleClickPasteEnabled = useAppStore(
+        (state) => state.terminalMiddleClickPasteEnabled,
+    );
     const showTerminalCopyNotification = useAppStore(
         (state) => state.showTerminalCopyNotification,
     );
@@ -155,6 +172,44 @@ export default function Terminal({
             }
 
             if (
+                data.type === terminalContextMenuMessageType &&
+                data.targetId === targetId &&
+                typeof data.x === "number" &&
+                typeof data.y === "number"
+            ) {
+                const iframe = iframeRef.current;
+                if (!iframe) return;
+
+                const rect = iframe.getBoundingClientRect();
+                const postCommand = (command: string) => {
+                    iframe.contentWindow?.postMessage(
+                        { command },
+                        window.location.origin,
+                    );
+                };
+                const menus: IContextmenuDataItem[] = [
+                    {
+                        label: t("files_menu_copy"),
+                        disabled: data.hasSelection !== true,
+                        click: () => postCommand("copy"),
+                        iconRender: () => <CopyOutlined />,
+                    },
+                    {
+                        label: t("files_menu_paste"),
+                        click: () => postCommand("paste"),
+                        iconRender: () => <SnippetsOutlined />,
+                    },
+                    {
+                        label: t("terminal_menu_clear"),
+                        click: () => postCommand("clear"),
+                        iconRender: () => <ClearOutlined />,
+                    },
+                ];
+                popContextMenu(menus, rect.left + data.x, rect.top + data.y);
+                return;
+            }
+
+            if (
                 data.type === terminalCopyMessageType &&
                 data.targetId === targetId
             ) {
@@ -178,7 +233,7 @@ export default function Terminal({
 
         window.addEventListener("message", handleMessage);
         return () => window.removeEventListener("message", handleMessage);
-    }, [scheduleCopyNotification, showTerminalCopyNotification, targetId]);
+    }, [scheduleCopyNotification, showTerminalCopyNotification, t, targetId]);
 
     useEffect(() => {
         if (!showTerminalCopyNotification) {
@@ -236,7 +291,23 @@ export default function Terminal({
             { command: "setTheme", args: terminalThemes[theme] },
             window.location.origin,
         );
-    }, [theme]);
+        contentWindow.postMessage(
+            {
+                command: "setClipboardOptions",
+                args: {
+                    selectionCopyEnabled: terminalSelectionCopyEnabled,
+                    rightClickPasteEnabled: terminalRightClickPasteEnabled,
+                    middleClickPasteEnabled: terminalMiddleClickPasteEnabled,
+                },
+            },
+            window.location.origin,
+        );
+    }, [
+        terminalMiddleClickPasteEnabled,
+        terminalRightClickPasteEnabled,
+        terminalSelectionCopyEnabled,
+        theme,
+    ]);
 
     const syncTerminalActive = useCallback(() => {
         iframeRef.current?.contentWindow?.postMessage(

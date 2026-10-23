@@ -32,6 +32,13 @@ type AppStore = {
     showTerminalCopyNotification: boolean;
     setShowTerminalCopyNotification: (show: boolean) => void;
 
+    terminalSelectionCopyEnabled: boolean;
+    setTerminalSelectionCopyEnabled: (enabled: boolean) => void;
+    terminalRightClickPasteEnabled: boolean;
+    setTerminalRightClickPasteEnabled: (enabled: boolean) => void;
+    terminalMiddleClickPasteEnabled: boolean;
+    setTerminalMiddleClickPasteEnabled: (enabled: boolean) => void;
+
     language: Language;
     setLanguage: (language: Language) => void;
 
@@ -81,6 +88,54 @@ function getInitialTabs() {
 
 let tabsHydrated = false;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
+const terminalClipboardSettingsStorageKey =
+    "webssh:terminal-clipboard-settings";
+
+function getStoredTerminalClipboardSettings(): {
+    selectionCopyEnabled?: boolean;
+    rightClickPasteEnabled?: boolean;
+    middleClickPasteEnabled?: boolean;
+} {
+    try {
+        const value = JSON.parse(
+            window.localStorage.getItem(terminalClipboardSettingsStorageKey) ||
+                "null",
+        ) as unknown;
+        if (!value || typeof value !== "object") return {};
+        const settings = value as Record<string, unknown>;
+        return {
+            ...(typeof settings.selectionCopyEnabled === "boolean"
+                ? { selectionCopyEnabled: settings.selectionCopyEnabled }
+                : {}),
+            ...(typeof settings.rightClickPasteEnabled === "boolean"
+                ? { rightClickPasteEnabled: settings.rightClickPasteEnabled }
+                : {}),
+            ...(typeof settings.middleClickPasteEnabled === "boolean"
+                ? { middleClickPasteEnabled: settings.middleClickPasteEnabled }
+                : {}),
+        };
+    } catch {
+        return {};
+    }
+}
+
+function storeTerminalClipboardSettings(settings: {
+    selectionCopyEnabled?: boolean;
+    rightClickPasteEnabled?: boolean;
+    middleClickPasteEnabled?: boolean;
+}) {
+    try {
+        window.localStorage.setItem(
+            terminalClipboardSettingsStorageKey,
+            JSON.stringify({
+                ...getStoredTerminalClipboardSettings(),
+                ...settings,
+            }),
+        );
+    } catch {
+        // Local storage is only a persistence fallback.
+    }
+}
 
 function getSystemTheme(): ResolvedTheme {
     return window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -98,6 +153,18 @@ function getInitialSidebarCollapsed() {
 
 function getInitialShowTerminalCopyNotification() {
     return true;
+}
+
+function getInitialTerminalSelectionCopyEnabled() {
+    return getStoredTerminalClipboardSettings().selectionCopyEnabled ?? true;
+}
+
+function getInitialTerminalRightClickPasteEnabled() {
+    return getStoredTerminalClipboardSettings().rightClickPasteEnabled ?? true;
+}
+
+function getInitialTerminalMiddleClickPasteEnabled() {
+    return getStoredTerminalClipboardSettings().middleClickPasteEnabled ?? true;
 }
 
 const useAppStore = create<AppStore>((set) => {
@@ -122,6 +189,26 @@ const useAppStore = create<AppStore>((set) => {
         showTerminalCopyNotification: getInitialShowTerminalCopyNotification(),
         setShowTerminalCopyNotification: (show: boolean) => {
             set({ showTerminalCopyNotification: show });
+        },
+
+        terminalSelectionCopyEnabled: getInitialTerminalSelectionCopyEnabled(),
+        setTerminalSelectionCopyEnabled: (enabled: boolean) => {
+            storeTerminalClipboardSettings({ selectionCopyEnabled: enabled });
+            set({ terminalSelectionCopyEnabled: enabled });
+        },
+        terminalRightClickPasteEnabled:
+            getInitialTerminalRightClickPasteEnabled(),
+        setTerminalRightClickPasteEnabled: (enabled: boolean) => {
+            storeTerminalClipboardSettings({ rightClickPasteEnabled: enabled });
+            set({ terminalRightClickPasteEnabled: enabled });
+        },
+        terminalMiddleClickPasteEnabled:
+            getInitialTerminalMiddleClickPasteEnabled(),
+        setTerminalMiddleClickPasteEnabled: (enabled: boolean) => {
+            storeTerminalClipboardSettings({
+                middleClickPasteEnabled: enabled,
+            });
+            set({ terminalMiddleClickPasteEnabled: enabled });
         },
 
         language: "zh",
@@ -316,12 +403,17 @@ const useAppStore = create<AppStore>((set) => {
                         theme_mode?: string;
                         sidebar_collapsed?: boolean;
                         show_terminal_copy_notification?: boolean;
+                        terminal_selection_copy_enabled?: boolean;
+                        terminal_right_click_paste_enabled?: boolean;
+                        terminal_middle_click_paste_enabled?: boolean;
                         language?: string;
                         last_local_directory?: string | null;
                     };
                 } | null>("/api/preferences");
                 const saved = response.data;
                 const settings = saved?.settings;
+                const storedTerminalSettings =
+                    getStoredTerminalClipboardSettings();
                 const themeMode = settings?.theme_mode;
                 const language = settings?.language;
                 set({
@@ -344,6 +436,30 @@ const useAppStore = create<AppStore>((set) => {
                         ? {
                               showTerminalCopyNotification:
                                   settings.show_terminal_copy_notification,
+                          }
+                        : {}),
+                    ...(typeof settings?.terminal_selection_copy_enabled ===
+                    "boolean"
+                        ? {
+                              terminalSelectionCopyEnabled:
+                                  storedTerminalSettings.selectionCopyEnabled ??
+                                  settings.terminal_selection_copy_enabled,
+                          }
+                        : {}),
+                    ...(typeof settings?.terminal_right_click_paste_enabled ===
+                    "boolean"
+                        ? {
+                              terminalRightClickPasteEnabled:
+                                  storedTerminalSettings.rightClickPasteEnabled ??
+                                  settings.terminal_right_click_paste_enabled,
+                          }
+                        : {}),
+                    ...(typeof settings?.terminal_middle_click_paste_enabled ===
+                    "boolean"
+                        ? {
+                              terminalMiddleClickPasteEnabled:
+                                  storedTerminalSettings.middleClickPasteEnabled ??
+                                  settings.terminal_middle_click_paste_enabled,
                           }
                         : {}),
                     ...(language === "zh" || language === "en"
@@ -397,6 +513,12 @@ useAppStore.subscribe((state, previousState) => {
         state.sidebarCollapsed === previousState.sidebarCollapsed &&
         state.showTerminalCopyNotification ===
             previousState.showTerminalCopyNotification &&
+        state.terminalSelectionCopyEnabled ===
+            previousState.terminalSelectionCopyEnabled &&
+        state.terminalRightClickPasteEnabled ===
+            previousState.terminalRightClickPasteEnabled &&
+        state.terminalMiddleClickPasteEnabled ===
+            previousState.terminalMiddleClickPasteEnabled &&
         state.language === previousState.language &&
         state.lastLocalDirectory === previousState.lastLocalDirectory
     ) {
@@ -423,6 +545,12 @@ useAppStore.subscribe((state, previousState) => {
                     sidebar_collapsed: current.sidebarCollapsed,
                     show_terminal_copy_notification:
                         current.showTerminalCopyNotification,
+                    terminal_selection_copy_enabled:
+                        current.terminalSelectionCopyEnabled,
+                    terminal_right_click_paste_enabled:
+                        current.terminalRightClickPasteEnabled,
+                    terminal_middle_click_paste_enabled:
+                        current.terminalMiddleClickPasteEnabled,
                     language: current.language,
                     last_local_directory: current.lastLocalDirectory ?? null,
                 },

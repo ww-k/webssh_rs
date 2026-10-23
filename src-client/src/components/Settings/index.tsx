@@ -1,4 +1,5 @@
 import {
+    CodeOutlined,
     DatabaseOutlined,
     DownloadOutlined,
     LayoutOutlined,
@@ -33,6 +34,12 @@ export default function Settings() {
     const {
         showTerminalCopyNotification,
         setShowTerminalCopyNotification,
+        terminalSelectionCopyEnabled,
+        setTerminalSelectionCopyEnabled,
+        terminalRightClickPasteEnabled,
+        setTerminalRightClickPasteEnabled,
+        terminalMiddleClickPasteEnabled,
+        setTerminalMiddleClickPasteEnabled,
         language,
         setLanguage,
     } = useAppStore();
@@ -43,6 +50,11 @@ export default function Settings() {
                 theme_mode: themeMode,
                 sidebar_collapsed: sidebarCollapsed,
                 show_terminal_copy_notification: showTerminalCopyNotification,
+                terminal_selection_copy_enabled: terminalSelectionCopyEnabled,
+                terminal_right_click_paste_enabled:
+                    terminalRightClickPasteEnabled,
+                terminal_middle_click_paste_enabled:
+                    terminalMiddleClickPasteEnabled,
                 language,
             });
             fileSave(
@@ -67,6 +79,15 @@ export default function Settings() {
             setSidebarCollapsed(result.settings.sidebar_collapsed);
             setShowTerminalCopyNotification(
                 result.settings.show_terminal_copy_notification,
+            );
+            setTerminalSelectionCopyEnabled(
+                result.settings.terminal_selection_copy_enabled,
+            );
+            setTerminalRightClickPasteEnabled(
+                result.settings.terminal_right_click_paste_enabled,
+            );
+            setTerminalMiddleClickPasteEnabled(
+                result.settings.terminal_middle_click_paste_enabled,
             );
             setLanguage(result.settings.language as "zh" | "en");
             message.success(
@@ -167,6 +188,65 @@ export default function Settings() {
                     <Switch
                         checked={showTerminalCopyNotification}
                         onChange={setShowTerminalCopyNotification}
+                    />
+                </div>
+            </section>
+
+            <section className="WebSSH-Settings-Section">
+                <div className="WebSSH-Settings-SectionHeading">
+                    <div className="WebSSH-Settings-SectionIcon">
+                        <CodeOutlined />
+                    </div>
+                    <div>
+                        <Title level={4}>{t("settings_terminal")}</Title>
+                        <Text type="secondary">
+                            {t("settings_terminal_description")}
+                        </Text>
+                    </div>
+                </div>
+
+                <div className="WebSSH-Settings-Row">
+                    <div className="WebSSH-Settings-RowText">
+                        <Text strong>
+                            {t("settings_terminal_selection_copy")}
+                        </Text>
+                        <Text type="secondary">
+                            {t("settings_terminal_selection_copy_help")}
+                        </Text>
+                    </div>
+                    <Switch
+                        checked={terminalSelectionCopyEnabled}
+                        onChange={setTerminalSelectionCopyEnabled}
+                    />
+                </div>
+
+                <div className="WebSSH-Settings-Row">
+                    <div className="WebSSH-Settings-RowText">
+                        <Text strong>
+                            {t("settings_terminal_right_click_paste")}
+                        </Text>
+                        <Text type="secondary">
+                            {t("settings_terminal_right_click_paste_help")}
+                        </Text>
+                    </div>
+                    <Switch
+                        checked={terminalRightClickPasteEnabled}
+                        onChange={setTerminalRightClickPasteEnabled}
+                    />
+                </div>
+
+                <div className="WebSSH-Settings-Row">
+                    <div className="WebSSH-Settings-RowText">
+                        <Text strong>
+                            {t("settings_terminal_middle_click_paste")}
+                        </Text>
+                        <Text type="secondary">
+                            {t("settings_terminal_middle_click_paste_help")}
+                        </Text>
+                    </div>
+                    <Switch
+                        checked={terminalMiddleClickPasteEnabled}
+                        onChange={setTerminalMiddleClickPasteEnabled}
                     />
                 </div>
             </section>
