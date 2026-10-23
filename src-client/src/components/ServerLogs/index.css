@@ -36,7 +36,17 @@
     padding: 12px;
     overflow: auto;
     color: var(--ant-color-text);
-    font-family: var(--ant-font-family);
+    font-family: var(
+        --ant-font-family-code,
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        "Courier New",
+        monospace
+    );
     font-size: 12px;
     line-height: 1.6;
     white-space: pre-wrap;
