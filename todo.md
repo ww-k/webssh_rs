@@ -2,3 +2,4 @@
 - [] [feat] target 增加tag，target list上增加通过tag过滤
 - [] [feat] ssh terminal支持缓存历史会话信息，重连时保留历史会话
 - [] [feat] ssh terminal的断开重连，区分ssh通道断开和websocket链接断开。websocket链接断开可重连websocket，并连上断开前的通道。ssh通道断开则完重连。
+- [] [feat] sftp 支持上传目录，下载目录
