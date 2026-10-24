@@ -1,9 +1,8 @@
 .WebSSH-Settings {
     box-sizing: border-box;
-    width: min(900px, 100%);
+    width: 100%;
     height: 100%;
-    padding: 40px 48px 64px;
-    margin: 0 auto;
+    padding: 40px max(48px, calc((100% - 900px) / 2 + 48px)) 64px;
     overflow: auto;
     position: absolute;
     inset: 0;
@@ -69,6 +68,41 @@
     gap: 4px;
 }
 
+.WebSSH-Settings-TerminalThemesRow {
+    align-items: flex-start;
+}
+
+.WebSSH-Settings-TerminalThemes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+    gap: 24px;
+    width: min(100%, 700px);
+}
+
+.WebSSH-Settings-TerminalTheme {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.WebSSH-Settings-TerminalThemeHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.WebSSH-Settings-TerminalColor {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.WebSSH-Settings-TerminalColor .ant-color-picker-trigger {
+    justify-content: flex-start;
+}
+
 @media (max-width: 720px) {
     .WebSSH-Settings {
         padding: 28px 20px 48px;
@@ -79,5 +113,9 @@
         flex-direction: column;
         gap: 12px;
         padding-left: 0;
+    }
+
+    .WebSSH-Settings-TerminalThemes {
+        width: 100%;
     }
 }

@@ -4,9 +4,15 @@ import { create } from "zustand";
 
 import i18n from "@/i18n";
 
+import { terminalThemeDefaults } from "./components/Terminal/constants";
+
 import type { TabPaneProps } from "antd";
 import type { IFileListCopyEvent } from "./components/Filelist/types";
-import type { TerminalRightClickAction } from "./components/Terminal/types";
+import type {
+    TerminalRightClickAction,
+    TerminalThemeColorKey,
+    TerminalThemeColors,
+} from "./components/Terminal/types";
 
 export type ITabState = Record<string, unknown>;
 
@@ -39,6 +45,12 @@ type AppStore = {
     setTerminalRightClickAction: (action: TerminalRightClickAction) => void;
     terminalMiddleClickPasteEnabled: boolean;
     setTerminalMiddleClickPasteEnabled: (enabled: boolean) => void;
+    terminalThemes: Record<ResolvedTheme, TerminalThemeColors>;
+    setTerminalThemeColor: (
+        theme: ResolvedTheme,
+        key: TerminalThemeColorKey,
+        value: string,
+    ) => void;
 
     language: Language;
     setLanguage: (language: Language) => void;
@@ -175,6 +187,69 @@ function getInitialTerminalMiddleClickPasteEnabled() {
     return getStoredTerminalClipboardSettings().middleClickPasteEnabled ?? true;
 }
 
+function parseTerminalThemes(
+    value: unknown,
+): Record<ResolvedTheme, TerminalThemeColors> | undefined {
+    if (!value || typeof value !== "object") return undefined;
+    const input = value as Record<string, unknown>;
+    const parseTheme = (mode: ResolvedTheme): TerminalThemeColors => {
+        const source = input[mode];
+        const values =
+            source && typeof source === "object"
+                ? (source as Record<string, unknown>)
+                : {};
+        const defaults = terminalThemeDefaults[mode];
+        return {
+            background:
+                typeof values.background === "string"
+                    ? values.background
+                    : defaults.background,
+            foreground:
+                typeof values.foreground === "string"
+                    ? values.foreground
+                    : defaults.foreground,
+            cursor:
+                typeof values.cursor === "string"
+                    ? values.cursor
+                    : defaults.cursor,
+            selectionBackground:
+                typeof values.selectionBackground === "string"
+                    ? values.selectionBackground
+                    : typeof values.selection_background === "string"
+                      ? values.selection_background
+                      : defaults.selectionBackground,
+            scrollbarThumb:
+                typeof values.scrollbarThumb === "string"
+                    ? values.scrollbarThumb
+                    : typeof values.scrollbar_thumb === "string"
+                      ? values.scrollbar_thumb
+                      : defaults.scrollbarThumb,
+        };
+    };
+    return { light: parseTheme("light"), dark: parseTheme("dark") };
+}
+
+function serializeTerminalThemes(
+    themes: Record<ResolvedTheme, TerminalThemeColors>,
+) {
+    return {
+        dark: {
+            background: themes.dark.background,
+            foreground: themes.dark.foreground,
+            cursor: themes.dark.cursor,
+            selection_background: themes.dark.selectionBackground,
+            scrollbar_thumb: themes.dark.scrollbarThumb,
+        },
+        light: {
+            background: themes.light.background,
+            foreground: themes.light.foreground,
+            cursor: themes.light.cursor,
+            selection_background: themes.light.selectionBackground,
+            scrollbar_thumb: themes.light.scrollbarThumb,
+        },
+    };
+}
+
 const useAppStore = create<AppStore>((set) => {
     const initialTabs = getInitialTabs();
     const initialThemeMode = getInitialThemeMode();
@@ -216,6 +291,18 @@ const useAppStore = create<AppStore>((set) => {
                 middleClickPasteEnabled: enabled,
             });
             set({ terminalMiddleClickPasteEnabled: enabled });
+        },
+        terminalThemes: {
+            dark: { ...terminalThemeDefaults.dark },
+            light: { ...terminalThemeDefaults.light },
+        },
+        setTerminalThemeColor: (theme, key, value) => {
+            set((state) => ({
+                terminalThemes: {
+                    ...state.terminalThemes,
+                    [theme]: { ...state.terminalThemes[theme], [key]: value },
+                },
+            }));
         },
 
         language: "zh",
@@ -413,6 +500,7 @@ const useAppStore = create<AppStore>((set) => {
                         terminal_selection_copy_enabled?: boolean;
                         terminal_right_click_paste_enabled?: boolean;
                         terminal_middle_click_paste_enabled?: boolean;
+                        terminal_themes?: unknown;
                         language?: string;
                         last_local_directory?: string | null;
                     };
@@ -423,6 +511,9 @@ const useAppStore = create<AppStore>((set) => {
                     getStoredTerminalClipboardSettings();
                 const themeMode = settings?.theme_mode;
                 const language = settings?.language;
+                const terminalThemes = parseTerminalThemes(
+                    settings?.terminal_themes,
+                );
                 set({
                     ...(themeMode === "light" ||
                     themeMode === "dark" ||
@@ -471,6 +562,7 @@ const useAppStore = create<AppStore>((set) => {
                                   settings.terminal_middle_click_paste_enabled,
                           }
                         : {}),
+                    ...(terminalThemes ? { terminalThemes } : {}),
                     ...(language === "zh" || language === "en"
                         ? { language }
                         : {}),
@@ -528,6 +620,7 @@ useAppStore.subscribe((state, previousState) => {
             previousState.terminalRightClickAction &&
         state.terminalMiddleClickPasteEnabled ===
             previousState.terminalMiddleClickPasteEnabled &&
+        state.terminalThemes === previousState.terminalThemes &&
         state.language === previousState.language &&
         state.lastLocalDirectory === previousState.lastLocalDirectory
     ) {
@@ -560,6 +653,9 @@ useAppStore.subscribe((state, previousState) => {
                         current.terminalRightClickAction === "paste",
                     terminal_middle_click_paste_enabled:
                         current.terminalMiddleClickPasteEnabled,
+                    terminal_themes: serializeTerminalThemes(
+                        current.terminalThemes,
+                    ),
                     language: current.language,
                     last_local_directory: current.lastLocalDirectory ?? null,
                 },

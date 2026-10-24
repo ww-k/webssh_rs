@@ -4,11 +4,13 @@ import {
     DownloadOutlined,
     LayoutOutlined,
     MoonOutlined,
+    ReloadOutlined,
     SunOutlined,
     UploadOutlined,
 } from "@ant-design/icons";
 import {
     Button,
+    ColorPicker,
     message,
     Segmented,
     Select,
@@ -23,9 +25,27 @@ import "./index.css";
 
 import fileSave from "@/helpers/fileSave";
 import { createUserDataExport, importUserData } from "@/services/userData";
-import useAppStore, { type ThemeMode } from "@/store";
+import useAppStore, { type ResolvedTheme, type ThemeMode } from "@/store";
+
+import { terminalThemeDefaults } from "../Terminal/constants";
+
+import type { TerminalThemeColorKey } from "../Terminal/types";
 
 const { Paragraph, Text, Title } = Typography;
+
+const terminalThemeColorFields: Array<{
+    key: TerminalThemeColorKey;
+    label: string;
+}> = [
+    { key: "background", label: "settings_terminal_color_background" },
+    { key: "foreground", label: "settings_terminal_color_foreground" },
+    { key: "cursor", label: "settings_terminal_color_cursor" },
+    {
+        key: "selectionBackground",
+        label: "settings_terminal_color_selection",
+    },
+    { key: "scrollbarThumb", label: "settings_terminal_color_scrollbar" },
+];
 
 export default function Settings() {
     const { t } = useTranslation();
@@ -40,9 +60,55 @@ export default function Settings() {
         setTerminalRightClickAction,
         terminalMiddleClickPasteEnabled,
         setTerminalMiddleClickPasteEnabled,
+        terminalThemes,
+        setTerminalThemeColor,
         language,
         setLanguage,
     } = useAppStore();
+
+    const resetTerminalTheme = (mode: ResolvedTheme) => {
+        for (const { key } of terminalThemeColorFields) {
+            setTerminalThemeColor(mode, key, terminalThemeDefaults[mode][key]);
+        }
+    };
+
+    const renderTerminalTheme = (mode: ResolvedTheme) => (
+        <div className="WebSSH-Settings-TerminalTheme">
+            <div className="WebSSH-Settings-TerminalThemeHeader">
+                <Text strong>
+                    {t(
+                        mode === "dark"
+                            ? "settings_terminal_theme_dark"
+                            : "settings_terminal_theme_light",
+                    )}
+                </Text>
+                <Button
+                    icon={<ReloadOutlined />}
+                    onClick={() => resetTerminalTheme(mode)}
+                    size="small"
+                >
+                    {t("settings_terminal_colors_reset")}
+                </Button>
+            </div>
+            {terminalThemeColorFields.map(({ key, label }) => (
+                <div className="WebSSH-Settings-TerminalColor" key={key}>
+                    <Text type="secondary">{t(label)}</Text>
+                    <ColorPicker
+                        style={{ width: 130 }}
+                        value={terminalThemes[mode][key]}
+                        showText
+                        onChangeComplete={(color) =>
+                            setTerminalThemeColor(
+                                mode,
+                                key,
+                                color.toRgbString(),
+                            )
+                        }
+                    />
+                </div>
+            ))}
+        </div>
+    );
     const importInputRef = useRef<HTMLInputElement>(null);
     const handleExport = async () => {
         try {
@@ -55,6 +121,7 @@ export default function Settings() {
                     terminalRightClickAction === "paste",
                 terminal_middle_click_paste_enabled:
                     terminalMiddleClickPasteEnabled,
+                terminal_themes: terminalThemes,
                 language,
             });
             fileSave(
@@ -91,6 +158,15 @@ export default function Settings() {
             setTerminalMiddleClickPasteEnabled(
                 result.settings.terminal_middle_click_paste_enabled,
             );
+            for (const mode of ["light", "dark"] as const) {
+                for (const { key } of terminalThemeColorFields) {
+                    setTerminalThemeColor(
+                        mode,
+                        key,
+                        result.settings.terminal_themes[mode][key],
+                    );
+                }
+            }
             setLanguage(result.settings.language as "zh" | "en");
             message.success(
                 t("settings_data_import_success", {
@@ -268,6 +344,19 @@ export default function Settings() {
                         checked={terminalMiddleClickPasteEnabled}
                         onChange={setTerminalMiddleClickPasteEnabled}
                     />
+                </div>
+
+                <div className="WebSSH-Settings-Row WebSSH-Settings-TerminalThemesRow">
+                    <div className="WebSSH-Settings-RowText">
+                        <Text strong>{t("settings_terminal_colors")}</Text>
+                        <Text type="secondary">
+                            {t("settings_terminal_colors_help")}
+                        </Text>
+                    </div>
+                    <div className="WebSSH-Settings-TerminalThemes">
+                        {renderTerminalTheme("light")}
+                        {renderTerminalTheme("dark")}
+                    </div>
                 </div>
             </section>
 

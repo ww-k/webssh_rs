@@ -1,6 +1,10 @@
 import { getUserDataExport, postUserDataImport } from "@/api";
+import { terminalThemeDefaults } from "@/components/Terminal/constants";
 
-import type { ThemeMode } from "@/store";
+import type { TerminalThemeColors } from "@/components/Terminal/types";
+import type { ResolvedTheme, ThemeMode } from "@/store";
+
+type UserDataTerminalThemes = Record<ResolvedTheme, TerminalThemeColors>;
 
 export interface UserDataExport {
     version: 1;
@@ -16,6 +20,7 @@ export interface UserDataExport {
         terminal_selection_copy_enabled: boolean;
         terminal_right_click_paste_enabled: boolean;
         terminal_middle_click_paste_enabled: boolean;
+        terminal_themes: UserDataTerminalThemes;
         language: string;
     };
 }
@@ -36,6 +41,10 @@ function readSettings(value: unknown): UserDataExport["settings"] {
             terminal_selection_copy_enabled: true,
             terminal_right_click_paste_enabled: true,
             terminal_middle_click_paste_enabled: true,
+            terminal_themes: {
+                dark: { ...terminalThemeDefaults.dark },
+                light: { ...terminalThemeDefaults.light },
+            },
             language: "zh",
         };
     }
@@ -52,9 +61,14 @@ function readSettings(value: unknown): UserDataExport["settings"] {
             terminal_selection_copy_enabled: true,
             terminal_right_click_paste_enabled: true,
             terminal_middle_click_paste_enabled: true,
+            terminal_themes: {
+                dark: { ...terminalThemeDefaults.dark },
+                light: { ...terminalThemeDefaults.light },
+            },
             language: "zh",
         };
     }
+    const terminalThemes = readTerminalThemes(settings.terminal_themes);
     return {
         theme_mode: settings.theme_mode,
         sidebar_collapsed:
@@ -77,11 +91,53 @@ function readSettings(value: unknown): UserDataExport["settings"] {
             typeof settings.terminal_middle_click_paste_enabled === "boolean"
                 ? settings.terminal_middle_click_paste_enabled
                 : true,
+        terminal_themes: terminalThemes,
         language:
             settings.language === "en" || settings.language === "zh"
                 ? settings.language
                 : "zh",
     };
+}
+
+function readTerminalThemes(value: unknown): UserDataTerminalThemes {
+    if (!value || typeof value !== "object") {
+        return {
+            dark: { ...terminalThemeDefaults.dark },
+            light: { ...terminalThemeDefaults.light },
+        };
+    }
+    const input = value as Record<string, unknown>;
+    const readTheme = (mode: ResolvedTheme): TerminalThemeColors => {
+        const source = input[mode];
+        const values =
+            source && typeof source === "object"
+                ? (source as Record<string, unknown>)
+                : {};
+        const defaults = terminalThemeDefaults[mode];
+        return {
+            background:
+                typeof values.background === "string"
+                    ? values.background
+                    : defaults.background,
+            foreground:
+                typeof values.foreground === "string"
+                    ? values.foreground
+                    : defaults.foreground,
+            cursor:
+                typeof values.cursor === "string"
+                    ? values.cursor
+                    : defaults.cursor,
+            selectionBackground:
+                typeof values.selectionBackground === "string"
+                    ? values.selectionBackground
+                    : defaults.selectionBackground,
+            scrollbarThumb:
+                typeof values.scrollbarThumb === "string"
+                    ? values.scrollbarThumb
+                    : defaults.scrollbarThumb,
+        };
+    };
+    return { dark: readTheme("dark"), light: readTheme("light") };
 }
 
 export async function createUserDataExport(

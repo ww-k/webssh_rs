@@ -5,6 +5,15 @@ export type TerminalTheme = ITheme & {
     scrollbarThumb?: string;
 };
 
+export type TerminalThemeColorKey =
+    | "background"
+    | "foreground"
+    | "cursor"
+    | "selectionBackground"
+    | "scrollbarThumb";
+
+export type TerminalThemeColors = Record<TerminalThemeColorKey, string>;
+
 export type TerminalRightClickAction = "paste" | "menu";
 
 export interface ClipboardOptions {

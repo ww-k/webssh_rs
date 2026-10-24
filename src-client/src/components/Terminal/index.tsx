@@ -22,9 +22,9 @@ import "./index.css";
 
 import { normalizeTerminalCwd } from "@/helpers/terminal_cwd";
 import useAppStore, { type ITab } from "@/store";
-import { terminalInteractionMessageType } from "./constants";
 
 import popContextMenu from "../Contextmenu";
+import { terminalInteractionMessageType } from "./constants";
 
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
 
@@ -47,23 +47,6 @@ function appendTerminalHistory(chunks: string[], data: string, length: number) {
     return nextLength;
 }
 
-const terminalThemes = {
-    dark: {
-        background: "#0f1115",
-        foreground: "#f5f7fa",
-        cursor: "#f5f7fa",
-        selectionBackground: "#3a4352",
-        scrollbarThumb: "rgba(255, 255, 255, 0.3)",
-    },
-    light: {
-        background: "#ffffff",
-        foreground: "#1f2328",
-        cursor: "#1f2328",
-        selectionBackground: "#add6ff",
-        scrollbarThumb: "rgba(0, 0, 0, 0.25)",
-    },
-} as const;
-
 export default function Terminal({
     active,
     tab,
@@ -74,6 +57,7 @@ export default function Terminal({
     const { t } = useTranslation();
     const openSftpAt = useAppStore((state) => state.openSftpAt);
     const theme = useAppStore((state) => state.theme);
+    const terminalThemes = useAppStore((state) => state.terminalThemes);
     const terminalSelectionCopyEnabled = useAppStore(
         (state) => state.terminalSelectionCopyEnabled,
     );
@@ -230,9 +214,7 @@ export default function Terminal({
                         click: () => {
                             void navigator.clipboard
                                 .readText()
-                                .then((text) =>
-                                    postCommand("pasteText", text),
-                                )
+                                .then((text) => postCommand("pasteText", text))
                                 .catch(() => undefined)
                                 .finally(focusTerminal);
                         },
@@ -340,14 +322,8 @@ export default function Terminal({
     const clearTerminal = useCallback(() => {
         const contentWindow = iframeRef.current?.contentWindow;
         if (!contentWindow) return;
-        contentWindow.postMessage(
-            { command: "clear" },
-            window.location.origin,
-        );
-        contentWindow.postMessage(
-            { command: "focus" },
-            window.location.origin,
-        );
+        contentWindow.postMessage({ command: "clear" }, window.location.origin);
+        contentWindow.postMessage({ command: "focus" }, window.location.origin);
     }, []);
 
     const syncTerminal = useCallback(() => {
@@ -373,6 +349,7 @@ export default function Terminal({
         terminalMiddleClickPasteEnabled,
         terminalRightClickAction,
         terminalSelectionCopyEnabled,
+        terminalThemes,
         theme,
     ]);
 
@@ -463,7 +440,10 @@ export default function Terminal({
                     />
                 </Tooltip>
             </div>
-            <div className="terminalContainer">
+            <div
+                className="terminalContainer"
+                style={{ backgroundColor: terminalThemes[theme].background }}
+            >
                 <iframe
                     key={iframeKey}
                     ref={iframeRef}
@@ -473,7 +453,13 @@ export default function Terminal({
                     onLoad={handleTerminalLoad}
                 />
                 {connectionStatus === "disconnected" && (
-                    <div className="terminalDisconnected" role="alert">
+                    <div
+                        className="terminalDisconnected"
+                        role="alert"
+                        style={{
+                            backgroundColor: terminalThemes[theme].background,
+                        }}
+                    >
                         <div className="terminalDisconnectedTitle">
                             {t("terminal_disconnected")}
                         </div>
