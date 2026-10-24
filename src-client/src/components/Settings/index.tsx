@@ -36,8 +36,8 @@ export default function Settings() {
         setShowTerminalCopyNotification,
         terminalSelectionCopyEnabled,
         setTerminalSelectionCopyEnabled,
-        terminalRightClickPasteEnabled,
-        setTerminalRightClickPasteEnabled,
+        terminalRightClickAction,
+        setTerminalRightClickAction,
         terminalMiddleClickPasteEnabled,
         setTerminalMiddleClickPasteEnabled,
         language,
@@ -52,7 +52,7 @@ export default function Settings() {
                 show_terminal_copy_notification: showTerminalCopyNotification,
                 terminal_selection_copy_enabled: terminalSelectionCopyEnabled,
                 terminal_right_click_paste_enabled:
-                    terminalRightClickPasteEnabled,
+                    terminalRightClickAction === "paste",
                 terminal_middle_click_paste_enabled:
                     terminalMiddleClickPasteEnabled,
                 language,
@@ -83,8 +83,10 @@ export default function Settings() {
             setTerminalSelectionCopyEnabled(
                 result.settings.terminal_selection_copy_enabled,
             );
-            setTerminalRightClickPasteEnabled(
-                result.settings.terminal_right_click_paste_enabled,
+            setTerminalRightClickAction(
+                result.settings.terminal_right_click_paste_enabled
+                    ? "paste"
+                    : "menu",
             );
             setTerminalMiddleClickPasteEnabled(
                 result.settings.terminal_middle_click_paste_enabled,
@@ -223,15 +225,33 @@ export default function Settings() {
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
                         <Text strong>
-                            {t("settings_terminal_right_click_paste")}
+                            {t("settings_terminal_right_click_action")}
                         </Text>
                         <Text type="secondary">
-                            {t("settings_terminal_right_click_paste_help")}
+                            {t("settings_terminal_right_click_action_help")}
                         </Text>
                     </div>
-                    <Switch
-                        checked={terminalRightClickPasteEnabled}
-                        onChange={setTerminalRightClickPasteEnabled}
+                    <Segmented
+                        value={terminalRightClickAction}
+                        options={[
+                            {
+                                value: "paste",
+                                label: t(
+                                    "settings_terminal_right_click_action_paste",
+                                ),
+                            },
+                            {
+                                value: "menu",
+                                label: t(
+                                    "settings_terminal_right_click_action_menu",
+                                ),
+                            },
+                        ]}
+                        onChange={(value) =>
+                            setTerminalRightClickAction(
+                                value as "paste" | "menu",
+                            )
+                        }
                     />
                 </div>
 

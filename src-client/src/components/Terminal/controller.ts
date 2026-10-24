@@ -121,6 +121,11 @@ class TerminalController {
             case "paste":
                 pasteFromClipboard(this.terminal);
                 break;
+            case "pasteText":
+                if (typeof data.args === "string") {
+                    this.terminal?.paste(data.args);
+                }
+                break;
             case "clear":
                 this.terminal?.clear();
                 break;

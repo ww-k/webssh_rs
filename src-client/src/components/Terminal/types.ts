@@ -5,9 +5,11 @@ export type TerminalTheme = ITheme & {
     scrollbarThumb?: string;
 };
 
+export type TerminalRightClickAction = "paste" | "menu";
+
 export interface ClipboardOptions {
     selectionCopyEnabled: boolean;
-    rightClickPasteEnabled: boolean;
+    rightClickAction: TerminalRightClickAction;
     middleClickPasteEnabled: boolean;
 }
 

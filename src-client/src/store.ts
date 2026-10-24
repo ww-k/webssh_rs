@@ -6,6 +6,7 @@ import i18n from "@/i18n";
 
 import type { TabPaneProps } from "antd";
 import type { IFileListCopyEvent } from "./components/Filelist/types";
+import type { TerminalRightClickAction } from "./components/Terminal/types";
 
 export type ITabState = Record<string, unknown>;
 
@@ -34,8 +35,8 @@ type AppStore = {
 
     terminalSelectionCopyEnabled: boolean;
     setTerminalSelectionCopyEnabled: (enabled: boolean) => void;
-    terminalRightClickPasteEnabled: boolean;
-    setTerminalRightClickPasteEnabled: (enabled: boolean) => void;
+    terminalRightClickAction: TerminalRightClickAction;
+    setTerminalRightClickAction: (action: TerminalRightClickAction) => void;
     terminalMiddleClickPasteEnabled: boolean;
     setTerminalMiddleClickPasteEnabled: (enabled: boolean) => void;
 
@@ -93,7 +94,7 @@ const terminalClipboardSettingsStorageKey =
 
 function getStoredTerminalClipboardSettings(): {
     selectionCopyEnabled?: boolean;
-    rightClickPasteEnabled?: boolean;
+    rightClickAction?: TerminalRightClickAction;
     middleClickPasteEnabled?: boolean;
 } {
     try {
@@ -103,13 +104,20 @@ function getStoredTerminalClipboardSettings(): {
         ) as unknown;
         if (!value || typeof value !== "object") return {};
         const settings = value as Record<string, unknown>;
+        const rightClickAction: TerminalRightClickAction | undefined =
+            settings.rightClickAction === "paste" ||
+            settings.rightClickAction === "menu"
+                ? settings.rightClickAction
+                : typeof settings.rightClickPasteEnabled === "boolean"
+                  ? settings.rightClickPasteEnabled
+                      ? "paste"
+                      : "menu"
+                  : undefined;
         return {
             ...(typeof settings.selectionCopyEnabled === "boolean"
                 ? { selectionCopyEnabled: settings.selectionCopyEnabled }
                 : {}),
-            ...(typeof settings.rightClickPasteEnabled === "boolean"
-                ? { rightClickPasteEnabled: settings.rightClickPasteEnabled }
-                : {}),
+            ...(rightClickAction ? { rightClickAction } : {}),
             ...(typeof settings.middleClickPasteEnabled === "boolean"
                 ? { middleClickPasteEnabled: settings.middleClickPasteEnabled }
                 : {}),
@@ -121,7 +129,7 @@ function getStoredTerminalClipboardSettings(): {
 
 function storeTerminalClipboardSettings(settings: {
     selectionCopyEnabled?: boolean;
-    rightClickPasteEnabled?: boolean;
+    rightClickAction?: TerminalRightClickAction;
     middleClickPasteEnabled?: boolean;
 }) {
     try {
@@ -159,8 +167,8 @@ function getInitialTerminalSelectionCopyEnabled() {
     return getStoredTerminalClipboardSettings().selectionCopyEnabled ?? true;
 }
 
-function getInitialTerminalRightClickPasteEnabled() {
-    return getStoredTerminalClipboardSettings().rightClickPasteEnabled ?? true;
+function getInitialTerminalRightClickAction(): TerminalRightClickAction {
+    return getStoredTerminalClipboardSettings().rightClickAction ?? "paste";
 }
 
 function getInitialTerminalMiddleClickPasteEnabled() {
@@ -196,11 +204,10 @@ const useAppStore = create<AppStore>((set) => {
             storeTerminalClipboardSettings({ selectionCopyEnabled: enabled });
             set({ terminalSelectionCopyEnabled: enabled });
         },
-        terminalRightClickPasteEnabled:
-            getInitialTerminalRightClickPasteEnabled(),
-        setTerminalRightClickPasteEnabled: (enabled: boolean) => {
-            storeTerminalClipboardSettings({ rightClickPasteEnabled: enabled });
-            set({ terminalRightClickPasteEnabled: enabled });
+        terminalRightClickAction: getInitialTerminalRightClickAction(),
+        setTerminalRightClickAction: (action: TerminalRightClickAction) => {
+            storeTerminalClipboardSettings({ rightClickAction: action });
+            set({ terminalRightClickAction: action });
         },
         terminalMiddleClickPasteEnabled:
             getInitialTerminalMiddleClickPasteEnabled(),
@@ -449,9 +456,11 @@ const useAppStore = create<AppStore>((set) => {
                     ...(typeof settings?.terminal_right_click_paste_enabled ===
                     "boolean"
                         ? {
-                              terminalRightClickPasteEnabled:
-                                  storedTerminalSettings.rightClickPasteEnabled ??
-                                  settings.terminal_right_click_paste_enabled,
+                              terminalRightClickAction:
+                                  storedTerminalSettings.rightClickAction ??
+                                  (settings.terminal_right_click_paste_enabled
+                                      ? "paste"
+                                      : "menu"),
                           }
                         : {}),
                     ...(typeof settings?.terminal_middle_click_paste_enabled ===
@@ -515,8 +524,8 @@ useAppStore.subscribe((state, previousState) => {
             previousState.showTerminalCopyNotification &&
         state.terminalSelectionCopyEnabled ===
             previousState.terminalSelectionCopyEnabled &&
-        state.terminalRightClickPasteEnabled ===
-            previousState.terminalRightClickPasteEnabled &&
+        state.terminalRightClickAction ===
+            previousState.terminalRightClickAction &&
         state.terminalMiddleClickPasteEnabled ===
             previousState.terminalMiddleClickPasteEnabled &&
         state.language === previousState.language &&
@@ -548,7 +557,7 @@ useAppStore.subscribe((state, previousState) => {
                     terminal_selection_copy_enabled:
                         current.terminalSelectionCopyEnabled,
                     terminal_right_click_paste_enabled:
-                        current.terminalRightClickPasteEnabled,
+                        current.terminalRightClickAction === "paste",
                     terminal_middle_click_paste_enabled:
                         current.terminalMiddleClickPasteEnabled,
                     language: current.language,

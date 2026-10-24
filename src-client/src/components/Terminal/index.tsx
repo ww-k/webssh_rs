@@ -22,6 +22,7 @@ import "./index.css";
 
 import { normalizeTerminalCwd } from "@/helpers/terminal_cwd";
 import useAppStore, { type ITab } from "@/store";
+import { terminalInteractionMessageType } from "./constants";
 
 import popContextMenu from "../Contextmenu";
 
@@ -76,8 +77,8 @@ export default function Terminal({
     const terminalSelectionCopyEnabled = useAppStore(
         (state) => state.terminalSelectionCopyEnabled,
     );
-    const terminalRightClickPasteEnabled = useAppStore(
-        (state) => state.terminalRightClickPasteEnabled,
+    const terminalRightClickAction = useAppStore(
+        (state) => state.terminalRightClickAction,
     );
     const terminalMiddleClickPasteEnabled = useAppStore(
         (state) => state.terminalMiddleClickPasteEnabled,
@@ -111,6 +112,7 @@ export default function Terminal({
         [tab.path],
     );
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    const terminalContextMenuDestroyRef = useRef<(() => void) | undefined>();
     const terminalHistoryChunksRef = useRef<string[]>([]);
     const terminalHistoryLengthRef = useRef(0);
     const targetId = useMemo(() => {
@@ -150,6 +152,15 @@ export default function Terminal({
 
             const data = event.data;
             if (
+                data.type === terminalInteractionMessageType &&
+                data.targetId === targetId
+            ) {
+                terminalContextMenuDestroyRef.current?.();
+                terminalContextMenuDestroyRef.current = undefined;
+                return;
+            }
+
+            if (
                 data.type === terminalStatusMessageType &&
                 data.targetId === targetId &&
                 (data.status === "connected" || data.status === "disconnected")
@@ -181,31 +192,67 @@ export default function Terminal({
                 if (!iframe) return;
 
                 const rect = iframe.getBoundingClientRect();
-                const postCommand = (command: string) => {
+                const postCommand = (command: string, args?: string) => {
                     iframe.contentWindow?.postMessage(
-                        { command },
+                        { command, ...(args === undefined ? {} : { args }) },
                         window.location.origin,
                     );
                 };
+                const focusTerminal = () => postCommand("focus");
                 const menus: IContextmenuDataItem[] = [
                     {
                         label: t("files_menu_copy"),
                         disabled: data.hasSelection !== true,
-                        click: () => postCommand("copy"),
+                        click: () => {
+                            if (
+                                typeof data.selection !== "string" ||
+                                !data.selection
+                            ) {
+                                return;
+                            }
+                            void navigator.clipboard
+                                .writeText(data.selection)
+                                .then(() => {
+                                    if (!showTerminalCopyNotification) {
+                                        return;
+                                    }
+                                    setCopyNotificationVisible(true);
+                                    copyNotificationRemainingRef.current = 2200;
+                                    scheduleCopyNotification();
+                                })
+                                .catch(() => undefined)
+                                .finally(focusTerminal);
+                        },
                         iconRender: () => <CopyOutlined />,
                     },
                     {
                         label: t("files_menu_paste"),
-                        click: () => postCommand("paste"),
+                        click: () => {
+                            void navigator.clipboard
+                                .readText()
+                                .then((text) =>
+                                    postCommand("pasteText", text),
+                                )
+                                .catch(() => undefined)
+                                .finally(focusTerminal);
+                        },
                         iconRender: () => <SnippetsOutlined />,
                     },
                     {
                         label: t("terminal_menu_clear"),
-                        click: () => postCommand("clear"),
+                        click: () => {
+                            postCommand("clear");
+                            focusTerminal();
+                        },
                         iconRender: () => <ClearOutlined />,
                     },
                 ];
-                popContextMenu(menus, rect.left + data.x, rect.top + data.y);
+                terminalContextMenuDestroyRef.current?.();
+                terminalContextMenuDestroyRef.current = popContextMenu(
+                    menus,
+                    rect.left + data.x,
+                    rect.top + data.y,
+                ).destroy;
                 return;
             }
 
@@ -234,6 +281,13 @@ export default function Terminal({
         window.addEventListener("message", handleMessage);
         return () => window.removeEventListener("message", handleMessage);
     }, [scheduleCopyNotification, showTerminalCopyNotification, t, targetId]);
+
+    useEffect(() => {
+        return () => {
+            terminalContextMenuDestroyRef.current?.();
+            terminalContextMenuDestroyRef.current = undefined;
+        };
+    }, []);
 
     useEffect(() => {
         if (!showTerminalCopyNotification) {
@@ -283,6 +337,19 @@ export default function Terminal({
         openSftpAt(targetId, cwd, tab.key);
     }, [cwd, openSftpAt, tab.key, targetId]);
 
+    const clearTerminal = useCallback(() => {
+        const contentWindow = iframeRef.current?.contentWindow;
+        if (!contentWindow) return;
+        contentWindow.postMessage(
+            { command: "clear" },
+            window.location.origin,
+        );
+        contentWindow.postMessage(
+            { command: "focus" },
+            window.location.origin,
+        );
+    }, []);
+
     const syncTerminal = useCallback(() => {
         const contentWindow = iframeRef.current?.contentWindow;
         if (!contentWindow) return;
@@ -296,7 +363,7 @@ export default function Terminal({
                 command: "setClipboardOptions",
                 args: {
                     selectionCopyEnabled: terminalSelectionCopyEnabled,
-                    rightClickPasteEnabled: terminalRightClickPasteEnabled,
+                    rightClickAction: terminalRightClickAction,
                     middleClickPasteEnabled: terminalMiddleClickPasteEnabled,
                 },
             },
@@ -304,7 +371,7 @@ export default function Terminal({
         );
     }, [
         terminalMiddleClickPasteEnabled,
-        terminalRightClickPasteEnabled,
+        terminalRightClickAction,
         terminalSelectionCopyEnabled,
         theme,
     ]);
@@ -377,16 +444,24 @@ export default function Terminal({
     return (
         <div className="terminalView">
             <div className="terminalToolbar">
-                {cwd && targetId !== undefined && (
-                    <Tooltip title={t("terminal_open_sftp")}>
-                        <Button
-                            icon={<FolderOutlined />}
-                            onClick={openSftp}
-                            size="small"
-                            type="text"
-                        />
-                    </Tooltip>
-                )}
+                <Tooltip title={t("terminal_open_sftp")}>
+                    <Button
+                        disabled={cwd === undefined}
+                        icon={<FolderOutlined />}
+                        onClick={openSftp}
+                        size="small"
+                        type="text"
+                    />
+                </Tooltip>
+                <Tooltip title={t("terminal_menu_clear")}>
+                    <Button
+                        aria-label={t("terminal_menu_clear")}
+                        icon={<ClearOutlined />}
+                        onClick={clearTerminal}
+                        size="small"
+                        type="text"
+                    />
+                </Tooltip>
             </div>
             <div className="terminalContainer">
                 <iframe

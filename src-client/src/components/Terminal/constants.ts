@@ -1,6 +1,7 @@
 import type { ClipboardOptions, TerminalTheme } from "./types";
 
 export const terminalContextMenuMessageType = "webssh:terminal-contextmenu";
+export const terminalInteractionMessageType = "webssh:terminal-interaction";
 
 export const defaultTheme: TerminalTheme = {
     background: "#0f1115",
@@ -12,7 +13,7 @@ export const defaultTheme: TerminalTheme = {
 
 export const defaultClipboardOptions: ClipboardOptions = {
     selectionCopyEnabled: true,
-    rightClickPasteEnabled: true,
+    rightClickAction: "paste",
     middleClickPasteEnabled: true,
 };
 
