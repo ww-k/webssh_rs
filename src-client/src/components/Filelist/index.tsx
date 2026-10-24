@@ -4,7 +4,8 @@ import { Component, createRef } from "react";
 
 import "./index.css";
 
-import { getParentDirUri } from "@/helpers/file_uri";
+import { getParentDirUri, isSftpFileUri } from "@/helpers/file_uri";
+import path, { posix as pathPosix } from "@/helpers/path";
 import i18n from "@/i18n";
 
 import getColumns from "./getColumns";
@@ -77,6 +78,8 @@ export default class Filelist extends Component<IProps, IState> {
         loading: true,
         multiple: true,
     };
+    /** nodejs path 模块 */
+    path: typeof path;
     rootElRef: React.RefObject<HTMLDivElement> = createRef();
     listTbodyRef: React.RefObject<Tbody> = createRef();
     listTheaderRef: React.RefObject<Theader> = createRef();
@@ -90,7 +93,7 @@ export default class Filelist extends Component<IProps, IState> {
     constructor(props: IProps) {
         super(props);
 
-        const parentUri = getParentDirUri(props.cwd);
+        this.path = props.posix ? pathPosix : path;
         this.parentFile = {
             atime: 0,
             isDir: true,
@@ -100,7 +103,7 @@ export default class Filelist extends Component<IProps, IState> {
             permissions: "",
             sortName: "",
             type: "d",
-            uri: parentUri,
+            uri: this.getParentDirUriOrPath(props.cwd),
         };
 
         const sortByDefault = props.sortByDefault || "sortName";
@@ -167,7 +170,7 @@ export default class Filelist extends Component<IProps, IState> {
         }
 
         if (prevProps.cwd !== nextProps.cwd && nextProps.enableParentFile) {
-            this.parentFile.uri = getParentDirUri(nextProps.cwd);
+            this.parentFile.uri = this.getParentDirUriOrPath(nextProps.cwd);
             this.listTheaderRef.current?.unselectAll();
         }
 
@@ -780,6 +783,13 @@ export default class Filelist extends Component<IProps, IState> {
             selected.splice(index, 1);
         }
         return selected;
+    }
+
+    getParentDirUriOrPath(fileUrlOrPath: string) {
+        if (isSftpFileUri(fileUrlOrPath)) {
+            return getParentDirUri(fileUrlOrPath);
+        }
+        return this.path.resolve(fileUrlOrPath, "..");
     }
 }
 

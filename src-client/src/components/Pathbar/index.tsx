@@ -1057,7 +1057,7 @@ export default class Pathbar extends Component<IProps, IState> {
     }
 
     generateEditorValue(data: string) {
-        return this.getFileFullpath(data);
+        return getFilePath(data);
     }
 
     generateHisotory(data: string[]) {
@@ -1343,13 +1343,6 @@ export default class Pathbar extends Component<IProps, IState> {
             activedIndex: null,
             previewModeActived: false,
         });
-    }
-
-    getFileFullpath(fileUrlOrPath: string) {
-        if (isSftpFileUri(fileUrlOrPath)) {
-            return getFilePath(fileUrlOrPath);
-        }
-        return fileUrlOrPath;
     }
 
     inputSearchChangeHandle(evt: React.ChangeEvent<HTMLInputElement>) {
