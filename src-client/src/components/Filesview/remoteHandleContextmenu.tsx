@@ -45,7 +45,7 @@ export default function remoteHandleContextmenu(
     if (Array.isArray(files) && files.length > 0) {
         menus.push({
             label: i18n.t("files_menu_download"),
-            disabled: !(Array.isArray(files) && files.length > 0),
+            disabled: files.some((file) => file.isDir),
             click: async () => {
                 const [localDir] = await renderFsSelector({
                     mode: "directory",
