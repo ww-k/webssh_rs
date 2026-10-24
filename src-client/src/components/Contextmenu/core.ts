@@ -76,6 +76,7 @@ class MenuItem implements IContextmenuDataItem {
     label?: string;
     disabled?: boolean;
     iconCls?: string;
+    icon?: IContextmenuDataItem["icon"];
     tooltip?: string;
     labelStyle?: IContextmenuDataItem["labelStyle"];
     click?: IContextmenuDataItem["click"];
@@ -93,6 +94,7 @@ class MenuItem implements IContextmenuDataItem {
         this.label = option.label;
         this.disabled = option.disabled;
         this.iconCls = option.iconCls;
+        this.icon = option.icon;
         this.tooltip = option.tooltip;
         this.labelStyle = option.labelStyle;
         this.click = option.click;
@@ -232,7 +234,10 @@ export default class ContextMenuCore {
         }
     }
 
-    handleMenuItemMouseEnter(menuItem: Menu[0], evt: React.MouseEvent) {
+    handleMenuItemMouseEnter(
+        menuItem: Menu[0],
+        evt: { currentTarget: { getBoundingClientRect(): DOMRect } },
+    ) {
         const order1 = this._menuItemLeaveOrderMap[menuItem.parentMenuId];
         // 如果 `当前菜单项` 所在 `菜单` 存在延迟执行工单, 则立即执行工单
         if (order1) {

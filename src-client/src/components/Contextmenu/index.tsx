@@ -7,6 +7,8 @@ import useAppStore from "@/store";
 import { popupCreator } from "./popupCreator";
 import useContextMenuCore from "./useContextMenuCore";
 
+export { default as popupNativeContextMenu } from "./native";
+
 import type { IContextmenuDataItem } from "./typings";
 
 const defaultActiveInfo = {
