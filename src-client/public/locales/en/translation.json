@@ -166,6 +166,7 @@
     "transfer_status_running": "Transferring",
     "transfer_status_waiting": "Waiting",
     "transfer_tab_all": "All",
+    "transfer_tab_batches": "Batches",
     "transfer_tab_download": "Download",
     "transfer_tab_upload": "Upload",
     "transfer_task_total": "{{count}} tasks",

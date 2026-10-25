@@ -45,21 +45,17 @@ export default function remoteHandleContextmenu(
     if (Array.isArray(files) && files.length > 0) {
         menus.push({
             label: i18n.t("files_menu_download"),
-            disabled: files.some((file) => file.isDir),
+            disabled: false,
             click: async () => {
                 const [localDir] = await renderFsSelector({
                     mode: "directory",
                     defaultDirectory: "downloads",
                     title: i18n.t("files_menu_select_download_directory"),
                 });
-                const allPromises = files.map((file) => {
-                    return transferService.download({
-                        fileUri: file.uri,
-                        localDir,
-                        size: file.size,
-                    });
+                await transferService.createDownloadBatch({
+                    sources: files.map((file) => file.uri),
+                    localDir,
                 });
-                await Promise.all(allPromises);
             },
             iconRender: () => <DownloadOutlined />,
         });
@@ -123,19 +119,14 @@ export default function remoteHandleContextmenu(
             label: i18n.t("files_menu_upload"),
             click: async () => {
                 const localPaths = await renderFsSelector({
-                    mode: "file",
+                    mode: "any",
                     multiple: true,
                     title: i18n.t("files_menu_select_upload_file"),
                 });
-                const allPromises = localPaths.map((localPath) => {
-                    const fileName =
-                        localPath.split(/[\\/]/).pop() || "Untitled";
-                    return transferService.upload({
-                        localPath,
-                        fileUri: joinUri(context.fileUri, fileName),
-                    });
+                await transferService.createUploadBatch({
+                    sources: localPaths,
+                    targetUri: context.fileUri,
                 });
-                await Promise.all(allPromises);
                 await context.getCwdFiles();
             },
             iconRender: () => <UploadOutlined />,
@@ -176,8 +167,4 @@ export default function remoteHandleContextmenu(
     if (menus.length > 0) {
         popContextMenu(menus, evt.clientX, evt.clientY);
     }
-}
-
-function joinUri(dirUri: string, fileName: string) {
-    return `${dirUri.replace(/\/+$/, "")}/${fileName}`;
 }

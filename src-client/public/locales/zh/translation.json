@@ -156,6 +156,7 @@
     "transfer_status_running": "传输中",
     "transfer_status_waiting": "等待中",
     "transfer_tab_all": "全部",
+    "transfer_tab_batches": "批次",
     "transfer_tab_download": "下载",
     "transfer_tab_upload": "上传",
     "transfer_task_total": "共 {{count}} 个任务",

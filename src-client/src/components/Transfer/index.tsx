@@ -33,7 +33,7 @@ import transferService from "@/services/transfer";
 
 import type { MenuProps, TableProps } from "antd";
 import type { TFunction } from "i18next";
-import type { ITransferTask } from "@/api";
+import type { ITransferBatch, ITransferTask } from "@/api";
 
 const { Text } = Typography;
 
@@ -404,6 +404,215 @@ const TransferTable = ({ type }: { type: "ALL" | ITransferTask["type"] }) => {
     );
 };
 
+const BatchTable = () => {
+    const { t } = useTranslation();
+    const [list, setList] = useState<ITransferBatch[]>(() =>
+        transferService.getBatches(),
+    );
+    const [items, setItems] = useState<Record<string, ITransferTask[]>>({});
+    const [expanded, setExpanded] = useState<string[]>([]);
+
+    useEffect(() => {
+        const unsubscribe = transferService.subscribeBatches(setList);
+        return () => {
+            unsubscribe();
+        };
+    }, []);
+
+    const columns: TableProps<ITransferBatch>["columns"] = [
+        {
+            title: t("transfer_column_filename"),
+            dataIndex: "name",
+            key: "name",
+            ellipsis: true,
+        },
+        {
+            title: t("transfer_column_type"),
+            dataIndex: "type",
+            key: "type",
+            width: "12%",
+            render: (type: ITransferBatch["type"]) =>
+                type === "UPLOAD"
+                    ? t("transfer_type_upload")
+                    : t("transfer_type_download"),
+        },
+        {
+            title: t("transfer_column_progress"),
+            key: "progress",
+            width: "36%",
+            render: (_, record) => {
+                const percent = record.percent;
+                return (
+                    <div className="WebSSH-TransferProgress">
+                        <div className="WebSSH-TransferProgressMeta">
+                            <Text type="secondary">
+                                {record.completed_count}/{record.item_count} ·{" "}
+                                {formatSize(record.loaded)}/
+                                {formatSize(record.total)}
+                            </Text>
+                            <Text
+                                type="secondary"
+                                className="WebSSH-TransferProgressMetaItem--speed"
+                            >
+                                {formatSpeed(record.speed)}
+                            </Text>
+                        </div>
+                        <Progress
+                            percent={percent}
+                            size={["100%", 4]}
+                            showInfo={false}
+                        />
+                    </div>
+                );
+            },
+        },
+        {
+            title: t("transfer_status_running"),
+            dataIndex: "status",
+            key: "status",
+            width: "12%",
+            render: (status: ITransferBatch["status"]) => (
+                <Text
+                    className={`WebSSH-TransferProgressMetaItem--status WebSSH-TransferProgressMetaItem--status-${status.toLowerCase()}`}
+                >
+                    {t(STATUS_TEXT_KEY[status])}
+                </Text>
+            ),
+        },
+        {
+            title: t("app_common_action"),
+            key: "action",
+            width: "10%",
+            align: "center",
+            render: (_, record) => {
+                const menuItems: MenuProps["items"] = [];
+                if (record.status === "RUN" || record.status === "WAIT") {
+                    menuItems.push({
+                        key: "pause",
+                        label: t("transfer_action_pause"),
+                        icon: <PauseCircleOutlined />,
+                        onClick: () => transferService.pauseBatch(record.id),
+                    });
+                    menuItems.push({
+                        key: "cancel",
+                        label: t("app_btn_cancel"),
+                        icon: <StopOutlined />,
+                        onClick: () => transferService.cancelBatch(record.id),
+                    });
+                } else if (
+                    record.status === "PAUSE" ||
+                    record.status === "FAIL" ||
+                    record.status === "CANCEL"
+                ) {
+                    if (record.status !== "CANCEL") {
+                        menuItems.push({
+                            key: "resume",
+                            label: t("transfer_action_resume"),
+                            icon: <PlayCircleOutlined />,
+                            onClick: () =>
+                                transferService.resumeBatch(record.id),
+                        });
+                    }
+                    if (record.status === "PAUSE") {
+                        menuItems.push({
+                            key: "cancel",
+                            label: t("app_btn_cancel"),
+                            icon: <StopOutlined />,
+                            onClick: () =>
+                                transferService.cancelBatch(record.id),
+                        });
+                    }
+                }
+                menuItems.push({
+                    key: "delete",
+                    label: t("app_btn_delete"),
+                    danger: true,
+                    icon: <DeleteOutlined />,
+                    onClick: () => transferService.removeBatch(record.id),
+                });
+                return (
+                    <Dropdown
+                        menu={{ items: menuItems }}
+                        trigger={["click"]}
+                        placement="bottomRight"
+                    >
+                        <Tooltip title={t("transfer_action_more")}>
+                            <Button
+                                className="WebSSH-TransferAction"
+                                type="text"
+                                aria-label={t("transfer_action_more")}
+                                icon={<MoreOutlined />}
+                            />
+                        </Tooltip>
+                    </Dropdown>
+                );
+            },
+        },
+    ];
+
+    return (
+        <Table<ITransferBatch>
+            columns={columns}
+            dataSource={list}
+            rowKey="id"
+            size="small"
+            rowClassName="WebSSH-TransferRow"
+            expandable={{
+                expandedRowKeys: expanded,
+                onExpand: async (isExpanded, record) => {
+                    if (isExpanded && !items[record.id]) {
+                        const response = await transferService.getBatchItems(
+                            record.id,
+                            undefined,
+                            200,
+                        );
+                        setItems((current) => ({
+                            ...current,
+                            [record.id]: response.items,
+                        }));
+                    }
+                    setExpanded((current) =>
+                        isExpanded
+                            ? [...current, record.id]
+                            : current.filter((id) => id !== record.id),
+                    );
+                },
+                expandedRowRender: (record) => (
+                    <Table<ITransferTask>
+                        columns={[
+                            {
+                                title: t("transfer_column_filename"),
+                                dataIndex: "name",
+                                key: "name",
+                            },
+                            {
+                                title: t("transfer_column_progress"),
+                                key: "progress",
+                                render: (_, item) =>
+                                    item.kind === "DIRECTORY"
+                                        ? t(STATUS_TEXT_KEY[item.status])
+                                        : `${item.loaded}/${item.total} (${Math.round(item.percent)}%)`,
+                            },
+                            {
+                                title: t("transfer_status_running"),
+                                dataIndex: "status",
+                                key: "status",
+                                render: (status: ITransferTask["status"]) =>
+                                    t(STATUS_TEXT_KEY[status]),
+                            },
+                        ]}
+                        dataSource={items[record.id] || []}
+                        rowKey="id"
+                        size="small"
+                        pagination={false}
+                    />
+                ),
+            }}
+            pagination={{ pageSize: 10, showSizeChanger: true }}
+        />
+    );
+};
+
 export default function Transfer() {
     const { i18n, t } = useTranslation();
     const antdLocale = i18n.resolvedLanguage?.startsWith("en") ? enUS : zhCN;
@@ -454,6 +663,11 @@ export default function Transfer() {
                     </Button>
                 }
                 items={[
+                    {
+                        key: "batches",
+                        label: t("transfer_tab_batches"),
+                        children: <BatchTable />,
+                    },
                     {
                         key: "all",
                         label: t("transfer_tab_all"),

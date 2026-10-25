@@ -31,13 +31,13 @@ impl TransferService {
         let task = self.get_task_model(id).await?;
         let local_path = task
             .local_path
-            .clone()
+            .as_deref()
             .ok_or_else(|| invalid_task("missing local_path"))?;
         let target_uri = task
             .target_uri
-            .clone()
+            .as_deref()
             .ok_or_else(|| invalid_task("missing target_uri"))?;
-        let uri = parse_file_uri(&target_uri)?;
+        let uri = parse_file_uri(target_uri)?;
         let ranges = ranges_from_json(&task.ranges)?;
         let truncate = ranges.len() == 1 && ranges[0] == [0, task.total - 1];
 
@@ -90,13 +90,13 @@ impl TransferService {
         let task = self.get_task_model(id).await?;
         let target_uri = task
             .target_uri
-            .clone()
+            .as_deref()
             .ok_or_else(|| invalid_task("missing target_uri"))?;
         let local_path = task
             .local_path
-            .clone()
+            .as_deref()
             .ok_or_else(|| invalid_task("missing local_path"))?;
-        let uri = parse_file_uri(&target_uri)?;
+        let uri = parse_file_uri(target_uri)?;
         let ranges = ranges_from_json(&task.ranges)?;
 
         let sftp = map_ssh_err!(

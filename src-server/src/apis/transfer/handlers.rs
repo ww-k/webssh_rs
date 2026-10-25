@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path as AxumPath, State},
+    extract::{Path as AxumPath, Query, State},
 };
+use serde::Deserialize;
 use tracing::info;
 
 use crate::{
@@ -13,9 +14,10 @@ use crate::{
 };
 
 use super::{
+    dto::{BatchItemsResponse, TransferBatchResponse},
     dto::{
-        CreateDownloadTaskPayload, CreateUploadTaskPayload, TransferRangeSchema,
-        TransferTaskResponse,
+        CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
+        CreateUploadTaskPayload, TransferRangeSchema, TransferTaskResponse,
     },
     ranges::ranges_from_json,
 };
@@ -38,6 +40,99 @@ pub async fn create_upload_task(
     info!("@transfer_upload {:?}", payload);
     let task = state.transfer_service.create_upload(payload).await?;
     Ok(Json(task.into_response()?))
+}
+
+pub async fn create_upload_batch(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateUploadBatchPayload>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(
+        state
+            .transfer_service
+            .create_upload_batch(payload)
+            .await?
+            .into(),
+    ))
+}
+
+pub async fn create_download_batch(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateDownloadBatchPayload>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(
+        state
+            .transfer_service
+            .create_download_batch(payload)
+            .await?
+            .into(),
+    ))
+}
+
+pub async fn list_batches(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<TransferBatchResponse>>, ApiErr> {
+    Ok(Json(
+        state
+            .transfer_service
+            .list_batches()
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect(),
+    ))
+}
+
+pub async fn get_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(
+        state.transfer_service.get_batch_model(&id).await?.into(),
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchItemsQuery {
+    pub cursor: Option<String>,
+    pub limit: Option<u64>,
+}
+
+pub async fn get_batch_items(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+    Query(query): Query<BatchItemsQuery>,
+) -> Result<Json<BatchItemsResponse>, ApiErr> {
+    Ok(Json(
+        state
+            .transfer_service
+            .get_batch_items(&id, query.cursor, query.limit.unwrap_or(100))
+            .await?,
+    ))
+}
+
+pub async fn pause_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(state.transfer_service.pause_batch(&id).await?.into()))
+}
+pub async fn resume_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(state.transfer_service.resume_batch(&id).await?.into()))
+}
+pub async fn cancel_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(state.transfer_service.cancel_batch(&id).await?.into()))
+}
+pub async fn delete_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<(), ApiErr> {
+    state.transfer_service.delete_batch(&id).await
 }
 
 #[utoipa::path(
@@ -188,6 +283,7 @@ impl IntoTransferResponse for TransferTaskModel {
                 .collect(),
             id: self.id,
             r#type: self.r#type,
+            kind: self.kind,
             status: self.status,
             local_path: self.local_path,
             target_uri: self.target_uri,
@@ -202,6 +298,9 @@ impl IntoTransferResponse for TransferTaskModel {
             created_at: self.created_at,
             updated_at: self.updated_at,
             ended_at: self.ended_at,
+            batch_id: self.batch_id,
+            relative_path: self.relative_path,
+            conflict_policy: self.conflict_policy,
         })
     }
 }

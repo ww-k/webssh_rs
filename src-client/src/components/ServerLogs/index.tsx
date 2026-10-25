@@ -18,7 +18,7 @@ import { getServerLogs } from "@/api";
 
 import "./index.css";
 
-const { Text, Title } = Typography;
+const { Title } = Typography;
 const LOG_LEVELS = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"] as const;
 type LogLevel = (typeof LOG_LEVELS)[number];
 

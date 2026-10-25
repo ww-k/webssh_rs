@@ -9,7 +9,7 @@ import FilesviewLocal from "../Filesview/Local";
 import type { IViewFileStat } from "@/types";
 import type { LocalDefaultDirectory } from "../Filesview/Local";
 
-type FsSelectorMode = "file" | "directory";
+type FsSelectorMode = "file" | "directory" | "any";
 
 function isDirectory(file: IViewFileStat) {
     return file.isDir;
@@ -48,7 +48,9 @@ export default function FsSelector({
                 (cwd !== "" && cwd !== "/")
             );
         }
-        return selectedFiles.some((file) => !file.isDir);
+        return mode === "any"
+            ? selectedFiles.length > 0
+            : selectedFiles.some((file) => !file.isDir);
     }, [cwd, mode, selectedFiles]);
 
     function handleOk() {
@@ -58,7 +60,10 @@ export default function FsSelector({
             return;
         }
         onOk(
-            selectedFiles.filter((file) => !file.isDir).map((file) => file.uri),
+            (mode === "any"
+                ? selectedFiles
+                : selectedFiles.filter((file) => !file.isDir)
+            ).map((file) => file.uri),
         );
     }
 
@@ -94,8 +99,10 @@ export default function FsSelector({
                 onSelecteChange={(files) => {
                     const selectableFiles =
                         mode === "directory"
-                            ? files.filter((file) => file.isDir)
-                            : files;
+                            ? files.filter(
+                                  (file) => file.isDir && file.name !== "..",
+                              )
+                            : files.filter((file) => file.name !== "..");
                     const selected = multiple
                         ? selectableFiles
                         : selectableFiles.slice(-1);
