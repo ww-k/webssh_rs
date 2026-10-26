@@ -126,9 +126,10 @@ impl TransferService {
         // SQLite uses one connection by default; finish SFTP discovery before opening the write transaction.
         let txn = self.db.begin().await.map_err(db_err)?;
         batch.insert(&txn).await.map_err(db_err)?;
-        for task in tasks {
-            task.insert(&txn).await.map_err(db_err)?;
-        }
+        TaskEntity::insert_many(tasks)
+            .exec(&txn)
+            .await
+            .map_err(db_err)?;
         txn.commit().await.map_err(db_err)?;
         self.start_batch_tasks(&batch_id).await?;
         self.get_batch_model(&batch_id).await
@@ -215,9 +216,10 @@ impl TransferService {
         // SFTP target lookup also uses the SQLite connection, so keep it outside this transaction.
         let txn = self.db.begin().await.map_err(db_err)?;
         batch.insert(&txn).await.map_err(db_err)?;
-        for task in tasks {
-            task.insert(&txn).await.map_err(db_err)?;
-        }
+        TaskEntity::insert_many(tasks)
+            .exec(&txn)
+            .await
+            .map_err(db_err)?;
         txn.commit().await.map_err(db_err)?;
         self.start_batch_tasks(&batch_id).await?;
         self.get_batch_model(&batch_id).await

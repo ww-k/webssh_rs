@@ -169,8 +169,8 @@ impl TransferService {
         children: Vec<ActiveModel>,
     ) -> Result<(), ApiErr> {
         let txn = self.db.begin().await.map_err(db_err)?;
-        for child in children {
-            Entity::insert(child)
+        if !children.is_empty() {
+            Entity::insert_many(children)
                 .on_conflict(
                     OnConflict::columns([Column::BatchId, Column::RelativePath, Column::Kind])
                         .do_nothing()
