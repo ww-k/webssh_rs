@@ -52,6 +52,13 @@ impl TransferService {
             .conflict_policy
             .unwrap_or(TransferConflictPolicy::Overwrite);
         let batch_id = nanoid!();
+        tracing::info!(
+            batch_id = %batch_id,
+            target_id = target.target_id,
+            source_count = payload.sources.len(),
+            conflict_policy = ?policy,
+            "upload batch discovery started"
+        );
         let now = now_ms();
         let name = if payload.sources.len() == 1 {
             Path::new(&payload.sources[0])
@@ -124,6 +131,12 @@ impl TransferService {
             }
         }
         // SQLite uses one connection by default; finish SFTP discovery before opening the write transaction.
+        let task_count = tasks.len();
+        tracing::debug!(
+            batch_id = %batch_id,
+            task_count,
+            "upload batch tasks discovered"
+        );
         let txn = self.db.begin().await.map_err(db_err)?;
         batch.insert(&txn).await.map_err(db_err)?;
         TaskEntity::insert_many(tasks)
@@ -131,6 +144,11 @@ impl TransferService {
             .await
             .map_err(db_err)?;
         txn.commit().await.map_err(db_err)?;
+        tracing::info!(
+            batch_id = %batch_id,
+            task_count,
+            "upload batch persisted"
+        );
         self.start_batch_tasks(&batch_id).await?;
         self.get_batch_model(&batch_id).await
     }
@@ -148,6 +166,13 @@ impl TransferService {
             .conflict_policy
             .unwrap_or(TransferConflictPolicy::Overwrite);
         let batch_id = nanoid!();
+        tracing::info!(
+            batch_id = %batch_id,
+            target_id = first_target_id,
+            source_count = sources.len(),
+            conflict_policy = ?policy,
+            "download batch discovery started"
+        );
         let now = now_ms();
         let batch = BatchActiveModel {
             id: Set(batch_id.clone()),
@@ -214,6 +239,12 @@ impl TransferService {
         }
         drop(sftp);
         // SFTP target lookup also uses the SQLite connection, so keep it outside this transaction.
+        let task_count = tasks.len();
+        tracing::debug!(
+            batch_id = %batch_id,
+            task_count,
+            "download batch tasks discovered"
+        );
         let txn = self.db.begin().await.map_err(db_err)?;
         batch.insert(&txn).await.map_err(db_err)?;
         TaskEntity::insert_many(tasks)
@@ -221,6 +252,11 @@ impl TransferService {
             .await
             .map_err(db_err)?;
         txn.commit().await.map_err(db_err)?;
+        tracing::info!(
+            batch_id = %batch_id,
+            task_count,
+            "download batch persisted"
+        );
         self.start_batch_tasks(&batch_id).await?;
         self.get_batch_model(&batch_id).await
     }
@@ -324,11 +360,20 @@ impl TransferService {
                 code: crate::consts::services_err_code::ERR_CODE_DB_ERR,
                 message: e.to_string(),
             })?;
+        let task_count = tasks.len();
+        let mut queued_count = 0;
         for task in tasks {
             if task.status == TransferTaskStatus::Wait {
                 self.queue_task(task.id).await?;
+                queued_count += 1;
             }
         }
+        tracing::info!(
+            batch_id = %id,
+            task_count,
+            queued_count,
+            "batch tasks queued"
+        );
         self.refresh_batch(id).await
     }
 
@@ -391,6 +436,15 @@ impl TransferService {
         };
         let tasks = self.batch_tasks_only(id).await?;
         let summary = summarize_tasks(&tasks);
+        tracing::debug!(
+            batch_id = %id,
+            status = ?summary.status,
+            item_count = summary.item_count,
+            completed_count = summary.completed_count,
+            failed_count = summary.failed_count,
+            directory_count = summary.directory_count,
+            "batch summary refreshed"
+        );
         let mut active: BatchActiveModel = model.into();
         active.status = Set(summary.status);
         active.item_count = Set(summary.item_count);

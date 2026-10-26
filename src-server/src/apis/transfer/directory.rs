@@ -46,6 +46,13 @@ impl TransferService {
             .unwrap_or(TransferConflictPolicy::Overwrite);
         let relative_path = task.relative_path.as_deref().unwrap_or_else(|| &task.name);
         let target = parse_file_uri(target_uri)?;
+        tracing::info!(
+            task_id = %task.id,
+            batch_id = %batch_id,
+            direction = ?task.r#type,
+            conflict_policy = ?policy,
+            "directory task expansion started"
+        );
 
         match task.r#type {
             TransferTaskType::Upload => {
@@ -65,6 +72,12 @@ impl TransferService {
                         .map_err(|err| ssh_err(err.to_string()))?;
                 }
                 let children = read_local_children(&local_path).await?;
+                tracing::debug!(
+                    task_id = %task.id,
+                    batch_id = %batch_id,
+                    child_count = children.len(),
+                    "local directory children discovered"
+                );
                 drop(sftp);
                 let mut models = Vec::with_capacity(children.len());
                 for child in children {
@@ -119,6 +132,12 @@ impl TransferService {
                     .read_dir(target.path)
                     .await
                     .map_err(|err| ssh_err(err.to_string()))?;
+                tracing::debug!(
+                    task_id = %task.id,
+                    batch_id = %batch_id,
+                    child_count = entries.len(),
+                    "remote directory children discovered"
+                );
                 let mut models = Vec::with_capacity(entries.len());
                 for entry in entries {
                     let (name, attrs) = entry.into_parts();
@@ -168,6 +187,13 @@ impl TransferService {
         parent: &Model,
         children: Vec<ActiveModel>,
     ) -> Result<(), ApiErr> {
+        let child_count = children.len();
+        tracing::info!(
+            task_id = %parent.id,
+            batch_id = ?parent.batch_id,
+            child_count,
+            "directory child tasks persisting"
+        );
         let txn = self.db.begin().await.map_err(db_err)?;
         if !children.is_empty() {
             Entity::insert_many(children)
@@ -188,6 +214,12 @@ impl TransferService {
         parent_active.ranges = Set("[]".to_string());
         parent_active.update(&txn).await.map_err(db_err)?;
         txn.commit().await.map_err(db_err)?;
+        tracing::info!(
+            task_id = %parent.id,
+            batch_id = ?parent.batch_id,
+            child_count,
+            "directory child tasks persisted"
+        );
         self.scheduler_notify.notify_one();
         Ok(())
     }
