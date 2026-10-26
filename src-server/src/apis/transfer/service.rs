@@ -17,6 +17,7 @@ use tokio::{
     fs,
     sync::{Mutex, Notify},
     task::JoinHandle,
+    time::{Duration, MissedTickBehavior},
 };
 
 use crate::{
@@ -52,6 +53,7 @@ pub struct TransferService {
     pub(super) connection_pool: Arc<SshConnectionPool>,
     running_tasks: Arc<Mutex<HashMap<String, RunningTask>>>,
     pub(super) scheduler_notify: Arc<Notify>,
+    pub(super) batch_refresh_notify: Arc<Notify>,
     scheduler_started: Arc<AtomicBool>,
     max_concurrent_tasks: usize,
     pub(super) transfer_chunk_size: usize,
@@ -78,6 +80,7 @@ impl TransferService {
             connection_pool,
             running_tasks: Arc::new(Mutex::new(HashMap::new())),
             scheduler_notify: Arc::new(Notify::new()),
+            batch_refresh_notify: Arc::new(Notify::new()),
             scheduler_started: Arc::new(AtomicBool::new(false)),
             max_concurrent_tasks: app_state.config.transfer_task_concurrency,
             transfer_chunk_size: app_state.config.transfer_chunk_size,
@@ -352,6 +355,7 @@ impl TransferService {
             });
         }
 
+        let batch_id = task.batch_id.clone();
         let mut active: ActiveModel = task.into();
         active.status = Set(TransferTaskStatus::Wait);
         active.fail_reason = Set(None);
@@ -361,6 +365,9 @@ impl TransferService {
 
         self.start_scheduler();
         self.scheduler_notify.notify_one();
+        if batch_id.is_some() {
+            self.batch_refresh_notify.notify_one();
+        }
         Ok(())
     }
 
@@ -377,12 +384,34 @@ impl TransferService {
         tokio::spawn(async move {
             scheduler_service.run_scheduler().await;
         });
+
+        let refresh_service = self.clone();
+        tokio::spawn(async move {
+            refresh_service.run_batch_refresh().await;
+        });
     }
 
     async fn run_scheduler(&self) {
         loop {
             self.dispatch_pending_tasks().await;
             self.scheduler_notify.notified().await;
+        }
+    }
+
+    async fn run_batch_refresh(&self) {
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        // `interval` ticks immediately on creation; consume that startup tick
+        // so subsequent refreshes stay on the regular schedule.
+        interval.tick().await;
+        let mut has_active_batches = self.refresh_active_batches().await;
+        loop {
+            if !has_active_batches {
+                self.batch_refresh_notify.notified().await;
+            }
+
+            interval.tick().await;
+            has_active_batches = self.refresh_active_batches().await;
         }
     }
 

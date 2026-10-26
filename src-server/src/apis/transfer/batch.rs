@@ -374,15 +374,14 @@ impl TransferService {
             queued_count,
             "batch tasks queued"
         );
-        self.refresh_batch(id).await
+        self.batch_refresh_notify.notify_one();
+        Ok(())
     }
 
     pub async fn get_batch_model(&self, id: &str) -> Result<BatchModel, ApiErr> {
         let model = map_db_err!(BatchEntity::find_by_id(id.to_string()).one(&self.db).await)?;
         if let Some(model) = model {
-            self.refresh_batch(id).await?;
-            return map_db_err!(BatchEntity::find_by_id(model.id).one(&self.db).await)?
-                .ok_or_else(|| invalid_not_found("transfer batch not found"));
+            return Ok(model);
         }
 
         let tasks = self.batch_tasks_only(id).await?;
@@ -396,15 +395,7 @@ impl TransferService {
                 .all(&self.db)
                 .await
         )?;
-        for model in &models {
-            self.refresh_batch(&model.id).await?;
-        }
-        map_db_err!(
-            BatchEntity::find()
-                .order_by_desc(transfer_batch::Column::CreatedAt)
-                .all(&self.db)
-                .await
-        )
+        Ok(models)
     }
 
     pub async fn get_batch_items(
@@ -429,13 +420,15 @@ impl TransferService {
         Ok(BatchItemsResponse { items, next_cursor })
     }
 
-    async fn refresh_batch(&self, id: &str) -> Result<(), ApiErr> {
-        let Some(model) = map_db_err!(BatchEntity::find_by_id(id.to_string()).one(&self.db).await)?
-        else {
-            return Ok(());
-        };
+    async fn refresh_batch_model(&self, model: BatchModel) -> Result<(), ApiErr> {
+        let id = model.id.as_str();
         let tasks = self.batch_tasks_only(id).await?;
         let summary = summarize_tasks(&tasks);
+        let ended_at = if summary.terminal {
+            model.ended_at.or_else(|| Some(now_ms()))
+        } else {
+            None
+        };
         tracing::debug!(
             batch_id = %id,
             status = ?summary.status,
@@ -445,6 +438,22 @@ impl TransferService {
             directory_count = summary.directory_count,
             "batch summary refreshed"
         );
+        let changed = model.status != summary.status
+            || model.item_count != summary.item_count
+            || model.completed_count != summary.completed_count
+            || model.failed_count != summary.failed_count
+            || model.directory_count != summary.directory_count
+            || model.directory_failed_count != summary.directory_failed_count
+            || model.total != summary.total
+            || model.loaded != summary.loaded
+            || model.percent != summary.percent
+            || model.speed != summary.speed
+            || model.estimated_time != summary.estimated_time
+            || model.fail_reason != summary.fail_reason
+            || model.ended_at != ended_at;
+        if !changed {
+            return Ok(());
+        }
         let mut active: BatchActiveModel = model.into();
         active.status = Set(summary.status);
         active.item_count = Set(summary.item_count);
@@ -459,9 +468,40 @@ impl TransferService {
         active.estimated_time = Set(summary.estimated_time);
         active.fail_reason = Set(summary.fail_reason);
         active.updated_at = Set(now_ms());
-        active.ended_at = Set(summary.terminal.then_some(now_ms()));
+        active.ended_at = Set(ended_at);
         map_db_err!(active.update(&self.db).await)?;
         Ok(())
+    }
+
+    pub(super) async fn refresh_active_batches(&self) -> bool {
+        let batches = match BatchEntity::find()
+            .filter(transfer_batch::Column::Status.is_in([
+                TransferBatchStatus::Wait,
+                TransferBatchStatus::Run,
+                TransferBatchStatus::Pause,
+            ]))
+            .all(&self.db)
+            .await
+        {
+            Ok(batches) => batches,
+            Err(err) => {
+                tracing::warn!(error = %err, "periodic batch query failed");
+                return true;
+            }
+        };
+        let has_active_batches = !batches.is_empty();
+
+        for batch in batches {
+            let batch_id = batch.id.clone();
+            if let Err(err) = self.refresh_batch_model(batch).await {
+                tracing::warn!(
+                    batch_id = %batch_id,
+                    error = %err.message,
+                    "periodic batch refresh failed"
+                );
+            }
+        }
+        has_active_batches
     }
 
     pub async fn pause_batch(&self, id: &str) -> Result<BatchModel, ApiErr> {
@@ -480,7 +520,6 @@ impl TransferService {
                 self.resume_task(&task.id).await?;
             }
         }
-        self.refresh_batch(id).await?;
         self.get_batch_model(id).await
     }
     async fn change_batch(
@@ -505,7 +544,6 @@ impl TransferService {
                 }
             }
         }
-        self.refresh_batch(id).await?;
         self.get_batch_model(id).await
     }
     async fn batch_tasks(&self, id: &str) -> Result<Vec<TaskModel>, ApiErr> {
