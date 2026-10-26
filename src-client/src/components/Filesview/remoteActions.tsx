@@ -58,7 +58,7 @@ export async function handleDelete(
                     reject(err);
                 }
             },
-            onCancel: reject,
+            onCancel: () => resolve(),
         });
     });
 }
