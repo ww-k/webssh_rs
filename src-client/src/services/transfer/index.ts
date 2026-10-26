@@ -1,5 +1,6 @@
 import {
     deleteTransferBatch,
+    deleteTransferHistory,
     deleteTransferTask,
     getTransferBatch,
     getTransferBatches,
@@ -255,10 +256,15 @@ class TransferService {
     resumeAll() {}
 
     async removeAll() {
-        const tasks = this.#tasks.filter((task) =>
-            FINISHED_STATUSES.has(task.status),
+        await deleteTransferHistory();
+        this.#tasks = this.#tasks.filter(
+            (task) => !FINISHED_STATUSES.has(task.status),
         );
-        await Promise.all(tasks.map((task) => this.remove(task.id)));
+        this.#batches = this.#batches.filter(
+            (batch) => !FINISHED_STATUSES.has(batch.status),
+        );
+        this.#emitTasks();
+        for (const listener of this.#batchListeners) listener(this.#batches);
     }
 
     async removeBatch(id: string) {

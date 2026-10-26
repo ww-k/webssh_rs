@@ -51,6 +51,7 @@ use utoipa::OpenApi;
         crate::apis::transfer::handlers::resume_task,
         crate::apis::transfer::handlers::cancel_task,
         crate::apis::transfer::handlers::delete_task,
+        crate::apis::transfer::handlers::delete_finished_history,
         crate::apis::user_data::handlers::user_data_export,
         crate::apis::user_data::handlers::user_data_import,
     ),

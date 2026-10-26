@@ -46,6 +46,17 @@ const STATUS_TEXT_KEY: Record<ITransferTask["status"], string> = {
     CANCEL: "transfer_status_cancelled",
 };
 
+const isFinishedTransferStatus = (status: ITransferTask["status"]) =>
+    ["SUCCESS", "FAIL", "CANCEL"].includes(status);
+
+const getFinishedHistoryCount = () =>
+    transferService
+        .getTasks()
+        .filter((task) => isFinishedTransferStatus(task.status)).length +
+    transferService
+        .getBatches()
+        .filter((batch) => isFinishedTransferStatus(batch.status)).length;
+
 // 格式化文件大小
 const formatSize = (bytes?: number): string => {
     if (bytes === undefined) return "-";
@@ -616,23 +627,25 @@ const BatchTable = () => {
 export default function Transfer() {
     const { i18n, t } = useTranslation();
     const antdLocale = i18n.resolvedLanguage?.startsWith("en") ? enUS : zhCN;
-    const [finishedTaskCount, setFinishedTaskCount] = useState(
-        () =>
-            transferService
-                .getTasks()
-                .filter((task) =>
-                    ["SUCCESS", "FAIL", "CANCEL"].includes(task.status),
-                ).length,
+    const [finishedHistoryCount, setFinishedHistoryCount] = useState(
+        getFinishedHistoryCount,
     );
 
     useEffect(() => {
-        return transferService.subscribe((tasks) =>
-            setFinishedTaskCount(
-                tasks.filter((task) =>
-                    ["SUCCESS", "FAIL", "CANCEL"].includes(task.status),
-                ).length,
-            ),
+        const updateFinishedHistoryCount = () => {
+            setFinishedHistoryCount(getFinishedHistoryCount());
+        };
+        const unsubscribeTasks = transferService.subscribe(
+            updateFinishedHistoryCount,
         );
+        const unsubscribeBatches = transferService.subscribeBatches(
+            updateFinishedHistoryCount,
+        );
+
+        return () => {
+            unsubscribeTasks();
+            unsubscribeBatches();
+        };
     }, []);
 
     const handleRemoveAll = () => {
@@ -655,7 +668,7 @@ export default function Transfer() {
                 tabBarExtraContent={
                     <Button
                         danger
-                        disabled={finishedTaskCount === 0}
+                        disabled={finishedHistoryCount === 0}
                         icon={<DeleteOutlined />}
                         onClick={handleRemoveAll}
                     >

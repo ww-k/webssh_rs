@@ -21,7 +21,7 @@ use crate::{
             TransferBatchStatus, TransferBatchType, TransferConflictPolicy,
         },
         transfer_task::{
-            ActiveModel, Entity as TaskEntity, Model as TaskModel, TransferTaskKind,
+            self, ActiveModel, Entity as TaskEntity, Model as TaskModel, TransferTaskKind,
             TransferTaskStatus, TransferTaskType,
         },
     },
@@ -564,6 +564,34 @@ impl TransferService {
                 .exec(&self.db)
                 .await
         )?;
+        Ok(())
+    }
+
+    pub async fn delete_finished_history(&self) -> Result<(), ApiErr> {
+        let txn = map_db_err!(self.db.begin().await)?;
+
+        map_db_err!(
+            TaskEntity::delete_many()
+                .filter(transfer_task::Column::Status.is_in([
+                    TransferTaskStatus::Success,
+                    TransferTaskStatus::Fail,
+                    TransferTaskStatus::Cancel,
+                ]))
+                .exec(&txn)
+                .await
+        )?;
+        map_db_err!(
+            BatchEntity::delete_many()
+                .filter(transfer_batch::Column::Status.is_in([
+                    TransferBatchStatus::Success,
+                    TransferBatchStatus::Fail,
+                    TransferBatchStatus::Cancel,
+                ]))
+                .exec(&txn)
+                .await
+        )?;
+
+        map_db_err!(txn.commit().await)?;
         Ok(())
     }
 }

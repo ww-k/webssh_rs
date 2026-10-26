@@ -131,6 +131,10 @@ export async function deleteTransferBatch(id: string) {
     await axios.delete(`/api/transfer/batches/${id}`);
 }
 
+export async function deleteTransferHistory() {
+    await axios.delete("/api/transfer/history");
+}
+
 export async function postTransferUpload(payload: {
     local_path: string;
     target_uri: string;

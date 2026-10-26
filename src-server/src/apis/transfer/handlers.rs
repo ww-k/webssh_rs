@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::{
     Json,
     extract::{Path as AxumPath, Query, State},
+    http::StatusCode,
 };
 use serde::Deserialize;
 use tracing::info;
@@ -133,6 +134,23 @@ pub async fn delete_batch(
     AxumPath(id): AxumPath<String>,
 ) -> Result<(), ApiErr> {
     state.transfer_service.delete_batch(&id).await
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/transfer/history",
+    tag = "transfer",
+    summary = "删除所有结束状态的传输历史",
+    responses(
+        (status = 204, description = "成功删除所有结束状态的传输历史"),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn delete_finished_history(
+    State(state): State<Arc<AppState>>,
+) -> Result<StatusCode, ApiErr> {
+    state.transfer_service.delete_finished_history().await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(
