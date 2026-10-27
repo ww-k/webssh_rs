@@ -106,8 +106,11 @@ class TransferService {
     async getBatch(id: string) {
         return getTransferBatch(id);
     }
-    async getBatchItems(id: string, cursor?: string, limit?: number) {
-        return getTransferBatchItems(id, { cursor, limit });
+    async getBatchItems(id: string, page = 1, pageSize = 10) {
+        return getTransferBatchItems(id, {
+            page,
+            page_size: pageSize,
+        });
     }
     async pauseBatch(id: string) {
         const batch = await postTransferBatchPause(id);
@@ -149,7 +152,7 @@ class TransferService {
                     option.fileUri.slice(0, option.fileUri.lastIndexOf("/")) ||
                     option.fileUri,
             });
-            const items = await this.getBatchItems(batch.id, undefined, 1);
+            const items = await this.getBatchItems(batch.id, 1, 1);
             const task = items.items[0];
             if (task) {
                 this.#upsertTask(task);
@@ -174,7 +177,7 @@ class TransferService {
                 sources: [option.fileUri],
                 localDir: option.localDir,
             });
-            const items = await this.getBatchItems(batch.id, undefined, 1);
+            const items = await this.getBatchItems(batch.id, 1, 1);
             const task = items.items[0];
             if (task) {
                 this.#upsertTask({
@@ -208,7 +211,11 @@ class TransferService {
             this.#setTasks(tasks);
             if (tasks.some((task) => ACTIVE_STATUSES.has(task.status))) {
                 this.#ensureSyncTimer();
-            } else {
+            } else if (
+                !this.#batches.some((batch) =>
+                    ACTIVE_STATUSES.has(batch.status),
+                )
+            ) {
                 this.#clearSyncTimer();
             }
             return tasks;
@@ -221,6 +228,13 @@ class TransferService {
         const batches = await getTransferBatches();
         this.#batches = batches;
         for (const listener of this.#batchListeners) listener(this.#batches);
+        if (batches.some((batch) => ACTIVE_STATUSES.has(batch.status))) {
+            this.#ensureSyncTimer();
+        } else if (
+            !this.#tasks.some((task) => ACTIVE_STATUSES.has(task.status))
+        ) {
+            this.#clearSyncTimer();
+        }
         return batches;
     }
 
@@ -234,6 +248,12 @@ class TransferService {
         const task = await postTransferResume(id);
         this.#upsertTask(task);
         this.#ensureSyncTimer(task);
+        return task;
+    }
+
+    async cancel(id: string) {
+        const task = await postTransferCancel(id);
+        this.#upsertTask(task);
         return task;
     }
 

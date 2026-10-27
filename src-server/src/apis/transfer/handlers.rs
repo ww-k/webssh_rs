@@ -94,8 +94,8 @@ pub async fn get_batch(
 
 #[derive(Debug, Deserialize)]
 pub struct BatchItemsQuery {
-    pub cursor: Option<String>,
-    pub limit: Option<u64>,
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
 }
 
 pub async fn get_batch_items(
@@ -106,7 +106,7 @@ pub async fn get_batch_items(
     Ok(Json(
         state
             .transfer_service
-            .get_batch_items(&id, query.cursor, query.limit.unwrap_or(100))
+            .get_batch_items(&id, query.page.unwrap_or(1), query.page_size.unwrap_or(10))
             .await?,
     ))
 }

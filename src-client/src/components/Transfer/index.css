@@ -24,7 +24,7 @@
 
 .WebSSH-Transfer .ant-tabs-content-holder {
     height: calc(100% - 47px);
-    overflow: hidden;
+    overflow: auto;
 }
 
 .WebSSH-Transfer .ant-tabs-tabpane {
@@ -50,6 +50,26 @@
 .WebSSH-Transfer .ant-table-body {
     height: 100%;
     overflow-y: auto;
+}
+
+.WebSSH-Transfer .ant-table-expanded-row > td {
+    padding: 8px 14px;
+    background: var(--ant-color-bg-container);
+}
+
+.WebSSH-Transfer .ant-table-expanded-row .ant-table-wrapper {
+    height: auto;
+}
+
+.WebSSH-Transfer .ant-table-expanded-row .ant-table {
+    height: auto;
+    border-radius: 4px;
+}
+
+.WebSSH-Transfer .ant-table-expanded-row .ant-table-container,
+.WebSSH-Transfer .ant-table-expanded-row .ant-table-body {
+    height: auto;
+    overflow-y: visible;
 }
 
 .WebSSH-Transfer .ant-table-thead > tr > th {

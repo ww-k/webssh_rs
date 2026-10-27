@@ -9,6 +9,7 @@ use std::{
 };
 
 use nanoid::nanoid;
+use sea_orm::sea_query::{Expr, Order};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder, QuerySelect,
@@ -257,7 +258,14 @@ impl TransferService {
     pub async fn list_tasks(&self) -> Result<Vec<TransferTaskModel>, ApiErr> {
         map_db_err!(
             TransferTaskEntity::find()
+                .order_by(
+                    Expr::cust(
+                        "CASE status WHEN 'FAIL' THEN 0 WHEN 'RUN' THEN 1 WHEN 'WAIT' THEN 2 WHEN 'PAUSE' THEN 3 ELSE 4 END",
+                    ),
+                    Order::Asc,
+                )
                 .order_by_desc(Column::CreatedAt)
+                .order_by_desc(Column::Id)
                 .all(&self.db)
                 .await
         )

@@ -62,7 +62,7 @@ export interface ITransferBatch {
 
 export interface ITransferBatchItems {
     items: ITransferTask[];
-    next_cursor?: string;
+    total: number;
 }
 
 export async function postTransferUploadBatch(payload: {
@@ -103,7 +103,7 @@ export async function getTransferBatch(id: string) {
 
 export async function getTransferBatchItems(
     id: string,
-    params?: { cursor?: string; limit?: number },
+    params?: { page?: number; page_size?: number },
 ) {
     const response = await axios.get<ITransferBatchItems>(
         `/api/transfer/batches/${id}/items`,

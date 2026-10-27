@@ -90,5 +90,5 @@ pub struct TransferBatchResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BatchItemsResponse {
     pub items: Vec<TransferTaskResponse>,
-    pub next_cursor: Option<String>,
+    pub total: u64,
 }

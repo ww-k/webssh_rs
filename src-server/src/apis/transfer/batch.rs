@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use nanoid::nanoid;
+use sea_orm::sea_query::{Expr, Order};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, TransactionTrait,
 };
 use tokio::fs;
 
@@ -389,35 +390,57 @@ impl TransferService {
     }
 
     pub async fn list_batches(&self) -> Result<Vec<BatchModel>, ApiErr> {
-        let models = map_db_err!(
+        map_db_err!(
             BatchEntity::find()
+                .order_by(
+                    Expr::cust(
+                        "CASE status WHEN 'FAIL' THEN 0 WHEN 'RUN' THEN 1 WHEN 'WAIT' THEN 2 WHEN 'PAUSE' THEN 3 ELSE 4 END",
+                    ),
+                    Order::Asc,
+                )
                 .order_by_desc(transfer_batch::Column::CreatedAt)
+                .order_by_desc(transfer_batch::Column::Id)
                 .all(&self.db)
                 .await
-        )?;
-        Ok(models)
+        )
     }
 
     pub async fn get_batch_items(
         &self,
         id: &str,
-        cursor: Option<String>,
-        limit: u64,
+        page: u64,
+        page_size: u64,
     ) -> Result<BatchItemsResponse, ApiErr> {
-        let mut query = TaskEntity::find()
-            .filter(crate::entities::transfer_task::Column::BatchId.eq(id.to_string()))
-            .order_by_asc(crate::entities::transfer_task::Column::CreatedAt)
-            .limit(limit.min(200));
-        if let Some(cursor) = cursor {
-            query = query.filter(crate::entities::transfer_task::Column::Id.gt(cursor));
-        }
-        let tasks = map_db_err!(query.all(&self.db).await)?;
-        let next_cursor = tasks.last().map(|t| t.id.clone());
+        let batch_filter = crate::entities::transfer_task::Column::BatchId.eq(id.to_string());
+        let total = map_db_err!(
+            TaskEntity::find()
+                .filter(batch_filter.clone())
+                .count(&self.db)
+                .await
+        )?;
+        let page_size = page_size.clamp(1, 200);
+        let offset = page.saturating_sub(1).saturating_mul(page_size);
+        let tasks = map_db_err!(
+            TaskEntity::find()
+                .filter(batch_filter)
+                .order_by(
+                    Expr::cust(
+                        "CASE status WHEN 'FAIL' THEN 0 WHEN 'RUN' THEN 1 WHEN 'WAIT' THEN 2 WHEN 'PAUSE' THEN 3 ELSE 4 END",
+                    ),
+                    Order::Asc,
+                )
+                .order_by_desc(crate::entities::transfer_task::Column::CreatedAt)
+                .order_by_desc(crate::entities::transfer_task::Column::Id)
+                .offset(offset)
+                .limit(page_size)
+                .all(&self.db)
+                .await
+        )?;
         let items = tasks
             .into_iter()
             .map(task_response)
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(BatchItemsResponse { items, next_cursor })
+        Ok(BatchItemsResponse { items, total })
     }
 
     async fn refresh_batch_model(&self, model: BatchModel) -> Result<(), ApiErr> {

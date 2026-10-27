@@ -23,7 +23,7 @@ import {
 } from "antd";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
@@ -179,7 +179,11 @@ const getActionMenuItems = (
     return items;
 };
 
-const TransferTable = ({ type }: { type: "ALL" | ITransferTask["type"] }) => {
+export const TransferTable = ({
+    type,
+}: {
+    type: "ALL" | ITransferTask["type"];
+}) => {
     const { t } = useTranslation();
     const [list, setList] = useState<ITransferTask[]>(() =>
         transferService.getTasks(),
@@ -211,7 +215,7 @@ const TransferTable = ({ type }: { type: "ALL" | ITransferTask["type"] }) => {
             okText: t("app_btn_ok"),
             cancelText: t("app_btn_cancel"),
             onOk: () => {
-                transferService.remove(record.id);
+                transferService.cancel(record.id);
             },
         });
     };
@@ -415,13 +419,29 @@ const TransferTable = ({ type }: { type: "ALL" | ITransferTask["type"] }) => {
     );
 };
 
-const BatchTable = () => {
+interface BatchItemsView {
+    items: ITransferTask[];
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
+const DEFAULT_BATCH_ITEMS_VIEW: BatchItemsView = {
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+};
+
+const BatchTable = ({ type }: { type?: ITransferBatch["type"] }) => {
     const { t } = useTranslation();
     const [list, setList] = useState<ITransferBatch[]>(() =>
         transferService.getBatches(),
     );
-    const [items, setItems] = useState<Record<string, ITransferTask[]>>({});
+    const [items, setItems] = useState<Record<string, BatchItemsView>>({});
     const [expanded, setExpanded] = useState<string[]>([]);
+    const itemsRef = useRef(items);
+    itemsRef.current = items;
 
     useEffect(() => {
         const unsubscribe = transferService.subscribeBatches(setList);
@@ -430,22 +450,129 @@ const BatchTable = () => {
         };
     }, []);
 
+    const expandedBatchIds = useMemo(
+        () => expanded.filter((id) => list.some((item) => item.id === id)),
+        [expanded, list],
+    );
+    const activeExpanded = useMemo(
+        () =>
+            expandedBatchIds.filter((id) => {
+                const batch = list.find((item) => item.id === id);
+                return batch && ["WAIT", "RUN", "PAUSE"].includes(batch.status);
+            }),
+        [expandedBatchIds, list],
+    );
+    const expandedBatchIdsRef = useRef(expandedBatchIds);
+    const activeExpandedRef = useRef(activeExpanded);
+    expandedBatchIdsRef.current = expandedBatchIds;
+    activeExpandedRef.current = activeExpanded;
+    const expandedBatchKey = expandedBatchIds.join(",");
+    const activeExpandedKey = activeExpanded.join(",");
+    const itemPageKey = expandedBatchIds
+        .map((id) => {
+            const view = items[id] || DEFAULT_BATCH_ITEMS_VIEW;
+            return `${id}:${view.page}:${view.pageSize}`;
+        })
+        .join(",");
+
+    // The keys restart polling only when the expanded or active batch set changes.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: refs hold the current IDs while keys control effect lifetime.
+    useEffect(() => {
+        if (expandedBatchIdsRef.current.length === 0) return;
+        let disposed = false;
+        let requestVersion = 0;
+        const refresh = async (ids: string[]) => {
+            const version = ++requestVersion;
+            const responses = await Promise.all(
+                ids.map((id) => {
+                    const view =
+                        itemsRef.current[id] || DEFAULT_BATCH_ITEMS_VIEW;
+                    return transferService.getBatchItems(
+                        id,
+                        view.page,
+                        view.pageSize,
+                    );
+                }),
+            );
+            if (disposed || version !== requestVersion) return;
+            setItems((current) => {
+                const next = { ...current };
+                ids.forEach((id, index) => {
+                    const view = current[id] || DEFAULT_BATCH_ITEMS_VIEW;
+                    const total = responses[index].total;
+                    const lastPage = Math.max(
+                        1,
+                        Math.ceil(total / view.pageSize),
+                    );
+                    next[id] = {
+                        ...view,
+                        items: responses[index].items,
+                        total,
+                        page: Math.min(view.page, lastPage),
+                    };
+                });
+                return next;
+            });
+        };
+        refresh(expandedBatchIdsRef.current).catch((err) =>
+            console.warn("TransferService.getBatchItems failed", err),
+        );
+        if (activeExpandedRef.current.length === 0) {
+            return () => {
+                disposed = true;
+            };
+        }
+        const timer = window.setInterval(() => {
+            refresh(activeExpandedRef.current).catch((err) =>
+                console.warn("TransferService.getBatchItems failed", err),
+            );
+        }, 1000);
+        return () => {
+            disposed = true;
+            window.clearInterval(timer);
+        };
+    }, [expandedBatchKey, activeExpandedKey, itemPageKey]);
+
     const columns: TableProps<ITransferBatch>["columns"] = [
         {
             title: t("transfer_column_filename"),
             dataIndex: "name",
             key: "name",
+            width: "24%",
             ellipsis: true,
+            render: (text, record) => (
+                <Tooltip title={record.name}>
+                    <Text className="WebSSH-TransferFileName">{text}</Text>
+                </Tooltip>
+            ),
         },
         {
             title: t("transfer_column_type"),
             dataIndex: "type",
             key: "type",
-            width: "12%",
-            render: (type: ITransferBatch["type"]) =>
-                type === "UPLOAD"
-                    ? t("transfer_type_upload")
-                    : t("transfer_type_download"),
+            width: "10%",
+            align: "center",
+            render: (type: ITransferBatch["type"]) => {
+                const isUpload = type === "UPLOAD";
+                const label = t(
+                    isUpload
+                        ? "transfer_type_upload"
+                        : "transfer_type_download",
+                );
+                return (
+                    <Tooltip title={label}>
+                        <span
+                            className={`WebSSH-TransferType WebSSH-TransferType--${type.toLowerCase()}`}
+                        >
+                            {isUpload ? (
+                                <ArrowUpOutlined aria-label={label} />
+                            ) : (
+                                <ArrowDownOutlined aria-label={label} />
+                            )}
+                        </span>
+                    </Tooltip>
+                );
+            },
         },
         {
             title: t("transfer_column_progress"),
@@ -561,25 +688,25 @@ const BatchTable = () => {
         },
     ];
 
+    const filteredList = type
+        ? list.filter((item) => item.type === type)
+        : list;
+
     return (
         <Table<ITransferBatch>
             columns={columns}
-            dataSource={list}
+            dataSource={filteredList}
             rowKey="id"
             size="small"
             rowClassName="WebSSH-TransferRow"
             expandable={{
                 expandedRowKeys: expanded,
-                onExpand: async (isExpanded, record) => {
-                    if (isExpanded && !items[record.id]) {
-                        const response = await transferService.getBatchItems(
-                            record.id,
-                            undefined,
-                            200,
-                        );
+                onExpand: (isExpanded, record) => {
+                    if (isExpanded) {
                         setItems((current) => ({
                             ...current,
-                            [record.id]: response.items,
+                            [record.id]:
+                                current[record.id] || DEFAULT_BATCH_ITEMS_VIEW,
                         }));
                     }
                     setExpanded((current) =>
@@ -595,27 +722,196 @@ const BatchTable = () => {
                                 title: t("transfer_column_filename"),
                                 dataIndex: "name",
                                 key: "name",
+                                width: "24%",
+                                ellipsis: true,
+                                render: (text, item) => (
+                                    <Tooltip
+                                        title={
+                                            item.local_path ||
+                                            item.target_uri ||
+                                            text
+                                        }
+                                    >
+                                        <Text className="WebSSH-TransferFileName">
+                                            {text}
+                                        </Text>
+                                    </Tooltip>
+                                ),
+                            },
+                            {
+                                title: t("transfer_column_type"),
+                                dataIndex: "type",
+                                key: "type",
+                                width: "10%",
+                                align: "center",
+                                render: (
+                                    transferType: ITransferTask["type"],
+                                ) => {
+                                    const isUpload = transferType === "UPLOAD";
+                                    const label = t(
+                                        isUpload
+                                            ? "transfer_type_upload"
+                                            : "transfer_type_download",
+                                    );
+                                    return (
+                                        <Tooltip title={label}>
+                                            <span
+                                                className={`WebSSH-TransferType WebSSH-TransferType--${transferType.toLowerCase()}`}
+                                            >
+                                                {isUpload ? (
+                                                    <ArrowUpOutlined
+                                                        aria-label={label}
+                                                    />
+                                                ) : (
+                                                    <ArrowDownOutlined
+                                                        aria-label={label}
+                                                    />
+                                                )}
+                                            </span>
+                                        </Tooltip>
+                                    );
+                                },
                             },
                             {
                                 title: t("transfer_column_progress"),
                                 key: "progress",
-                                render: (_, item) =>
-                                    item.kind === "DIRECTORY"
-                                        ? t(STATUS_TEXT_KEY[item.status])
-                                        : `${item.loaded}/${item.total} (${Math.round(item.percent)}%)`,
+                                width: "36%",
+                                render: (_, item) => {
+                                    const progressStatus =
+                                        item.status === "SUCCESS"
+                                            ? "success"
+                                            : item.status === "FAIL"
+                                              ? "exception"
+                                              : ["PAUSE", "CANCEL"].includes(
+                                                      item.status,
+                                                  )
+                                                ? "normal"
+                                                : "active";
+                                    return (
+                                        <div className="WebSSH-TransferProgress">
+                                            <div className="WebSSH-TransferProgressMeta">
+                                                <Text type="secondary">
+                                                    {formatSize(item.loaded)}/
+                                                    {formatSize(item.total)}
+                                                </Text>
+                                            </div>
+                                            <Progress
+                                                percent={
+                                                    item.status === "SUCCESS"
+                                                        ? 100
+                                                        : Number(
+                                                              item.percent.toFixed(
+                                                                  2,
+                                                              ),
+                                                          )
+                                                }
+                                                status={progressStatus}
+                                                size={["100%", 4]}
+                                                showInfo={false}
+                                            />
+                                        </div>
+                                    );
+                                },
                             },
                             {
                                 title: t("transfer_status_running"),
                                 dataIndex: "status",
                                 key: "status",
-                                render: (status: ITransferTask["status"]) =>
-                                    t(STATUS_TEXT_KEY[status]),
+                                width: "12%",
+                                render: (status: ITransferTask["status"]) => (
+                                    <Text
+                                        className={`WebSSH-TransferProgressMetaItem--status WebSSH-TransferProgressMetaItem--status-${status.toLowerCase()}`}
+                                    >
+                                        {t(STATUS_TEXT_KEY[status])}
+                                    </Text>
+                                ),
+                            },
+                            {
+                                title: t("app_common_action"),
+                                key: "action",
+                                width: "10%",
+                                align: "center",
+                                render: (_, item) => (
+                                    <Dropdown
+                                        menu={{
+                                            items: getActionMenuItems(
+                                                item,
+                                                t,
+                                                () =>
+                                                    transferService.pause(
+                                                        item.id,
+                                                    ),
+                                                () =>
+                                                    transferService.resume(
+                                                        item.id,
+                                                    ),
+                                                () =>
+                                                    transferService.cancel(
+                                                        item.id,
+                                                    ),
+                                                () =>
+                                                    transferService.remove(
+                                                        item.id,
+                                                    ),
+                                                () => {
+                                                    if (item.local_path) {
+                                                        postFsShowInFolder(
+                                                            item.local_path,
+                                                        ).catch((err) =>
+                                                            console.warn(
+                                                                "Show transfer in folder failed",
+                                                                err,
+                                                            ),
+                                                        );
+                                                    }
+                                                },
+                                            ),
+                                        }}
+                                        trigger={["click"]}
+                                        placement="bottomRight"
+                                    >
+                                        <Tooltip
+                                            title={t("transfer_action_more")}
+                                        >
+                                            <Button
+                                                className="WebSSH-TransferAction"
+                                                type="text"
+                                                aria-label={t(
+                                                    "transfer_action_more",
+                                                )}
+                                                icon={<MoreOutlined />}
+                                            />
+                                        </Tooltip>
+                                    </Dropdown>
+                                ),
                             },
                         ]}
-                        dataSource={items[record.id] || []}
+                        dataSource={
+                            (items[record.id] || DEFAULT_BATCH_ITEMS_VIEW).items
+                        }
                         rowKey="id"
                         size="small"
-                        pagination={false}
+                        pagination={(() => {
+                            const view =
+                                items[record.id] || DEFAULT_BATCH_ITEMS_VIEW;
+                            return {
+                                current: view.page,
+                                pageSize: view.pageSize,
+                                total: view.total,
+                                showSizeChanger: true,
+                                onChange: (page: number, pageSize: number) => {
+                                    setItems((current) => ({
+                                        ...current,
+                                        [record.id]: {
+                                            ...(current[record.id] ||
+                                                DEFAULT_BATCH_ITEMS_VIEW),
+                                            page,
+                                            pageSize,
+                                        },
+                                    }));
+                                },
+                            };
+                        })()}
                     />
                 ),
             }}
@@ -677,24 +973,19 @@ export default function Transfer() {
                 }
                 items={[
                     {
-                        key: "batches",
-                        label: t("transfer_tab_batches"),
-                        children: <BatchTable />,
-                    },
-                    {
                         key: "all",
                         label: t("transfer_tab_all"),
-                        children: <TransferTable type="ALL" />,
+                        children: <BatchTable />,
                     },
                     {
                         key: "upload",
                         label: t("transfer_tab_upload"),
-                        children: <TransferTable type="UPLOAD" />,
+                        children: <BatchTable type="UPLOAD" />,
                     },
                     {
                         key: "download",
                         label: t("transfer_tab_download"),
-                        children: <TransferTable type="DOWNLOAD" />,
+                        children: <BatchTable type="DOWNLOAD" />,
                     },
                 ]}
             />
