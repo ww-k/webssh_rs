@@ -2,11 +2,13 @@ import {
     ArrowDownOutlined,
     ArrowUpOutlined,
     DeleteOutlined,
+    DownOutlined,
     FolderOpenOutlined,
     MoreOutlined,
     PauseCircleOutlined,
     PlayCircleOutlined,
     ReloadOutlined,
+    RightOutlined,
     StopOutlined,
 } from "@ant-design/icons";
 import {
@@ -407,7 +409,6 @@ export const TransferTable = ({
             dataSource={filteredList}
             rowKey="id"
             size="small"
-            rowClassName="WebSSH-TransferRow"
             pagination={{
                 pageSize: 10,
                 showSizeChanger: true,
@@ -533,18 +534,54 @@ const BatchTable = ({ type }: { type?: ITransferBatch["type"] }) => {
         };
     }, [expandedBatchKey, activeExpandedKey, itemPageKey]);
 
+    const handleExpand = (isExpanded: boolean, record: ITransferBatch) => {
+        if (isExpanded) {
+            setItems((current) => ({
+                ...current,
+                [record.id]:
+                    current[record.id] || DEFAULT_BATCH_ITEMS_VIEW,
+            }));
+        }
+        setExpanded((current) =>
+            isExpanded
+                ? [...current, record.id]
+                : current.filter((id) => id !== record.id),
+        );
+    };
+
     const columns: TableProps<ITransferBatch>["columns"] = [
         {
             title: t("transfer_column_filename"),
             dataIndex: "name",
             key: "name",
-            width: "24%",
+            width: "32%",
             ellipsis: true,
-            render: (text, record) => (
-                <Tooltip title={record.name}>
-                    <Text className="WebSSH-TransferFileName">{text}</Text>
-                </Tooltip>
-            ),
+            render: (text, record) => {
+                const isExpanded = expanded.includes(record.id);
+                return (
+                    <div className="WebSSH-TransferBatchNameCell">
+                        <Button
+                            className="WebSSH-TransferExpandAction"
+                            type="text"
+                            aria-expanded={isExpanded}
+                            aria-label={record.name}
+                            icon={
+                                isExpanded ? (
+                                    <DownOutlined />
+                                ) : (
+                                    <RightOutlined />
+                                )
+                            }
+                            onClick={() => handleExpand(!isExpanded, record)}
+                        />
+                        <Tooltip title={record.name}>
+                            <Text className="WebSSH-TransferFileName">
+                                {text}
+                            </Text>
+                        </Tooltip>
+                    </div>
+                );
+            },
         },
         {
             title: t("transfer_column_type"),
@@ -603,19 +640,6 @@ const BatchTable = ({ type }: { type?: ITransferBatch["type"] }) => {
                     </div>
                 );
             },
-        },
-        {
-            title: t("transfer_status_running"),
-            dataIndex: "status",
-            key: "status",
-            width: "12%",
-            render: (status: ITransferBatch["status"]) => (
-                <Text
-                    className={`WebSSH-TransferProgressMetaItem--status WebSSH-TransferProgressMetaItem--status-${status.toLowerCase()}`}
-                >
-                    {t(STATUS_TEXT_KEY[status])}
-                </Text>
-            ),
         },
         {
             title: t("app_common_action"),
@@ -698,23 +722,10 @@ const BatchTable = ({ type }: { type?: ITransferBatch["type"] }) => {
             dataSource={filteredList}
             rowKey="id"
             size="small"
-            rowClassName="WebSSH-TransferRow"
             expandable={{
+                showExpandColumn: false,
                 expandedRowKeys: expanded,
-                onExpand: (isExpanded, record) => {
-                    if (isExpanded) {
-                        setItems((current) => ({
-                            ...current,
-                            [record.id]:
-                                current[record.id] || DEFAULT_BATCH_ITEMS_VIEW,
-                        }));
-                    }
-                    setExpanded((current) =>
-                        isExpanded
-                            ? [...current, record.id]
-                            : current.filter((id) => id !== record.id),
-                    );
-                },
+                onExpand: handleExpand,
                 expandedRowRender: (record) => (
                     <Table<ITransferTask>
                         columns={[
@@ -722,20 +733,22 @@ const BatchTable = ({ type }: { type?: ITransferBatch["type"] }) => {
                                 title: t("transfer_column_filename"),
                                 dataIndex: "name",
                                 key: "name",
-                                width: "24%",
+                                width: "32%",
                                 ellipsis: true,
                                 render: (text, item) => (
-                                    <Tooltip
-                                        title={
-                                            item.local_path ||
-                                            item.target_uri ||
-                                            text
-                                        }
-                                    >
-                                        <Text className="WebSSH-TransferFileName">
-                                            {text}
-                                        </Text>
-                                    </Tooltip>
+                                    <div className="WebSSH-TransferFileNameCell">
+                                        <Tooltip
+                                            title={
+                                                item.local_path ||
+                                                item.target_uri ||
+                                                text
+                                            }
+                                        >
+                                            <Text className="WebSSH-TransferFileName">
+                                                {text}
+                                            </Text>
+                                        </Tooltip>
+                                    </div>
                                 ),
                             },
                             {
@@ -814,19 +827,6 @@ const BatchTable = ({ type }: { type?: ITransferBatch["type"] }) => {
                                 },
                             },
                             {
-                                title: t("transfer_status_running"),
-                                dataIndex: "status",
-                                key: "status",
-                                width: "12%",
-                                render: (status: ITransferTask["status"]) => (
-                                    <Text
-                                        className={`WebSSH-TransferProgressMetaItem--status WebSSH-TransferProgressMetaItem--status-${status.toLowerCase()}`}
-                                    >
-                                        {t(STATUS_TEXT_KEY[status])}
-                                    </Text>
-                                ),
-                            },
-                            {
                                 title: t("app_common_action"),
                                 key: "action",
                                 width: "10%",
@@ -889,6 +889,7 @@ const BatchTable = ({ type }: { type?: ITransferBatch["type"] }) => {
                         dataSource={
                             (items[record.id] || DEFAULT_BATCH_ITEMS_VIEW).items
                         }
+                        showHeader={false}
                         rowKey="id"
                         size="small"
                         pagination={(() => {
