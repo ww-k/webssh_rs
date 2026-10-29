@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    dto::{BatchItemsResponse, TransferBatchResponse},
+    dto::{BatchItemsResponse, TransferBatchListResponse, TransferBatchResponse},
     dto::{
         CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
         CreateUploadTaskPayload, TransferRangeSchema, TransferTaskResponse,
@@ -71,16 +71,26 @@ pub async fn create_download_batch(
 
 pub async fn list_batches(
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<TransferBatchResponse>>, ApiErr> {
-    Ok(Json(
-        state
-            .transfer_service
-            .list_batches()
-            .await?
-            .into_iter()
-            .map(Into::into)
-            .collect(),
-    ))
+    Query(query): Query<BatchListQuery>,
+) -> Result<Json<TransferBatchListResponse>, ApiErr> {
+    let page = query.page.unwrap_or(1).max(1);
+    let page_size = query.page_size.unwrap_or(10).clamp(1, 200);
+    let result = state
+        .transfer_service
+        .list_batches(page, page_size, query.r#type, query.status)
+        .await?;
+    Ok(Json(TransferBatchListResponse {
+        items: result.items.into_iter().map(Into::into).collect(),
+        total: result.total,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    pub r#type: Option<crate::entities::transfer_batch::TransferBatchType>,
+    pub status: Option<crate::entities::transfer_batch::TransferBatchStatus>,
 }
 
 pub async fn get_batch(
@@ -319,6 +329,7 @@ impl IntoTransferResponse for TransferTaskModel {
             batch_id: self.batch_id,
             relative_path: self.relative_path,
             conflict_policy: self.conflict_policy,
+            all: self.all,
         })
     }
 }

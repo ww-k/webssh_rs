@@ -18,7 +18,13 @@ import {
     postTransferUploadBatch,
 } from "@/api";
 
-import type { ITransferBatch, ITransferTask } from "@/api";
+import type {
+    ITransferBatch,
+    ITransferBatchList,
+    ITransferTask,
+    ITransferTaskStatus,
+    ITransferTaskType,
+} from "@/api";
 
 const ACTIVE_STATUSES = new Set(["WAIT", "RUN"]);
 const FINISHED_STATUSES = new Set(["SUCCESS", "FAIL", "CANCEL"]);
@@ -37,7 +43,26 @@ interface IDownloadOption {
     localPath?: string;
     localDir?: string;
     size?: number;
+    all?: boolean;
 }
+
+export interface ITransferBatchListParams {
+    page?: number;
+    pageSize?: number;
+    type?: ITransferTaskType;
+    status?: ITransferTaskStatus;
+}
+
+const getTransferItemName = (source: string) => {
+    const normalized = source.replace(/[\\/]+$/, "");
+    const name = normalized.split(/[\\/]/).pop() || "";
+    return name || normalized;
+};
+
+export const getTransferBatchName = (sources: string[]) => {
+    const first = getTransferItemName(sources[0] || "Transfer");
+    return sources.length === 1 ? first : `${first} 等 ${sources.length} 个`;
+};
 
 class TransferService {
     #syncTimer?: number;
@@ -76,11 +101,15 @@ class TransferService {
     async createUploadBatch(option: {
         sources: string[];
         targetUri: string;
+        name?: string;
+        all?: boolean;
         conflictPolicy?: "OVERWRITE" | "SKIP" | "RENAME" | "FAIL";
     }) {
         const batch = await postTransferUploadBatch({
             target_uri: option.targetUri,
             sources: option.sources,
+            name: option.name || getTransferBatchName(option.sources),
+            all: option.all ?? false,
             conflict_policy: option.conflictPolicy,
         });
         this.#upsertBatch(batch);
@@ -91,11 +120,15 @@ class TransferService {
     async createDownloadBatch(option: {
         sources: string[];
         localDir: string;
+        name?: string;
+        all?: boolean;
         conflictPolicy?: "OVERWRITE" | "SKIP" | "RENAME" | "FAIL";
     }) {
         const batch = await postTransferDownloadBatch({
             sources: option.sources,
             local_dir: option.localDir,
+            name: option.name || getTransferBatchName(option.sources),
+            all: option.all ?? false,
             conflict_policy: option.conflictPolicy,
         });
         this.#upsertBatch(batch);
@@ -105,6 +138,16 @@ class TransferService {
 
     async getBatch(id: string) {
         return getTransferBatch(id);
+    }
+    async getBatchesPage(
+        params: ITransferBatchListParams = {},
+    ): Promise<ITransferBatchList> {
+        return getTransferBatches({
+            page: params.page,
+            page_size: params.pageSize,
+            type: params.type,
+            status: params.status,
+        });
     }
     async getBatchItems(id: string, page = 1, pageSize = 10) {
         return getTransferBatchItems(id, {
@@ -151,6 +194,7 @@ class TransferService {
                 targetUri:
                     option.fileUri.slice(0, option.fileUri.lastIndexOf("/")) ||
                     option.fileUri,
+                all: false,
             });
             const items = await this.getBatchItems(batch.id, 1, 1);
             const task = items.items[0];
@@ -176,6 +220,7 @@ class TransferService {
             const batch = await this.createDownloadBatch({
                 sources: [option.fileUri],
                 localDir: option.localDir,
+                all: option.all ?? false,
             });
             const items = await this.getBatchItems(batch.id, 1, 1);
             const task = items.items[0];
@@ -225,7 +270,8 @@ class TransferService {
     }
 
     async syncBatches() {
-        const batches = await getTransferBatches();
+        const response = await getTransferBatches({ page: 1, page_size: 200 });
+        const batches = response.items;
         this.#batches = batches;
         for (const listener of this.#batchListeners) listener(this.#batches);
         if (batches.some((batch) => ACTIVE_STATUSES.has(batch.status))) {

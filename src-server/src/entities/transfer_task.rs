@@ -82,6 +82,7 @@ pub struct Model {
     pub batch_id: Option<String>,
     pub relative_path: Option<String>,
     pub conflict_policy: Option<TransferConflictPolicy>,
+    pub all: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

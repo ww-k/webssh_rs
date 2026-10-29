@@ -71,7 +71,7 @@ impl TransferService {
                         .await
                         .map_err(|err| ssh_err(err.to_string()))?;
                 }
-                let children = read_local_children(&local_path).await?;
+                let children = read_local_children(&local_path, task.all).await?;
                 tracing::debug!(
                     task_id = %task.id,
                     batch_id = %batch_id,
@@ -94,6 +94,7 @@ impl TransferService {
                             format!("sftp:{}:{}", target.target_id, child_target),
                             child_relative,
                             policy,
+                            task.all,
                         )),
                         ChildKind::File(total) => {
                             let sftp = self
@@ -144,6 +145,9 @@ impl TransferService {
                     if !is_safe_component(&name) {
                         continue;
                     }
+                    if !task.all && is_hidden_name(&name) {
+                        continue;
+                    }
                     let child_relative = join_relative(&relative_path, &name);
                     let child_remote = join_remote(target.path, &name);
                     match attrs.file_type() {
@@ -154,6 +158,7 @@ impl TransferService {
                             format!("sftp:{}:{}", target.target_id, child_remote),
                             child_relative,
                             policy,
+                            task.all,
                         )),
                         SftpFileType::File => {
                             let local = local_root.join(&name);
@@ -237,7 +242,7 @@ struct Child {
     kind: ChildKind,
 }
 
-async fn read_local_children(path: &str) -> Result<Vec<Child>, ApiErr> {
+async fn read_local_children(path: &str, all: bool) -> Result<Vec<Child>, ApiErr> {
     let mut entries = fs::read_dir(path).await.map_err(map_transfer_io_err)?;
     let mut children = Vec::new();
     while let Some(entry) = entries.next_entry().await.map_err(map_transfer_io_err)? {
@@ -245,6 +250,9 @@ async fn read_local_children(path: &str) -> Result<Vec<Child>, ApiErr> {
         let metadata = fs::symlink_metadata(&child_path)
             .await
             .map_err(map_transfer_io_err)?;
+        if !all && is_hidden_path(&child_path, &metadata) {
+            continue;
+        }
         let kind = if metadata.is_dir() {
             ChildKind::Directory
         } else if metadata.is_file() {
@@ -268,6 +276,7 @@ fn directory_model(
     target: String,
     relative: String,
     conflict_policy: TransferConflictPolicy,
+    all: bool,
 ) -> ActiveModel {
     task_model(
         batch_id,
@@ -280,6 +289,7 @@ fn directory_model(
         TransferTaskStatus::Wait,
         None,
         Some(conflict_policy),
+        all,
     )
 }
 
@@ -304,6 +314,7 @@ fn file_model(
         status,
         reason,
         None,
+        false,
     )
 }
 
@@ -318,6 +329,7 @@ fn task_model(
     status: TransferTaskStatus,
     reason: Option<String>,
     conflict_policy: Option<TransferConflictPolicy>,
+    all: bool,
 ) -> ActiveModel {
     let now = now_ms();
     let terminal_success = status == TransferTaskStatus::Success;
@@ -352,7 +364,34 @@ fn task_model(
         batch_id: Set(Some(batch_id.to_string())),
         relative_path: Set(Some(relative)),
         conflict_policy: Set(conflict_policy),
+        all: Set(all),
     }
+}
+
+fn is_hidden_name(name: &str) -> bool {
+    name.starts_with('.')
+}
+
+#[cfg(windows)]
+fn is_hidden_path(path: &Path, metadata: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+
+    const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+
+    is_hidden_name(
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default(),
+    ) || metadata.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0
+}
+
+#[cfg(not(windows))]
+fn is_hidden_path(path: &Path, _metadata: &std::fs::Metadata) -> bool {
+    is_hidden_name(
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default(),
+    )
 }
 
 async fn resolve_remote_conflict(

@@ -69,6 +69,14 @@ impl MigrationTrait for Migration {
             )
             .await?;
         manager
+            .alter_table(
+                Table::alter()
+                    .table(TransferTask::Table)
+                    .add_column(boolean(TransferTask::All).default(false))
+                    .to_owned(),
+            )
+            .await?;
+        manager
             .create_index(
                 Index::create()
                     .name("idx_transfer_task_batch_status")
@@ -98,6 +106,14 @@ impl MigrationTrait for Migration {
                 Index::drop()
                     .name("idx_transfer_task_batch_relative")
                     .table(TransferTask::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(TransferTask::Table)
+                    .drop_column(TransferTask::All)
                     .to_owned(),
             )
             .await?;
@@ -196,4 +212,5 @@ enum TransferTask {
     BatchId,
     RelativePath,
     ConflictPolicy,
+    All,
 }

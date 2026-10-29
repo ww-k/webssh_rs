@@ -17,8 +17,8 @@ use crate::AppState;
 
 pub use dto::{
     BatchItemsResponse, CreateDownloadBatchPayload, CreateDownloadTaskPayload,
-    CreateUploadBatchPayload, CreateUploadTaskPayload, TransferBatchResponse, TransferRangeSchema,
-    TransferTaskResponse,
+    CreateUploadBatchPayload, CreateUploadTaskPayload, TransferBatchListResponse,
+    TransferBatchResponse, TransferRangeSchema, TransferTaskResponse,
 };
 pub use handlers::{
     cancel_batch, cancel_task, create_download_batch, create_download_task, create_upload_batch,

@@ -155,6 +155,7 @@ impl TransferService {
             batch_id: Set(None),
             relative_path: Set(None),
             conflict_policy: Set(None),
+            all: Set(false),
         };
         let task = map_db_err!(task.insert(&self.db).await)?;
         self.queue_task(task.id.clone()).await?;
@@ -237,6 +238,7 @@ impl TransferService {
             batch_id: Set(None),
             relative_path: Set(None),
             conflict_policy: Set(None),
+            all: Set(false),
         };
         let task = map_db_err!(task.insert(&self.db).await)?;
         self.queue_task(task.id.clone()).await?;

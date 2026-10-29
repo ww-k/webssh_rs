@@ -34,6 +34,7 @@ export default function remoteHandleContextmenu(
     context: {
         copyData?: IFileListCopyEvent;
         fileUri: string;
+        showAllFiles: boolean;
         getCwdFiles: () => Promise<IViewFileStat[]>;
         setCopyData: (data: IFileListCopyEvent) => void;
         onViewEdit: (file: IViewFileStat) => void;
@@ -55,6 +56,7 @@ export default function remoteHandleContextmenu(
                 await transferService.createDownloadBatch({
                     sources: files.map((file) => file.uri),
                     localDir,
+                    all: context.showAllFiles,
                 });
             },
             iconRender: () => <DownloadOutlined />,
@@ -126,6 +128,7 @@ export default function remoteHandleContextmenu(
                 await transferService.createUploadBatch({
                     sources: localPaths,
                     targetUri: context.fileUri,
+                    all: false,
                 });
                 await context.getCwdFiles();
             },

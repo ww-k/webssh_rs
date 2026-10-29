@@ -26,6 +26,9 @@ pub struct CreateDownloadTaskPayload {
 pub struct CreateUploadBatchPayload {
     pub target_uri: String,
     pub sources: Vec<String>,
+    pub name: String,
+    #[serde(default)]
+    pub all: bool,
     #[serde(default)]
     pub conflict_policy: Option<TransferConflictPolicy>,
 }
@@ -34,6 +37,9 @@ pub struct CreateUploadBatchPayload {
 pub struct CreateDownloadBatchPayload {
     pub sources: Vec<String>,
     pub local_dir: String,
+    pub name: String,
+    #[serde(default)]
+    pub all: bool,
     #[serde(default)]
     pub conflict_policy: Option<TransferConflictPolicy>,
 }
@@ -61,6 +67,7 @@ pub struct TransferTaskResponse {
     pub batch_id: Option<String>,
     pub relative_path: Option<String>,
     pub conflict_policy: Option<TransferConflictPolicy>,
+    pub all: bool,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -90,5 +97,11 @@ pub struct TransferBatchResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BatchItemsResponse {
     pub items: Vec<TransferTaskResponse>,
+    pub total: u64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TransferBatchListResponse {
+    pub items: Vec<TransferBatchResponse>,
     pub total: u64,
 }

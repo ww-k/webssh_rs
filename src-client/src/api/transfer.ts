@@ -35,6 +35,7 @@ export interface ITransferTask {
     batch_id?: string;
     relative_path?: string;
     conflict_policy?: ITransferConflictPolicy;
+    all?: boolean;
 }
 
 export interface ITransferBatch {
@@ -65,9 +66,16 @@ export interface ITransferBatchItems {
     total: number;
 }
 
+export interface ITransferBatchList {
+    items: ITransferBatch[];
+    total: number;
+}
+
 export async function postTransferUploadBatch(payload: {
     target_uri: string;
     sources: string[];
+    name: string;
+    all?: boolean;
     conflict_policy?: ITransferConflictPolicy;
 }) {
     const response = await axios.post<ITransferBatch>(
@@ -80,6 +88,8 @@ export async function postTransferUploadBatch(payload: {
 export async function postTransferDownloadBatch(payload: {
     sources: string[];
     local_dir: string;
+    name: string;
+    all?: boolean;
     conflict_policy?: ITransferConflictPolicy;
 }) {
     const response = await axios.post<ITransferBatch>(
@@ -89,8 +99,16 @@ export async function postTransferDownloadBatch(payload: {
     return response.data;
 }
 
-export async function getTransferBatches() {
-    const response = await axios.get<ITransferBatch[]>("/api/transfer/batches");
+export async function getTransferBatches(params?: {
+    page?: number;
+    page_size?: number;
+    type?: ITransferTaskType;
+    status?: ITransferTaskStatus;
+}) {
+    const response = await axios.get<ITransferBatchList>(
+        "/api/transfer/batches",
+        { params },
+    );
     return response.data;
 }
 

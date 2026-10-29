@@ -40,6 +40,11 @@ use super::{
     service::{TransferService, map_transfer_io_err, now_ms},
 };
 
+pub struct BatchPage {
+    pub items: Vec<BatchModel>,
+    pub total: u64,
+}
+
 impl TransferService {
     pub async fn create_upload_batch(
         &self,
@@ -52,6 +57,7 @@ impl TransferService {
         let policy = payload
             .conflict_policy
             .unwrap_or(TransferConflictPolicy::Overwrite);
+        let all = payload.all;
         let batch_id = nanoid!();
         tracing::info!(
             batch_id = %batch_id,
@@ -61,19 +67,11 @@ impl TransferService {
             "upload batch discovery started"
         );
         let now = now_ms();
-        let name = if payload.sources.len() == 1 {
-            Path::new(&payload.sources[0])
-                .file_name()
-                .map(|v| v.to_string_lossy().to_string())
-                .unwrap_or_else(|| "Upload".into())
-        } else {
-            format!("{} items", payload.sources.len())
-        };
         let batch = BatchActiveModel {
             id: Set(batch_id.clone()),
             r#type: Set(TransferBatchType::Upload),
             status: Set(TransferBatchStatus::Wait),
-            name: Set(name),
+            name: Set(payload.name.clone()),
             target_id: Set(Some(target.target_id)),
             conflict_policy: Set(policy),
             item_count: Set(0),
@@ -113,6 +111,7 @@ impl TransferService {
                     root,
                     now,
                     policy,
+                    all,
                 ));
             } else if metadata.is_file() {
                 let requested_path = join_remote(target.path, &root);
@@ -162,10 +161,12 @@ impl TransferService {
             return Err(invalid("sources must not be empty"));
         }
         let first_target_id = parse_file_uri(&payload.sources[0])?.target_id;
+        let batch_name = payload.name.clone();
         let sources = payload.sources;
         let policy = payload
             .conflict_policy
             .unwrap_or(TransferConflictPolicy::Overwrite);
+        let all = payload.all;
         let batch_id = nanoid!();
         tracing::info!(
             batch_id = %batch_id,
@@ -179,7 +180,7 @@ impl TransferService {
             id: Set(batch_id.clone()),
             r#type: Set(TransferBatchType::Download),
             status: Set(TransferBatchStatus::Wait),
-            name: Set(format!("{} items", sources.len())),
+            name: Set(batch_name),
             target_id: Set(Some(first_target_id)),
             conflict_policy: Set(policy),
             item_count: Set(0),
@@ -222,6 +223,7 @@ impl TransferService {
                     root,
                     now,
                     policy,
+                    all,
                 ));
             } else {
                 let local = PathBuf::from(&payload.local_dir).join(&root);
@@ -308,6 +310,7 @@ impl TransferService {
             batch_id: Set(Some(batch_id.to_string())),
             relative_path: Set(Some(relative)),
             conflict_policy: Set(None),
+            all: Set(false),
         };
         Ok(task)
     }
@@ -321,6 +324,7 @@ impl TransferService {
         relative_path: String,
         now: i64,
         conflict_policy: TransferConflictPolicy,
+        all: bool,
     ) -> ActiveModel {
         let target_id = parse_file_uri(&target_uri).ok().map(|uri| uri.target_id);
         let task = ActiveModel {
@@ -348,6 +352,7 @@ impl TransferService {
             batch_id: Set(Some(batch_id.to_string())),
             relative_path: Set(Some(relative_path)),
             conflict_policy: Set(Some(conflict_policy)),
+            all: Set(all),
         };
         task
     }
@@ -389,9 +394,21 @@ impl TransferService {
         synthetic_batch(id, &tasks)
     }
 
-    pub async fn list_batches(&self) -> Result<Vec<BatchModel>, ApiErr> {
-        map_db_err!(
-            BatchEntity::find()
+    pub async fn list_batches(
+        &self,
+        page: u64,
+        page_size: u64,
+        batch_type: Option<TransferBatchType>,
+        status: Option<TransferBatchStatus>,
+    ) -> Result<BatchPage, ApiErr> {
+        let mut query = BatchEntity::find();
+        if let Some(batch_type) = batch_type {
+            query = query.filter(transfer_batch::Column::Type.eq(batch_type));
+        }
+        if let Some(status) = status {
+            query = query.filter(transfer_batch::Column::Status.eq(status));
+        }
+        let query = query
                 .order_by(
                     Expr::cust(
                         "CASE status WHEN 'FAIL' THEN 0 WHEN 'RUN' THEN 1 WHEN 'WAIT' THEN 2 WHEN 'PAUSE' THEN 3 ELSE 4 END",
@@ -400,9 +417,14 @@ impl TransferService {
                 )
                 .order_by_desc(transfer_batch::Column::CreatedAt)
                 .order_by_desc(transfer_batch::Column::Id)
-                .all(&self.db)
-                .await
-        )
+                ;
+        let paginator = query.paginate(&self.db, page_size);
+        let total = paginator.num_items().await.map_err(db_err)?;
+        let items = paginator
+            .fetch_page(page.saturating_sub(1))
+            .await
+            .map_err(db_err)?;
+        Ok(BatchPage { items, total })
     }
 
     pub async fn get_batch_items(
@@ -863,6 +885,7 @@ fn task_response(task: TaskModel) -> Result<TransferTaskResponse, ApiErr> {
         batch_id: task.batch_id,
         relative_path: task.relative_path,
         conflict_policy: task.conflict_policy,
+        all: task.all,
     })
 }
 

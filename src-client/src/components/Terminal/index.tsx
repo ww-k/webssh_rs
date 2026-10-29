@@ -340,6 +340,7 @@ export default function Terminal({
         await transferService.createUploadBatch({
             sources: localPaths,
             targetUri: `sftp:${targetId}:${cwd}`,
+            all: false,
         });
     }, [cwd, t, targetId]);
 
