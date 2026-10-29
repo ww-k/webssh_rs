@@ -43,7 +43,9 @@ import type {
 const { Text } = Typography;
 type TransferRow = ITransferTask | ITransferBatch;
 type TransferTypeFilter = "ALL" | ITransferTaskType;
+type TransferViewMode = "batch" | "file";
 type TransferFilterState = {
+    viewMode: TransferViewMode;
     type: TransferTypeFilter;
     status?: ITransferTaskStatus;
 };
@@ -78,6 +80,7 @@ const getStoredTransferFilters = (): TransferFilterState => {
         const type = value?.type;
         const status = value?.status;
         return {
+            viewMode: value?.viewMode === "file" ? "file" : "batch",
             type: type === "UPLOAD" || type === "DOWNLOAD" ? type : "ALL",
             ...(typeof status === "string" &&
             Object.keys(STATUS_TEXT_KEY).includes(status as ITransferTaskStatus)
@@ -85,7 +88,7 @@ const getStoredTransferFilters = (): TransferFilterState => {
                 : {}),
         };
     } catch {
-        return { type: "ALL" };
+        return { viewMode: "batch", type: "ALL" };
     }
 };
 
@@ -862,11 +865,10 @@ const BatchTable = ({
 
 export default function Transfer() {
     const { t } = useTranslation();
-    const [viewMode, setViewMode] = useState<"batch" | "file">("batch");
     const [filters, setFilters] = useState<TransferFilterState>(
         getStoredTransferFilters,
     );
-    const { type, status } = filters;
+    const { status, type, viewMode } = filters;
     useEffect(() => {
         storeTransferFilters(filters);
     }, [filters]);
@@ -908,7 +910,12 @@ export default function Transfer() {
             <div className="WebSSH-TransferToolbar">
                 <Segmented
                     value={viewMode}
-                    onChange={(value) => setViewMode(value as "batch" | "file")}
+                    onChange={(value) =>
+                        setFilters((current) => ({
+                            ...current,
+                            viewMode: value as TransferViewMode,
+                        }))
+                    }
                     options={[
                         {
                             value: "batch",
