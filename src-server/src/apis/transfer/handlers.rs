@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path as AxumPath, State},
+    extract::{Path as AxumPath, Query, State},
+    http::StatusCode,
 };
+use serde::Deserialize;
 use tracing::info;
 
 use crate::{
@@ -13,9 +15,10 @@ use crate::{
 };
 
 use super::{
+    dto::{BatchItemsResponse, TransferBatchListResponse, TransferBatchResponse},
     dto::{
-        CreateDownloadTaskPayload, CreateUploadTaskPayload, TransferRangeSchema,
-        TransferTaskResponse,
+        CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
+        CreateUploadTaskPayload, TransferRangeSchema, TransferTaskResponse,
     },
     ranges::ranges_from_json,
 };
@@ -38,6 +41,126 @@ pub async fn create_upload_task(
     info!("@transfer_upload {:?}", payload);
     let task = state.transfer_service.create_upload(payload).await?;
     Ok(Json(task.into_response()?))
+}
+
+pub async fn create_upload_batch(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateUploadBatchPayload>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(
+        state
+            .transfer_service
+            .create_upload_batch(payload)
+            .await?
+            .into(),
+    ))
+}
+
+pub async fn create_download_batch(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateDownloadBatchPayload>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(
+        state
+            .transfer_service
+            .create_download_batch(payload)
+            .await?
+            .into(),
+    ))
+}
+
+pub async fn list_batches(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<BatchListQuery>,
+) -> Result<Json<TransferBatchListResponse>, ApiErr> {
+    let page = query.page.unwrap_or(1).max(1);
+    let page_size = query.page_size.unwrap_or(10).clamp(1, 200);
+    let result = state
+        .transfer_service
+        .list_batches(page, page_size, query.r#type, query.status)
+        .await?;
+    Ok(Json(TransferBatchListResponse {
+        items: result.items.into_iter().map(Into::into).collect(),
+        total: result.total,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    pub r#type: Option<crate::entities::transfer_batch::TransferBatchType>,
+    pub status: Option<crate::entities::transfer_batch::TransferBatchStatus>,
+}
+
+pub async fn get_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(
+        state.transfer_service.get_batch_model(&id).await?.into(),
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchItemsQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+}
+
+pub async fn get_batch_items(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+    Query(query): Query<BatchItemsQuery>,
+) -> Result<Json<BatchItemsResponse>, ApiErr> {
+    Ok(Json(
+        state
+            .transfer_service
+            .get_batch_items(&id, query.page.unwrap_or(1), query.page_size.unwrap_or(10))
+            .await?,
+    ))
+}
+
+pub async fn pause_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(state.transfer_service.pause_batch(&id).await?.into()))
+}
+pub async fn resume_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(state.transfer_service.resume_batch(&id).await?.into()))
+}
+pub async fn cancel_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(state.transfer_service.cancel_batch(&id).await?.into()))
+}
+pub async fn delete_batch(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<(), ApiErr> {
+    state.transfer_service.delete_batch(&id).await
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/transfer/history",
+    tag = "transfer",
+    summary = "删除所有结束状态的传输历史",
+    responses(
+        (status = 204, description = "成功删除所有结束状态的传输历史"),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn delete_finished_history(
+    State(state): State<Arc<AppState>>,
+) -> Result<StatusCode, ApiErr> {
+    state.transfer_service.delete_finished_history().await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(
@@ -188,6 +311,7 @@ impl IntoTransferResponse for TransferTaskModel {
                 .collect(),
             id: self.id,
             r#type: self.r#type,
+            kind: self.kind,
             status: self.status,
             local_path: self.local_path,
             target_uri: self.target_uri,
@@ -202,6 +326,10 @@ impl IntoTransferResponse for TransferTaskModel {
             created_at: self.created_at,
             updated_at: self.updated_at,
             ended_at: self.ended_at,
+            batch_id: self.batch_id,
+            relative_path: self.relative_path,
+            conflict_policy: self.conflict_policy,
+            all: self.all,
         })
     }
 }

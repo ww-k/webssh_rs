@@ -5,7 +5,7 @@ import FsSelector from "./index";
 import type { LocalDefaultDirectory } from "../Filesview/Local";
 
 export default function renderFsSelector(option: {
-    mode: "file" | "directory";
+    mode: "file" | "directory" | "any";
     multiple?: boolean;
     defaultDirectory?: LocalDefaultDirectory;
     title: string;

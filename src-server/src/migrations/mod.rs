@@ -5,6 +5,7 @@ mod m000002_target_jump_host;
 mod m000003_preferences;
 mod m000004_target_name;
 mod m000005_ssh_known_host_endpoint;
+mod m000006_transfer_batches;
 
 pub struct Migrator;
 
@@ -17,6 +18,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000003_preferences::Migration),
             Box::new(m000004_target_name::Migration),
             Box::new(m000005_ssh_known_host_endpoint::Migration),
+            Box::new(m000006_transfer_batches::Migration),
         ]
     }
 }
@@ -53,7 +55,7 @@ mod tests {
             let stmt2 = stmt.clone();
             let rows = TableName::find_by_statement(stmt).all(&db).await.unwrap();
 
-            assert_eq!(rows.len(), 7, "Expected 7 tables, got {}", rows.len());
+            assert_eq!(rows.len(), 8, "Expected 8 tables, got {}", rows.len());
             assert_eq!(
                 Vec::from_iter(rows.iter().map(|row| row.name.as_str())),
                 vec![
@@ -63,7 +65,8 @@ mod tests {
                     "transfer_task",
                     "favorite_directory",
                     "favorite_directory_initialization",
-                    "preference"
+                    "preference",
+                    "transfer_batch"
                 ],
                 "Unexpected tables: {:?}",
                 rows

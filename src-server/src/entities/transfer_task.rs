@@ -2,6 +2,8 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use super::transfer_batch::TransferConflictPolicy;
+
 #[derive(
     Deserialize, Serialize, Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, ToSchema,
 )]
@@ -13,6 +15,19 @@ pub enum TransferTaskType {
     #[serde(rename = "DOWNLOAD")]
     #[sea_orm(string_value = "DOWNLOAD")]
     Download,
+}
+
+#[derive(
+    Deserialize, Serialize, Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, ToSchema,
+)]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(16))")]
+pub enum TransferTaskKind {
+    #[serde(rename = "FILE")]
+    #[sea_orm(string_value = "FILE")]
+    File,
+    #[serde(rename = "DIRECTORY")]
+    #[sea_orm(string_value = "DIRECTORY")]
+    Directory,
 }
 
 #[derive(
@@ -48,6 +63,7 @@ pub struct Model {
     pub id: String,
     #[sea_orm(column_name = "type")]
     pub r#type: TransferTaskType,
+    pub kind: TransferTaskKind,
     pub status: TransferTaskStatus,
     pub local_path: Option<String>,
     pub target_uri: Option<String>,
@@ -63,6 +79,10 @@ pub struct Model {
     pub created_at: i64,
     pub updated_at: i64,
     pub ended_at: Option<i64>,
+    pub batch_id: Option<String>,
+    pub relative_path: Option<String>,
+    pub conflict_policy: Option<TransferConflictPolicy>,
+    pub all: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -9,6 +9,7 @@ use std::{
 };
 
 use nanoid::nanoid;
+use sea_orm::sea_query::{Expr, Order};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
     QueryOrder, QuerySelect,
@@ -17,6 +18,7 @@ use tokio::{
     fs,
     sync::{Mutex, Notify},
     task::JoinHandle,
+    time::{Duration, MissedTickBehavior},
 };
 
 use crate::{
@@ -31,7 +33,7 @@ use crate::{
     },
     entities::transfer_task::{
         ActiveModel, Column, Entity as TransferTaskEntity, Model as TransferTaskModel,
-        TransferTaskStatus, TransferTaskType,
+        TransferTaskKind, TransferTaskStatus, TransferTaskType,
     },
     map_db_err, map_ssh_err,
     sftp_client::SftpFileType,
@@ -51,7 +53,8 @@ pub struct TransferService {
     pub(super) db: DatabaseConnection,
     pub(super) connection_pool: Arc<SshConnectionPool>,
     running_tasks: Arc<Mutex<HashMap<String, RunningTask>>>,
-    scheduler_notify: Arc<Notify>,
+    pub(super) scheduler_notify: Arc<Notify>,
+    pub(super) batch_refresh_notify: Arc<Notify>,
     scheduler_started: Arc<AtomicBool>,
     max_concurrent_tasks: usize,
     pub(super) transfer_chunk_size: usize,
@@ -78,6 +81,7 @@ impl TransferService {
             connection_pool,
             running_tasks: Arc::new(Mutex::new(HashMap::new())),
             scheduler_notify: Arc::new(Notify::new()),
+            batch_refresh_notify: Arc::new(Notify::new()),
             scheduler_started: Arc::new(AtomicBool::new(false)),
             max_concurrent_tasks: app_state.config.transfer_task_concurrency,
             transfer_chunk_size: app_state.config.transfer_chunk_size,
@@ -89,7 +93,7 @@ impl TransferService {
         let now = now_ms();
         let tasks = map_db_err!(
             TransferTaskEntity::find()
-                .filter(Column::Status.is_in([TransferTaskStatus::Wait, TransferTaskStatus::Run]))
+                .filter(Column::Status.eq(TransferTaskStatus::Run))
                 .all(&self.db)
                 .await
         )?;
@@ -132,6 +136,7 @@ impl TransferService {
         let task = ActiveModel {
             id: Set(nanoid!()),
             r#type: Set(TransferTaskType::Upload),
+            kind: Set(TransferTaskKind::File),
             status: Set(TransferTaskStatus::Wait),
             local_path: Set(Some(payload.local_path)),
             target_uri: Set(Some(payload.target_uri)),
@@ -147,6 +152,10 @@ impl TransferService {
             created_at: Set(now),
             updated_at: Set(now),
             ended_at: Set(None),
+            batch_id: Set(None),
+            relative_path: Set(None),
+            conflict_policy: Set(None),
+            all: Set(false),
         };
         let task = map_db_err!(task.insert(&self.db).await)?;
         self.queue_task(task.id.clone()).await?;
@@ -210,6 +219,7 @@ impl TransferService {
         let task = ActiveModel {
             id: Set(nanoid!()),
             r#type: Set(TransferTaskType::Download),
+            kind: Set(TransferTaskKind::File),
             status: Set(TransferTaskStatus::Wait),
             local_path: Set(Some(local_path)),
             target_uri: Set(Some(payload.source_uri)),
@@ -225,6 +235,10 @@ impl TransferService {
             created_at: Set(now),
             updated_at: Set(now),
             ended_at: Set(None),
+            batch_id: Set(None),
+            relative_path: Set(None),
+            conflict_policy: Set(None),
+            all: Set(false),
         };
         let task = map_db_err!(task.insert(&self.db).await)?;
         self.queue_task(task.id.clone()).await?;
@@ -246,7 +260,14 @@ impl TransferService {
     pub async fn list_tasks(&self) -> Result<Vec<TransferTaskModel>, ApiErr> {
         map_db_err!(
             TransferTaskEntity::find()
+                .order_by(
+                    Expr::cust(
+                        "CASE status WHEN 'FAIL' THEN 0 WHEN 'RUN' THEN 1 WHEN 'WAIT' THEN 2 WHEN 'PAUSE' THEN 3 ELSE 4 END",
+                    ),
+                    Order::Asc,
+                )
                 .order_by_desc(Column::CreatedAt)
+                .order_by_desc(Column::Id)
                 .all(&self.db)
                 .await
         )
@@ -325,7 +346,7 @@ impl TransferService {
         self.get_task_model(id).await
     }
 
-    async fn queue_task(&self, id: String) -> Result<(), ApiErr> {
+    pub(super) async fn queue_task(&self, id: String) -> Result<(), ApiErr> {
         {
             let running_tasks = self.running_tasks.lock().await;
             if running_tasks.contains_key(&id) {
@@ -344,6 +365,7 @@ impl TransferService {
             });
         }
 
+        let batch_id = task.batch_id.clone();
         let mut active: ActiveModel = task.into();
         active.status = Set(TransferTaskStatus::Wait);
         active.fail_reason = Set(None);
@@ -353,6 +375,9 @@ impl TransferService {
 
         self.start_scheduler();
         self.scheduler_notify.notify_one();
+        if batch_id.is_some() {
+            self.batch_refresh_notify.notify_one();
+        }
         Ok(())
     }
 
@@ -369,12 +394,34 @@ impl TransferService {
         tokio::spawn(async move {
             scheduler_service.run_scheduler().await;
         });
+
+        let refresh_service = self.clone();
+        tokio::spawn(async move {
+            refresh_service.run_batch_refresh().await;
+        });
     }
 
     async fn run_scheduler(&self) {
         loop {
             self.dispatch_pending_tasks().await;
             self.scheduler_notify.notified().await;
+        }
+    }
+
+    async fn run_batch_refresh(&self) {
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        // `interval` ticks immediately on creation; consume that startup tick
+        // so subsequent refreshes stay on the regular schedule.
+        interval.tick().await;
+        let mut has_active_batches = self.refresh_active_batches().await;
+        loop {
+            if !has_active_batches {
+                self.batch_refresh_notify.notified().await;
+            }
+
+            interval.tick().await;
+            has_active_batches = self.refresh_active_batches().await;
         }
     }
 
@@ -467,7 +514,7 @@ impl TransferService {
         true
     }
 
-    async fn abort_task(&self, id: &str) {
+    pub(super) async fn abort_task(&self, id: &str) {
         if let Some(task) = self.running_tasks.lock().await.remove(id) {
             task.abort.store(true, Ordering::Release);
             if let Some(handle) = task.handle {
@@ -492,6 +539,7 @@ impl TransferService {
         } else {
             tracing::info!(task_id = %id, "transfer task started");
         }
+
         let result = self.run_task_inner(&id, abort.clone()).await;
 
         self.running_tasks.lock().await.remove(&id);
@@ -542,12 +590,20 @@ impl TransferService {
             return Ok(());
         }
 
-        match task.r#type {
-            TransferTaskType::Upload => self.run_upload(id, abort).await?,
-            TransferTaskType::Download => self.run_download(id, abort).await?,
+        match task.kind {
+            crate::entities::transfer_task::TransferTaskKind::Directory => {
+                self.run_directory(id).await?
+            }
+            crate::entities::transfer_task::TransferTaskKind::File => match task.r#type {
+                TransferTaskType::Upload => self.run_upload(id, abort).await?,
+                TransferTaskType::Download => self.run_download(id, abort).await?,
+            },
         }
 
         let task = self.get_task_model(id).await?;
+        if task.kind == crate::entities::transfer_task::TransferTaskKind::Directory {
+            return Ok(());
+        }
         let ranges = ranges_from_json(&task.ranges)?;
         if ranges.is_empty() {
             self.finish_success(task, ranges).await?;
@@ -650,7 +706,7 @@ pub fn map_transfer_io_err(err: std::io::Error) -> ApiErr {
     }
 }
 
-fn now_ms() -> i64 {
+pub(super) fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as i64)

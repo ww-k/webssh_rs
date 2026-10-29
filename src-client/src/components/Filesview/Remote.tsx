@@ -151,6 +151,7 @@ export default function FilesviewRemote({
             onContextMenu={(files, evt) => {
                 handleContextmenu(files, evt, {
                     fileUri: cwd,
+                    showAllFiles,
                     copyData,
                     getCwdFiles,
                     setCopyData,
