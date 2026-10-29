@@ -6,6 +6,7 @@ import {
     FolderOutlined,
     ReloadOutlined,
     SnippetsOutlined,
+    UploadOutlined,
 } from "@ant-design/icons";
 import { Button, Tooltip } from "antd";
 import {
@@ -21,9 +22,11 @@ import { useTranslation } from "react-i18next";
 import "./index.css";
 
 import { normalizeTerminalCwd } from "@/helpers/terminal_cwd";
+import transferService from "@/services/transfer";
 import useAppStore, { type ITab } from "@/store";
 
 import popContextMenu from "../Contextmenu";
+import renderFsSelector from "../FsSelector/render";
 import { terminalInteractionMessageType } from "./constants";
 
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
@@ -319,6 +322,27 @@ export default function Terminal({
         openSftpAt(targetId, cwd, tab.key);
     }, [cwd, openSftpAt, tab.key, targetId]);
 
+    const uploadToCwd = useCallback(async () => {
+        if (targetId === undefined || !cwd) return;
+
+        let localPaths: string[];
+        try {
+            localPaths = await renderFsSelector({
+                mode: "any",
+                multiple: true,
+                title: t("files_menu_select_upload_file"),
+            });
+        } catch {
+            return;
+        }
+
+        if (localPaths.length === 0) return;
+        await transferService.createUploadBatch({
+            sources: localPaths,
+            targetUri: `sftp:${targetId}:${cwd}`,
+        });
+    }, [cwd, t, targetId]);
+
     const clearTerminal = useCallback(() => {
         const contentWindow = iframeRef.current?.contentWindow;
         if (!contentWindow) return;
@@ -426,6 +450,16 @@ export default function Terminal({
                         disabled={cwd === undefined}
                         icon={<FolderOutlined />}
                         onClick={openSftp}
+                        size="small"
+                        type="text"
+                    />
+                </Tooltip>
+                <Tooltip title={t("files_menu_upload")}>
+                    <Button
+                        aria-label={t("files_menu_upload")}
+                        disabled={cwd === undefined}
+                        icon={<UploadOutlined />}
+                        onClick={() => void uploadToCwd()}
                         size="small"
                         type="text"
                     />
