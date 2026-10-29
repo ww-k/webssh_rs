@@ -1121,6 +1121,12 @@ export default class Pathbar extends Component<IProps, IState> {
             const { editorValue } = this.state;
             let normalizePath = this.path.normalize(editorValue);
             normalizePath = normalizePath.trim();
+            if (
+                normalizePath !== "/" &&
+                !/^[A-Za-z]:[\\/]$/.test(normalizePath)
+            ) {
+                normalizePath = normalizePath.replace(/[\\/]+$/, "");
+            }
 
             this.editorBlurHandle();
 
