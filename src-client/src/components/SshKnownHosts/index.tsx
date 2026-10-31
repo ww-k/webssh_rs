@@ -1,6 +1,14 @@
 import { DeleteOutlined, KeyOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Button, Empty, message, Popconfirm, Table, Typography } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import {
+    Button,
+    Empty,
+    message,
+    Popconfirm,
+    Table,
+    Tooltip,
+    Typography,
+} from "antd";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getSshKnownHostList, postSshKnownHostRemove } from "@/api";
@@ -10,13 +18,15 @@ import type { ISshKnownHost } from "@/api";
 
 import "./index.css";
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 export default function SshKnownHosts() {
     const { t } = useTranslation();
     const [knownHosts, setKnownHosts] = useState<ISshKnownHost[]>([]);
     const [loading, setLoading] = useState(false);
     const [removingId, setRemovingId] = useState<number>();
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const loadKnownHosts = useCallback(
         async (showError = false) => {
@@ -35,6 +45,20 @@ export default function SshKnownHosts() {
     useEffect(() => {
         void loadKnownHosts();
     }, [loadKnownHosts]);
+
+    useEffect(() => {
+        const element = tableContainerRef.current;
+        if (!element) return;
+
+        const updateTableHeight = () => {
+            setTableBodyHeight(Math.max(element.clientHeight - 38, 160));
+        };
+        updateTableHeight();
+
+        const observer = new ResizeObserver(updateTableHeight);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
 
     const removeKnownHost = useCallback(
         async (knownHost: ISshKnownHost) => {
@@ -56,7 +80,6 @@ export default function SshKnownHosts() {
         {
             title: t("ssh_known_hosts_column_host"),
             key: "host",
-            width: 160,
             render: (_, knownHost) => `${knownHost.host}:${knownHost.port}`,
         },
         {
@@ -71,7 +94,8 @@ export default function SshKnownHosts() {
                 <Text
                     code
                     copyable={{ text: fingerprint }}
-                    ellipsis={{ tooltip: fingerprint }}>
+                    ellipsis={{ tooltip: fingerprint }}
+                >
                     {fingerprint}
                 </Text>
             ),
@@ -101,50 +125,63 @@ export default function SshKnownHosts() {
                     okText={t("app_btn_ok")}
                     cancelText={t("app_btn_cancel")}
                 >
-                    <Button
-                        danger
-                        icon={<DeleteOutlined />}
-                        loading={removingId === knownHost.id}
-                        size="small"
-                    >
-                        {t("app_btn_delete")}
-                    </Button>
+                    <Tooltip title={t("app_btn_delete")}>
+                        <Button
+                            aria-label={t("app_btn_delete")}
+                            danger
+                            icon={<DeleteOutlined />}
+                            loading={removingId === knownHost.id}
+                            size="small"
+                            type="text"
+                        />
+                    </Tooltip>
                 </Popconfirm>
             ),
         },
     ];
 
     return (
-        <main className="WebSSH-SshKnownHosts">
-            <div className="WebSSH-SshKnownHosts-Header">
-                <div>
-                    <Title level={2}>{t("app_menu_ssh_known_hosts")}</Title>
-                </div>
-                <Button
-                    icon={<ReloadOutlined />}
-                    loading={loading}
-                    onClick={() => void loadKnownHosts(true)}
-                >
-                    {t("app_btn_refresh")}
-                </Button>
+        <main className="WebSSH-MenuPage WebSSH-SshKnownHosts">
+            <div className="WebSSH-MenuPageToolbar WebSSH-SshKnownHosts-Header">
+                <Tooltip title={t("app_btn_refresh")}>
+                    <Button
+                        aria-label={t("app_btn_refresh")}
+                        icon={<ReloadOutlined />}
+                        loading={loading}
+                        onClick={() => void loadKnownHosts(true)}
+                    />
+                </Tooltip>
             </div>
-            <Table<ISshKnownHost>
-                columns={columns}
-                dataSource={knownHosts}
-                loading={loading}
-                rowKey="id"
-                locale={{
-                    emptyText: (
-                        <Empty
-                            image={<KeyOutlined />}
-                            description={t("ssh_known_hosts_empty")}
-                        />
-                    ),
-                }}
-                pagination={false}
-                scroll={{ x: 900 }}
-                size="small"
-            />
+            <div className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll">
+                <div
+                    ref={tableContainerRef}
+                    className="WebSSH-SshKnownHosts-TableContainer"
+                >
+                    <Table<ISshKnownHost>
+                        className="WebSSH-FilelistTable WebSSH-SshKnownHosts-Table"
+                        columns={columns}
+                        dataSource={knownHosts}
+                        loading={loading}
+                        rowKey="id"
+                        locale={{
+                            emptyText: (
+                                <Empty
+                                    image={<KeyOutlined />}
+                                    description={t("ssh_known_hosts_empty")}
+                                />
+                            ),
+                        }}
+                        pagination={false}
+                        virtual={tableBodyHeight > 0}
+                        scroll={
+                            tableBodyHeight > 0
+                                ? { x: 900, y: tableBodyHeight }
+                                : undefined
+                        }
+                        size="small"
+                    />
+                </div>
+            </div>
         </main>
     );
 }

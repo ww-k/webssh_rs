@@ -11,9 +11,10 @@ import {
     Space,
     Table,
     Tag,
+    Tooltip,
     Typography,
 } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TableProps } from "antd";
@@ -30,7 +31,7 @@ import getTargetName from "@/components/Target/getTargetName";
 
 import type { ISshConnection, ITarget } from "@/api";
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 export default function SshConnections() {
     const { t } = useTranslation();
@@ -38,6 +39,8 @@ export default function SshConnections() {
     const [targets, setTargets] = useState<ITarget[]>([]);
     const [loading, setLoading] = useState(false);
     const [actionKey, setActionKey] = useState<string>();
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const loadConnections = useCallback(async () => {
         setLoading(true);
@@ -58,6 +61,20 @@ export default function SshConnections() {
     useEffect(() => {
         void loadConnections();
     }, [loadConnections]);
+
+    useEffect(() => {
+        const element = tableContainerRef.current;
+        if (!element) return;
+
+        const updateTableHeight = () => {
+            setTableBodyHeight(Math.max(element.clientHeight - 38, 160));
+        };
+        updateTableHeight();
+
+        const observer = new ResizeObserver(updateTableHeight);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
 
     const runAction = useCallback(
         async (connection: ISshConnection, action: "expire" | "close") => {
@@ -110,10 +127,12 @@ export default function SshConnections() {
         {
             title: t("ssh_connections_column_channels"),
             key: "active_channels",
+            width: 80,
             render: (_, connection) => connection.active_channels ?? 0,
         },
         {
             title: t("ssh_connections_column_status"),
+            width: 80,
             render: (_, connection) => {
                 const color = connection.closed
                     ? "default"
@@ -131,18 +150,24 @@ export default function SshConnections() {
         {
             title: t("app_common_action"),
             key: "actions",
-            width: 220,
+            width: 100,
             render: (_, connection) => (
-                <Space>
+                <Space size="small">
                     {!connection.expired && !connection.closed && (
-                        <Button
-                            icon={<DisconnectOutlined />}
-                            loading={actionKey === `expire:${connection.id}`}
-                            onClick={() => void runAction(connection, "expire")}
-                            size="small"
-                        >
-                            {t("ssh_connections_expire")}
-                        </Button>
+                        <Tooltip title={t("ssh_connections_expire")}>
+                            <Button
+                                aria-label={t("ssh_connections_expire")}
+                                icon={<DisconnectOutlined />}
+                                loading={
+                                    actionKey === `expire:${connection.id}`
+                                }
+                                onClick={() =>
+                                    void runAction(connection, "expire")
+                                }
+                                size="small"
+                                type="text"
+                            />
+                        </Tooltip>
                     )}
                     {!connection.closed && (
                         <Popconfirm
@@ -153,14 +178,18 @@ export default function SshConnections() {
                             okText={t("app_btn_ok")}
                             cancelText={t("app_btn_cancel")}
                         >
-                            <Button
-                                danger
-                                icon={<CloseCircleOutlined />}
-                                loading={actionKey === `close:${connection.id}`}
-                                size="small"
-                            >
-                                {t("ssh_connections_close")}
-                            </Button>
+                            <Tooltip title={t("ssh_connections_close")}>
+                                <Button
+                                    aria-label={t("ssh_connections_close")}
+                                    danger
+                                    icon={<CloseCircleOutlined />}
+                                    loading={
+                                        actionKey === `close:${connection.id}`
+                                    }
+                                    size="small"
+                                    type="text"
+                                />
+                            </Tooltip>
                         </Popconfirm>
                     )}
                 </Space>
@@ -169,33 +198,46 @@ export default function SshConnections() {
     ];
 
     return (
-        <main className="WebSSH-SshConnections">
-            <div className="WebSSH-SshConnections-Header">
-                <div>
-                    <Title level={2}>{t("ssh_connections_title")}</Title>
-                </div>
-                <Button
-                    icon={<ReloadOutlined />}
-                    loading={loading}
-                    onClick={() => void loadConnections()}
-                >
-                    {t("app_btn_refresh")}
-                </Button>
+        <main className="WebSSH-MenuPage WebSSH-SshConnections">
+            <div className="WebSSH-MenuPageToolbar WebSSH-SshConnections-Header">
+                <Tooltip title={t("app_btn_refresh")}>
+                    <Button
+                        aria-label={t("app_btn_refresh")}
+                        icon={<ReloadOutlined />}
+                        loading={loading}
+                        onClick={() => void loadConnections()}
+                    />
+                </Tooltip>
             </div>
-            <Table<ISshConnection>
-                columns={columns}
-                dataSource={connections}
-                loading={loading}
-                rowKey="id"
-                locale={{
-                    emptyText: (
-                        <Empty description={t("ssh_connections_empty")} />
-                    ),
-                }}
-                pagination={false}
-                scroll={{ x: 760 }}
-                size="small"
-            />
+            <div className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll">
+                <div
+                    ref={tableContainerRef}
+                    className="WebSSH-SshConnections-TableContainer"
+                >
+                    <Table<ISshConnection>
+                        className="WebSSH-FilelistTable WebSSH-SshConnections-Table"
+                        columns={columns}
+                        dataSource={connections}
+                        loading={loading}
+                        rowKey="id"
+                        locale={{
+                            emptyText: (
+                                <Empty
+                                    description={t("ssh_connections_empty")}
+                                />
+                            ),
+                        }}
+                        pagination={false}
+                        virtual={tableBodyHeight > 0}
+                        scroll={
+                            tableBodyHeight > 0
+                                ? { x: 760, y: tableBodyHeight }
+                                : undefined
+                        }
+                        size="small"
+                    />
+                </div>
+            </div>
         </main>
     );
 }

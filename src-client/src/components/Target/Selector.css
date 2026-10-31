@@ -1,36 +1,3 @@
-.targetSelector {
-    display: flex;
+.WebSSH-TargetSelector {
     min-width: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-}
-
-.targetSelectorCard {
-    max-width: 724px;
-    box-shadow: 0 3px 8px 0 rgba(0, 0, 0, 0.2);
-    height: max(660px, 90%);
-    display: flex;
-    flex-direction: column;
-}
-
-.targetSelector > .ant-card {
-    flex: 0 0 auto;
-    margin: auto;
-}
-
-.targetSelectorCard > .ant-card-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.targetSelectorAddForm.ant-form-inline .ant-form-item {
-    margin-bottom: var(--ant-form-item-margin-bottom);
-}
-
-.targetSelectorAddForm.ant-form-inline > .ant-form-item:last-child {
-    margin-inline-end: 0;
-    padding-inline-end: 0;
 }

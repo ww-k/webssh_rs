@@ -1,35 +1,19 @@
-.WebSSH-SshConnections {
-    box-sizing: border-box;
-    width: min(1100px, 100%);
-    height: 100%;
-    padding: 40px 48px 64px;
-    margin: 0 auto;
-    overflow: auto;
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    background: var(--ant-color-bg-container);
-}
-
 .WebSSH-SshConnections-Header {
+    justify-content: flex-end;
+}
+
+.WebSSH-SshConnections .WebSSH-MenuPageContent {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 24px;
+    min-height: 0;
+    overflow: hidden;
 }
 
-.WebSSH-SshConnections-Header .ant-typography {
-    margin: 0;
+.WebSSH-SshConnections-TableContainer {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
-@media (max-width: 720px) {
-    .WebSSH-SshConnections {
-        padding: 28px 20px 48px;
-    }
-
-    .WebSSH-SshConnections-Header {
-        align-items: stretch;
-        flex-direction: column;
-    }
+.WebSSH-SshConnections-Table {
+    height: 100%;
 }

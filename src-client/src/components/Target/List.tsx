@@ -3,10 +3,12 @@ import {
     DeleteOutlined,
     EditOutlined,
     FolderOutlined,
+    PlusCircleTwoTone,
     ReloadOutlined,
+    SearchOutlined,
 } from "@ant-design/icons";
 import { Button, Input, Modal, Space, Table, Tooltip } from "antd";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getTargetList, postTargetRemove } from "@/api";
@@ -21,19 +23,15 @@ import type { ColumnsType } from "antd/es/table/interface";
 import type { ITarget } from "@/api";
 import type { ITab } from "@/store";
 
-export default function TargetList({
-    tab,
-    refreshKey,
-}: {
-    tab: ITab;
-    refreshKey?: number;
-}) {
+export default function TargetList({ tab }: { tab: ITab }) {
     const { t } = useTranslation();
     const { setTabPath } = useAppStore();
     const [editorOpen, setEditorOpen] = useState(false);
     const [editorData, setEditorData] = useState<ITarget>();
     const [dataSource, setDataSource] = useState<ITarget[]>([]);
     const [searchValue, setSearchValue] = useState("");
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const filteredDataSource = useMemo(() => {
         const search = searchValue.trim().toLocaleLowerCase();
@@ -136,47 +134,70 @@ export default function TargetList({
     }, [refresh]);
 
     useEffect(() => {
-        if (refreshKey && refreshKey > 0) {
-            void refresh();
-        }
-    }, [refresh, refreshKey]);
+        const element = tableContainerRef.current;
+        if (!element) return;
+
+        const updateTableHeight = () => {
+            setTableBodyHeight(Math.max(element.clientHeight - 38, 160));
+        };
+        updateTableHeight();
+
+        const observer = new ResizeObserver(updateTableHeight);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
 
     return (
         <>
-            <div className="targetListToolbar">
-                <Space>
-                    <Button
-                        onClick={() => {
-                            setEditorData(undefined);
-                            setEditorOpen(true);
-                        }}
-                    >
-                        {t("target_new")}
-                    </Button>
-                </Space>
-                <Space className="targetListSearch">
-                    <Input
-                        allowClear
-                        onChange={(event) => setSearchValue(event.target.value)}
-                        placeholder={t("target_search_placeholder")}
-                        value={searchValue}
-                    />
-                    <Button
-                        aria-label={t("app_btn_refresh")}
-                        icon={<ReloadOutlined />}
-                        onClick={refresh}
-                        title={t("app_btn_refresh")}
-                    />
+            <div className="WebSSH-MenuPageToolbar targetListToolbar">
+                <Input
+                    allowClear
+                    aria-label={t("transfer_filter_keyword")}
+                    className="WebSSH-TransferKeyword targetListSearch"
+                    onChange={(event) => setSearchValue(event.target.value)}
+                    placeholder={t("transfer_filter_keyword")}
+                    prefix={<SearchOutlined />}
+                    value={searchValue}
+                />
+                <Space className="targetListActions" size="small">
+                    <Tooltip title={t("target_new")}>
+                        <Button
+                            icon={<PlusCircleTwoTone />}
+                            onClick={() => {
+                                setEditorData(undefined);
+                                setEditorOpen(true);
+                            }}
+                        />
+                    </Tooltip>
+                    <Tooltip title={t("app_btn_refresh")}>
+                        <Button
+                            aria-label={t("app_btn_refresh")}
+                            icon={<ReloadOutlined />}
+                            onClick={refresh}
+                            title={t("app_btn_refresh")}
+                        />
+                    </Tooltip>
                 </Space>
             </div>
-            <Table
-                className="targetListTable"
-                rowKey="id"
-                columns={columns}
-                dataSource={filteredDataSource}
-                size="small"
-                pagination={false}
-            />
+            <div
+                ref={tableContainerRef}
+                className="WebSSH-MenuPageContent targetListTableContainer"
+            >
+                <Table
+                    className="WebSSH-FilelistTable targetListTable"
+                    rowKey="id"
+                    columns={columns}
+                    dataSource={filteredDataSource}
+                    size="small"
+                    pagination={false}
+                    virtual={tableBodyHeight > 0}
+                    scroll={
+                        tableBodyHeight > 0
+                            ? { x: 520, y: tableBodyHeight }
+                            : undefined
+                    }
+                />
+            </div>
             <TargetEditor
                 open={editorOpen}
                 data={editorData}

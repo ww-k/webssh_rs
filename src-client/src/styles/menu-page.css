@@ -1,0 +1,36 @@
+.WebSSH-MenuPage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    padding: 10px;
+    overflow: hidden;
+    background: var(--ant-color-bg-container);
+}
+
+.WebSSH-MenuPageToolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    margin-bottom: 12px;
+}
+
+.WebSSH-MenuPageContent {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--ant-color-border);
+    border-radius: 4px;
+}
+
+.WebSSH-MenuPageContent--scroll {
+    overflow: auto;
+}
+
+@media (max-width: 600px) {
+    .WebSSH-MenuPage {
+        padding: 16px;
+    }
+}

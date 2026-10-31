@@ -781,7 +781,7 @@ export const TransferTable = ({
         if (tableSize.width === 0 || tableSize.height === 0) return undefined;
         return {
             x: Math.max(tableSize.width, 800),
-            y: Math.max(tableSize.height - 44, 160),
+            y: Math.max(tableSize.height - 30, 160),
         };
     }, [tableSize]);
     const handleShowInFolder = useCallback(
@@ -863,6 +863,7 @@ export const TransferTable = ({
     return (
         <div ref={tableContainerRef} className="WebSSH-TransferTableContainer">
             <TransferVirtualTable
+                className="WebSSH-FilelistTable"
                 columns={columns as TableProps<TransferTreeRow>["columns"]}
                 dataSource={tree}
                 rowKey="id"
@@ -917,8 +918,8 @@ export default function Transfer() {
         { value: "DOWNLOAD", label: t("transfer_type_download") },
     ];
     return (
-        <div className="WebSSH-Transfer">
-            <div className="WebSSH-TransferToolbar">
+        <div className="WebSSH-MenuPage WebSSH-Transfer">
+            <div className="WebSSH-MenuPageToolbar WebSSH-TransferToolbar">
                 <label className="WebSSH-TransferFilter">
                     <Segmented
                         aria-label={t("transfer_filter_type")}
@@ -948,17 +949,18 @@ export default function Transfer() {
                         }
                     />
                 </label>
-                <Button
-                    className="WebSSH-TransferDeleteHistory"
-                    danger
-                    disabled={finishedHistoryCount === 0}
-                    icon={<DeleteOutlined />}
-                    onClick={handleRemoveAll}
-                >
-                    {t("transfer_action_delete_all_history")}
-                </Button>
+                <Tooltip title={t("transfer_action_delete_all_history")}>
+                    <Button
+                        aria-label={t("transfer_action_delete_all_history")}
+                        className="WebSSH-TransferDeleteHistory"
+                        danger
+                        disabled={finishedHistoryCount === 0}
+                        icon={<DeleteOutlined />}
+                        onClick={handleRemoveAll}
+                    />
+                </Tooltip>
             </div>
-            <div className="WebSSH-TransferContent">
+            <div className="WebSSH-MenuPageContent WebSSH-TransferContent">
                 <TransferTable type={type} keyword={keyword} />
             </div>
         </div>

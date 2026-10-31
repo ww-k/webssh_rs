@@ -1,9 +1,8 @@
 import {
     FileTextOutlined,
-    ReloadOutlined,
     SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Empty, Input, message, Select, Space, Typography } from "antd";
+import { Empty, Input, message, Select, Space } from "antd";
 import {
     type ReactNode,
     useCallback,
@@ -18,7 +17,6 @@ import { getServerLogs } from "@/api";
 
 import "./index.css";
 
-const { Title } = Typography;
 const LOG_LEVELS = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"] as const;
 type LogLevel = (typeof LOG_LEVELS)[number];
 
@@ -119,7 +117,6 @@ export default function ServerLogs() {
     const [logs, setLogs] = useState<string[]>([]);
     const [keyword, setKeyword] = useState("");
     const [level, setLevel] = useState<LogLevel | "ALL">("ALL");
-    const [loading, setLoading] = useState(false);
     const outputRef = useRef<HTMLPreElement>(null);
     const shouldStickToBottom = useRef(true);
     const normalizedKeyword = keyword.trim().toLocaleLowerCase();
@@ -140,13 +137,10 @@ export default function ServerLogs() {
 
     const loadLogs = useCallback(
         async (showError = false) => {
-            setLoading(true);
             try {
                 setLogs(await getServerLogs());
             } catch {
                 if (showError) message.error(t("server_logs_load_failed"));
-            } finally {
-                setLoading(false);
             }
         },
         [t],
@@ -180,12 +174,9 @@ export default function ServerLogs() {
     });
 
     return (
-        <main className="WebSSH-ServerLogs">
-            <div className="WebSSH-ServerLogs-Header">
-                <div>
-                    <Title level={2}>{t("app_menu_server_logs")}</Title>
-                </div>
-                <Space>
+        <main className="WebSSH-MenuPage WebSSH-ServerLogs">
+            <div className="WebSSH-MenuPageToolbar WebSSH-ServerLogs-Header">
+                <Space className="WebSSH-ServerLogs-Filters">
                     <Select<LogLevel | "ALL">
                         aria-label={t("server_logs_level_filter")}
                         className="WebSSH-ServerLogs-LevelFilter"
@@ -210,38 +201,33 @@ export default function ServerLogs() {
                         prefix={<SearchOutlined />}
                         value={keyword}
                     />
-                    <Button
-                        icon={<ReloadOutlined />}
-                        loading={loading}
-                        onClick={() => void loadLogs(true)}
-                    >
-                        {t("app_btn_refresh")}
-                    </Button>
                 </Space>
             </div>
-            <pre
-                className="WebSSH-ServerLogs-Output"
-                onScroll={(event) => {
-                    const { scrollTop, scrollHeight, clientHeight } =
-                        event.currentTarget;
-                    shouldStickToBottom.current =
-                        scrollHeight - scrollTop - clientHeight < 24;
-                }}
-                ref={outputRef}
-            >
-                {visibleLogs.length ? (
-                    renderedLogs
-                ) : logs.length ? (
-                    <span className="WebSSH-ServerLogs-Empty">
-                        <Empty description={t("server_logs_no_match")} />
-                    </span>
-                ) : (
-                    <span className="WebSSH-ServerLogs-Empty">
-                        <FileTextOutlined />
-                        <Empty description={t("server_logs_empty")} />
-                    </span>
-                )}
-            </pre>
+            <div className="WebSSH-MenuPageContent WebSSH-ServerLogs-Content">
+                <pre
+                    className="WebSSH-ServerLogs-Output"
+                    onScroll={(event) => {
+                        const { scrollTop, scrollHeight, clientHeight } =
+                            event.currentTarget;
+                        shouldStickToBottom.current =
+                            scrollHeight - scrollTop - clientHeight < 24;
+                    }}
+                    ref={outputRef}
+                >
+                    {visibleLogs.length ? (
+                        renderedLogs
+                    ) : logs.length ? (
+                        <span className="WebSSH-ServerLogs-Empty">
+                            <Empty description={t("server_logs_no_match")} />
+                        </span>
+                    ) : (
+                        <span className="WebSSH-ServerLogs-Empty">
+                            <FileTextOutlined />
+                            <Empty description={t("server_logs_empty")} />
+                        </span>
+                    )}
+                </pre>
+            </div>
         </main>
     );
 }
