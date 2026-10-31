@@ -10,8 +10,8 @@ use std::{
 
 use nanoid::nanoid;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, sea_query::Condition,
 };
 use tokio::{
     fs,
@@ -266,6 +266,25 @@ impl TransferService {
                 .order_by_desc(Column::CreatedAt)
                 .order_by_desc(Column::Id)
                 .all(&self.db)
+                .await
+        )
+    }
+
+    pub async fn count_unfinished_tasks(&self, created_after: Option<i64>) -> Result<u64, ApiErr> {
+        let mut condition = Condition::any().add(Column::Status.is_in([
+            TransferTaskStatus::Wait,
+            TransferTaskStatus::Run,
+            TransferTaskStatus::Pause,
+            TransferTaskStatus::Fail,
+        ]));
+        if let Some(created_after) = created_after {
+            condition = condition.add(Column::CreatedAt.gt(created_after));
+        }
+
+        map_db_err!(
+            TransferTaskEntity::find()
+                .filter(condition)
+                .count(&self.db)
                 .await
         )
     }

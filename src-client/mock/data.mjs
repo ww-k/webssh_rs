@@ -1,6 +1,6 @@
 const MEBIBYTE = 1024 * 1024;
 const GIBIBYTE = 1024 * MEBIBYTE;
-export const MOCK_ROW_COUNT = 100;
+export const MOCK_ROW_COUNT = 10000;
 const mebibytes = (value) => Math.round(value * MEBIBYTE);
 const gibibytes = (value) => Math.round(value * GIBIBYTE);
 

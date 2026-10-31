@@ -19,26 +19,18 @@ import { useTranslation } from "react-i18next";
 
 import useAppStore from "@/store";
 
+import { getTransferUnfinishedCount } from "./api";
 import Home from "./components/Home";
 import ServerLogs from "./components/ServerLogs";
 import Settings from "./components/Settings";
 import SshConnections from "./components/SshConnections";
 import SshKnownHosts from "./components/SshKnownHosts";
 import Transfer from "./components/Transfer";
-import transferService from "./services/transfer";
 
 import type { MenuProps } from "antd";
-import type { ITransferTask } from "./api";
 
 const { darkAlgorithm, defaultAlgorithm } = theme;
 const { Content, Sider } = Layout;
-const UNFINISHED_TRANSFER_STATUSES = new Set<ITransferTask["status"]>([
-    "WAIT",
-    "RUN",
-    "PAUSE",
-    "FAIL",
-]);
-
 export default function App() {
     const { t, i18n } = useTranslation();
     const {
@@ -51,20 +43,11 @@ export default function App() {
     } = useAppStore();
     const pageOpenedAt = useRef(Date.now());
     const [lastTransferMenuClickAt, setLastTransferMenuClickAt] = useState(0);
-    const [transferTasks, setTransferTasks] = useState<ITransferTask[]>(() =>
-        transferService.getTasks(),
+    const [newTransferCount, setNewTransferCount] = useState(0);
+    const createdAfter = Math.max(
+        pageOpenedAt.current,
+        lastTransferMenuClickAt,
     );
-    const newTransferCount = useMemo(() => {
-        const createdAfter = Math.max(
-            pageOpenedAt.current,
-            lastTransferMenuClickAt,
-        );
-        return transferTasks.filter(
-            (item) =>
-                UNFINISHED_TRANSFER_STATUSES.has(item.status) ||
-                (item.created_at && item.created_at > createdAfter),
-        ).length;
-    }, [lastTransferMenuClickAt, transferTasks]);
     const menusItems = useMemo<Required<MenuProps>["items"]>(() => {
         return [
             {
@@ -126,8 +109,23 @@ export default function App() {
     );
 
     useEffect(() => {
-        return transferService.subscribe(setTransferTasks);
-    }, []);
+        let disposed = false;
+        const syncCount = () => {
+            getTransferUnfinishedCount(createdAfter)
+                .then((count) => {
+                    if (!disposed) setNewTransferCount(count);
+                })
+                .catch((err) => {
+                    console.warn("Transfer unfinished count sync failed", err);
+                });
+        };
+        syncCount();
+        const timer = window.setInterval(syncCount, 1000);
+        return () => {
+            disposed = true;
+            window.clearInterval(timer);
+        };
+    }, [createdAfter]);
 
     useEffect(() => {
         console.log("App init");

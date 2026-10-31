@@ -6,6 +6,12 @@ import { posix } from "node:path";
 const state = createMockState();
 const MEBIBYTE = 1024 * 1024;
 const GIBIBYTE = 1024 * MEBIBYTE;
+const UNFINISHED_TRANSFER_STATUSES = new Set([
+    "WAIT",
+    "RUN",
+    "PAUSE",
+    "FAIL",
+]);
 const mebibytes = (value) => Math.round(value * MEBIBYTE);
 const gibibytes = (value) => Math.round(value * GIBIBYTE);
 
@@ -293,6 +299,19 @@ async function handleUserData(request, response, pathname) {
 }
 
 async function handleTransfer(request, response, pathname, searchParams) {
+    if (request.method === "GET" && pathname === "/api/transfer/unfinished-count") {
+        const createdAfter = Number(
+            searchParams.get("created_after") ||
+                searchParams.get("createdAfter") ||
+                0,
+        );
+        const count = state.transferTasks.filter(
+            (task) =>
+                UNFINISHED_TRANSFER_STATUSES.has(task.status) ||
+                task.created_at > createdAfter,
+        ).length;
+        return sendJson(response, 200, { count });
+    }
     if (request.method === "GET" && pathname === "/api/transfer/list") {
         const batchId = searchParams.get("batch_id");
         return sendJson(

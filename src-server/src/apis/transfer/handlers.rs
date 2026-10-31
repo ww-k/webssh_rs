@@ -15,10 +15,10 @@ use crate::{
 };
 
 use super::{
-    dto::TransferBatchResponse,
     dto::{
         CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
-        CreateUploadTaskPayload, TransferRangeSchema, TransferTaskResponse,
+        CreateUploadTaskPayload, TransferBatchResponse, TransferRangeSchema,
+        TransferTaskCountResponse, TransferTaskResponse,
     },
     ranges::ranges_from_json,
 };
@@ -176,9 +176,37 @@ pub async fn list_tasks(
     Ok(Json(response))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/transfer/unfinished-count",
+    tag = "transfer",
+    summary = "查询未完成传输任务数量",
+    params(("created_after" = Option<i64>, Query, description = "统计此时间之后创建的任务")),
+    responses(
+        (status = 200, description = "未完成传输任务数量", body = TransferTaskCountResponse),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn count_unfinished_tasks(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<UnfinishedCountQuery>,
+) -> Result<Json<TransferTaskCountResponse>, ApiErr> {
+    let count = state
+        .transfer_service
+        .count_unfinished_tasks(query.created_after)
+        .await?;
+    Ok(Json(TransferTaskCountResponse { count }))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ListTasksQuery {
     pub batch_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UnfinishedCountQuery {
+    #[serde(alias = "createdAfter")]
+    pub created_after: Option<i64>,
 }
 
 #[utoipa::path(

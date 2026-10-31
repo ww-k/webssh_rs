@@ -17,12 +17,13 @@ use crate::AppState;
 
 pub use dto::{
     CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
-    CreateUploadTaskPayload, TransferBatchResponse, TransferRangeSchema, TransferTaskResponse,
+    CreateUploadTaskPayload, TransferBatchResponse, TransferRangeSchema, TransferTaskCountResponse,
+    TransferTaskResponse,
 };
 pub use handlers::{
-    cancel_batch, cancel_task, create_download_batch, create_download_task, create_upload_batch,
-    create_upload_task, delete_batch, delete_finished_history, delete_task, get_task, list_tasks,
-    pause_batch, pause_task, resume_batch, resume_task,
+    cancel_batch, cancel_task, count_unfinished_tasks, create_download_batch, create_download_task,
+    create_upload_batch, create_upload_task, delete_batch, delete_finished_history, delete_task,
+    get_task, list_tasks, pause_batch, pause_task, resume_batch, resume_task,
 };
 pub use ranges::TransferRange;
 pub use service::TransferService;
@@ -39,6 +40,7 @@ pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
         .route("/batches/{id}/cancel", post(cancel_batch))
         .route("/history", delete(delete_finished_history))
         .route("/list", get(list_tasks))
+        .route("/unfinished-count", get(count_unfinished_tasks))
         .route("/{id}", get(get_task).delete(delete_task))
         .route("/{id}/pause", post(pause_task))
         .route("/{id}/resume", post(resume_task))

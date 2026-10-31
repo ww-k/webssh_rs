@@ -147,6 +147,16 @@ export async function getTransferTasks(params?: { batch_id?: string }) {
     return response.data;
 }
 
+export async function getTransferUnfinishedCount(createdAfter?: number) {
+    const response = await axios.get<{ count: number }>(
+        "/api/transfer/unfinished-count",
+        {
+            params: { created_after: createdAfter },
+        },
+    );
+    return response.data.count;
+}
+
 export async function postTransferPause(id: string) {
     const response = await axios.post<ITransferTask>(
         `/api/transfer/${id}/pause`,

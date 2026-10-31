@@ -71,6 +71,11 @@ pub struct TransferTaskResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+pub struct TransferTaskCountResponse {
+    pub count: u64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
 pub struct TransferBatchResponse {
     pub id: String,
     pub r#type: TransferBatchType,
