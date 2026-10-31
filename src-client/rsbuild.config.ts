@@ -45,7 +45,7 @@ export default defineConfig({
         port: clientPort,
         strictPort: true,
         setup: ({ action, server }) => {
-            if (action === "dev") {
+            if (action === "dev" && enableMock) {
                 server.middlewares.use(mockMiddlewares);
             }
         },

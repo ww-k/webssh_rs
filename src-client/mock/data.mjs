@@ -1,45 +1,68 @@
 const MEBIBYTE = 1024 * 1024;
 const GIBIBYTE = 1024 * MEBIBYTE;
+export const MOCK_ROW_COUNT = 100;
 const mebibytes = (value) => Math.round(value * MEBIBYTE);
 const gibibytes = (value) => Math.round(value * GIBIBYTE);
 
-const createTargets = () => [
-    {
-        id: 1,
-        name: "Local password",
-        host: "127.0.0.1",
-        method: 1,
-        user: "user1",
-        key: "",
-        password: "111111",
-        system: "",
-    },
-    {
-        id: 2,
-        name: "Local private key",
-        host: "127.0.0.1",
-        method: 2,
-        user: "user2",
-        key: "mock-private-key",
-        password: "222222",
-        system: "",
-    },
-    {
-        id: 3,
-        name: "Windows server",
-        host: "127.0.0.1",
-        port: 2222,
-        method: 1,
-        user: "user3",
-        key: "",
-        password: "333333",
-        system: "windows",
-    },
-];
+const createTargets = () => {
+    const seed = [
+        {
+            id: 1,
+            name: "Local password",
+            host: "127.0.0.1",
+            method: 1,
+            user: "user1",
+            key: "",
+            password: "111111",
+            system: "",
+        },
+        {
+            id: 2,
+            name: "Local private key",
+            host: "127.0.0.1",
+            method: 2,
+            user: "user2",
+            key: "mock-private-key",
+            password: "222222",
+            system: "",
+        },
+        {
+            id: 3,
+            name: "Windows server",
+            host: "127.0.0.1",
+            port: 2222,
+            method: 1,
+            user: "user3",
+            key: "",
+            password: "333333",
+            system: "windows",
+        },
+    ];
+    return [
+        ...seed,
+        ...Array.from(
+            { length: MOCK_ROW_COUNT - seed.length },
+            (_, offset) => {
+                const id = seed.length + offset + 1;
+                return {
+                    id,
+                    name: `Mock target ${id}`,
+                    host: `server-${String(id).padStart(5, "0")}.example.test`,
+                    port: id % 4 === 0 ? 2222 : 22,
+                    method: id % 2 === 0 ? 2 : 1,
+                    user: `user${id}`,
+                    key: id % 2 === 0 ? "mock-private-key" : "",
+                    password: `password-${id}`,
+                    system: id % 3 === 0 ? "windows" : "",
+                };
+            },
+        ),
+    ];
+};
 
 const createTransferTasks = () => {
     const now = Date.now();
-    return [
+    const seed = [
         {
             id: "mock-transfer-wait",
             type: "UPLOAD",
@@ -142,7 +165,75 @@ const createTransferTasks = () => {
             ended_at: now - 54_000,
         },
     ];
+    const statuses = ["WAIT", "RUN", "PAUSE", "SUCCESS", "FAIL", "CANCEL"];
+    return [
+        ...seed,
+        ...Array.from(
+            { length: MOCK_ROW_COUNT - seed.length },
+            (_, offset) => {
+                const index = offset + seed.length + 1;
+                const status = statuses[index % statuses.length];
+                const total = gibibytes(1 + (index % 40) / 10);
+                const loaded = status === "SUCCESS"
+                    ? total
+                    : status === "WAIT"
+                      ? 0
+                      : Math.round(total * ((index % 80) / 100));
+                const targetId = (index % MOCK_ROW_COUNT) + 1;
+                const type = index % 2 === 0 ? "DOWNLOAD" : "UPLOAD";
+                const createdAt = now - index * 1_000;
+                return {
+                    id: `mock-transfer-row-${index}`,
+                    type,
+                    kind: "FILE",
+                    status,
+                    local_path: `/Users/demo/Downloads/mock-file-${index}.bin`,
+                    target_uri: `sftp:${targetId}:/data/mock-file-${index}.bin`,
+                    target_id: targetId,
+                    name: `mock-file-${index}.bin`,
+                    loaded,
+                    total,
+                    percent: total === 0 ? 0 : Number(((loaded / total) * 100).toFixed(2)),
+                    speed: status === "RUN" ? mebibytes(10 + (index % 50)) : 0,
+                    estimated_time: status === "RUN" ? 60 + (index % 600) : undefined,
+                    ranges: loaded > 0 ? [[0, loaded]] : [],
+                    fail_reason: status === "FAIL" ? "Mock transfer failed" : undefined,
+                    created_at: createdAt,
+                    updated_at: status === "WAIT" ? createdAt : now,
+                    ended_at: ["SUCCESS", "FAIL", "CANCEL"].includes(status)
+                        ? now
+                        : undefined,
+                };
+            },
+        ),
+    ];
 };
+
+const createKnownHosts = () =>
+    Array.from({ length: MOCK_ROW_COUNT }, (_, index) => {
+        const id = index + 1;
+        const fingerprint = `SHA256:mock-${id.toString(16).padStart(8, "0")}`;
+        return {
+            id,
+            host: `server-${String(id).padStart(5, "0")}.example.test`,
+            port: id % 4 === 0 ? 2222 : 22,
+            key_algorithm: id % 2 === 0 ? "ssh-ed25519" : "ssh-rsa",
+            public_key: `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA mock-key-${id}`,
+            fingerprint,
+        };
+    });
+
+const createSshConnections = () =>
+    Array.from({ length: MOCK_ROW_COUNT }, (_, index) => {
+        const id = index + 1;
+        return {
+            id: `mock-connection-${id}`,
+            expired: id % 13 === 0,
+            closed: id % 17 === 0,
+            target_id: id,
+            active_channels: id % 8,
+        };
+    });
 
 const file = (name, size, time = 1_638_400_000) => ({
     name,
@@ -209,6 +300,11 @@ const createFsEntries = () =>
 export const createMockState = () => ({
     targets: createTargets(),
     transferTasks: createTransferTasks(),
+    transferBatches: new Map(),
+    knownHosts: createKnownHosts(),
+    sshConnections: createSshConnections(),
+    favoriteDirectories: new Map(),
+    preferences: null,
     sftpEntries: createSftpEntries(),
     fsEntries: createFsEntries(),
 });
