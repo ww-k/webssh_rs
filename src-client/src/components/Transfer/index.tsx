@@ -6,7 +6,6 @@ import {
     FolderOpenOutlined,
     FolderOutlined,
     MinusOutlined,
-    MoreOutlined,
     PauseCircleOutlined,
     PlayCircleOutlined,
     PlusOutlined,
@@ -16,12 +15,12 @@ import {
 } from "@ant-design/icons";
 import {
     Button,
-    Dropdown,
     Input,
     Modal,
     message,
     Progress,
     Segmented,
+    Space,
     Table,
     Tooltip,
     Typography,
@@ -34,7 +33,7 @@ import "./index.css";
 import { postFsShowInFolder } from "@/api";
 import transferService, { getTransferBatchName } from "@/services/transfer";
 
-import type { MenuProps, TableProps } from "antd";
+import type { TableProps } from "antd";
 import type { TFunction } from "i18next";
 import type { ComponentType } from "react";
 import type {
@@ -322,7 +321,15 @@ const TransferNameCell = memo(
     ),
 );
 
-const getActionMenuItems = (
+type TransferAction = {
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+    onClick: () => void;
+    danger?: boolean;
+};
+
+const getActionItems = (
     record: ITransferTask,
     t: TFunction,
     onPause: () => void,
@@ -330,8 +337,8 @@ const getActionMenuItems = (
     onCancel: () => void,
     onDelete: () => void,
     onShowInFolder: () => void,
-): MenuProps["items"] => {
-    const items: MenuProps["items"] = [];
+): TransferAction[] => {
+    const items: TransferAction[] = [];
     if (record.status === "RUN" || record.status === "WAIT") {
         items.push({
             key: "pause",
@@ -374,9 +381,6 @@ const getActionMenuItems = (
             onClick: onShowInFolder,
         });
     }
-    if (items.length > 0 && record.status !== "SUCCESS") {
-        items.push({ type: "divider" });
-    }
     items.push({
         key: "delete",
         label: t("app_btn_delete"),
@@ -387,23 +391,25 @@ const getActionMenuItems = (
     return items;
 };
 
-const ActionButton = ({
-    items,
-    t,
+const ActionButtons = ({
+    actions,
 }: {
-    items: MenuProps["items"];
-    t: TFunction;
+    actions: TransferAction[];
 }) => (
-    <Dropdown menu={{ items }} trigger={["click"]} placement="bottomRight">
-        <Tooltip title={t("transfer_action_more")}>
-            <Button
-                className="WebSSH-TransferAction"
-                type="text"
-                aria-label={t("transfer_action_more")}
-                icon={<MoreOutlined />}
-            />
-        </Tooltip>
-    </Dropdown>
+    <Space className="WebSSH-TransferActions" size="small">
+        {actions.map((action) => (
+            <Tooltip key={action.key} title={action.label}>
+                <Button
+                    aria-label={action.label}
+                    className="WebSSH-TransferAction"
+                    danger={action.danger}
+                    icon={action.icon}
+                    type="text"
+                    onClick={action.onClick}
+                />
+            </Tooltip>
+        ))}
+    </Space>
 );
 
 const getCommonColumns = (
@@ -654,15 +660,15 @@ const buildTransferFileTree = (tasks: ITransferTask[]): TransferTreeRow[] => {
     return sortTransferTree(result);
 };
 
-const getBatchActionMenuItems = (
+const getBatchActionItems = (
     record: ITransferBatch,
     t: TFunction,
     refresh?: () => void,
-): MenuProps["items"] => {
+): TransferAction[] => {
     const action = (fn: () => Promise<unknown>) => {
         fn().then(refresh).catch(console.warn);
     };
-    const items: MenuProps["items"] = [];
+    const items: TransferAction[] = [];
     if (record.status === "RUN" || record.status === "WAIT") {
         items.push(
             {
@@ -705,7 +711,6 @@ const getBatchActionMenuItems = (
             onClick: () => action(() => transferService.resumeBatch(record.id)),
         });
     }
-    if (items.length > 0) items.push({ type: "divider" });
     items.push({
         key: "delete",
         label: t("app_btn_delete"),
@@ -830,19 +835,15 @@ export const TransferTable = ({
             {
                 title: t("app_common_action"),
                 key: "action",
-                width: "10%",
-                align: "center" as const,
-                className: "WebSSH-TransferCenterCell",
+                width: 180,
                 render: (_: unknown, record: TransferTreeRow) =>
                     isBatch(record) ? (
-                        <ActionButton
-                            t={t}
-                            items={getBatchActionMenuItems(record, t)}
+                        <ActionButtons
+                            actions={getBatchActionItems(record, t)}
                         />
                     ) : record.isVirtual ? null : (
-                        <ActionButton
-                            t={t}
-                            items={getActionMenuItems(
+                        <ActionButtons
+                            actions={getActionItems(
                                 record,
                                 t,
                                 () => transferService.pause(record.id),

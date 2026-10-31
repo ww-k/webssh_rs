@@ -170,17 +170,8 @@
     border-radius: 2px;
 }
 
-.WebSSH-TransferAction.ant-btn {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    color: var(--ant-color-text-secondary);
-    border-radius: 4px;
-}
-
-.WebSSH-TransferAction.ant-btn:hover {
-    color: var(--ant-color-text);
-    background: var(--ant-color-fill-secondary);
+.WebSSH-TransferActions {
+    white-space: nowrap;
 }
 
 .WebSSH-Transfer .ant-pagination {
