@@ -59,12 +59,9 @@ pub enum TransferConflictPolicy {
     Fail,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, DeriveEntityModel, ToSchema)]
-#[sea_orm(table_name = "transfer_batch")]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, ToSchema)]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
-    #[sea_orm(column_name = "type")]
     pub r#type: TransferBatchType,
     pub status: TransferBatchStatus,
     pub name: String,
@@ -85,8 +82,3 @@ pub struct Model {
     pub updated_at: i64,
     pub ended_at: Option<i64>,
 }
-
-#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
-
-impl ActiveModelBehavior for ActiveModel {}

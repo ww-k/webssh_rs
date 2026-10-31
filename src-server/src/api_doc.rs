@@ -67,7 +67,6 @@ use utoipa::OpenApi;
             crate::apis::transfer::CreateUploadBatchPayload,
             crate::apis::transfer::CreateDownloadBatchPayload,
             crate::apis::transfer::TransferBatchResponse,
-            crate::apis::transfer::BatchItemsResponse,
             crate::apis::transfer::TransferTaskResponse,
             crate::entities::transfer_task::TransferTaskType,
             crate::entities::transfer_task::TransferTaskStatus,

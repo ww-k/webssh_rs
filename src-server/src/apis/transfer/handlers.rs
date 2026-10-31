@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    dto::{BatchItemsResponse, TransferBatchListResponse, TransferBatchResponse},
+    dto::TransferBatchResponse,
     dto::{
         CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
         CreateUploadTaskPayload, TransferRangeSchema, TransferTaskResponse,
@@ -66,58 +66,6 @@ pub async fn create_download_batch(
             .create_download_batch(payload)
             .await?
             .into(),
-    ))
-}
-
-pub async fn list_batches(
-    State(state): State<Arc<AppState>>,
-    Query(query): Query<BatchListQuery>,
-) -> Result<Json<TransferBatchListResponse>, ApiErr> {
-    let page = query.page.unwrap_or(1).max(1);
-    let page_size = query.page_size.unwrap_or(10).clamp(1, 200);
-    let result = state
-        .transfer_service
-        .list_batches(page, page_size, query.r#type, query.status)
-        .await?;
-    Ok(Json(TransferBatchListResponse {
-        items: result.items.into_iter().map(Into::into).collect(),
-        total: result.total,
-    }))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct BatchListQuery {
-    pub page: Option<u64>,
-    pub page_size: Option<u64>,
-    pub r#type: Option<crate::entities::transfer_batch::TransferBatchType>,
-    pub status: Option<crate::entities::transfer_batch::TransferBatchStatus>,
-}
-
-pub async fn get_batch(
-    State(state): State<Arc<AppState>>,
-    AxumPath(id): AxumPath<String>,
-) -> Result<Json<TransferBatchResponse>, ApiErr> {
-    Ok(Json(
-        state.transfer_service.get_batch_model(&id).await?.into(),
-    ))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct BatchItemsQuery {
-    pub page: Option<u64>,
-    pub page_size: Option<u64>,
-}
-
-pub async fn get_batch_items(
-    State(state): State<Arc<AppState>>,
-    AxumPath(id): AxumPath<String>,
-    Query(query): Query<BatchItemsQuery>,
-) -> Result<Json<BatchItemsResponse>, ApiErr> {
-    Ok(Json(
-        state
-            .transfer_service
-            .get_batch_items(&id, query.page.unwrap_or(1), query.page_size.unwrap_or(10))
-            .await?,
     ))
 }
 
@@ -207,6 +155,7 @@ pub async fn get_task(
     path = "/api/transfer/list",
     tag = "transfer",
     summary = "查询传输任务列表",
+    params(("batch_id" = Option<String>, Query, description = "按批次 ID 筛选任务")),
     responses(
         (status = 200, description = "成功查询传输任务列表", body = Vec<TransferTaskResponse>),
         (status = 500, response = InternalErrorResponse)
@@ -214,13 +163,22 @@ pub async fn get_task(
 )]
 pub async fn list_tasks(
     State(state): State<Arc<AppState>>,
+    Query(query): Query<ListTasksQuery>,
 ) -> Result<Json<Vec<TransferTaskResponse>>, ApiErr> {
-    let tasks = state.transfer_service.list_tasks().await?;
+    let tasks = state
+        .transfer_service
+        .list_tasks(query.batch_id.as_deref())
+        .await?;
     let response = tasks
         .into_iter()
         .map(IntoTransferResponse::into_response)
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Json(response))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListTasksQuery {
+    pub batch_id: Option<String>,
 }
 
 #[utoipa::path(

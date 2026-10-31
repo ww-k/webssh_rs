@@ -6,31 +6,6 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let batch = Table::create()
-            .table(TransferBatch::Table)
-            .if_not_exists()
-            .col(string_len(TransferBatch::Id, 32).primary_key())
-            .col(string(TransferBatch::Type))
-            .col(string(TransferBatch::Status))
-            .col(string(TransferBatch::Name))
-            .col(integer_null(TransferBatch::TargetId))
-            .col(string(TransferBatch::ConflictPolicy))
-            .col(big_integer(TransferBatch::ItemCount))
-            .col(big_integer(TransferBatch::CompletedCount))
-            .col(big_integer(TransferBatch::FailedCount))
-            .col(big_integer(TransferBatch::DirectoryCount))
-            .col(big_integer(TransferBatch::DirectoryFailedCount))
-            .col(big_integer(TransferBatch::Total))
-            .col(big_integer(TransferBatch::Loaded))
-            .col(double_null(TransferBatch::Percent))
-            .col(big_integer(TransferBatch::Speed))
-            .col(big_integer_null(TransferBatch::EstimatedTime))
-            .col(text_null(TransferBatch::FailReason))
-            .col(big_integer(TransferBatch::CreatedAt))
-            .col(big_integer(TransferBatch::UpdatedAt))
-            .col(big_integer_null(TransferBatch::EndedAt))
-            .to_owned();
-        manager.create_table(batch).await?;
         manager
             .alter_table(
                 Table::alter()
@@ -134,22 +109,6 @@ impl MigrationTrait for Migration {
             )
             .await?;
         manager
-            .alter_table(
-                Table::alter()
-                    .table(TransferBatch::Table)
-                    .drop_column(TransferBatch::DirectoryFailedCount)
-                    .to_owned(),
-            )
-            .await?;
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(TransferBatch::Table)
-                    .drop_column(TransferBatch::DirectoryCount)
-                    .to_owned(),
-            )
-            .await?;
-        manager
             .drop_index(
                 Index::drop()
                     .name("idx_transfer_task_batch_status")
@@ -173,35 +132,8 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        manager
-            .drop_table(Table::drop().table(TransferBatch::Table).to_owned())
-            .await
+        Ok(())
     }
-}
-
-#[derive(DeriveIden)]
-enum TransferBatch {
-    Table,
-    Id,
-    Type,
-    Status,
-    Name,
-    TargetId,
-    ConflictPolicy,
-    ItemCount,
-    CompletedCount,
-    FailedCount,
-    DirectoryCount,
-    DirectoryFailedCount,
-    Total,
-    Loaded,
-    Percent,
-    Speed,
-    EstimatedTime,
-    FailReason,
-    CreatedAt,
-    UpdatedAt,
-    EndedAt,
 }
 
 #[derive(DeriveIden)]

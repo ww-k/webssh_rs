@@ -16,15 +16,13 @@ use axum::{
 use crate::AppState;
 
 pub use dto::{
-    BatchItemsResponse, CreateDownloadBatchPayload, CreateDownloadTaskPayload,
-    CreateUploadBatchPayload, CreateUploadTaskPayload, TransferBatchListResponse,
-    TransferBatchResponse, TransferRangeSchema, TransferTaskResponse,
+    CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
+    CreateUploadTaskPayload, TransferBatchResponse, TransferRangeSchema, TransferTaskResponse,
 };
 pub use handlers::{
     cancel_batch, cancel_task, create_download_batch, create_download_task, create_upload_batch,
-    create_upload_task, delete_batch, delete_finished_history, delete_task, get_batch,
-    get_batch_items, get_task, list_batches, list_tasks, pause_batch, pause_task, resume_batch,
-    resume_task,
+    create_upload_task, delete_batch, delete_finished_history, delete_task, get_task, list_tasks,
+    pause_batch, pause_task, resume_batch, resume_task,
 };
 pub use ranges::TransferRange;
 pub use service::TransferService;
@@ -35,9 +33,7 @@ pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
         .route("/download", post(create_download_task))
         .route("/batches/upload", post(create_upload_batch))
         .route("/batches/download", post(create_download_batch))
-        .route("/batches", get(list_batches))
-        .route("/batches/{id}", get(get_batch).delete(delete_batch))
-        .route("/batches/{id}/items", get(get_batch_items))
+        .route("/batches/{id}", delete(delete_batch))
         .route("/batches/{id}/pause", post(pause_batch))
         .route("/batches/{id}/resume", post(resume_batch))
         .route("/batches/{id}/cancel", post(cancel_batch))

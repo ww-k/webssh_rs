@@ -36,12 +36,12 @@ pub(crate) async fn list(
     State(connection_pool): State<Arc<SshConnectionPool>>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<Vec<ConnectionInfo>>, ApiErr> {
-    info!("@ssh_connection {:?}", params);
+    info!("@ssh_connection_list {:?}", params);
     let target_filter = params.get("target_id").and_then(|s| s.parse::<i32>().ok());
 
     let list = service::list(&connection_pool, target_filter).await;
 
-    debug!("@ssh_connection done {:?}", params);
+    debug!("@ssh_connection_list done {:?}", params);
     Ok(Json(list))
 }
 
@@ -64,7 +64,7 @@ pub(crate) async fn expire(
     State(connection_pool): State<Arc<SshConnectionPool>>,
     Query(payload): Query<SshConnectionExpirePayload>,
 ) -> Result<(), ApiErr> {
-    info!("@ssh_connection {:?}", payload);
+    info!("@ssh_connection_expire {:?}", payload);
 
     service::expire(
         &connection_pool,
@@ -73,7 +73,7 @@ pub(crate) async fn expire(
     )
     .await;
 
-    debug!("@ssh_connection done {:?}", payload);
+    debug!("@ssh_connection_expire done {:?}", payload);
     Ok(())
 }
 
@@ -96,7 +96,7 @@ pub(crate) async fn close(
     State(connection_pool): State<Arc<SshConnectionPool>>,
     Query(payload): Query<SshConnectionExpirePayload>,
 ) -> Result<(), ApiErr> {
-    info!("@ssh_connection close {:?}", payload);
+    info!("@ssh_connection_close {:?}", payload);
 
     service::close(
         &connection_pool,
@@ -105,6 +105,6 @@ pub(crate) async fn close(
     )
     .await;
 
-    debug!("@ssh_connection close done {:?}", payload);
+    debug!("@ssh_connection_close done {:?}", payload);
     Ok(())
 }

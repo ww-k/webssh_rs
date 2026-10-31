@@ -93,15 +93,3 @@ pub struct TransferBatchResponse {
     pub updated_at: i64,
     pub ended_at: Option<i64>,
 }
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct BatchItemsResponse {
-    pub items: Vec<TransferTaskResponse>,
-    pub total: u64,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct TransferBatchListResponse {
-    pub items: Vec<TransferBatchResponse>,
-    pub total: u64,
-}

@@ -148,6 +148,7 @@
     "transfer_view_files": "File view",
     "transfer_filter_type": "Transfer type",
     "transfer_filter_status": "Status",
+    "transfer_filter_keyword": "Search by keyword",
     "transfer_filter_all": "All",
     "transfer_action_pause": "Pause",
     "transfer_action_resume": "Resume",

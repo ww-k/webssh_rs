@@ -2,9 +2,6 @@ import {
     deleteTransferBatch,
     deleteTransferHistory,
     deleteTransferTask,
-    getTransferBatch,
-    getTransferBatches,
-    getTransferBatchItems,
     getTransferTasks,
     postTransferBatchCancel,
     postTransferBatchPause,
@@ -18,20 +15,13 @@ import {
     postTransferUploadBatch,
 } from "@/api";
 
-import type {
-    ITransferBatch,
-    ITransferBatchList,
-    ITransferTask,
-    ITransferTaskStatus,
-    ITransferTaskType,
-} from "@/api";
+import type { ITransferTask } from "@/api";
 
 const ACTIVE_STATUSES = new Set(["WAIT", "RUN"]);
 const FINISHED_STATUSES = new Set(["SUCCESS", "FAIL", "CANCEL"]);
 const SYNC_INTERVAL = 1000;
 
 type TransferTasksListener = (tasks: ITransferTask[]) => void;
-type TransferBatchesListener = (batches: ITransferBatch[]) => void;
 
 interface IUploadOption {
     localPath: string;
@@ -44,13 +34,6 @@ interface IDownloadOption {
     localDir?: string;
     size?: number;
     all?: boolean;
-}
-
-export interface ITransferBatchListParams {
-    page?: number;
-    pageSize?: number;
-    type?: ITransferTaskType;
-    status?: ITransferTaskStatus;
 }
 
 const getTransferItemName = (source: string) => {
@@ -69,8 +52,6 @@ class TransferService {
     #syncing = false;
     #tasks: ITransferTask[] = [];
     #listeners = new Set<TransferTasksListener>();
-    #batchListeners = new Set<TransferBatchesListener>();
-    #batches: ITransferBatch[] = [];
 
     setConfig(_option: {
         /** 并发任务数 */
@@ -81,21 +62,6 @@ class TransferService {
 
     getTasks() {
         return this.#tasks;
-    }
-
-    getBatches() {
-        return this.#batches;
-    }
-
-    subscribeBatches(listener: TransferBatchesListener) {
-        this.#batchListeners.add(listener);
-        listener(this.#batches);
-        this.syncBatches().catch((err) =>
-            console.warn("TransferService.syncBatches failed", err),
-        );
-        return () => {
-            this.#batchListeners.delete(listener);
-        };
     }
 
     async createUploadBatch(option: {
@@ -112,7 +78,6 @@ class TransferService {
             all: option.all ?? false,
             conflict_policy: option.conflictPolicy,
         });
-        this.#upsertBatch(batch);
         this.#ensureSyncTimer();
         return batch;
     }
@@ -131,44 +96,24 @@ class TransferService {
             all: option.all ?? false,
             conflict_policy: option.conflictPolicy,
         });
-        this.#upsertBatch(batch);
         this.#ensureSyncTimer();
         return batch;
     }
 
-    async getBatch(id: string) {
-        return getTransferBatch(id);
-    }
-    async getBatchesPage(
-        params: ITransferBatchListParams = {},
-    ): Promise<ITransferBatchList> {
-        return getTransferBatches({
-            page: params.page,
-            page_size: params.pageSize,
-            type: params.type,
-            status: params.status,
-        });
-    }
-    async getBatchItems(id: string, page = 1, pageSize = 10) {
-        return getTransferBatchItems(id, {
-            page,
-            page_size: pageSize,
-        });
-    }
     async pauseBatch(id: string) {
         const batch = await postTransferBatchPause(id);
-        this.#upsertBatch(batch);
+        await this.syncTasks();
         return batch;
     }
     async resumeBatch(id: string) {
         const batch = await postTransferBatchResume(id);
-        this.#upsertBatch(batch);
+        await this.syncTasks();
         this.#ensureSyncTimer();
         return batch;
     }
     async cancelBatch(id: string) {
         const batch = await postTransferBatchCancel(id);
-        this.#upsertBatch(batch);
+        await this.syncTasks();
         return batch;
     }
 
@@ -196,8 +141,8 @@ class TransferService {
                     option.fileUri,
                 all: false,
             });
-            const items = await this.getBatchItems(batch.id, 1, 1);
-            const task = items.items[0];
+            const items = await getTransferTasks({ batch_id: batch.id });
+            const task = items[0];
             if (task) {
                 this.#upsertTask(task);
                 return task;
@@ -222,8 +167,8 @@ class TransferService {
                 localDir: option.localDir,
                 all: option.all ?? false,
             });
-            const items = await this.getBatchItems(batch.id, 1, 1);
-            const task = items.items[0];
+            const items = await getTransferTasks({ batch_id: batch.id });
+            const task = items[0];
             if (task) {
                 this.#upsertTask({
                     ...task,
@@ -256,32 +201,13 @@ class TransferService {
             this.#setTasks(tasks);
             if (tasks.some((task) => ACTIVE_STATUSES.has(task.status))) {
                 this.#ensureSyncTimer();
-            } else if (
-                !this.#batches.some((batch) =>
-                    ACTIVE_STATUSES.has(batch.status),
-                )
-            ) {
+            } else {
                 this.#clearSyncTimer();
             }
             return tasks;
         } finally {
             this.#syncing = false;
         }
-    }
-
-    async syncBatches() {
-        const response = await getTransferBatches({ page: 1, page_size: 200 });
-        const batches = response.items;
-        this.#batches = batches;
-        for (const listener of this.#batchListeners) listener(this.#batches);
-        if (batches.some((batch) => ACTIVE_STATUSES.has(batch.status))) {
-            this.#ensureSyncTimer();
-        } else if (
-            !this.#tasks.some((task) => ACTIVE_STATUSES.has(task.status))
-        ) {
-            this.#clearSyncTimer();
-        }
-        return batches;
     }
 
     async pause(id: string) {
@@ -326,17 +252,12 @@ class TransferService {
         this.#tasks = this.#tasks.filter(
             (task) => !FINISHED_STATUSES.has(task.status),
         );
-        this.#batches = this.#batches.filter(
-            (batch) => !FINISHED_STATUSES.has(batch.status),
-        );
         this.#emitTasks();
-        for (const listener of this.#batchListeners) listener(this.#batches);
     }
 
     async removeBatch(id: string) {
         await deleteTransferBatch(id);
-        this.#batches = this.#batches.filter((batch) => batch.id !== id);
-        for (const listener of this.#batchListeners) listener(this.#batches);
+        await this.syncTasks();
     }
 
     #ensureSyncTimer(task?: ITransferTask) {
@@ -350,9 +271,6 @@ class TransferService {
         this.#syncTimer = window.setInterval(() => {
             this.syncTasks().catch((err) => {
                 console.warn("TransferService.syncTasks failed", err);
-            });
-            this.syncBatches().catch((err) => {
-                console.warn("TransferService.syncBatches failed", err);
             });
         }, SYNC_INTERVAL);
     }
@@ -390,15 +308,6 @@ class TransferService {
         for (const listener of this.#listeners) {
             listener(this.#tasks);
         }
-    }
-
-    #upsertBatch(batch: ITransferBatch) {
-        const index = this.#batches.findIndex((item) => item.id === batch.id);
-        this.#batches =
-            index === -1
-                ? [batch, ...this.#batches]
-                : this.#batches.map((item, i) => (i === index ? batch : item));
-        for (const listener of this.#batchListeners) listener(this.#batches);
     }
 }
 

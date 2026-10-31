@@ -35,7 +35,7 @@ async function route(request, response) {
         return handleTarget(request, response, pathname);
     }
     if (pathname.startsWith("/api/transfer/")) {
-        return handleTransfer(request, response, pathname);
+        return handleTransfer(request, response, pathname, searchParams);
     }
     if (pathname.startsWith("/api/sftp/")) {
         return handleFileApi(request, response, pathname, searchParams, true);
@@ -80,9 +80,18 @@ async function handleTarget(request, response, pathname) {
     return sendMethodNotAllowed(response);
 }
 
-async function handleTransfer(request, response, pathname) {
+async function handleTransfer(request, response, pathname, searchParams) {
     if (request.method === "GET" && pathname === "/api/transfer/list") {
-        return sendJson(response, 200, state.transferTasks);
+        const batchId = searchParams.get("batch_id");
+        return sendJson(
+            response,
+            200,
+            batchId
+                ? state.transferTasks.filter(
+                      (task) => task.batch_id === batchId,
+                  )
+                : state.transferTasks,
+        );
     }
     if (
         request.method === "POST" &&

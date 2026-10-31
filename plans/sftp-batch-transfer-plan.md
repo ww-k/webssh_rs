@@ -233,9 +233,7 @@ POST /api/transfer/download
 ```text
 POST   /api/transfer/batches/upload
 POST   /api/transfer/batches/download
-GET    /api/transfer/batches
-GET    /api/transfer/batches/{batch_id}
-GET    /api/transfer/batches/{batch_id}/items
+GET    /api/transfer/list?batch_id={batch_id}
 POST   /api/transfer/batches/{batch_id}/pause
 POST   /api/transfer/batches/{batch_id}/resume
 POST   /api/transfer/batches/{batch_id}/cancel
@@ -253,8 +251,6 @@ DELETE /api/transfer/batches/{batch_id}
 ```ts
 createUploadBatch(...)
 createDownloadBatch(...)
-getBatch(...)
-getBatchItems(...)
 pauseBatch(...)
 resumeBatch(...)
 cancelBatch(...)

@@ -55,7 +55,7 @@ mod tests {
             let stmt2 = stmt.clone();
             let rows = TableName::find_by_statement(stmt).all(&db).await.unwrap();
 
-            assert_eq!(rows.len(), 8, "Expected 8 tables, got {}", rows.len());
+            assert_eq!(rows.len(), 7, "Expected 7 tables, got {}", rows.len());
             assert_eq!(
                 Vec::from_iter(rows.iter().map(|row| row.name.as_str())),
                 vec![
@@ -65,8 +65,7 @@ mod tests {
                     "transfer_task",
                     "favorite_directory",
                     "favorite_directory_initialization",
-                    "preference",
-                    "transfer_batch"
+                    "preference"
                 ],
                 "Unexpected tables: {:?}",
                 rows

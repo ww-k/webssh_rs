@@ -61,16 +61,6 @@ export interface ITransferBatch {
     ended_at?: number;
 }
 
-export interface ITransferBatchItems {
-    items: ITransferTask[];
-    total: number;
-}
-
-export interface ITransferBatchList {
-    items: ITransferBatch[];
-    total: number;
-}
-
 export async function postTransferUploadBatch(payload: {
     target_uri: string;
     sources: string[];
@@ -95,37 +85,6 @@ export async function postTransferDownloadBatch(payload: {
     const response = await axios.post<ITransferBatch>(
         "/api/transfer/batches/download",
         payload,
-    );
-    return response.data;
-}
-
-export async function getTransferBatches(params?: {
-    page?: number;
-    page_size?: number;
-    type?: ITransferTaskType;
-    status?: ITransferTaskStatus;
-}) {
-    const response = await axios.get<ITransferBatchList>(
-        "/api/transfer/batches",
-        { params },
-    );
-    return response.data;
-}
-
-export async function getTransferBatch(id: string) {
-    const response = await axios.get<ITransferBatch>(
-        `/api/transfer/batches/${id}`,
-    );
-    return response.data;
-}
-
-export async function getTransferBatchItems(
-    id: string,
-    params?: { page?: number; page_size?: number },
-) {
-    const response = await axios.get<ITransferBatchItems>(
-        `/api/transfer/batches/${id}/items`,
-        { params },
     );
     return response.data;
 }
@@ -181,8 +140,10 @@ export async function getTransferTask(id: string) {
     return response.data;
 }
 
-export async function getTransferTasks() {
-    const response = await axios.get<ITransferTask[]>("/api/transfer/list");
+export async function getTransferTasks(params?: { batch_id?: string }) {
+    const response = await axios.get<ITransferTask[]>("/api/transfer/list", {
+        params,
+    });
     return response.data;
 }
 

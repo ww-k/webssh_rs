@@ -17,8 +17,19 @@
     margin-bottom: 12px;
 }
 
-.WebSSH-TransferToolbar .ant-select {
-    min-width: 120px;
+.WebSSH-TransferFilter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.WebSSH-TransferFilterLabel {
+    color: var(--ant-color-text-secondary);
+    white-space: nowrap;
+}
+
+.WebSSH-TransferKeyword {
+    width: 240px;
 }
 
 .WebSSH-TransferDeleteHistory {
@@ -27,7 +38,11 @@
 
 .WebSSH-TransferContent {
     height: calc(100% - 52px);
-    overflow: auto;
+    overflow: hidden;
+}
+
+.WebSSH-TransferTableContainer {
+    height: 100%;
 }
 
 .WebSSH-Transfer .ant-table-thead > tr > th {
@@ -47,37 +62,42 @@
     background: var(--ant-color-bg-container);
 }
 
-.WebSSH-TransferBatchNameCell {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    gap: 4px;
-}
-
-.WebSSH-TransferExpandAction.ant-btn {
-    flex: 0 0 24px;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    color: var(--ant-color-text-secondary);
-    border-radius: 4px;
-}
-
-.WebSSH-TransferExpandAction.ant-btn:hover {
-    color: var(--ant-color-text);
-    background: var(--ant-color-fill-secondary);
-}
-
 .WebSSH-TransferFileName {
     color: var(--ant-color-text);
     font-weight: 500;
 }
 
-.WebSSH-TransferBatchNameCell .WebSSH-TransferFileName {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.WebSSH-TransferTreeIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-inline-end: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.WebSSH-TransferTreeIcon--file {
+    color: var(--ant-color-text-secondary);
+}
+
+.WebSSH-TransferTreeIcon--directory {
+    color: var(--ant-color-primary);
+    cursor: pointer;
+}
+
+.WebSSH-TransferTreeIcon--batch {
+    color: var(--ant-color-text-secondary);
+    cursor: pointer;
+}
+
+.WebSSH-TransferTreeIcon--batch:hover,
+.WebSSH-TransferTreeIcon--directory:hover {
+    color: var(--ant-color-primary-hover);
 }
 
 .WebSSH-TransferType {
@@ -195,11 +215,45 @@
 }
 
 .WebSSH-Transfer .ant-table-wrapper .ant-table.ant-table-small .ant-table-cell,
-.WebSSH-Transfer .ant-table-wrapper .ant-table.ant-table-small .ant-table-tbody>tr>td{
+.WebSSH-Transfer
+    .ant-table-wrapper
+    .ant-table.ant-table-small
+    .ant-table-tbody
+    > tr
+    > td {
     padding: 0;
 }
 
-.WebSSH-Transfer .ant-table-wrapper .ant-table.ant-table-small .ant-table-tbody .ant-table-wrapper:only-child .ant-table {
+.WebSSH-Transfer .ant-table-tbody-virtual .ant-table-row {
+    min-height: 44px;
+}
+
+.WebSSH-Transfer
+    .ant-table-wrapper
+    .ant-table.ant-table-small
+    .ant-table-tbody-virtual
+    .ant-table-cell {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    height: 44px;
+    padding: 6px 14px;
+}
+
+.WebSSH-Transfer
+    .ant-table-wrapper
+    .ant-table.ant-table-small
+    .ant-table-tbody-virtual
+    .WebSSH-TransferCenterCell {
+    justify-content: center;
+}
+
+.WebSSH-Transfer
+    .ant-table-wrapper
+    .ant-table.ant-table-small
+    .ant-table-tbody
+    .ant-table-wrapper:only-child
+    .ant-table {
     margin-inline: 0;
     margin-block: 0;
 }

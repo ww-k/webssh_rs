@@ -138,6 +138,7 @@
     "transfer_view_files": "文件视图",
     "transfer_filter_type": "传输类型",
     "transfer_filter_status": "状态",
+    "transfer_filter_keyword": "按关键字搜索",
     "transfer_filter_all": "全部",
     "transfer_action_pause": "暂停",
     "transfer_action_resume": "恢复",
