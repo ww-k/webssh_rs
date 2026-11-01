@@ -327,6 +327,7 @@ type TransferAction = {
     icon: React.ReactNode;
     onClick: () => void;
     danger?: boolean;
+    disabled?: boolean;
 };
 
 const getActionItems = (
@@ -338,57 +339,49 @@ const getActionItems = (
     onDelete: () => void,
     onShowInFolder: () => void,
 ): TransferAction[] => {
-    const items: TransferAction[] = [];
-    if (record.status === "RUN" || record.status === "WAIT") {
-        items.push({
-            key: "pause",
-            label: t("transfer_action_pause"),
-            icon: <PauseCircleOutlined />,
-            onClick: onPause,
-        });
-        items.push({
+    const canPause = record.status === "RUN" || record.status === "WAIT";
+    const canResume = record.status === "PAUSE";
+    const canCancel = canPause || canResume;
+    const canRetry = record.status === "FAIL" || record.status === "CANCEL";
+    return [
+        {
+            key: "pause-resume",
+            label: canResume
+                ? t("transfer_action_resume")
+                : t("transfer_action_pause"),
+            icon: canResume ? <PlayCircleOutlined /> : <PauseCircleOutlined />,
+            onClick: canResume ? onResume : onPause,
+            disabled: !canPause && !canResume,
+        },
+        {
             key: "cancel",
             label: t("app_btn_cancel"),
             icon: <StopOutlined />,
             onClick: onCancel,
-        });
-    } else if (record.status === "PAUSE") {
-        items.push({
-            key: "resume",
-            label: t("transfer_action_resume"),
-            icon: <PlayCircleOutlined />,
-            onClick: onResume,
-        });
-        items.push({
-            key: "cancel",
-            label: t("app_btn_cancel"),
-            icon: <StopOutlined />,
-            onClick: onCancel,
-        });
-    } else if (record.status === "FAIL" || record.status === "CANCEL") {
-        items.push({
+            disabled: !canCancel,
+        },
+        {
             key: "retry",
             label: t("transfer_action_retry"),
             icon: <ReloadOutlined />,
             onClick: onResume,
-        });
-    }
-    if (record.local_path) {
-        items.push({
+            disabled: !canRetry,
+        },
+        {
             key: "show-in-folder",
             label: t("transfer_action_show_in_folder"),
             icon: <FolderOpenOutlined />,
             onClick: onShowInFolder,
-        });
-    }
-    items.push({
-        key: "delete",
-        label: t("app_btn_delete"),
-        icon: <DeleteOutlined />,
-        danger: true,
-        onClick: onDelete,
-    });
-    return items;
+            disabled: !record.local_path,
+        },
+        {
+            key: "delete",
+            label: t("app_btn_delete"),
+            icon: <DeleteOutlined />,
+            danger: true,
+            onClick: onDelete,
+        },
+    ];
 };
 
 const ActionButtons = ({
@@ -403,6 +396,7 @@ const ActionButtons = ({
                     aria-label={action.label}
                     className="WebSSH-TransferAction"
                     danger={action.danger}
+                    disabled={action.disabled}
                     icon={action.icon}
                     type="text"
                     onClick={action.onClick}
@@ -411,6 +405,45 @@ const ActionButtons = ({
         ))}
     </Space>
 );
+
+const getUnavailableActionItems = (t: TFunction): TransferAction[] => [
+    {
+        key: "pause-resume",
+        label: t("transfer_action_pause"),
+        icon: <PauseCircleOutlined />,
+        onClick: () => undefined,
+        disabled: true,
+    },
+    {
+        key: "cancel",
+        label: t("app_btn_cancel"),
+        icon: <StopOutlined />,
+        onClick: () => undefined,
+        disabled: true,
+    },
+    {
+        key: "retry",
+        label: t("transfer_action_retry"),
+        icon: <ReloadOutlined />,
+        onClick: () => undefined,
+        disabled: true,
+    },
+    {
+        key: "show-in-folder",
+        label: t("transfer_action_show_in_folder"),
+        icon: <FolderOpenOutlined />,
+        onClick: () => undefined,
+        disabled: true,
+    },
+    {
+        key: "delete",
+        label: t("app_btn_delete"),
+        icon: <DeleteOutlined />,
+        onClick: () => undefined,
+        danger: true,
+        disabled: true,
+    },
+];
 
 const getCommonColumns = (
     t: TFunction,
@@ -443,7 +476,6 @@ const getCommonColumns = (
     {
         title: t("transfer_column_progress"),
         key: "progress",
-        width: "48%",
         render: (_, record) => <TransferProgressCell record={record} t={t} />,
     },
 ];
@@ -668,57 +700,51 @@ const getBatchActionItems = (
     const action = (fn: () => Promise<unknown>) => {
         fn().then(refresh).catch(console.warn);
     };
-    const items: TransferAction[] = [];
-    if (record.status === "RUN" || record.status === "WAIT") {
-        items.push(
-            {
-                key: "pause",
-                label: t("transfer_action_pause"),
-                icon: <PauseCircleOutlined />,
-                onClick: () =>
-                    action(() => transferService.pauseBatch(record.id)),
-            },
-            {
-                key: "cancel",
-                label: t("app_btn_cancel"),
-                icon: <StopOutlined />,
-                onClick: () =>
-                    action(() => transferService.cancelBatch(record.id)),
-            },
-        );
-    } else if (record.status === "PAUSE") {
-        items.push(
-            {
-                key: "resume",
-                label: t("transfer_action_resume"),
-                icon: <PlayCircleOutlined />,
-                onClick: () =>
-                    action(() => transferService.resumeBatch(record.id)),
-            },
-            {
-                key: "cancel",
-                label: t("app_btn_cancel"),
-                icon: <StopOutlined />,
-                onClick: () =>
-                    action(() => transferService.cancelBatch(record.id)),
-            },
-        );
-    } else if (record.status === "FAIL" || record.status === "CANCEL") {
-        items.push({
+    const canPause = record.status === "RUN" || record.status === "WAIT";
+    const canResume = record.status === "PAUSE";
+    const canCancel = canPause || canResume;
+    const canRetry = record.status === "FAIL" || record.status === "CANCEL";
+    return [
+        {
+            key: "pause-resume",
+            label: canResume
+                ? t("transfer_action_resume")
+                : t("transfer_action_pause"),
+            icon: canResume ? <PlayCircleOutlined /> : <PauseCircleOutlined />,
+            onClick: canResume
+                ? () => action(() => transferService.resumeBatch(record.id))
+                : () => action(() => transferService.pauseBatch(record.id)),
+            disabled: !canPause && !canResume,
+        },
+        {
+            key: "cancel",
+            label: t("app_btn_cancel"),
+            icon: <StopOutlined />,
+            onClick: () => action(() => transferService.cancelBatch(record.id)),
+            disabled: !canCancel,
+        },
+        {
             key: "retry",
             label: t("transfer_action_retry"),
             icon: <ReloadOutlined />,
             onClick: () => action(() => transferService.resumeBatch(record.id)),
-        });
-    }
-    items.push({
-        key: "delete",
-        label: t("app_btn_delete"),
-        danger: true,
-        icon: <DeleteOutlined />,
-        onClick: () => action(() => transferService.removeBatch(record.id)),
-    });
-    return items;
+            disabled: !canRetry,
+        },
+        {
+            key: "show-in-folder",
+            label: t("transfer_action_show_in_folder"),
+            icon: <FolderOpenOutlined />,
+            onClick: () => undefined,
+            disabled: true,
+        },
+        {
+            key: "delete",
+            label: t("app_btn_delete"),
+            danger: true,
+            icon: <DeleteOutlined />,
+            onClick: () => action(() => transferService.removeBatch(record.id)),
+        },
+    ];
 };
 
 export const TransferTable = ({
@@ -789,6 +815,21 @@ export const TransferTable = ({
             y: Math.max(tableSize.height - 30, 160),
         };
     }, [tableSize]);
+    const handleTableKeyDown = useCallback(
+        (event: React.KeyboardEvent<HTMLDivElement>) => {
+            if (event.key !== "PageUp" && event.key !== "PageDown") return;
+            const scrollContainer =
+                event.currentTarget.querySelector<HTMLElement>(
+                    ".ant-table-body",
+                );
+            if (!scrollContainer) return;
+            event.preventDefault();
+            const offset = scrollContainer.clientHeight;
+            scrollContainer.scrollTop +=
+                event.key === "PageDown" ? offset : -offset;
+        },
+        [],
+    );
     const handleShowInFolder = useCallback(
         (record: ITransferTask) => {
             if (!record.local_path) return;
@@ -835,13 +876,15 @@ export const TransferTable = ({
             {
                 title: t("app_common_action"),
                 key: "action",
-                width: 180,
+                width: 220,
                 render: (_: unknown, record: TransferTreeRow) =>
                     isBatch(record) ? (
                         <ActionButtons
                             actions={getBatchActionItems(record, t)}
                         />
-                    ) : record.isVirtual ? null : (
+                    ) : record.isVirtual ? (
+                        <ActionButtons actions={getUnavailableActionItems(t)} />
+                    ) : (
                         <ActionButtons
                             actions={getActionItems(
                                 record,
@@ -862,7 +905,12 @@ export const TransferTable = ({
         [handleCancel, handleDelete, handleShowInFolder, t],
     );
     return (
-        <div ref={tableContainerRef} className="WebSSH-TransferTableContainer">
+        <div
+            ref={tableContainerRef}
+            className="WebSSH-TransferTableContainer"
+            tabIndex={0}
+            onKeyDown={handleTableKeyDown}
+        >
             <TransferVirtualTable
                 className="WebSSH-FilelistTable"
                 columns={columns as TableProps<TransferTreeRow>["columns"]}
