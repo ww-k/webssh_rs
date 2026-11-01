@@ -14,7 +14,7 @@ import {
     Tooltip,
     Typography,
 } from "antd";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TableProps } from "antd";
@@ -28,6 +28,7 @@ import {
     postSshConnectionExpire,
 } from "@/api";
 import getTargetName from "@/components/Target/getTargetName";
+import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 
 import type { ISshConnection, ITarget } from "@/api";
 
@@ -39,7 +40,10 @@ export default function SshConnections() {
     const [targets, setTargets] = useState<ITarget[]>([]);
     const [loading, setLoading] = useState(false);
     const [actionKey, setActionKey] = useState<string>();
-    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const {
+        tableContainerRef,
+        tablePageNavigationProps,
+    } = useTablePageNavigation();
     const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const loadConnections = useCallback(async () => {
@@ -74,7 +78,7 @@ export default function SshConnections() {
         const observer = new ResizeObserver(updateTableHeight);
         observer.observe(element);
         return () => observer.disconnect();
-    }, []);
+    }, [tableContainerRef]);
 
     const runAction = useCallback(
         async (connection: ISshConnection, action: "expire" | "close") => {
@@ -153,45 +157,38 @@ export default function SshConnections() {
             width: 100,
             render: (_, connection) => (
                 <Space size="small">
-                    {!connection.expired && !connection.closed && (
-                        <Tooltip title={t("ssh_connections_expire")}>
+                    <Tooltip title={t("ssh_connections_expire")}>
+                        <Button
+                            aria-label={t("ssh_connections_expire")}
+                            disabled={connection.expired || connection.closed}
+                            icon={<DisconnectOutlined />}
+                            loading={actionKey === `expire:${connection.id}`}
+                            onClick={() =>
+                                void runAction(connection, "expire")
+                            }
+                            size="small"
+                            type="text"
+                        />
+                    </Tooltip>
+                    <Popconfirm
+                        disabled={connection.closed}
+                        title={t("ssh_connections_close_confirm")}
+                        onConfirm={() => void runAction(connection, "close")}
+                        okText={t("app_btn_ok")}
+                        cancelText={t("app_btn_cancel")}
+                    >
+                        <Tooltip title={t("ssh_connections_close")}>
                             <Button
-                                aria-label={t("ssh_connections_expire")}
-                                icon={<DisconnectOutlined />}
-                                loading={
-                                    actionKey === `expire:${connection.id}`
-                                }
-                                onClick={() =>
-                                    void runAction(connection, "expire")
-                                }
+                                aria-label={t("ssh_connections_close")}
+                                danger
+                                disabled={connection.closed}
+                                icon={<CloseCircleOutlined />}
+                                loading={actionKey === `close:${connection.id}`}
                                 size="small"
                                 type="text"
                             />
                         </Tooltip>
-                    )}
-                    {!connection.closed && (
-                        <Popconfirm
-                            title={t("ssh_connections_close_confirm")}
-                            onConfirm={() =>
-                                void runAction(connection, "close")
-                            }
-                            okText={t("app_btn_ok")}
-                            cancelText={t("app_btn_cancel")}
-                        >
-                            <Tooltip title={t("ssh_connections_close")}>
-                                <Button
-                                    aria-label={t("ssh_connections_close")}
-                                    danger
-                                    icon={<CloseCircleOutlined />}
-                                    loading={
-                                        actionKey === `close:${connection.id}`
-                                    }
-                                    size="small"
-                                    type="text"
-                                />
-                            </Tooltip>
-                        </Popconfirm>
-                    )}
+                    </Popconfirm>
                 </Space>
             ),
         },
@@ -213,6 +210,7 @@ export default function SshConnections() {
                 <div
                     ref={tableContainerRef}
                     className="WebSSH-SshConnections-TableContainer"
+                    {...tablePageNavigationProps}
                 >
                     <Table<ISshConnection>
                         className="WebSSH-FilelistTable WebSSH-SshConnections-Table"

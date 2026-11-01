@@ -25,12 +25,13 @@ import {
     Tooltip,
     Typography,
 } from "antd";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
 
 import { postFsShowInFolder } from "@/api";
+import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 import transferService, { getTransferBatchName } from "@/services/transfer";
 
 import type { TableProps } from "antd";
@@ -755,7 +756,10 @@ export const TransferTable = ({
     keyword: string;
 }) => {
     const { t } = useTranslation();
-    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const {
+        tableContainerRef,
+        tablePageNavigationProps,
+    } = useTablePageNavigation();
     const [tableSize, setTableSize] = useState({ width: 0, height: 0 });
     const [list, setList] = useState<ITransferTask[]>(() =>
         transferService.getTasks(),
@@ -772,7 +776,7 @@ export const TransferTable = ({
         const observer = new ResizeObserver(updateSize);
         observer.observe(element);
         return () => observer.disconnect();
-    }, []);
+    }, [tableContainerRef]);
     useEffect(() => {
         const unsubscribeTasks = transferService.subscribe(setList);
         return () => {
@@ -815,21 +819,6 @@ export const TransferTable = ({
             y: Math.max(tableSize.height - 30, 160),
         };
     }, [tableSize]);
-    const handleTableKeyDown = useCallback(
-        (event: React.KeyboardEvent<HTMLDivElement>) => {
-            if (event.key !== "PageUp" && event.key !== "PageDown") return;
-            const scrollContainer =
-                event.currentTarget.querySelector<HTMLElement>(
-                    ".ant-table-body",
-                );
-            if (!scrollContainer) return;
-            event.preventDefault();
-            const offset = scrollContainer.clientHeight;
-            scrollContainer.scrollTop +=
-                event.key === "PageDown" ? offset : -offset;
-        },
-        [],
-    );
     const handleShowInFolder = useCallback(
         (record: ITransferTask) => {
             if (!record.local_path) return;
@@ -908,8 +897,7 @@ export const TransferTable = ({
         <div
             ref={tableContainerRef}
             className="WebSSH-TransferTableContainer"
-            tabIndex={0}
-            onKeyDown={handleTableKeyDown}
+            {...tablePageNavigationProps}
         >
             <TransferVirtualTable
                 className="WebSSH-FilelistTable"

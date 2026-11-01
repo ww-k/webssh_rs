@@ -8,10 +8,11 @@ import {
     Tooltip,
     Typography,
 } from "antd";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getSshKnownHostList, postSshKnownHostRemove } from "@/api";
+import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 
 import type { TableProps } from "antd";
 import type { ISshKnownHost } from "@/api";
@@ -25,7 +26,10 @@ export default function SshKnownHosts() {
     const [knownHosts, setKnownHosts] = useState<ISshKnownHost[]>([]);
     const [loading, setLoading] = useState(false);
     const [removingId, setRemovingId] = useState<number>();
-    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const {
+        tableContainerRef,
+        tablePageNavigationProps,
+    } = useTablePageNavigation();
     const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const loadKnownHosts = useCallback(
@@ -58,7 +62,7 @@ export default function SshKnownHosts() {
         const observer = new ResizeObserver(updateTableHeight);
         observer.observe(element);
         return () => observer.disconnect();
-    }, []);
+    }, [tableContainerRef]);
 
     const removeKnownHost = useCallback(
         async (knownHost: ISshKnownHost) => {
@@ -156,6 +160,7 @@ export default function SshKnownHosts() {
                 <div
                     ref={tableContainerRef}
                     className="WebSSH-SshKnownHosts-TableContainer"
+                    {...tablePageNavigationProps}
                 >
                     <Table<ISshKnownHost>
                         className="WebSSH-FilelistTable WebSSH-SshKnownHosts-Table"

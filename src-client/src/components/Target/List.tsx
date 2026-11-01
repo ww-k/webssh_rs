@@ -8,10 +8,11 @@ import {
     SearchOutlined,
 } from "@ant-design/icons";
 import { Button, Input, Modal, Space, Table, Tooltip } from "antd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getTargetList, postTargetRemove } from "@/api";
+import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 import useAppStore from "@/store";
 
 import "./List.css";
@@ -30,7 +31,10 @@ export default function TargetList({ tab }: { tab: ITab }) {
     const [editorData, setEditorData] = useState<ITarget>();
     const [dataSource, setDataSource] = useState<ITarget[]>([]);
     const [searchValue, setSearchValue] = useState("");
-    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const {
+        tableContainerRef,
+        tablePageNavigationProps,
+    } = useTablePageNavigation();
     const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const filteredDataSource = useMemo(() => {
@@ -145,7 +149,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
         const observer = new ResizeObserver(updateTableHeight);
         observer.observe(element);
         return () => observer.disconnect();
-    }, []);
+    }, [tableContainerRef]);
 
     return (
         <>
@@ -182,6 +186,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
             <div
                 ref={tableContainerRef}
                 className="WebSSH-MenuPageContent targetListTableContainer"
+                {...tablePageNavigationProps}
             >
                 <Table
                     className="WebSSH-FilelistTable targetListTable"
