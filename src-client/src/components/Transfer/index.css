@@ -17,10 +17,6 @@
     margin-left: auto;
 }
 
-.WebSSH-TransferTableContainer {
-    height: 100%;
-}
-
 .WebSSH-Transfer .ant-table-thead > tr > th {
     height: 30px;
 }

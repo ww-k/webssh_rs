@@ -751,32 +751,17 @@ const getBatchActionItems = (
 export const TransferTable = ({
     type,
     keyword,
+    tableBodyHeight,
 }: {
     type: TransferTypeFilter;
     keyword: string;
+    tableBodyHeight: number;
 }) => {
     const { t } = useTranslation();
-    const {
-        tableContainerRef,
-        tablePageNavigationProps,
-    } = useTablePageNavigation();
-    const [tableSize, setTableSize] = useState({ width: 0, height: 0 });
     const [list, setList] = useState<ITransferTask[]>(() =>
         transferService.getTasks(),
     );
-    useEffect(() => {
-        const element = tableContainerRef.current;
-        if (!element) return;
-        const updateSize = () =>
-            setTableSize({
-                width: element.clientWidth,
-                height: element.clientHeight,
-            });
-        updateSize();
-        const observer = new ResizeObserver(updateSize);
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [tableContainerRef]);
+
     useEffect(() => {
         const unsubscribeTasks = transferService.subscribe(setList);
         return () => {
@@ -812,13 +797,7 @@ export const TransferTable = ({
             window.clearTimeout(timer);
         };
     }, [keyword, list, type]);
-    const virtualScroll = useMemo(() => {
-        if (tableSize.width === 0 || tableSize.height === 0) return undefined;
-        return {
-            x: Math.max(tableSize.width, 800),
-            y: Math.max(tableSize.height - 30, 160),
-        };
-    }, [tableSize]);
+
     const handleShowInFolder = useCallback(
         (record: ITransferTask) => {
             if (!record.local_path) return;
@@ -894,35 +873,39 @@ export const TransferTable = ({
         [handleCancel, handleDelete, handleShowInFolder, t],
     );
     return (
-        <div
-            ref={tableContainerRef}
-            className="WebSSH-TransferTableContainer"
-            {...tablePageNavigationProps}
-        >
-            <TransferVirtualTable
-                className="WebSSH-FilelistTable"
-                columns={columns as TableProps<TransferTreeRow>["columns"]}
-                dataSource={tree}
-                rowKey="id"
-                size="small"
-                loading={treeLoading}
-                listItemHeight={TRANSFER_ROW_HEIGHT}
-                virtual={virtualScroll !== undefined}
-                scroll={virtualScroll}
-                expandable={{
-                    defaultExpandAllRows: true,
-                    expandIcon: (props) => (
-                        <TransferTreeExpandIcon {...props} />
-                    ),
-                }}
-                pagination={false}
-            />
-        </div>
+        <TransferVirtualTable
+            className="WebSSH-FilelistTable"
+            columns={columns as TableProps<TransferTreeRow>["columns"]}
+            dataSource={tree}
+            rowKey="id"
+            size="small"
+            loading={treeLoading}
+            listItemHeight={TRANSFER_ROW_HEIGHT}
+            virtual={tableBodyHeight > 0}
+            scroll={
+                tableBodyHeight > 0
+                    ? { x: 900, y: tableBodyHeight }
+                    : undefined
+            }
+            expandable={{
+                defaultExpandAllRows: true,
+                expandIcon: (props) => (
+                    <TransferTreeExpandIcon {...props} />
+                ),
+            }}
+            pagination={false}
+        />
     );
 };
 
 export default function Transfer() {
     const { t } = useTranslation();
+    const {
+        tableContainerRef,
+        tablePageNavigationProps,
+    } = useTablePageNavigation();
+    const [tableBodyHeight, setTableBodyHeight] = useState(0);
+
     const [filters, setFilters] = useState<TransferFilterState>(
         getStoredTransferFilters,
     );
@@ -940,6 +923,19 @@ export default function Transfer() {
             unsubscribeTasks();
         };
     }, []);
+    useEffect(() => {
+        const element = tableContainerRef.current;
+        if (!element) return;
+
+        const updateTableHeight = () => {
+            setTableBodyHeight(Math.max(element.clientHeight - 38, 160));
+        };
+        updateTableHeight();
+
+        const observer = new ResizeObserver(updateTableHeight);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [tableContainerRef]);
     const handleRemoveAll = () =>
         Modal.confirm({
             title: t("transfer_confirm_delete_all_title"),
@@ -997,8 +993,16 @@ export default function Transfer() {
                     />
                 </Tooltip>
             </div>
-            <div className="WebSSH-MenuPageContent WebSSH-TransferContent">
-                <TransferTable type={type} keyword={keyword} />
+            <div
+                ref={tableContainerRef}
+                className="WebSSH-MenuPageContent WebSSH-TransferContent"
+                {...tablePageNavigationProps}
+            >
+                <TransferTable
+                    type={type}
+                    keyword={keyword}
+                    tableBodyHeight={tableBodyHeight}
+                />
             </div>
         </div>
     );

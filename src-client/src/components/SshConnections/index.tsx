@@ -206,35 +206,33 @@ export default function SshConnections() {
                     />
                 </Tooltip>
             </div>
-            <div className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll">
-                <div
-                    ref={tableContainerRef}
-                    className="WebSSH-SshConnections-TableContainer"
-                    {...tablePageNavigationProps}
-                >
-                    <Table<ISshConnection>
-                        className="WebSSH-FilelistTable WebSSH-SshConnections-Table"
-                        columns={columns}
-                        dataSource={connections}
-                        loading={loading}
-                        rowKey="id"
-                        locale={{
-                            emptyText: (
-                                <Empty
-                                    description={t("ssh_connections_empty")}
-                                />
-                            ),
-                        }}
-                        pagination={false}
-                        virtual={tableBodyHeight > 0}
-                        scroll={
-                            tableBodyHeight > 0
-                                ? { x: 760, y: tableBodyHeight }
-                                : undefined
-                        }
-                        size="small"
-                    />
-                </div>
+            <div
+                ref={tableContainerRef}
+                className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll"
+                {...tablePageNavigationProps}
+            >
+                <Table<ISshConnection>
+                    className="WebSSH-FilelistTable WebSSH-SshConnections-Table"
+                    columns={columns}
+                    dataSource={connections}
+                    loading={loading}
+                    rowKey="id"
+                    locale={{
+                        emptyText: (
+                            <Empty
+                                description={t("ssh_connections_empty")}
+                            />
+                        ),
+                    }}
+                    pagination={false}
+                    virtual={tableBodyHeight > 0}
+                    scroll={
+                        tableBodyHeight > 0
+                            ? { x: 760, y: tableBodyHeight }
+                            : undefined
+                    }
+                    size="small"
+                />
             </div>
         </main>
     );

@@ -156,36 +156,34 @@ export default function SshKnownHosts() {
                     />
                 </Tooltip>
             </div>
-            <div className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll">
-                <div
-                    ref={tableContainerRef}
-                    className="WebSSH-SshKnownHosts-TableContainer"
-                    {...tablePageNavigationProps}
-                >
-                    <Table<ISshKnownHost>
-                        className="WebSSH-FilelistTable WebSSH-SshKnownHosts-Table"
-                        columns={columns}
-                        dataSource={knownHosts}
-                        loading={loading}
-                        rowKey="id"
-                        locale={{
-                            emptyText: (
-                                <Empty
-                                    image={<KeyOutlined />}
-                                    description={t("ssh_known_hosts_empty")}
-                                />
-                            ),
-                        }}
-                        pagination={false}
-                        virtual={tableBodyHeight > 0}
-                        scroll={
-                            tableBodyHeight > 0
-                                ? { x: 900, y: tableBodyHeight }
-                                : undefined
-                        }
-                        size="small"
-                    />
-                </div>
+            <div
+                ref={tableContainerRef}
+                className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll"
+                {...tablePageNavigationProps}
+            >
+                <Table<ISshKnownHost>
+                    className="WebSSH-FilelistTable WebSSH-SshKnownHosts-Table"
+                    columns={columns}
+                    dataSource={knownHosts}
+                    loading={loading}
+                    rowKey="id"
+                    locale={{
+                        emptyText: (
+                            <Empty
+                                image={<KeyOutlined />}
+                                description={t("ssh_known_hosts_empty")}
+                            />
+                        ),
+                    }}
+                    pagination={false}
+                    virtual={tableBodyHeight > 0}
+                    scroll={
+                        tableBodyHeight > 0
+                            ? { x: 900, y: tableBodyHeight }
+                            : undefined
+                    }
+                    size="small"
+                />
             </div>
         </main>
     );

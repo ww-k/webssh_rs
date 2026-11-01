@@ -1,17 +1,3 @@
 .WebSSH-SshKnownHosts-Header {
     justify-content: flex-end;
 }
-
-.WebSSH-SshKnownHosts .WebSSH-MenuPageContent {
-    display: flex;
-}
-
-.WebSSH-SshKnownHosts-TableContainer {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.WebSSH-SshKnownHosts-Table {
-    height: 100%;
-}

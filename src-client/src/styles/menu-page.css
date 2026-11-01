@@ -25,8 +25,9 @@
     border-radius: 4px;
 }
 
-.WebSSH-MenuPageContent--scroll {
-    overflow: auto;
+.WebSSH-MenuPageContent:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
 }
 
 @media (max-width: 600px) {
