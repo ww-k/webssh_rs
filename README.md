@@ -165,8 +165,10 @@ GitHub Actions 会在推送 `v*` 格式的 tag 后构建并创建 GitHub Release
 发布示例：
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+pnpm release 0.5.0
+git push origin main
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 工作流文件位于 `.github/workflows/release.yml`。
