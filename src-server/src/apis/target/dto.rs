@@ -10,6 +10,9 @@ pub struct TargetUpdatePayload {
     /// SSH target name
     #[serde(default)]
     pub name: String,
+    /// Optional target directory used for grouping targets in the UI.
+    #[serde(default)]
+    pub directory: String,
     /// SSH 目标主机地址
     pub host: String,
     /// SSH 端口号
@@ -33,6 +36,7 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
         target::ActiveModel {
             id: Set(p.id),
             name: Set(p.name),
+            directory: Set(p.directory),
             host: Set(p.host),
             port: Set(p.port),
             method: Set(p.method),

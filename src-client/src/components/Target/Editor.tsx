@@ -1,5 +1,14 @@
 import { InfoCircleOutlined } from "@ant-design/icons";
-import { Button, Form, Input, InputNumber, Modal, Select, Tooltip } from "antd";
+import {
+    AutoComplete,
+    Button,
+    Form,
+    Input,
+    InputNumber,
+    Modal,
+    Select,
+    Tooltip,
+} from "antd";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -31,6 +40,15 @@ export default function TargetEditor({
     const keyResult = validateCertContent(key ?? "");
     const showPassword = method === 1 || (method === 2 && keyResult === 2);
     const [targets, setTargets] = useState<ITarget[]>([]);
+    const directoryOptions = [
+        ...new Set(
+            targets
+                .map((target) => target.directory?.trim())
+                .filter((directory): directory is string => Boolean(directory)),
+        ),
+    ]
+        .sort((left, right) => left.localeCompare(right))
+        .map((directory) => ({ label: directory, value: directory }));
 
     useEffect(() => {
         if (open) {
@@ -84,6 +102,13 @@ export default function TargetEditor({
                 </Form.Item>
                 <Form.Item name="name" label={t("target_name")}>
                     <Input placeholder={t("target_name_placeholder")} />
+                </Form.Item>
+                <Form.Item name="directory" label={t("target_directory")}>
+                    <AutoComplete
+                        allowClear
+                        options={directoryOptions}
+                        placeholder={t("target_directory_placeholder")}
+                    />
                 </Form.Item>
                 <Form.Item
                     name="method"

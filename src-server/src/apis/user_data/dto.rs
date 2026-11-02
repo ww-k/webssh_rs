@@ -10,6 +10,8 @@ pub struct UserDataTarget {
     pub id: i32,
     #[serde(default)]
     pub name: String,
+    #[serde(default)]
+    pub directory: String,
     pub host: String,
     pub port: Option<u16>,
     pub method: TargetAuthMethod,

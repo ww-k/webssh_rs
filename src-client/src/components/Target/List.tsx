@@ -2,12 +2,15 @@ import {
     CodeOutlined,
     DeleteOutlined,
     EditOutlined,
+    FolderOpenOutlined,
     FolderOutlined,
+    LinuxOutlined,
     PlusCircleTwoTone,
     ReloadOutlined,
     SearchOutlined,
+    WindowsOutlined,
 } from "@ant-design/icons";
-import { Button, Input, Modal, Space, Table, Tooltip } from "antd";
+import { Button, Input, Modal, Select, Space, Table, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -20,9 +23,107 @@ import "./List.css";
 import TargetEditor from "./Editor";
 import getTargetName from "./getTargetName";
 
+import type { TableProps } from "antd";
 import type { ColumnsType } from "antd/es/table/interface";
+import type { ComponentType } from "react";
 import type { ITarget } from "@/api";
 import type { ITab } from "@/store";
+
+type TargetDirectoryRow = {
+    id: string;
+    name: string;
+    directory: string;
+    host: string;
+    user: string;
+    method: number;
+    isDirectory: true;
+    children: TargetTreeRow[];
+};
+type TargetTreeRow =
+    | (ITarget & {
+          children?: TargetTreeRow[];
+          isDirectory?: false;
+      })
+    | TargetDirectoryRow;
+
+const TargetVirtualTable = Table as unknown as ComponentType<
+    TableProps<TargetTreeRow> & { listItemHeight?: number }
+>;
+
+const TARGET_ROW_HEIGHT = 44;
+
+const normalizeDirectory = (directory?: string) =>
+    directory?.trim().replace(/^\/+|\/+$/g, "") || "";
+
+const buildTargetTree = (targets: ITarget[]): TargetTreeRow[] => {
+    const grouped = new Map<string, ITarget[]>();
+    const standalone: TargetTreeRow[] = [];
+
+    for (const target of targets) {
+        const directory = normalizeDirectory(target.directory);
+        if (!directory) {
+            standalone.push({ ...target });
+            continue;
+        }
+        const group = grouped.get(directory) || [];
+        group.push(target);
+        grouped.set(directory, group);
+    }
+
+    const directories = [...grouped.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([directory, children]) => ({
+            id: `target-directory:${directory}`,
+            name: directory,
+            directory,
+            host: "",
+            user: "",
+            method: 3,
+            isDirectory: true as const,
+            children: children.map((target) => ({ ...target })),
+        }));
+
+    return [...directories, ...standalone];
+};
+
+const TargetTreeExpandIcon = ({
+    expanded,
+    onExpand,
+    record,
+}: {
+    expanded: boolean;
+    onExpand: (
+        record: TargetTreeRow,
+        event: React.MouseEvent<HTMLButtonElement, MouseEvent>,
+    ) => void;
+    record: TargetTreeRow;
+}) => {
+    if (!record.isDirectory) {
+        const SystemIcon =
+            record.system?.toLocaleLowerCase() === "windows"
+                ? WindowsOutlined
+                : LinuxOutlined;
+        return (
+            <span
+                className="targetTreeExpandIcon targetTreeExpandIconTarget"
+                aria-label={record.system || "Linux"}
+            >
+                <SystemIcon aria-hidden="true" />
+            </span>
+        );
+    }
+    return (
+        <button
+            type="button"
+            className="targetTreeExpandIcon targetTreeExpandIconDirectory"
+            aria-expanded={expanded}
+            aria-label={record.name}
+            onClick={(event) => onExpand(record, event)}
+        >
+            {expanded ? <FolderOpenOutlined /> : <FolderOutlined />}
+        </button>
+    );
+};
 
 export default function TargetList({ tab }: { tab: ITab }) {
     const { t } = useTranslation();
@@ -31,103 +132,132 @@ export default function TargetList({ tab }: { tab: ITab }) {
     const [editorData, setEditorData] = useState<ITarget>();
     const [dataSource, setDataSource] = useState<ITarget[]>([]);
     const [searchValue, setSearchValue] = useState("");
-    const {
-        tableContainerRef,
-        tablePageNavigationProps,
-    } = useTablePageNavigation();
+    const [directoryFilter, setDirectoryFilter] = useState<string>();
+    const { tableContainerRef, tablePageNavigationProps } =
+        useTablePageNavigation();
     const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const filteredDataSource = useMemo(() => {
         const search = searchValue.trim().toLocaleLowerCase();
-        if (!search) {
-            return dataSource;
-        }
-
-        return dataSource.filter((target) =>
-            [target.name, target.user, target.host].some((value) =>
-                value?.toLocaleLowerCase().includes(search),
-            ),
-        );
-    }, [dataSource, searchValue]);
+        return dataSource.filter((target) => {
+            if (
+                directoryFilter &&
+                normalizeDirectory(target.directory) !== directoryFilter
+            ) {
+                return false;
+            }
+            if (!search) return true;
+            return [
+                target.directory,
+                target.name,
+                target.user,
+                target.host,
+            ].some((value) => value?.toLocaleLowerCase().includes(search));
+        });
+    }, [dataSource, directoryFilter, searchValue]);
 
     const refresh = useCallback(async () => {
         const res = await getTargetList();
         setDataSource(res);
     }, []);
 
-    const columns: ColumnsType<ITarget> = useMemo(
+    const treeDataSource = useMemo(
+        () => buildTargetTree(filteredDataSource),
+        [filteredDataSource],
+    );
+    const directoryOptions = useMemo(
+        () =>
+            [
+                ...new Set(
+                    dataSource
+                        .map((target) => normalizeDirectory(target.directory))
+                        .filter(Boolean),
+                ),
+            ]
+                .sort((left, right) => left.localeCompare(right))
+                .map((directory) => ({ label: directory, value: directory })),
+        [dataSource],
+    );
+
+    const columns: ColumnsType<TargetTreeRow> = useMemo(
         () => [
             {
-                title: t("target_name"),
+                title: t("target_directory"),
                 dataIndex: "name",
                 key: "name",
-                render: (_, record) => getTargetName(record),
+                render: (_, record) =>
+                    record.isDirectory
+                        ? `${record.name}/`
+                        : getTargetName(record),
             },
             {
                 title: t("app_common_action"),
                 key: "action",
                 width: 180,
-                render: (_, record) => (
-                    <Space size="small">
-                        <Tooltip title="SSH">
-                            <Button
-                                aria-label="SSH"
-                                icon={<CodeOutlined />}
-                                type="text"
-                                onClick={() => {
-                                    setTabPath(
-                                        tab.key,
-                                        `/terminal/${record.id}`,
-                                        `${getTargetName(record)}`,
-                                    );
-                                }}
-                            />
-                        </Tooltip>
-                        <Tooltip title="SFTP">
-                            <Button
-                                aria-label="SFTP"
-                                icon={<FolderOutlined />}
-                                type="text"
-                                onClick={() => {
-                                    setTabPath(
-                                        tab.key,
-                                        `/filesview/${record.id}`,
-                                        `${getTargetName(record)}`,
-                                    );
-                                }}
-                            />
-                        </Tooltip>
-                        <Tooltip title={t("app_btn_edit")}>
-                            <Button
-                                aria-label={t("app_btn_edit")}
-                                icon={<EditOutlined />}
-                                type="text"
-                                onClick={() => {
-                                    setEditorData(record);
-                                    setEditorOpen(true);
-                                    refresh();
-                                }}
-                            />
-                        </Tooltip>
-                        <Tooltip title={t("app_btn_delete")}>
-                            <Button
-                                aria-label={t("app_btn_delete")}
-                                danger
-                                icon={<DeleteOutlined />}
-                                type="text"
-                                onClick={() => {
-                                    Modal.confirm({
-                                        content: "Confirm to delete?",
-                                        async onOk() {
-                                            await postTargetRemove(record.id);
-                                            await refresh();
-                                        },
-                                    });
-                                }}
-                            />
-                        </Tooltip>
-                    </Space>
-                ),
+                render: (_, record) =>
+                    record.isDirectory ? null : (
+                        <Space size="small">
+                            <Tooltip title="SSH">
+                                <Button
+                                    aria-label="SSH"
+                                    icon={<CodeOutlined />}
+                                    type="text"
+                                    onClick={() => {
+                                        setTabPath(
+                                            tab.key,
+                                            `/terminal/${record.id}`,
+                                            `${getTargetName(record)}`,
+                                        );
+                                    }}
+                                />
+                            </Tooltip>
+                            <Tooltip title="SFTP">
+                                <Button
+                                    aria-label="SFTP"
+                                    icon={<FolderOutlined />}
+                                    type="text"
+                                    onClick={() => {
+                                        setTabPath(
+                                            tab.key,
+                                            `/filesview/${record.id}`,
+                                            `${getTargetName(record)}`,
+                                        );
+                                    }}
+                                />
+                            </Tooltip>
+                            <Tooltip title={t("app_btn_edit")}>
+                                <Button
+                                    aria-label={t("app_btn_edit")}
+                                    icon={<EditOutlined />}
+                                    type="text"
+                                    onClick={() => {
+                                        setEditorData(record);
+                                        setEditorOpen(true);
+                                        refresh();
+                                    }}
+                                />
+                            </Tooltip>
+                            <Tooltip title={t("app_btn_delete")}>
+                                <Button
+                                    aria-label={t("app_btn_delete")}
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    type="text"
+                                    onClick={() => {
+                                        Modal.confirm({
+                                            content: "Confirm to delete?",
+                                            async onOk() {
+                                                await postTargetRemove(
+                                                    record.id,
+                                                );
+                                                await refresh();
+                                            },
+                                        });
+                                    }}
+                                />
+                            </Tooltip>
+                        </Space>
+                    ),
             },
         ],
         [refresh, setTabPath, t, tab.key],
@@ -154,6 +284,19 @@ export default function TargetList({ tab }: { tab: ITab }) {
     return (
         <>
             <div className="WebSSH-MenuPageToolbar targetListToolbar">
+                <Select
+                    allowClear
+                    className="targetListDirectoryFilter"
+                    aria-label={t("target_directory_filter")}
+                    options={directoryOptions}
+                    placeholder={t("target_directory_filter")}
+                    showSearch
+                    value={directoryFilter}
+                    onChange={(value) => setDirectoryFilter(value)}
+                    getPopupContainer={(trigger) =>
+                        trigger.parentElement ?? document.body
+                    }
+                />
                 <Input
                     allowClear
                     aria-label={t("transfer_filter_keyword")}
@@ -188,19 +331,26 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 className="WebSSH-MenuPageContent targetListTableContainer"
                 {...tablePageNavigationProps}
             >
-                <Table
+                <TargetVirtualTable
                     className="WebSSH-FilelistTable targetListTable"
                     rowKey="id"
                     columns={columns}
-                    dataSource={filteredDataSource}
+                    dataSource={treeDataSource}
                     size="small"
                     pagination={false}
+                    listItemHeight={TARGET_ROW_HEIGHT}
                     virtual={tableBodyHeight > 0}
                     scroll={
                         tableBodyHeight > 0
                             ? { x: 520, y: tableBodyHeight }
                             : undefined
                     }
+                    expandable={{
+                        defaultExpandAllRows: true,
+                        expandIcon: (props) => (
+                            <TargetTreeExpandIcon {...props} />
+                        ),
+                    }}
                 />
             </div>
             <TargetEditor

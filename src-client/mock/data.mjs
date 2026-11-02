@@ -9,6 +9,7 @@ const createTargets = () => {
         {
             id: 1,
             name: "Local password",
+            directory: "Local",
             host: "127.0.0.1",
             method: 1,
             user: "user1",
@@ -19,6 +20,7 @@ const createTargets = () => {
         {
             id: 2,
             name: "Local private key",
+            directory: "Local",
             host: "127.0.0.1",
             method: 2,
             user: "user2",
@@ -29,6 +31,7 @@ const createTargets = () => {
         {
             id: 3,
             name: "Windows server",
+            directory: "Servers",
             host: "127.0.0.1",
             port: 2222,
             method: 1,
@@ -47,6 +50,7 @@ const createTargets = () => {
                 return {
                     id,
                     name: `Mock target ${id}`,
+                    directory: id % 3 === 0 ? "Servers" : "",
                     host: `server-${String(id).padStart(5, "0")}.example.test`,
                     port: id % 4 === 0 ? 2222 : 22,
                     method: id % 2 === 0 ? 2 : 1,

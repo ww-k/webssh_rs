@@ -140,7 +140,12 @@ export default function Home({ active }: { active: boolean }) {
                         children = <Filesview tab={tab} />;
                         break;
                     default:
-                        children = <TargetSelector tab={tab} />;
+                        children = (
+                            <TargetSelector
+                                active={active && activeTabKey === tab.key}
+                                tab={tab}
+                            />
+                        );
                         break;
                 }
 
@@ -165,7 +170,7 @@ export default function Home({ active }: { active: boolean }) {
                     children,
                 };
             }),
-        [activeTabKey, onTabContextMenu, tabs],
+        [active, activeTabKey, onTabContextMenu, tabs],
     );
 
     const onEdit = useCallback(
@@ -183,7 +188,7 @@ export default function Home({ active }: { active: boolean }) {
     );
     return (
         <Tabs
-            style={{ visibility: active ? "visible" : "hidden" }}
+            style={{ display: active ? undefined : "none" }}
             size="small"
             activeKey={activeTabKey}
             className="WebSSH-Home-Tabs"

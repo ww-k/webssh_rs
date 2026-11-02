@@ -6,6 +6,38 @@
     width: 240px;
 }
 
+.targetListDirectoryFilter {
+    width: 180px;
+}
+
 .targetListActions {
     margin-left: auto;
+}
+
+.targetTreeExpandIconTarget {
+    color: var(--ant-color-text-secondary);
+    pointer-events: none;
+}
+
+.targetTreeExpandIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-inline-end: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.targetTreeExpandIconDirectory {
+    color: var(--ant-color-primary);
+    cursor: pointer;
+}
+
+.targetTreeExpandIconDirectory:hover {
+    color: var(--ant-color-primary-hover);
 }

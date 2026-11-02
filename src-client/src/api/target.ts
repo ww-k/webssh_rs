@@ -3,6 +3,7 @@ import axios from "axios";
 export interface ITarget {
     id: number;
     name?: string;
+    directory?: string;
     host: string;
     port?: number;
     method: number;

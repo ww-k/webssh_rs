@@ -112,6 +112,7 @@ mod tests {
             target::Model {
                 id: 0,
                 name: "Test target".to_string(),
+                directory: String::new(),
                 host: "127.0.0.1".to_string(),
                 port: Some(22),
                 method: TargetAuthMethod::Password,

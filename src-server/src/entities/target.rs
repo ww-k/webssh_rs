@@ -83,6 +83,9 @@ pub struct Model {
     /// SSH target name
     #[serde(default)]
     pub name: String,
+    /// Optional target directory used for grouping targets in the UI.
+    #[serde(default)]
+    pub directory: String,
     /// SSH 目标主机地址
     pub host: String,
     /// SSH 端口号，默认为 22
@@ -107,6 +110,7 @@ impl std::fmt::Debug for Model {
         f.debug_struct("Model")
             .field("id", &self.id)
             .field("name", &self.name)
+            .field("directory", &self.directory)
             .field("host", &self.host)
             .field("port", &self.port)
             .field("method", &self.method)

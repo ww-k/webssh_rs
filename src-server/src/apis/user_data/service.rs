@@ -102,6 +102,7 @@ async fn import_in_transaction<C: ConnectionTrait>(
         let target = target::ActiveModel {
             id: NotSet,
             name: Set(source.name.clone()),
+            directory: Set(source.directory.clone()),
             host: Set(source.host.clone()),
             port: Set(source.port),
             method: Set(source.method.clone()),
@@ -250,6 +251,7 @@ impl From<target::Model> for UserDataTarget {
         Self {
             id: target.id,
             name: target.name,
+            directory: target.directory,
             host: target.host,
             port: target.port,
             method: target.method,

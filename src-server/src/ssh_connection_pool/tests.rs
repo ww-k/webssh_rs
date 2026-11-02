@@ -61,6 +61,7 @@ fn test_target() -> target::Model {
     target::Model {
         id: 1,
         name: "Test target".to_string(),
+        directory: String::new(),
         host: "127.0.0.1".to_string(),
         port: Some(2222),
         method: TargetAuthMethod::Password,
@@ -580,6 +581,7 @@ async fn target_update_is_not_blocked_by_a_capacity_waiter(context: &TestContext
     let payload = TargetUpdatePayload {
         id: current.id,
         name: current.name,
+        directory: current.directory,
         host: current.host,
         port: current.port,
         method: current.method,
