@@ -66,7 +66,6 @@ export default function remoteHandleContextmenu(
             disabled: !(
                 files.length === 1 &&
                 !files[0].isDir &&
-                files[0].type === "f" &&
                 files[0].size <= 20 * 1024 * 1024
             ),
             click: async () => {
