@@ -92,12 +92,17 @@ async fn list_dir(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> 
 
     while let Some(entry) = entries.next_entry().await.map_err(map_fs_io_err)? {
         let path = entry.path();
-        let metadata = entry.metadata().await.map_err(map_fs_io_err)?;
+        let metadata = fs::symlink_metadata(&path).await.map_err(map_fs_io_err)?;
         if !all.unwrap_or(false) && is_hidden_path(&path, &metadata) {
             continue;
         }
 
-        files.push(fs_file_from_metadata(path, metadata));
+        let target_is_dir = if metadata.file_type().is_symlink() {
+            fs::metadata(&path).await.ok().map(|target| target.is_dir())
+        } else {
+            Some(metadata.is_dir())
+        };
+        files.push(fs_file_from_metadata(path, metadata, target_is_dir));
     }
 
     files.sort_by(|a, b| match (a.r#type, b.r#type) {
@@ -112,8 +117,13 @@ async fn list_dir(path: &str, all: Option<bool>) -> Result<Vec<FsFile>, ApiErr> 
 
 pub async fn stat(path: &str) -> Result<FsFile, ApiErr> {
     let path = PathBuf::from(path);
-    let metadata = fs::metadata(&path).await.map_err(map_fs_io_err)?;
-    Ok(fs_file_from_metadata(path, metadata))
+    let metadata = fs::symlink_metadata(&path).await.map_err(map_fs_io_err)?;
+    let target_is_dir = if metadata.file_type().is_symlink() {
+        fs::metadata(&path).await.ok().map(|target| target.is_dir())
+    } else {
+        Some(metadata.is_dir())
+    };
+    Ok(fs_file_from_metadata(path, metadata, target_is_dir))
 }
 
 pub async fn mkdir(path: &str) -> Result<(), ApiErr> {
@@ -282,6 +292,7 @@ async fn list_roots() -> Result<Vec<FsFile>, ApiErr> {
             roots.push(FsFile {
                 name: format!("{}:", letter as char),
                 r#type: 'd',
+                is_dir: true,
                 size: None,
                 atime: None,
                 mtime: None,
@@ -302,19 +313,24 @@ fn should_list_roots(_path: &str) -> bool {
     false
 }
 
-fn fs_file_from_metadata(path: PathBuf, metadata: std::fs::Metadata) -> FsFile {
+fn fs_file_from_metadata(
+    path: PathBuf,
+    metadata: std::fs::Metadata,
+    target_is_dir: Option<bool>,
+) -> FsFile {
     let name = file_name(&path);
     FsFile {
         name,
-        r#type: if metadata.is_dir() {
+        r#type: if metadata.file_type().is_symlink() {
+            'l'
+        } else if metadata.is_dir() {
             'd'
         } else if metadata.is_file() {
             'f'
-        } else if metadata.file_type().is_symlink() {
-            'l'
         } else {
             '?'
         },
+        is_dir: target_is_dir.unwrap_or(false),
         size: Some(metadata.len()),
         atime: metadata
             .accessed()

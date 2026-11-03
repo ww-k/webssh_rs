@@ -37,6 +37,9 @@ pub struct FsFile {
     pub name: String,
     /// 文件类型：f-文件，d-目录，l-符号链接，?-未知
     pub r#type: char,
+    /// 文件目标是否为目录。符号链接使用该字段区分文件链接和目录链接。
+    #[serde(rename = "isDir")]
+    pub is_dir: bool,
     /// 文件大小（字节）
     pub size: Option<u64>,
     /// 最后访问时间

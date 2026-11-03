@@ -13,7 +13,7 @@ export default async function getFsLsMapFiles(path: string, all?: boolean) {
         size: item.size || 0,
         mtime: (item.mtime || 0) * 1000,
         atime: (item.atime || 0) * 1000,
-        isDir: item.type === "d",
+        isDir: item.isDir,
         uri: joinLocalPath(cwd, item.name),
         sortName: item.name.toLowerCase(),
     }));

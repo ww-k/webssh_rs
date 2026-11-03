@@ -12,7 +12,7 @@ export default async function getSftpLsMapFiles(
         ...item,
         mtime: item.mtime * 1000,
         atime: item.atime * 1000,
-        isDir: item.type === "d",
+        isDir: item.isDir,
         uri: joinFileUri(fileUri, item.name),
         sortName: item.name.toLowerCase(),
     }));

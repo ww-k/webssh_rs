@@ -11,6 +11,8 @@ export interface ISftpFileStat {
     name: string;
     /** 文件所在目录路径 */
     type: "f" | "d" | "l" | "?";
+    /** 文件目标是否为目录，符号链接据此区分文件链接和目录链接 */
+    isDir?: boolean;
     /** 文件大小 */
     size: number;
     /** 最近访问时间 */

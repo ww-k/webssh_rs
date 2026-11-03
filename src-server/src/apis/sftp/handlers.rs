@@ -68,19 +68,30 @@ pub async fn ls(
 
     debug!("@sftp_ls sftp.read_dir {:?}", payload);
 
-    let files = match payload.all {
-        Some(true) => {
-            let files = read_dir.into_iter().map(SftpFile::from_dir_entry);
-            Vec::from_iter(files)
-        }
-        _ => {
-            let files = read_dir
-                .into_iter()
-                .filter(|dir_entry| !dir_entry.file_name().starts_with("."))
-                .map(SftpFile::from_dir_entry);
-            Vec::from_iter(files)
-        }
+    let entries = match payload.all {
+        Some(true) => read_dir,
+        _ => read_dir
+            .into_iter()
+            .filter(|dir_entry| !dir_entry.file_name().starts_with("."))
+            .collect(),
     };
+    let mut files = Vec::with_capacity(entries.len());
+    for dir_entry in entries {
+        let (name, attrs) = dir_entry.into_parts();
+        let is_dir = if attrs.file_type() == SftpFileType::Symlink {
+            let path = if uri.path == "/" {
+                format!("/{name}")
+            } else {
+                format!("/{}/{}", uri.path.trim_matches('/'), name)
+            };
+            map_ssh_err!(sftp.metadata(path).await)
+                .ok()
+                .is_some_and(|target| target.file_type() == SftpFileType::Dir)
+        } else {
+            attrs.file_type() == SftpFileType::Dir
+        };
+        files.push(SftpFile::from_name_attrs_with_dir(name, attrs, is_dir));
+    }
 
     Ok(Json(files))
 }

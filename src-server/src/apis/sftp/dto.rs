@@ -2,7 +2,7 @@ use axum::http::HeaderValue;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::sftp_client::{SftpAttrs, SftpDirEntry, SftpFileType};
+use crate::sftp_client::{SftpAttrs, SftpFileType};
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct QueryTargetId {
@@ -32,6 +32,9 @@ pub struct SftpFile {
     pub name: String,
     /// 文件类型：f-文件，d-目录，l-符号链接，?-未知
     pub r#type: char,
+    /// 文件目标是否为目录。符号链接使用该字段区分文件链接和目录链接。
+    #[serde(rename = "isDir")]
+    pub is_dir: bool,
     /// 文件大小（字节）
     pub size: Option<u64>,
     /// 最后访问时间
@@ -43,12 +46,12 @@ pub struct SftpFile {
 }
 
 impl SftpFile {
-    pub(crate) fn from_dir_entry(dir_entry: SftpDirEntry) -> Self {
-        let (name, attrs) = dir_entry.into_parts();
-        Self::from_name_attrs(name, attrs)
+    pub(crate) fn from_name_attrs(name: String, attrs: SftpAttrs) -> Self {
+        let is_dir = attrs.file_type() == SftpFileType::Dir;
+        Self::from_name_attrs_with_dir(name, attrs, is_dir)
     }
 
-    pub(crate) fn from_name_attrs(name: String, attrs: SftpAttrs) -> Self {
+    pub(crate) fn from_name_attrs_with_dir(name: String, attrs: SftpAttrs, is_dir: bool) -> Self {
         SftpFile {
             name,
             r#type: match attrs.file_type() {
@@ -57,6 +60,7 @@ impl SftpFile {
                 SftpFileType::Symlink => 'l',
                 _ => '?',
             },
+            is_dir,
             size: attrs.size,
             atime: attrs.atime,
             mtime: attrs.mtime,
@@ -70,6 +74,7 @@ impl Default for SftpFile {
         SftpFile {
             name: "".to_string(),
             r#type: '?',
+            is_dir: false,
             size: None,
             atime: None,
             mtime: None,
