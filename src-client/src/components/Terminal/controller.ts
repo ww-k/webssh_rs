@@ -4,8 +4,6 @@ import { Terminal } from "@xterm/xterm";
 
 import { parseTerminalCwd } from "@/helpers/terminal_cwd";
 
-import type { Socket } from "socket.io-client";
-
 import {
     copyTerminalSelection,
     enhanceMouseCopyPaste,
@@ -22,6 +20,7 @@ import { installManualRetry } from "./reconnect";
 import { createTerminalSocket } from "./socket";
 import { applyTerminalTheme } from "./theme";
 
+import type { Socket } from "socket.io-client";
 import type { ClipboardOptions, TerminalSize, TerminalTheme } from "./types";
 
 interface TerminalMessage {
@@ -179,8 +178,16 @@ class TerminalController {
                     this.maxDisconnectionDuration =
                         option.maxDisconnectionDuration;
                 }
-                if (this.terminal)
-                    window.setTimeout(() => this.fitTerminal(), 0);
+                if (this.terminal) {
+                    window.setTimeout(() => {
+                        this.fitTerminal();
+                        // fit() does not emit onResize when the dimensions did
+                        // not change. The initial resize may also have happened
+                        // before the server installed its resize listener, so
+                        // always synchronize the current size after ready.
+                        this.emitResize();
+                    }, 0);
+                }
             },
             onOutput: (data) => {
                 if (!this.terminal) this.outputBuffer += data;
@@ -229,7 +236,9 @@ class TerminalController {
 
         this.terminal.onResize((size) => {
             this.sizeCache = { col: size.cols, row: size.rows };
-            if (socket.connected) socket.emit("resize", this.sizeCache);
+            if (this.terminalReady && socket.connected) {
+                socket.emit("resize", this.sizeCache);
+            }
         });
         this.terminal.onData((data) => {
             if (socket.connected) socket.emit("input", data);
@@ -258,6 +267,17 @@ class TerminalController {
         console.log("fitTerminal terminalActive", this.terminalActive);
         this.fitAddon.fit();
     };
+
+    private emitResize(): void {
+        if (!this.terminalReady || !this.terminalSocket?.connected) return;
+
+        const size =
+            this.sizeCache ||
+            (this.terminal
+                ? { col: this.terminal.cols, row: this.terminal.rows }
+                : undefined);
+        if (size) this.terminalSocket.emit("resize", size);
+    }
 
     private getTargetId(): number {
         return targetIdFromQuery() ?? 0;
