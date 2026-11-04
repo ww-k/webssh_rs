@@ -3,6 +3,7 @@ import {
     DatabaseOutlined,
     DownloadOutlined,
     LayoutOutlined,
+    LinkOutlined,
     MoonOutlined,
     ReloadOutlined,
     SunOutlined,
@@ -24,8 +25,13 @@ import { useTranslation } from "react-i18next";
 import "./index.css";
 
 import fileSave from "@/helpers/fileSave";
-import renderPrompt from "@/helpers/renderPrompt";
-import { createUserDataExport, importUserData } from "@/services/userData";
+import renderPrompt, { renderUrlPasswordPrompt } from "@/helpers/renderPrompt";
+import {
+    createUserDataExport,
+    getUserDataImportErrorType,
+    importUserData,
+    importUserDataFromUrl,
+} from "@/services/userData";
 import useAppStore, { type ResolvedTheme, type ThemeMode } from "@/store";
 
 import { terminalThemeDefaults } from "../Terminal/constants";
@@ -151,65 +157,110 @@ export default function Settings() {
         }
     };
 
+    const applyImportedData = (
+        result: Awaited<ReturnType<typeof importUserData>>,
+    ) => {
+        setTheme(result.settings.theme_mode);
+        setSidebarCollapsed(result.settings.sidebar_collapsed);
+        setShowTerminalCopyNotification(
+            result.settings.show_terminal_copy_notification,
+        );
+        setTerminalSelectionCopyEnabled(
+            result.settings.terminal_selection_copy_enabled,
+        );
+        setTerminalRightClickAction(
+            result.settings.terminal_right_click_paste_enabled
+                ? "paste"
+                : "menu",
+        );
+        setTerminalMiddleClickPasteEnabled(
+            result.settings.terminal_middle_click_paste_enabled,
+        );
+        for (const mode of ["light", "dark"] as const) {
+            for (const { key } of terminalThemeColorFields) {
+                setTerminalThemeColor(
+                    mode,
+                    key,
+                    result.settings.terminal_themes[mode][key],
+                );
+            }
+        }
+        setLanguage(result.settings.language as "zh" | "en");
+        message.success(
+            t("settings_data_import_success", {
+                added: result.addedTargets,
+                skipped: result.skippedTargets,
+                favorites: result.importedFavorites,
+            }),
+        );
+    };
+
+    const importData = async (data: unknown) => {
+        const record =
+            data && typeof data === "object" && !Array.isArray(data)
+                ? (data as Record<string, unknown>)
+                : undefined;
+        const encrypted =
+            typeof record?.algorithm === "string" &&
+            typeof record?.salt === "string" &&
+            typeof record?.nonce === "string" &&
+            typeof record?.ciphertext === "string";
+        const password = encrypted
+            ? await renderPrompt({
+                  title: t("settings_data_import_password_title"),
+                  okText: t("app_btn_ok"),
+                  cancelText: t("app_btn_cancel"),
+                  password: true,
+              })
+            : undefined;
+        if (encrypted && password === undefined) return;
+        const result = await importUserData(data, password);
+        applyImportedData(result);
+    };
+
     const handleImport = async (file: File) => {
         try {
-            const data = JSON.parse(await file.text()) as unknown;
-            const record =
-                data && typeof data === "object" && !Array.isArray(data)
-                    ? (data as Record<string, unknown>)
-                    : undefined;
-            const encrypted =
-                typeof record?.algorithm === "string" &&
-                typeof record?.salt === "string" &&
-                typeof record?.nonce === "string" &&
-                typeof record?.ciphertext === "string";
-            const password = encrypted
-                ? await renderPrompt({
-                      title: t("settings_data_import_password_title"),
-                      okText: t("app_btn_ok"),
-                      cancelText: t("app_btn_cancel"),
-                      password: true,
-                  })
-                : undefined;
-            if (encrypted && password === undefined) return;
-            const result = await importUserData(data, password);
-            setTheme(result.settings.theme_mode);
-            setSidebarCollapsed(result.settings.sidebar_collapsed);
-            setShowTerminalCopyNotification(
-                result.settings.show_terminal_copy_notification,
+            await importData(JSON.parse(await file.text()) as unknown);
+        } catch (error) {
+            message.error(
+                t(
+                    `settings_data_import_error_${getUserDataImportErrorType(
+                        error,
+                    )}`,
+                ),
             );
-            setTerminalSelectionCopyEnabled(
-                result.settings.terminal_selection_copy_enabled,
-            );
-            setTerminalRightClickAction(
-                result.settings.terminal_right_click_paste_enabled
-                    ? "paste"
-                    : "menu",
-            );
-            setTerminalMiddleClickPasteEnabled(
-                result.settings.terminal_middle_click_paste_enabled,
-            );
-            for (const mode of ["light", "dark"] as const) {
-                for (const { key } of terminalThemeColorFields) {
-                    setTerminalThemeColor(
-                        mode,
-                        key,
-                        result.settings.terminal_themes[mode][key],
-                    );
-                }
-            }
-            setLanguage(result.settings.language as "zh" | "en");
-            message.success(
-                t("settings_data_import_success", {
-                    added: result.addedTargets,
-                    skipped: result.skippedTargets,
-                    favorites: result.importedFavorites,
-                }),
-            );
-        } catch {
-            message.error(t("settings_data_import_failed"));
         } finally {
             if (importInputRef.current) importInputRef.current.value = "";
+        }
+    };
+
+    const handleImportFromUrl = async () => {
+        const value = await renderUrlPasswordPrompt({
+            title: t("settings_data_import_url_title"),
+            urlPlaceholder: t("settings_data_import_url_placeholder"),
+            passwordPlaceholder: t(
+                "settings_data_import_url_password_placeholder",
+            ),
+            okText: t("app_btn_ok"),
+            cancelText: t("app_btn_cancel"),
+        });
+        const url = value?.url.trim();
+        if (!url) return;
+
+        try {
+            const result = await importUserDataFromUrl(
+                url,
+                value.password || undefined,
+            );
+            applyImportedData(result);
+        } catch (error) {
+            message.error(
+                t(
+                    `settings_data_import_url_error_${getUserDataImportErrorType(
+                        error,
+                    )}`,
+                ),
+            );
         }
     };
 
@@ -450,6 +501,12 @@ export default function Settings() {
                             onClick={() => importInputRef.current?.click()}
                         >
                             {t("settings_data_import")}
+                        </Button>
+                        <Button
+                            icon={<LinkOutlined />}
+                            onClick={() => void handleImportFromUrl()}
+                        >
+                            {t("settings_data_import_url")}
                         </Button>
                         <input
                             ref={importInputRef}

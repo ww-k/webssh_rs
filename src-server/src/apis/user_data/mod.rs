@@ -12,6 +12,7 @@ pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route("/export", post(handlers::user_data_export))
         .route("/import", post(handlers::user_data_import))
+        .route("/import/url", post(handlers::user_data_import_url))
         .fallback(|| async { "not supported" })
         .with_state(app_state)
 }

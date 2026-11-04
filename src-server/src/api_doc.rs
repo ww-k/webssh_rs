@@ -55,6 +55,7 @@ use utoipa::OpenApi;
         crate::apis::transfer::handlers::delete_finished_history,
         crate::apis::user_data::handlers::user_data_export,
         crate::apis::user_data::handlers::user_data_import,
+        crate::apis::user_data::handlers::user_data_import_url,
     ),
     components(
         schemas(
@@ -77,6 +78,7 @@ use utoipa::OpenApi;
             crate::apis::preferences::dto::PreferenceSettings,
             crate::apis::user_data::dto::UserDataExportPayload,
             crate::apis::user_data::dto::UserDataImportPayload,
+            crate::apis::user_data::dto::UserDataImportUrlPayload,
             crate::apis::user_data::dto::UserDataImportResult,
             crate::apis::user_data::dto::UserDataDocument,
             crate::apis::user_data::dto::UserDataTarget,

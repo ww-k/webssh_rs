@@ -7,7 +7,10 @@ use crate::{
     apis::{
         ApiErr, InternalErrorResponse, ValidJson,
         user_data::{
-            dto::{UserDataExportPayload, UserDataImportPayload, UserDataImportResult},
+            dto::{
+                UserDataExportPayload, UserDataImportPayload, UserDataImportResult,
+                UserDataImportUrlPayload,
+            },
             service,
         },
     },
@@ -47,4 +50,22 @@ pub async fn user_data_import(
     ValidJson(payload): ValidJson<UserDataImportPayload>,
 ) -> Result<Json<UserDataImportResult>, ApiErr> {
     Ok(Json(service::import(&state.db, payload).await?))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/user_data/import/url",
+    tag = "user_data",
+    operation_id = "user_data_import_url",
+    request_body = UserDataImportUrlPayload,
+    responses(
+        (status = 200, description = "从 URL 获取并导入用户数据", body = UserDataImportResult),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn user_data_import_url(
+    State(state): State<Arc<AppState>>,
+    ValidJson(payload): ValidJson<UserDataImportUrlPayload>,
+) -> Result<Json<UserDataImportResult>, ApiErr> {
+    Ok(Json(service::import_from_url(&state.db, payload).await?))
 }

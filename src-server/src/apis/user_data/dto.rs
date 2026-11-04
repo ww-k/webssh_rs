@@ -51,6 +51,12 @@ pub struct UserDataImportPayload {
     pub data: Value,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UserDataImportUrlPayload {
+    pub password: Option<String>,
+    pub url: String,
+}
+
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UserDataDocument {
     pub version: u32,

@@ -28,3 +28,16 @@ export async function postUserDataImport(data: {
     }>("/api/user_data/import", data);
     return response.data;
 }
+
+export async function postUserDataImportUrl(data: {
+    password?: string;
+    url: string;
+}) {
+    const response = await axios.post<{
+        added_targets: number;
+        skipped_targets: number;
+        imported_favorites: number;
+        settings: unknown;
+    }>("/api/user_data/import/url", data);
+    return response.data;
+}

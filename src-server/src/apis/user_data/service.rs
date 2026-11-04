@@ -22,10 +22,15 @@ use crate::{
         ApiErr,
         user_data::dto::{
             EncryptedUserDataExport, USER_DATA_VERSION, UserDataDocument, UserDataExportPayload,
-            UserDataFavoriteDirectory, UserDataImportPayload, UserDataImportResult, UserDataTarget,
+            UserDataFavoriteDirectory, UserDataImportPayload, UserDataImportResult,
+            UserDataImportUrlPayload, UserDataTarget,
         },
     },
-    consts::services_err_code::{ERR_CODE_DB_ERR, ERR_CODE_JSON_ERR},
+    consts::services_err_code::{
+        ERR_CODE_DB_ERR, ERR_CODE_JSON_ERR, ERR_CODE_USER_DATA_DECRYPT_FAILED,
+        ERR_CODE_USER_DATA_PASSWORD_REQUIRED, ERR_CODE_USER_DATA_URL_FETCH_FAILED,
+        ERR_CODE_USER_DATA_URL_FORMAT, ERR_CODE_USER_DATA_URL_INVALID,
+    },
     entities::{favorite_directory, target},
     map_db_err,
 };
@@ -70,7 +75,45 @@ pub async fn import(
     db: &DatabaseConnection,
     payload: UserDataImportPayload,
 ) -> Result<UserDataImportResult, ApiErr> {
-    let document = decode_document(payload.data, payload.password.as_deref())?;
+    import_document(db, payload.data, payload.password.as_deref()).await
+}
+
+pub async fn import_from_url(
+    db: &DatabaseConnection,
+    payload: UserDataImportUrlPayload,
+) -> Result<UserDataImportResult, ApiErr> {
+    let url = reqwest::Url::parse(&payload.url).map_err(|_| url_error())?;
+    if url.scheme() != "http" && url.scheme() != "https" {
+        return Err(url_error());
+    }
+    let response = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|err| fetch_error(err.to_string()))?
+        .get(url)
+        .header(reqwest::header::ACCEPT, "application/json")
+        .send()
+        .await
+        .map_err(|err| fetch_error(err.to_string()))?
+        .error_for_status()
+        .map_err(|err| fetch_error(err.to_string()))?;
+    let body = response
+        .bytes()
+        .await
+        .map_err(|err| fetch_error(err.to_string()))?;
+    if body.len() > 10 * 1024 * 1024 {
+        return Err(fetch_error("user data response is too large"));
+    }
+    let data = serde_json::from_slice(body.as_ref()).map_err(|_| url_format_error())?;
+    import_document(db, data, payload.password.as_deref()).await
+}
+
+async fn import_document(
+    db: &DatabaseConnection,
+    data: serde_json::Value,
+    password: Option<&str>,
+) -> Result<UserDataImportResult, ApiErr> {
+    let document = decode_document(data, password)?;
     let import_payload = UserDataImportPayloadData {
         version: document.version,
         targets: document.targets,
@@ -292,11 +335,11 @@ fn decode_document(
         .and_then(serde_json::Value::as_str)
         .is_some();
     if is_encrypted {
-        let password = password
-            .filter(|value| !value.is_empty())
-            .ok_or_else(crypto_error)?;
         let envelope: EncryptedUserDataExport =
             serde_json::from_value(data).map_err(|_| crypto_error())?;
+        let password = password
+            .filter(|value| !value.is_empty())
+            .ok_or_else(password_required_error)?;
         decrypt_document(&envelope, password)
     } else {
         serde_json::from_value(data).map_err(|_| ApiErr {
@@ -382,8 +425,36 @@ fn decrypt_document(
 
 fn crypto_error() -> ApiErr {
     ApiErr {
-        code: ERR_CODE_JSON_ERR,
+        code: ERR_CODE_USER_DATA_DECRYPT_FAILED,
         message: "invalid password or encrypted user data".to_string(),
+    }
+}
+
+fn password_required_error() -> ApiErr {
+    ApiErr {
+        code: ERR_CODE_USER_DATA_PASSWORD_REQUIRED,
+        message: "password is required for encrypted user data".to_string(),
+    }
+}
+
+fn url_error() -> ApiErr {
+    ApiErr {
+        code: ERR_CODE_USER_DATA_URL_INVALID,
+        message: "user data URL must use HTTP or HTTPS".to_string(),
+    }
+}
+
+fn fetch_error(message: impl Into<String>) -> ApiErr {
+    ApiErr {
+        code: ERR_CODE_USER_DATA_URL_FETCH_FAILED,
+        message: format!("failed to fetch user data: {}", message.into()),
+    }
+}
+
+fn url_format_error() -> ApiErr {
+    ApiErr {
+        code: ERR_CODE_USER_DATA_URL_FORMAT,
+        message: "user data URL returned invalid JSON".to_string(),
     }
 }
 

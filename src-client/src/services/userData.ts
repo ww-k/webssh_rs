@@ -1,4 +1,8 @@
-import { postUserDataExport, postUserDataImport } from "@/api";
+import {
+    postUserDataExport,
+    postUserDataImport,
+    postUserDataImportUrl,
+} from "@/api";
 import { terminalThemeDefaults } from "@/components/Terminal/constants";
 
 import type { TerminalThemeColors } from "@/components/Terminal/types";
@@ -16,14 +20,12 @@ export interface UserDataSettings {
     terminal_themes: UserDataTerminalThemes;
     language: string;
 }
-
 export interface UserDataImportResult {
     addedTargets: number;
     skippedTargets: number;
     importedFavorites: number;
     settings: UserDataSettings;
 }
-
 function readSettings(value: unknown): UserDataSettings {
     if (!value || typeof value !== "object") {
         return {
@@ -171,4 +173,58 @@ export async function importUserData(
         importedFavorites: result.imported_favorites,
         settings: readSettings(result.settings),
     };
+}
+
+export async function importUserDataFromUrl(
+    url: string,
+    password?: string,
+): Promise<UserDataImportResult> {
+    const result = await postUserDataImportUrl({
+        url,
+        ...(password ? { password } : {}),
+    });
+    return {
+        addedTargets: result.added_targets,
+        skippedTargets: result.skipped_targets,
+        importedFavorites: result.imported_favorites,
+        settings: readSettings(result.settings),
+    };
+}
+
+export type UserDataImportErrorType =
+    | "password_required"
+    | "decrypt_failed"
+    | "format"
+    | "url"
+    | "unknown";
+
+export function getUserDataImportErrorType(
+    error: unknown,
+): UserDataImportErrorType {
+    if (!error || typeof error !== "object") {
+        return "format";
+    }
+    const value = error as {
+        code?: unknown;
+        message?: unknown;
+        name?: unknown;
+    };
+    if (value.name === "SyntaxError") return "format";
+    switch (String(value.code)) {
+        case "6000":
+            return "password_required";
+        case "6001":
+            return "decrypt_failed";
+        case "6002":
+        case "6003":
+            return "url";
+        case "6004":
+            return "format";
+        case "2":
+            return "format";
+    }
+    const message = typeof value.message === "string" ? value.message : "";
+    if (/password/i.test(message)) return "password_required";
+    if (/json|invalid|unsupported|format/i.test(message)) return "format";
+    return "unknown";
 }

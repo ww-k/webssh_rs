@@ -379,8 +379,18 @@ async function handleUserData(request, response, pathname) {
             encryptUserData(document, payload.password),
         );
     }
-    if (request.method === "POST" && pathname === "/api/user_data/import") {
+    if (
+        request.method === "POST" &&
+        ["/api/user_data/import", "/api/user_data/import/url"].includes(
+            pathname,
+        )
+    ) {
         const payload = await readJson(request);
+        if (pathname === "/api/user_data/import/url") {
+            const fetched = await fetch(payload.url);
+            if (!fetched.ok) throw new Error(`HTTP ${fetched.status}`);
+            payload.data = await fetched.json();
+        }
         if (!payload.data) throw new Error("invalid user data");
         const encrypted = typeof payload.data.algorithm === "string";
         const document = encrypted
