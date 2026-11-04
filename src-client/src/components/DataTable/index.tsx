@@ -1,11 +1,18 @@
-import { CaretDownOutlined, CaretUpOutlined } from "@ant-design/icons";
+import {
+    CaretDownOutlined,
+    CaretRightOutlined,
+    CaretUpOutlined,
+} from "@ant-design/icons";
 import {
     type ColumnDef,
     createCoreRowModel,
+    createExpandedRowModel,
     createSortedRowModel,
+    type ExpandedState,
     flexRender,
     type RowData,
     type RowSelectionState,
+    rowExpandingFeature,
     rowSelectionFeature,
     rowSortingFeature,
     type SortingState,
@@ -21,9 +28,11 @@ import "./index.css";
 
 const features = tableFeatures({
     rowSelectionFeature,
+    rowExpandingFeature,
     rowSortingFeature,
     coreRowModel: createCoreRowModel(),
     sortedRowModel: createSortedRowModel(),
+    expandedRowModel: createExpandedRowModel(),
 });
 const ROW_OVERSCAN = 10;
 const VIRTUAL_WINDOW_STEP = 8;
@@ -80,6 +89,16 @@ export interface DataTableProps<TData extends RowData> {
     onRename?: (row: TData) => void;
     onCopy?: (rows: TData[], cut: boolean) => void;
     onPaste?: () => void;
+    getSubRows?: (
+        row: TData,
+        index: number,
+    ) => ReadonlyArray<TData> | undefined;
+    defaultExpanded?: boolean;
+    expandIcon?: (
+        row: TData,
+        expanded: boolean,
+        onToggle: () => void,
+    ) => React.ReactNode;
 }
 
 function DataTable<TData extends RowData>({
@@ -107,10 +126,16 @@ function DataTable<TData extends RowData>({
     onRename,
     onCopy,
     onPaste,
+    getSubRows,
+    defaultExpanded = false,
+    expandIcon,
 }: DataTableProps<TData>) {
     const rootRef = useRef<HTMLDivElement>(null);
     const [sorting, setSorting] = useState<SortingState>([]);
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const [expanded, setExpanded] = useState<ExpandedState>(
+        defaultExpanded ? true : {},
+    );
     const [activeId, setActiveId] = useState<string | null>(null);
     const [scrollTop, setScrollTop] = useState(0);
     const scrollTopRef = useRef(0);
@@ -154,9 +179,11 @@ function DataTable<TData extends RowData>({
         data,
         columns: tableColumns,
         getRowId,
-        state: { sorting, rowSelection },
+        getSubRows,
+        state: { sorting, rowSelection, expanded },
         onSortingChange: setSorting,
         onRowSelectionChange: setRowSelection,
+        onExpandedChange: setExpanded,
         enableRowSelection: (row) => isRowSelectable?.(row.original) ?? true,
         enableMultiRowSelection: multiple,
     });
@@ -195,7 +222,15 @@ function DataTable<TData extends RowData>({
 
     useEffect(() => {
         setRowSelection((previous) => {
-            const ids = new Set(data.map(getRowId));
+            const ids = new Set<string>();
+            const collectIds = (items: ReadonlyArray<TData>) => {
+                items.forEach((item, index) => {
+                    ids.add(getRowId(item, index));
+                    const children = getSubRows?.(item, index);
+                    if (children) collectIds(children);
+                });
+            };
+            collectIds(data);
             const next = Object.fromEntries(
                 Object.entries(previous).filter(([id]) => ids.has(id)),
             );
@@ -203,7 +238,7 @@ function DataTable<TData extends RowData>({
                 ? previous
                 : next;
         });
-    }, [data, getRowId]);
+    }, [data, getRowId, getSubRows]);
 
     useEffect(() => {
         const element = rootRef.current;
@@ -433,7 +468,10 @@ function DataTable<TData extends RowData>({
                 className="WebSSH-DataTableHeader"
                 style={{ width: tableWidth }}
             >
-                <table className="filelistTable" style={{ width: tableWidth }}>
+                <table
+                    className="WebSSH-DataTableTable"
+                    style={{ width: tableWidth }}
+                >
                     <colgroup>
                         {multiple && <col style={{ width: 26 }} />}
                         {columns.map((column) => (
@@ -451,7 +489,7 @@ function DataTable<TData extends RowData>({
                     <thead>
                         <tr>
                             {multiple && (
-                                <th className="filelistTableCellColCheckbox">
+                                <th className="WebSSH-DataTableCellColCheckbox">
                                     <input
                                         type="checkbox"
                                         aria-label="Select all rows"
@@ -507,8 +545,8 @@ function DataTable<TData extends RowData>({
                                                 header.column.toggleSorting();
                                             }}
                                         >
-                                            <div className="filelistTableColumnHeader">
-                                                <span className="filelistTableColumnTitle">
+                                            <div className="WebSSH-DataTableColumnHeader">
+                                                <span className="WebSSH-DataTableColumnTitle">
                                                     {flexRender(
                                                         header.column.columnDef
                                                             .header,
@@ -516,26 +554,25 @@ function DataTable<TData extends RowData>({
                                                     )}
                                                 </span>
                                                 <span
-                                                    className="filelistTableColumnSorter"
+                                                    className="WebSSH-DataTableColumnSorter"
                                                     aria-hidden="true"
                                                 >
                                                     <CaretUpOutlined
                                                         className={
                                                             sorted === "asc"
-                                                                ? "filelistTableColumnSorterIconActive"
+                                                                ? "WebSSH-DataTableColumnSorterIconActive"
                                                                 : ""
                                                         }
                                                     />
                                                     <CaretDownOutlined
                                                         className={
                                                             sorted === "desc"
-                                                                ? "filelistTableColumnSorterIconActive"
+                                                                ? "WebSSH-DataTableColumnSorterIconActive"
                                                                 : ""
                                                         }
                                                     />
                                                 </span>
                                             </div>
-                                            <div className="filelistTableThBorderRight" />
                                             <ResizeLine
                                                 direction="v"
                                                 className="WebSSH-DataTableResize"
@@ -627,7 +664,7 @@ function DataTable<TData extends RowData>({
                     }}
                 >
                     <table
-                        className="filelistTable WebSSH-DataTableVirtualTable"
+                        className="WebSSH-DataTableTable WebSSH-DataTableVirtualTable"
                         style={{
                             width: tableWidth,
                             top: virtual ? startIndex * rowHeight : 0,
@@ -656,10 +693,11 @@ function DataTable<TData extends RowData>({
                                     <tr
                                         key={row.id}
                                         className={classNames({
-                                            filelistTableTrActive:
+                                            "WebSSH-DataTableTrActive":
                                                 row.getIsSelected(),
-                                            filelistTableTrDisabled: disabled,
-                                            filelistTableTrActiveBorder:
+                                            "WebSSH-DataTableTrDisabled":
+                                                disabled,
+                                            "WebSSH-DataTableTrActiveBorder":
                                                 activeId === row.id,
                                         })}
                                         style={{ height: rowHeight }}
@@ -750,7 +788,7 @@ function DataTable<TData extends RowData>({
                                         }
                                     >
                                         {multiple && (
-                                            <td className="filelistTableCellColCheckbox">
+                                            <td className="WebSSH-DataTableCellColCheckbox">
                                                 <input
                                                     type="checkbox"
                                                     checked={row.getIsSelected()}
@@ -776,6 +814,9 @@ function DataTable<TData extends RowData>({
                                             .map((cell, cellIndex) => {
                                                 const column =
                                                     columns[cellIndex];
+                                                const isTreeColumn =
+                                                    Boolean(getSubRows) &&
+                                                    cellIndex === 0;
                                                 return (
                                                     <td
                                                         key={cell.id}
@@ -788,11 +829,56 @@ function DataTable<TData extends RowData>({
                                                                 "left",
                                                         }}
                                                     >
-                                                        {flexRender(
-                                                            cell.column
-                                                                .columnDef.cell,
-                                                            cell.getContext(),
-                                                        )}
+                                                        <div
+                                                            className={classNames(
+                                                                isTreeColumn &&
+                                                                    "WebSSH-DataTableTreeCell",
+                                                            )}
+                                                            style={
+                                                                isTreeColumn
+                                                                    ? {
+                                                                          paddingLeft:
+                                                                              row.depth *
+                                                                              20,
+                                                                      }
+                                                                    : undefined
+                                                            }
+                                                        >
+                                                            {isTreeColumn &&
+                                                                (expandIcon ? (
+                                                                    expandIcon(
+                                                                        original,
+                                                                        row.getIsExpanded(),
+                                                                        () =>
+                                                                            row.toggleExpanded(),
+                                                                    )
+                                                                ) : row.getCanExpand() ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="WebSSH-DataTableExpandIcon"
+                                                                        aria-label="Toggle row"
+                                                                        aria-expanded={row.getIsExpanded()}
+                                                                        onClick={(
+                                                                            event,
+                                                                        ) => {
+                                                                            event.stopPropagation();
+                                                                            row.toggleExpanded();
+                                                                        }}
+                                                                    >
+                                                                        {row.getIsExpanded() ? (
+                                                                            <CaretDownOutlined />
+                                                                        ) : (
+                                                                            <CaretRightOutlined />
+                                                                        )}
+                                                                    </button>
+                                                                ) : null)}
+                                                            {flexRender(
+                                                                cell.column
+                                                                    .columnDef
+                                                                    .cell,
+                                                                cell.getContext(),
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 );
                                             })}

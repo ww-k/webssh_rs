@@ -10,11 +10,12 @@ import {
     SearchOutlined,
     WindowsOutlined,
 } from "@ant-design/icons";
-import { Button, Input, Modal, Select, Space, Table, Tooltip } from "antd";
+import { Button, Input, Modal, Select, Space, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getTargetList, postTargetRemove } from "@/api";
+import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 import useAppStore from "@/store";
 
@@ -23,9 +24,6 @@ import "./List.css";
 import TargetEditor from "./Editor";
 import getTargetName from "./getTargetName";
 
-import type { TableProps } from "antd";
-import type { ColumnsType } from "antd/es/table/interface";
-import type { ComponentType } from "react";
 import type { ITarget } from "@/api";
 import type { ITab } from "@/store";
 
@@ -46,11 +44,7 @@ type TargetTreeRow =
       })
     | TargetDirectoryRow;
 
-const TargetVirtualTable = Table as unknown as ComponentType<
-    TableProps<TargetTreeRow> & { listItemHeight?: number }
->;
-
-const TARGET_ROW_HEIGHT = 44;
+const TARGET_ROW_HEIGHT = 33;
 
 const normalizeDirectory = (directory?: string) =>
     directory?.trim().replace(/^\/+|\/+$/g, "") || "";
@@ -86,18 +80,11 @@ const buildTargetTree = (targets: ITarget[]): TargetTreeRow[] => {
     return [...directories, ...standalone];
 };
 
-const TargetTreeExpandIcon = ({
-    expanded,
-    onExpand,
-    record,
-}: {
-    expanded: boolean;
-    onExpand: (
-        record: TargetTreeRow,
-        event: React.MouseEvent<HTMLButtonElement, MouseEvent>,
-    ) => void;
-    record: TargetTreeRow;
-}) => {
+const TargetTreeExpandIcon = (
+    record: TargetTreeRow,
+    expanded: boolean,
+    onToggle: () => void,
+) => {
     if (!record.isDirectory) {
         const SystemIcon =
             record.system?.toLocaleLowerCase() === "windows"
@@ -118,7 +105,10 @@ const TargetTreeExpandIcon = ({
             className="targetTreeExpandIcon targetTreeExpandIconDirectory"
             aria-expanded={expanded}
             aria-label={record.name}
-            onClick={(event) => onExpand(record, event)}
+            onClick={(event) => {
+                event.stopPropagation();
+                onToggle();
+            }}
         >
             {expanded ? <FolderOpenOutlined /> : <FolderOutlined />}
         </button>
@@ -179,22 +169,24 @@ export default function TargetList({ tab }: { tab: ITab }) {
         [dataSource],
     );
 
-    const columns: ColumnsType<TargetTreeRow> = useMemo(
+    const columns: DataTableColumn<TargetTreeRow>[] = useMemo(
         () => [
             {
-                title: t("target_directory"),
-                dataIndex: "name",
-                key: "name",
-                render: (_, record) =>
+                id: "name",
+                header: t("target_directory"),
+                accessor: (record) => record.name,
+                cell: (_value, record) =>
                     record.isDirectory
                         ? `${record.name}/`
                         : getTargetName(record),
             },
             {
-                title: t("app_common_action"),
-                key: "action",
+                id: "action",
+                header: t("app_common_action"),
+                accessor: () => "",
                 width: 180,
-                render: (_, record) =>
+                sortable: false,
+                cell: (_value, record) =>
                     record.isDirectory ? null : (
                         <Space size="small">
                             <Tooltip title="SSH">
@@ -331,26 +323,17 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 className="WebSSH-MenuPageContent targetListTableContainer"
                 {...tablePageNavigationProps}
             >
-                <TargetVirtualTable
-                    className="WebSSH-FilelistTable targetListTable"
-                    rowKey="id"
+                <DataTable
+                    className="targetListTable"
                     columns={columns}
-                    dataSource={treeDataSource}
-                    size="small"
-                    pagination={false}
-                    listItemHeight={TARGET_ROW_HEIGHT}
+                    data={treeDataSource}
+                    getRowId={(row) => String(row.id)}
+                    getSubRows={(row) => row.children}
+                    defaultExpanded
+                    expandIcon={TargetTreeExpandIcon}
+                    rowHeight={TARGET_ROW_HEIGHT}
+                    multiple={false}
                     virtual={tableBodyHeight > 0}
-                    scroll={
-                        tableBodyHeight > 0
-                            ? { x: 520, y: tableBodyHeight }
-                            : undefined
-                    }
-                    expandable={{
-                        defaultExpandAllRows: true,
-                        expandIcon: (props) => (
-                            <TargetTreeExpandIcon {...props} />
-                        ),
-                    }}
                 />
             </div>
             <TargetEditor
