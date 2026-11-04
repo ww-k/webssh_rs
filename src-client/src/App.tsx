@@ -12,6 +12,7 @@ import {
     KeyOutlined,
     SettingOutlined,
     SwapOutlined,
+    TableOutlined,
 } from "@ant-design/icons";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
@@ -20,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import useAppStore from "@/store";
 
 import { getTransferUnfinishedCount } from "./api";
+import DataTableDemo from "./components/DataTableDemo";
 import Home from "./components/Home";
 import ServerLogs from "./components/ServerLogs";
 import Settings from "./components/Settings";
@@ -93,6 +95,11 @@ export default function App() {
                 key: "server_logs",
                 icon: <FileTextOutlined />,
                 label: t("app_menu_server_logs"),
+            },
+            {
+                key: "table_demo",
+                icon: <TableOutlined />,
+                label: "Table Demo",
             },
         ];
     }, [newTransferCount, sidebarCollapsed, t]);
@@ -226,6 +233,7 @@ export default function App() {
                     {activeMenuKey === "server_logs" && <ServerLogs />}
                     {activeMenuKey === "ssh_known_hosts" && <SshKnownHosts />}
                     {activeMenuKey === "settings" && <Settings />}
+                    {activeMenuKey === "table_demo" && <DataTableDemo />}
                 </Content>
             </Layout>
         </ConfigProvider>
