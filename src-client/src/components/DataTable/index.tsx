@@ -534,6 +534,11 @@ function DataTable<TData extends RowData>({
                                             }}
                                             onClick={(event) => {
                                                 if (
+                                                    !header.column.getCanSort()
+                                                ) {
+                                                    return;
+                                                }
+                                                if (
                                                     (
                                                         event.target as HTMLElement
                                                     ).closest(
@@ -553,25 +558,28 @@ function DataTable<TData extends RowData>({
                                                         header.getContext(),
                                                     )}
                                                 </span>
-                                                <span
-                                                    className="WebSSH-DataTableColumnSorter"
-                                                    aria-hidden="true"
-                                                >
-                                                    <CaretUpOutlined
-                                                        className={
-                                                            sorted === "asc"
-                                                                ? "WebSSH-DataTableColumnSorterIconActive"
-                                                                : ""
-                                                        }
-                                                    />
-                                                    <CaretDownOutlined
-                                                        className={
-                                                            sorted === "desc"
-                                                                ? "WebSSH-DataTableColumnSorterIconActive"
-                                                                : ""
-                                                        }
-                                                    />
-                                                </span>
+                                                {header.column.getCanSort() && (
+                                                    <span
+                                                        className="WebSSH-DataTableColumnSorter"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <CaretUpOutlined
+                                                            className={
+                                                                sorted === "asc"
+                                                                    ? "WebSSH-DataTableColumnSorterIconActive"
+                                                                    : ""
+                                                            }
+                                                        />
+                                                        <CaretDownOutlined
+                                                            className={
+                                                                sorted ===
+                                                                "desc"
+                                                                    ? "WebSSH-DataTableColumnSorterIconActive"
+                                                                    : ""
+                                                            }
+                                                        />
+                                                    </span>
+                                                )}
                                             </div>
                                             <ResizeLine
                                                 direction="v"

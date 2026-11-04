@@ -175,6 +175,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 id: "name",
                 header: t("target_directory"),
                 accessor: (record) => record.name,
+                sortable: false,
                 cell: (_value, record) =>
                     record.isDirectory
                         ? `${record.name}/`

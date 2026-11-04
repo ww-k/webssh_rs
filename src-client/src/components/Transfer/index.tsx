@@ -450,6 +450,7 @@ const getCommonColumns = (
         header: t("transfer_column_filename"),
         accessor: (record) => record.name,
         width: 320,
+        sortable: false,
         cell: (_value, record) => (
             <TransferNameCell record={record} className={nameClassName}>
                 {renderName?.(record)}
@@ -461,6 +462,7 @@ const getCommonColumns = (
         header: t("transfer_column_type"),
         accessor: (record) => record.type,
         width: 100,
+        sortable: false,
         align: "center",
         className: "WebSSH-TransferCenterCell",
         cell: (type) => (
@@ -472,6 +474,7 @@ const getCommonColumns = (
         header: t("transfer_column_progress"),
         accessor: (record) => record.percent,
         width: 300,
+        sortable: false,
         cell: (_value, record) => <TransferProgressCell record={record} t={t} />,
     },
 ];
