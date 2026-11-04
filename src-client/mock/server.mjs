@@ -1,19 +1,78 @@
 import { createMockState, MOCK_ROW_COUNT } from "./data.mjs";
 
-import { createHash, randomUUID } from "node:crypto";
+import {
+    createCipheriv,
+    createDecipheriv,
+    createHash,
+    pbkdf2Sync,
+    randomBytes,
+    randomUUID,
+} from "node:crypto";
 import { posix } from "node:path";
 
 const state = createMockState();
 const MEBIBYTE = 1024 * 1024;
 const GIBIBYTE = 1024 * MEBIBYTE;
-const UNFINISHED_TRANSFER_STATUSES = new Set([
-    "WAIT",
-    "RUN",
-    "PAUSE",
-    "FAIL",
-]);
+const UNFINISHED_TRANSFER_STATUSES = new Set(["WAIT", "RUN", "PAUSE", "FAIL"]);
 const mebibytes = (value) => Math.round(value * MEBIBYTE);
 const gibibytes = (value) => Math.round(value * GIBIBYTE);
+const USER_DATA_ALGORITHM = "AES-256-GCM-PBKDF2-SHA256";
+
+function deriveUserDataKey(password, salt) {
+    return pbkdf2Sync(password, salt, 600_000, 32, "sha256");
+}
+
+function encryptUserData(document, password) {
+    const salt = randomBytes(16);
+    const nonce = randomBytes(12);
+    const cipher = createCipheriv(
+        "aes-256-gcm",
+        deriveUserDataKey(password, salt),
+        nonce,
+    );
+    cipher.setAAD(Buffer.from(USER_DATA_ALGORITHM));
+    const ciphertext = Buffer.concat([
+        cipher.update(JSON.stringify(document)),
+        cipher.final(),
+        cipher.getAuthTag(),
+    ]);
+    return {
+        version: 1,
+        algorithm: USER_DATA_ALGORITHM,
+        salt: salt.toString("base64"),
+        nonce: nonce.toString("base64"),
+        ciphertext: ciphertext.toString("base64"),
+    };
+}
+
+function decryptUserData(envelope, password) {
+    if (envelope.version !== 1 || envelope.algorithm !== USER_DATA_ALGORITHM) {
+        throw new Error("invalid password or encrypted user data");
+    }
+    const salt = Buffer.from(envelope.salt, "base64");
+    const nonce = Buffer.from(envelope.nonce, "base64");
+    const ciphertext = Buffer.from(envelope.ciphertext, "base64");
+    if (nonce.length !== 12 || ciphertext.length < 16) {
+        throw new Error("invalid password or encrypted user data");
+    }
+    const decipher = createDecipheriv(
+        "aes-256-gcm",
+        deriveUserDataKey(password, salt),
+        nonce,
+    );
+    decipher.setAAD(Buffer.from(USER_DATA_ALGORITHM));
+    decipher.setAuthTag(ciphertext.subarray(-16));
+    try {
+        return JSON.parse(
+            Buffer.concat([
+                decipher.update(ciphertext.subarray(0, -16)),
+                decipher.final(),
+            ]).toString("utf8"),
+        );
+    } catch {
+        throw new Error("invalid password or encrypted user data");
+    }
+}
 
 export function mockMiddlewares(request, response, next) {
     const isRewrittenMockApi = request.url?.startsWith("/mock_api");
@@ -57,7 +116,12 @@ async function route(request, response) {
         return handleSshConnection(request, response, pathname, searchParams);
     }
     if (pathname.startsWith("/api/favorite_directory/")) {
-        return handleFavoriteDirectory(request, response, pathname, searchParams);
+        return handleFavoriteDirectory(
+            request,
+            response,
+            pathname,
+            searchParams,
+        );
     }
     if (pathname.startsWith("/api/user_data/")) {
         return handleUserData(request, response, pathname);
@@ -126,7 +190,8 @@ function handleLogs(request, response) {
 }
 
 async function handlePreferences(request, response) {
-    if (request.method === "GET") return sendJson(response, 200, state.preferences);
+    if (request.method === "GET")
+        return sendJson(response, 200, state.preferences);
     if (request.method === "PUT") {
         state.preferences = await readJson(request);
         return sendJson(response, 200, state.preferences);
@@ -138,10 +203,16 @@ async function handleKnownHost(request, response, pathname) {
     if (request.method === "GET" && pathname === "/api/ssh_known_host/list") {
         return sendJson(response, 200, state.knownHosts);
     }
-    if (request.method === "POST" && pathname === "/api/ssh_known_host/remove") {
+    if (
+        request.method === "POST" &&
+        pathname === "/api/ssh_known_host/remove"
+    ) {
         const payload = await readJson(request);
-        const index = state.knownHosts.findIndex((item) => item.id === payload.id);
-        if (index === -1) return sendNotFound(response, "Known host", payload.id);
+        const index = state.knownHosts.findIndex(
+            (item) => item.id === payload.id,
+        );
+        if (index === -1)
+            return sendNotFound(response, "Known host", payload.id);
         state.knownHosts.splice(index, 1);
         response.writeHead(200);
         return response.end();
@@ -153,17 +224,24 @@ async function handleSshConnection(request, response, pathname, searchParams) {
     if (request.method === "GET" && pathname === "/api/ssh_connection/list") {
         const targetId = searchParams.get("target_id");
         const connections = targetId
-            ? state.sshConnections.filter((item) => item.target_id === Number(targetId))
+            ? state.sshConnections.filter(
+                  (item) => item.target_id === Number(targetId),
+              )
             : state.sshConnections;
         return sendJson(response, 200, connections);
     }
     if (
         request.method === "POST" &&
-        ["/api/ssh_connection/expire", "/api/ssh_connection/close"].includes(pathname)
+        ["/api/ssh_connection/expire", "/api/ssh_connection/close"].includes(
+            pathname,
+        )
     ) {
         const connectionId = searchParams.get("connection_id");
-        const connection = state.sshConnections.find((item) => item.id === connectionId);
-        if (!connection) return sendNotFound(response, "SSH connection", connectionId);
+        const connection = state.sshConnections.find(
+            (item) => item.id === connectionId,
+        );
+        if (!connection)
+            return sendNotFound(response, "SSH connection", connectionId);
         if (pathname.endsWith("/expire")) connection.expired = true;
         else connection.closed = true;
         return sendJson(response, 200, connection);
@@ -171,18 +249,32 @@ async function handleSshConnection(request, response, pathname, searchParams) {
     return sendMethodNotAllowed(response);
 }
 
-async function handleFavoriteDirectory(request, response, pathname, searchParams) {
-    if (request.method === "GET" && pathname === "/api/favorite_directory/list") {
+async function handleFavoriteDirectory(
+    request,
+    response,
+    pathname,
+    searchParams,
+) {
+    if (
+        request.method === "GET" &&
+        pathname === "/api/favorite_directory/list"
+    ) {
         const targetId = Number(searchParams.get("target_id") || 0);
         ensureFavoriteDirectories(targetId);
         return sendJson(response, 200, state.favoriteDirectories.get(targetId));
     }
-    if (request.method === "POST" && pathname === "/api/favorite_directory/initialize") {
+    if (
+        request.method === "POST" &&
+        pathname === "/api/favorite_directory/initialize"
+    ) {
         ensureFavoriteDirectories(Number(searchParams.get("target_id") || 0));
         response.writeHead(200);
         return response.end();
     }
-    if (request.method === "POST" && pathname === "/api/favorite_directory/add") {
+    if (
+        request.method === "POST" &&
+        pathname === "/api/favorite_directory/add"
+    ) {
         const payload = await readJson(request);
         const targetId = Number(payload.target_id || 0);
         ensureFavoriteDirectories(targetId);
@@ -203,9 +295,13 @@ async function handleFavoriteDirectory(request, response, pathname, searchParams
         list.push(item);
         return sendJson(response, 200, item);
     }
-    if (request.method === "POST" && pathname === "/api/favorite_directory/remove") {
+    if (
+        request.method === "POST" &&
+        pathname === "/api/favorite_directory/remove"
+    ) {
         const payload = await readJson(request);
-        const list = state.favoriteDirectories.get(Number(payload.target_id || 0)) || [];
+        const list =
+            state.favoriteDirectories.get(Number(payload.target_id || 0)) || [];
         state.favoriteDirectories.set(
             Number(payload.target_id || 0),
             list.filter((item) => item.path !== payload.path),
@@ -219,48 +315,78 @@ async function handleFavoriteDirectory(request, response, pathname, searchParams
 function ensureFavoriteDirectories(targetId) {
     if (state.favoriteDirectories.has(targetId)) return;
     const prefix = targetId === 0 ? "" : `sftp:${targetId}:`;
-    state.favoriteDirectories.set(targetId, [
-        {
-            id: targetId * 10 + 1,
-            target_id: targetId,
-            name: "Home",
-            path: targetId === 0 ? "/Users/demo" : "/Users/test",
-            is_default: true,
-            created_at: 1_638_400_000,
-        },
-        {
-            id: targetId * 10 + 2,
-            target_id: targetId,
-            name: "Downloads",
-            path: targetId === 0 ? "/Users/demo/Downloads" : "/Users/test/Downloads",
-            is_default: true,
-            created_at: 1_638_400_000,
-        },
-    ].map((item) => ({ ...item, path: item.path.replace(/^sftp:\d+:/, prefix) })));
+    state.favoriteDirectories.set(
+        targetId,
+        [
+            {
+                id: targetId * 10 + 1,
+                target_id: targetId,
+                name: "Home",
+                path: targetId === 0 ? "/Users/demo" : "/Users/test",
+                is_default: true,
+                created_at: 1_638_400_000,
+            },
+            {
+                id: targetId * 10 + 2,
+                target_id: targetId,
+                name: "Downloads",
+                path:
+                    targetId === 0
+                        ? "/Users/demo/Downloads"
+                        : "/Users/test/Downloads",
+                is_default: true,
+                created_at: 1_638_400_000,
+            },
+        ].map((item) => ({
+            ...item,
+            path: item.path.replace(/^sftp:\d+:/, prefix),
+        })),
+    );
 }
 
 function nextFavoriteId() {
-    return Math.max(
-        0,
-        ...Array.from(state.favoriteDirectories.values()).flat().map((item) => item.id),
-    ) + 1;
+    return (
+        Math.max(
+            0,
+            ...Array.from(state.favoriteDirectories.values())
+                .flat()
+                .map((item) => item.id),
+        ) + 1
+    );
 }
 
 async function handleUserData(request, response, pathname) {
-    if (request.method === "GET" && pathname === "/api/user_data/export") {
-        return sendJson(response, 200, {
+    if (request.method === "POST" && pathname === "/api/user_data/export") {
+        const payload = await readJson(request);
+        const document = {
             version: 1,
             exported_at: new Date().toISOString(),
             targets: clone(state.targets),
             favorite_directories: Array.from(state.favoriteDirectories.values())
                 .flat()
                 .filter((item) => !item.is_default)
-                .map(({ target_id, name, path }) => ({ target_id, name, path })),
-        });
+                .map(({ target_id, name, path }) => ({
+                    target_id,
+                    name,
+                    path,
+                })),
+            settings: payload.settings ?? {},
+        };
+        if (!payload.password) return sendJson(response, 200, document);
+        return sendJson(
+            response,
+            200,
+            encryptUserData(document, payload.password),
+        );
     }
     if (request.method === "POST" && pathname === "/api/user_data/import") {
         const payload = await readJson(request);
-        const targets = Array.isArray(payload.targets) ? payload.targets : [];
+        if (!payload.data) throw new Error("invalid user data");
+        const encrypted = typeof payload.data.algorithm === "string";
+        const document = encrypted
+            ? decryptUserData(payload.data, payload.password || "")
+            : payload.data;
+        const targets = Array.isArray(document.targets) ? document.targets : [];
         const targetIds = new Set(state.targets.map((item) => item.id));
         let addedTargets = 0;
         let skippedTargets = 0;
@@ -272,12 +398,14 @@ async function handleUserData(request, response, pathname) {
                 addedTargets++;
             }
         }
-        const favorites = Array.isArray(payload.favorite_directories)
-            ? payload.favorite_directories
+        const favorites = Array.isArray(document.favorite_directories)
+            ? document.favorite_directories
             : [];
         for (const favorite of favorites) {
             ensureFavoriteDirectories(Number(favorite.target_id || 0));
-            const list = state.favoriteDirectories.get(Number(favorite.target_id || 0));
+            const list = state.favoriteDirectories.get(
+                Number(favorite.target_id || 0),
+            );
             if (!list.some((item) => item.path === favorite.path)) {
                 list.push({
                     id: nextFavoriteId(),
@@ -293,13 +421,17 @@ async function handleUserData(request, response, pathname) {
             added_targets: addedTargets,
             skipped_targets: skippedTargets,
             imported_favorites: favorites.length,
+            settings: document.settings ?? {},
         });
     }
     return sendMethodNotAllowed(response);
 }
 
 async function handleTransfer(request, response, pathname, searchParams) {
-    if (request.method === "GET" && pathname === "/api/transfer/unfinished-count") {
+    if (
+        request.method === "GET" &&
+        pathname === "/api/transfer/unfinished-count"
+    ) {
         const createdAfter = Number(
             searchParams.get("created_after") ||
                 searchParams.get("createdAfter") ||
@@ -332,10 +464,16 @@ async function handleTransfer(request, response, pathname, searchParams) {
     }
     if (
         request.method === "POST" &&
-        ["/api/transfer/batches/upload", "/api/transfer/batches/download"].includes(pathname)
+        [
+            "/api/transfer/batches/upload",
+            "/api/transfer/batches/download",
+        ].includes(pathname)
     ) {
         const payload = await readJson(request);
-        const batch = createTransferBatch(pathname.endsWith("/upload"), payload);
+        const batch = createTransferBatch(
+            pathname.endsWith("/upload"),
+            payload,
+        );
         state.transferBatches.set(batch.id, batch);
         state.transferTasks.unshift(...batch.tasks);
         return sendJson(response, 200, withoutBatchTasks(batch));
@@ -355,7 +493,11 @@ async function handleTransfer(request, response, pathname, searchParams) {
             return endResponse(response);
         }
         if (request.method === "POST" && action) {
-            const statuses = { pause: "PAUSE", resume: "RUN", cancel: "CANCEL" };
+            const statuses = {
+                pause: "PAUSE",
+                resume: "RUN",
+                cancel: "CANCEL",
+            };
             const status = statuses[action];
             batch.status = status;
             batch.updated_at = Date.now();
@@ -486,11 +628,20 @@ function updateBatchTasks(batchId, status) {
     );
     const batch = state.transferBatches.get(batchId);
     if (!batch) return;
-    batch.tasks = state.transferTasks.filter((task) => task.batch_id === batchId);
+    batch.tasks = state.transferTasks.filter(
+        (task) => task.batch_id === batchId,
+    );
     batch.loaded = batch.tasks.reduce((sum, task) => sum + task.loaded, 0);
-    batch.completed_count = batch.tasks.filter((task) => task.status === "SUCCESS").length;
-    batch.failed_count = batch.tasks.filter((task) => ["FAIL", "CANCEL"].includes(task.status)).length;
-    batch.percent = batch.total === 0 ? 0 : Number(((batch.loaded / batch.total) * 100).toFixed(2));
+    batch.completed_count = batch.tasks.filter(
+        (task) => task.status === "SUCCESS",
+    ).length;
+    batch.failed_count = batch.tasks.filter((task) =>
+        ["FAIL", "CANCEL"].includes(task.status),
+    ).length;
+    batch.percent =
+        batch.total === 0
+            ? 0
+            : Number(((batch.loaded / batch.total) * 100).toFixed(2));
 }
 
 function createTransferTask(upload, payload) {
@@ -530,10 +681,7 @@ async function handleFileApi(request, response, pathname, searchParams, sftp) {
             sftp ? `sftp:${targetId}:/Users/test` : "/Users/demo",
         );
     }
-    if (
-        request.method === "GET" &&
-        pathname === `${prefix}/user-dirs/home`
-    ) {
+    if (request.method === "GET" && pathname === `${prefix}/user-dirs/home`) {
         const targetId = searchParams.get("target_id") || "1";
         return sendJson(
             response,

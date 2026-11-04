@@ -8,6 +8,7 @@ export interface RenderPromptOptions {
     defaultValue?: string;
     okText?: string;
     cancelText?: string;
+    password?: boolean;
 }
 
 export default function renderPrompt(
@@ -25,6 +26,32 @@ export default function renderPrompt(
             resolve(result);
         };
 
+        const handleEnter = () => {
+            finish(value);
+            destroyModal();
+        };
+
+        const input = options.password ? (
+            <Input.Password
+                ref={inputRef}
+                autoFocus={true}
+                onChange={(event) => {
+                    value = event.target.value;
+                }}
+                onPressEnter={handleEnter}
+            />
+        ) : (
+            <Input
+                ref={inputRef}
+                autoFocus={true}
+                defaultValue={value}
+                onChange={(event) => {
+                    value = event.target.value;
+                }}
+                onPressEnter={handleEnter}
+            />
+        );
+
         const modal = Modal.confirm({
             title: options.title,
             autoFocusButton: null,
@@ -33,20 +60,7 @@ export default function renderPrompt(
                     inputRef.current?.focus();
                 }
             },
-            content: (
-                <Input
-                    ref={inputRef}
-                    autoFocus={true}
-                    defaultValue={value}
-                    onChange={(event) => {
-                        value = event.target.value;
-                    }}
-                    onPressEnter={() => {
-                        finish(value);
-                        destroyModal();
-                    }}
-                />
-            ),
+            content: input,
             okText: options.okText,
             cancelText: options.cancelText,
             onOk: () => finish(value),

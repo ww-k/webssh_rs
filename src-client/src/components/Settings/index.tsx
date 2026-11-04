@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import "./index.css";
 
 import fileSave from "@/helpers/fileSave";
+import renderPrompt from "@/helpers/renderPrompt";
 import { createUserDataExport, importUserData } from "@/services/userData";
 import useAppStore, { type ResolvedTheme, type ThemeMode } from "@/store";
 
@@ -111,19 +112,31 @@ export default function Settings() {
     );
     const importInputRef = useRef<HTMLInputElement>(null);
     const handleExport = async () => {
+        const password = await renderPrompt({
+            title: t("settings_data_export_password_title"),
+            okText: t("app_btn_ok"),
+            cancelText: t("app_btn_cancel"),
+            password: true,
+        });
+        if (password === undefined) return;
         try {
-            const data = await createUserDataExport({
-                theme_mode: themeMode,
-                sidebar_collapsed: sidebarCollapsed,
-                show_terminal_copy_notification: showTerminalCopyNotification,
-                terminal_selection_copy_enabled: terminalSelectionCopyEnabled,
-                terminal_right_click_paste_enabled:
-                    terminalRightClickAction === "paste",
-                terminal_middle_click_paste_enabled:
-                    terminalMiddleClickPasteEnabled,
-                terminal_themes: terminalThemes,
-                language,
-            });
+            const data = await createUserDataExport(
+                {
+                    theme_mode: themeMode,
+                    sidebar_collapsed: sidebarCollapsed,
+                    show_terminal_copy_notification:
+                        showTerminalCopyNotification,
+                    terminal_selection_copy_enabled:
+                        terminalSelectionCopyEnabled,
+                    terminal_right_click_paste_enabled:
+                        terminalRightClickAction === "paste",
+                    terminal_middle_click_paste_enabled:
+                        terminalMiddleClickPasteEnabled,
+                    terminal_themes: terminalThemes,
+                    language,
+                },
+                password,
+            );
             fileSave(
                 new Blob([JSON.stringify(data, null, 2)], {
                     type: "application/json",
@@ -141,7 +154,25 @@ export default function Settings() {
     const handleImport = async (file: File) => {
         try {
             const data = JSON.parse(await file.text()) as unknown;
-            const result = await importUserData(data);
+            const record =
+                data && typeof data === "object" && !Array.isArray(data)
+                    ? (data as Record<string, unknown>)
+                    : undefined;
+            const encrypted =
+                typeof record?.algorithm === "string" &&
+                typeof record?.salt === "string" &&
+                typeof record?.nonce === "string" &&
+                typeof record?.ciphertext === "string";
+            const password = encrypted
+                ? await renderPrompt({
+                      title: t("settings_data_import_password_title"),
+                      okText: t("app_btn_ok"),
+                      cancelText: t("app_btn_cancel"),
+                      password: true,
+                  })
+                : undefined;
+            if (encrypted && password === undefined) return;
+            const result = await importUserData(data, password);
             setTheme(result.settings.theme_mode);
             setSidebarCollapsed(result.settings.sidebar_collapsed);
             setShowTerminalCopyNotification(

@@ -1,4 +1,4 @@
-import { getUserDataExport, postUserDataImport } from "@/api";
+import { postUserDataExport, postUserDataImport } from "@/api";
 import { terminalThemeDefaults } from "@/components/Terminal/constants";
 
 import type { TerminalThemeColors } from "@/components/Terminal/types";
@@ -6,33 +6,25 @@ import type { ResolvedTheme, ThemeMode } from "@/store";
 
 type UserDataTerminalThemes = Record<ResolvedTheme, TerminalThemeColors>;
 
-export interface UserDataExport {
-    version: 1;
-    exported_at: string;
-    targets: Awaited<ReturnType<typeof getUserDataExport>>["targets"];
-    favorite_directories: Awaited<
-        ReturnType<typeof getUserDataExport>
-    >["favorite_directories"];
-    settings: {
-        theme_mode: ThemeMode;
-        sidebar_collapsed: boolean;
-        show_terminal_copy_notification: boolean;
-        terminal_selection_copy_enabled: boolean;
-        terminal_right_click_paste_enabled: boolean;
-        terminal_middle_click_paste_enabled: boolean;
-        terminal_themes: UserDataTerminalThemes;
-        language: string;
-    };
+export interface UserDataSettings {
+    theme_mode: ThemeMode;
+    sidebar_collapsed: boolean;
+    show_terminal_copy_notification: boolean;
+    terminal_selection_copy_enabled: boolean;
+    terminal_right_click_paste_enabled: boolean;
+    terminal_middle_click_paste_enabled: boolean;
+    terminal_themes: UserDataTerminalThemes;
+    language: string;
 }
 
 export interface UserDataImportResult {
     addedTargets: number;
     skippedTargets: number;
     importedFavorites: number;
-    settings: UserDataExport["settings"];
+    settings: UserDataSettings;
 }
 
-function readSettings(value: unknown): UserDataExport["settings"] {
+function readSettings(value: unknown): UserDataSettings {
     if (!value || typeof value !== "object") {
         return {
             theme_mode: "system",
@@ -48,7 +40,7 @@ function readSettings(value: unknown): UserDataExport["settings"] {
             language: "zh",
         };
     }
-    const settings = value as Partial<UserDataExport["settings"]>;
+    const settings = value as Partial<UserDataSettings>;
     if (
         settings.theme_mode !== "light" &&
         settings.theme_mode !== "dark" &&
@@ -141,37 +133,42 @@ function readTerminalThemes(value: unknown): UserDataTerminalThemes {
 }
 
 export async function createUserDataExport(
-    settings: UserDataExport["settings"],
+    settings: UserDataSettings,
+    password?: string,
 ) {
-    const data = await getUserDataExport();
-    return { ...data, settings } satisfies UserDataExport;
+    return postUserDataExport({
+        ...(password ? { password } : {}),
+        settings,
+    });
 }
 
 export async function importUserData(
     raw: unknown,
+    password?: string,
 ): Promise<UserDataImportResult> {
-    if (!raw || typeof raw !== "object") {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
         throw new Error("Invalid user data file");
     }
-    const data = raw as Partial<UserDataExport>;
-    if (data.version !== 1 || !Array.isArray(data.targets)) {
+    const data = raw as Record<string, unknown>;
+    if (data.version !== 1) {
         throw new Error("Unsupported user data file");
     }
+    const encrypted =
+        typeof data.algorithm === "string" &&
+        typeof data.salt === "string" &&
+        typeof data.nonce === "string" &&
+        typeof data.ciphertext === "string";
+    if (encrypted && !password) {
+        throw new Error("Password is required");
+    }
     const result = await postUserDataImport({
-        version: 1,
-        exported_at:
-            typeof data.exported_at === "string"
-                ? data.exported_at
-                : new Date().toISOString(),
-        targets: data.targets,
-        favorite_directories: Array.isArray(data.favorite_directories)
-            ? data.favorite_directories
-            : [],
+        ...(encrypted && password ? { password } : {}),
+        data: raw,
     });
     return {
         addedTargets: result.added_targets,
         skippedTargets: result.skipped_targets,
         importedFavorites: result.imported_favorites,
-        settings: readSettings(data.settings),
+        settings: readSettings(result.settings),
     };
 }

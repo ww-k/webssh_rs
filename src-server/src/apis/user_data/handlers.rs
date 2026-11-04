@@ -7,26 +7,28 @@ use crate::{
     apis::{
         ApiErr, InternalErrorResponse, ValidJson,
         user_data::{
-            dto::{UserDataExport, UserDataImportPayload, UserDataImportResult},
+            dto::{UserDataExportPayload, UserDataImportPayload, UserDataImportResult},
             service,
         },
     },
 };
 
 #[utoipa::path(
-    get,
+    post,
     path = "/api/user_data/export",
     tag = "user_data",
     operation_id = "user_data_export",
+    request_body = UserDataExportPayload,
     responses(
-        (status = 200, description = "导出用户数据", body = UserDataExport),
+        (status = 200, description = "导出用户数据", body = serde_json::Value),
         (status = 500, response = InternalErrorResponse)
     )
 )]
 pub async fn user_data_export(
     State(state): State<Arc<AppState>>,
-) -> Result<Json<UserDataExport>, ApiErr> {
-    Ok(Json(service::export(&state.db).await?))
+    ValidJson(payload): ValidJson<UserDataExportPayload>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    Ok(Json(service::export(&state.db, payload).await?))
 }
 
 #[utoipa::path(
@@ -36,7 +38,7 @@ pub async fn user_data_export(
     operation_id = "user_data_import",
     request_body = UserDataImportPayload,
     responses(
-        (status = 200, description = "导入用户数据", body = UserDataImportResult),
+        (status = 200, description = "解密并导入用户数据", body = UserDataImportResult),
         (status = 500, response = InternalErrorResponse)
     )
 )]

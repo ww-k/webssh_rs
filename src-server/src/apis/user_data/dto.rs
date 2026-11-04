@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use utoipa::ToSchema;
 
 use crate::entities::target::TargetAuthMethod;
@@ -29,20 +30,35 @@ pub struct UserDataFavoriteDirectory {
     pub path: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, ToSchema)]
-pub struct UserDataExport {
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UserDataExportPayload {
+    pub password: Option<String>,
+    pub settings: Value,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct EncryptedUserDataExport {
     pub version: u32,
-    pub exported_at: String,
-    pub targets: Vec<UserDataTarget>,
-    pub favorite_directories: Vec<UserDataFavoriteDirectory>,
+    pub algorithm: String,
+    pub salt: String,
+    pub nonce: String,
+    pub ciphertext: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UserDataImportPayload {
+    pub password: Option<String>,
+    pub data: Value,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UserDataDocument {
     pub version: u32,
+    pub exported_at: String,
     pub targets: Vec<UserDataTarget>,
-    #[serde(default)]
     pub favorite_directories: Vec<UserDataFavoriteDirectory>,
+    #[serde(default)]
+    pub settings: Value,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -50,4 +66,5 @@ pub struct UserDataImportResult {
     pub added_targets: usize,
     pub skipped_targets: usize,
     pub imported_favorites: usize,
+    pub settings: Value,
 }
