@@ -25,7 +25,7 @@ import {
     Tooltip,
     Typography,
 } from "antd";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
@@ -334,16 +334,39 @@ type TransferAction = {
 const getActionItems = (
     record: ITransferTask,
     t: TFunction,
-    onPause: () => void,
-    onResume: () => void,
-    onCancel: () => void,
-    onDelete: () => void,
-    onShowInFolder: () => void,
 ): TransferAction[] => {
     const canPause = record.status === "RUN" || record.status === "WAIT";
     const canResume = record.status === "PAUSE";
     const canCancel = canPause || canResume;
     const canRetry = record.status === "FAIL" || record.status === "CANCEL";
+    const handleShowInFolder = () => {
+        if (!record.local_path) return;
+        postFsShowInFolder(record.local_path).catch((err) => {
+            console.warn("Show transfer in folder failed", err);
+            message.error(t("transfer_show_in_folder_failed"));
+        });
+    };
+    const handleCancel = () =>
+        Modal.confirm({
+            title: t("transfer_confirm_cancel_title"),
+            content: t("transfer_confirm_cancel_content", {
+                name: record.name,
+            }),
+            okText: t("app_btn_ok"),
+            cancelText: t("app_btn_cancel"),
+            onOk: () => transferService.cancel(record.id),
+        });
+    const handleDelete = () =>
+        Modal.confirm({
+            title: t("transfer_confirm_delete_title"),
+            content: t("transfer_confirm_delete_content", {
+                name: record.name,
+            }),
+            okText: t("app_btn_ok"),
+            cancelText: t("app_btn_cancel"),
+            onOk: () => transferService.remove(record.id),
+        });
+
     return [
         {
             key: "pause-resume",
@@ -351,28 +374,30 @@ const getActionItems = (
                 ? t("transfer_action_resume")
                 : t("transfer_action_pause"),
             icon: canResume ? <PlayCircleOutlined /> : <PauseCircleOutlined />,
-            onClick: canResume ? onResume : onPause,
+            onClick: canResume
+                ? () => transferService.resume(record.id).catch(console.warn)
+                : () => transferService.pause(record.id),
             disabled: !canPause && !canResume,
         },
         {
             key: "cancel",
             label: t("app_btn_cancel"),
             icon: <StopOutlined />,
-            onClick: onCancel,
+            onClick: handleCancel,
             disabled: !canCancel,
         },
         {
             key: "retry",
             label: t("transfer_action_retry"),
             icon: <ReloadOutlined />,
-            onClick: onResume,
+            onClick: () => transferService.resume(record.id).catch(console.warn),
             disabled: !canRetry,
         },
         {
             key: "show-in-folder",
             label: t("transfer_action_show_in_folder"),
             icon: <FolderOpenOutlined />,
-            onClick: onShowInFolder,
+            onClick: handleShowInFolder,
             disabled: !record.local_path,
         },
         {
@@ -380,7 +405,7 @@ const getActionItems = (
             label: t("app_btn_delete"),
             icon: <DeleteOutlined />,
             danger: true,
-            onClick: onDelete,
+            onClick: handleDelete,
         },
     ];
 };
@@ -446,40 +471,57 @@ const getUnavailableActionItems = (t: TFunction): TransferAction[] => [
     },
 ];
 
-const getCommonColumns = (
+const getTableColumns = (
     t: TFunction,
-    renderName?: (record: TransferRow) => React.ReactNode,
-    nameClassName?: string,
-): TableProps<TransferRow>["columns"] => [
-    {
-        title: t("transfer_column_filename"),
-        dataIndex: "name",
-        key: "name",
-        width: "32%",
-        ellipsis: true,
-        render: (_, record) => (
-            <TransferNameCell record={record} className={nameClassName}>
-                {renderName?.(record)}
-            </TransferNameCell>
-        ),
-    },
-    {
-        title: t("transfer_column_type"),
-        dataIndex: "type",
-        key: "type",
-        width: "10%",
-        align: "center",
-        className: "WebSSH-TransferCenterCell",
-        render: (type: ITransferTaskType) => (
-            <TransferTypeCell type={type} t={t} />
-        ),
-    },
-    {
-        title: t("transfer_column_progress"),
-        key: "progress",
-        render: (_, record) => <TransferProgressCell record={record} t={t} />,
-    },
-];
+): TableProps<TransferTreeRow>["columns"] => {
+    const renderAction = (record: TransferTreeRow) =>
+        isBatch(record) ? (
+            <ActionButtons actions={getBatchActionItems(record, t)} />
+        ) : record.isVirtual ? (
+            <ActionButtons actions={getUnavailableActionItems(t)} />
+        ) : (
+            <ActionButtons actions={getActionItems(record, t)} />
+        );
+
+    return [
+        {
+            title: t("transfer_column_filename"),
+            dataIndex: "name",
+            key: "name",
+            width: "32%",
+            ellipsis: true,
+            render: (_, record) => (
+                <TransferNameCell record={record}>
+                    {record.name}
+                </TransferNameCell>
+            ),
+        },
+        {
+            title: t("transfer_column_type"),
+            dataIndex: "type",
+            key: "type",
+            width: "10%",
+            align: "center",
+            className: "WebSSH-TransferCenterCell",
+            render: (type: ITransferTaskType) => (
+                <TransferTypeCell type={type} t={t} />
+            ),
+        },
+        {
+            title: t("transfer_column_progress"),
+            key: "progress",
+            render: (_, record) => (
+                <TransferProgressCell record={record} t={t} />
+            ),
+        },
+        {
+            title: t("app_common_action"),
+            key: "action",
+            width: 220,
+            render: (_: unknown, record) => renderAction(record),
+        },
+    ];
+};
 
 const normalizeTransferPath = (value: string) =>
     value
@@ -798,84 +840,14 @@ export const TransferTable = ({
         };
     }, [keyword, list, type]);
 
-    const handleShowInFolder = useCallback(
-        (record: ITransferTask) => {
-            if (!record.local_path) return;
-            postFsShowInFolder(record.local_path).catch((err) => {
-                console.warn("Show transfer in folder failed", err);
-                message.error(t("transfer_show_in_folder_failed"));
-            });
-        },
-        [t],
-    );
-    const handleCancel = useCallback(
-        (record: ITransferTask) =>
-            Modal.confirm({
-                title: t("transfer_confirm_cancel_title"),
-                content: t("transfer_confirm_cancel_content", {
-                    name: record.name,
-                }),
-                okText: t("app_btn_ok"),
-                cancelText: t("app_btn_cancel"),
-                onOk: () => transferService.cancel(record.id),
-            }),
-        [t],
-    );
-    const handleDelete = useCallback(
-        (record: ITransferTask) =>
-            Modal.confirm({
-                title: t("transfer_confirm_delete_title"),
-                content: t("transfer_confirm_delete_content", {
-                    name: record.name,
-                }),
-                okText: t("app_btn_ok"),
-                cancelText: t("app_btn_cancel"),
-                onOk: () => transferService.remove(record.id),
-            }),
-        [t],
-    );
     const columns = useMemo(
-        () => [
-            ...(getCommonColumns(t, (record) =>
-                isBatch(record)
-                    ? record.name
-                    : `${record.name}${record.kind === "DIRECTORY" ? "/" : ""}`,
-            ) || []),
-            {
-                title: t("app_common_action"),
-                key: "action",
-                width: 220,
-                render: (_: unknown, record: TransferTreeRow) =>
-                    isBatch(record) ? (
-                        <ActionButtons
-                            actions={getBatchActionItems(record, t)}
-                        />
-                    ) : record.isVirtual ? (
-                        <ActionButtons actions={getUnavailableActionItems(t)} />
-                    ) : (
-                        <ActionButtons
-                            actions={getActionItems(
-                                record,
-                                t,
-                                () => transferService.pause(record.id),
-                                () =>
-                                    transferService
-                                        .resume(record.id)
-                                        .catch(console.warn),
-                                () => handleCancel(record),
-                                () => handleDelete(record),
-                                () => handleShowInFolder(record),
-                            )}
-                        />
-                    ),
-            },
-        ],
-        [handleCancel, handleDelete, handleShowInFolder, t],
+        () => getTableColumns(t),
+        [t],
     );
     return (
         <TransferVirtualTable
             className="WebSSH-FilelistTable"
-            columns={columns as TableProps<TransferTreeRow>["columns"]}
+            columns={columns}
             dataSource={tree}
             rowKey="id"
             size="small"
