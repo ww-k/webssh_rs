@@ -21,7 +21,6 @@ import {
     Progress,
     Segmented,
     Space,
-    Table,
     Tooltip,
     Typography,
 } from "antd";
@@ -31,12 +30,11 @@ import { useTranslation } from "react-i18next";
 import "./index.css";
 
 import { postFsShowInFolder } from "@/api";
+import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 import transferService, { getTransferBatchName } from "@/services/transfer";
 
-import type { TableProps } from "antd";
 import type { TFunction } from "i18next";
-import type { ComponentType } from "react";
 import type {
     ITransferBatch,
     ITransferTask,
@@ -50,10 +48,7 @@ type TransferTreeRow = TransferRow & {
     children?: TransferTreeRow[];
     isVirtual?: boolean;
 };
-const TransferVirtualTable = Table as unknown as ComponentType<
-    TableProps<TransferTreeRow> & { listItemHeight?: number }
->;
-const TRANSFER_ROW_HEIGHT = 56;
+const TRANSFER_ROW_HEIGHT = 40;
 type TransferTypeFilter = "ALL" | ITransferTaskType;
 type TransferFilterState = {
     type: TransferTypeFilter;
@@ -135,18 +130,11 @@ const formatDuration = (seconds?: number): string => {
 const isBatch = (record: TransferRow): record is ITransferBatch =>
     "item_count" in record;
 
-const TransferTreeExpandIcon = ({
-    expanded,
-    onExpand,
-    record,
-}: {
-    expanded: boolean;
-    onExpand: (
-        record: TransferTreeRow,
-        event: React.MouseEvent<HTMLButtonElement, MouseEvent>,
-    ) => void;
-    record: TransferTreeRow;
-}) => {
+const TransferTreeExpandIcon = (
+    record: TransferTreeRow,
+    expanded: boolean,
+    onToggle: () => void,
+) => {
     const hasChildren = Boolean(record.children?.length);
     if (isBatch(record)) {
         return (
@@ -156,7 +144,10 @@ const TransferTreeExpandIcon = ({
                 aria-expanded={hasChildren ? expanded : undefined}
                 aria-label={record.name}
                 onClick={(event) => {
-                    if (hasChildren) onExpand(record, event);
+                    if (hasChildren) {
+                        event.stopPropagation();
+                        onToggle();
+                    }
                 }}
             >
                 {expanded && hasChildren ? (
@@ -182,7 +173,10 @@ const TransferTreeExpandIcon = ({
             aria-expanded={hasChildren ? expanded : undefined}
             aria-label={record.name}
             onClick={(event) => {
-                if (hasChildren) onExpand(record, event);
+                if (hasChildren) {
+                    event.stopPropagation();
+                    onToggle();
+                }
             }}
         >
             {expanded && hasChildren ? (
@@ -473,7 +467,7 @@ const getUnavailableActionItems = (t: TFunction): TransferAction[] => [
 
 const getTableColumns = (
     t: TFunction,
-): TableProps<TransferTreeRow>["columns"] => {
+): DataTableColumn<TransferTreeRow>[] => {
     const renderAction = (record: TransferTreeRow) =>
         isBatch(record) ? (
             <ActionButtons actions={getBatchActionItems(record, t)} />
@@ -485,40 +479,41 @@ const getTableColumns = (
 
     return [
         {
-            title: t("transfer_column_filename"),
-            dataIndex: "name",
-            key: "name",
-            width: "32%",
-            ellipsis: true,
-            render: (_, record) => (
-                <TransferNameCell record={record}>
-                    {record.name}
-                </TransferNameCell>
-            ),
+            id: "name",
+            header: t("transfer_column_filename"),
+            accessor: (record) => record.name,
+            width: 320,
+            sortable: false,
         },
         {
-            title: t("transfer_column_type"),
-            dataIndex: "type",
-            key: "type",
-            width: "10%",
+            id: "type",
+            header: t("transfer_column_type"),
+            accessor: (record) => record.type,
+            width: 100,
+            sortable: false,
             align: "center",
             className: "WebSSH-TransferCenterCell",
-            render: (type: ITransferTaskType) => (
-                <TransferTypeCell type={type} t={t} />
+            cell: (type) => (
+                <TransferTypeCell type={type as ITransferTaskType} t={t} />
             ),
         },
         {
-            title: t("transfer_column_progress"),
-            key: "progress",
-            render: (_, record) => (
+            id: "progress",
+            header: t("transfer_column_progress"),
+            accessor: (record) => record.percent,
+            width: 300,
+            sortable: false,
+            cell: (_value, record) => (
                 <TransferProgressCell record={record} t={t} />
             ),
         },
         {
-            title: t("app_common_action"),
-            key: "action",
+            id: "action",
+            header: t("app_common_action"),
+            accessor: () => "",
             width: 220,
-            render: (_: unknown, record) => renderAction(record),
+            sortable: false,
+            cell: (_value, record) => renderAction(record),
         },
     ];
 };
@@ -840,32 +835,24 @@ export const TransferTable = ({
         };
     }, [keyword, list, type]);
 
-    const columns = useMemo(
-        () => getTableColumns(t),
+    const columns: DataTableColumn<TransferTreeRow>[] = useMemo(
+        () =>
+            getTableColumns(t),
         [t],
     );
     return (
-        <TransferVirtualTable
-            className="WebSSH-FilelistTable"
+        <DataTable
             columns={columns}
-            dataSource={tree}
-            rowKey="id"
-            size="small"
+            data={tree}
+            getRowId={(row) => row.id}
+            getSubRows={(row) => row.children}
+            defaultExpanded
+            expandIcon={TransferTreeExpandIcon}
+            rowHeight={TRANSFER_ROW_HEIGHT}
+            multiple={false}
+            selectable={false}
             loading={treeLoading}
-            listItemHeight={TRANSFER_ROW_HEIGHT}
             virtual={tableBodyHeight > 0}
-            scroll={
-                tableBodyHeight > 0
-                    ? { x: 900, y: tableBodyHeight }
-                    : undefined
-            }
-            expandable={{
-                defaultExpandAllRows: true,
-                expandIcon: (props) => (
-                    <TransferTreeExpandIcon {...props} />
-                ),
-            }}
-            pagination={false}
         />
     );
 };

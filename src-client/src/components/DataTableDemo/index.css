@@ -1,0 +1,47 @@
+.DataTableDemoToolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 40px;
+    padding: 0 2px;
+    color: var(--ant-color-text-secondary);
+    font-size: 12px;
+}
+
+.DataTableDemoToolbar > div {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.DataTableDemoToolbar strong {
+    color: var(--ant-color-text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.DataTableDemoContent {
+    display: flex;
+    flex-direction: column;
+}
+
+.DataTableDemoName {
+    color: var(--ant-color-text);
+    font-weight: 500;
+}
+
+.DataTableDemoStatus {
+    font-weight: 500;
+}
+
+.DataTableDemoStatus-ready {
+    color: var(--ant-color-success);
+}
+
+.DataTableDemoStatus-processing {
+    color: var(--ant-color-warning);
+}
+
+.DataTableDemoStatus-archived {
+    color: var(--ant-color-text-tertiary);
+}
