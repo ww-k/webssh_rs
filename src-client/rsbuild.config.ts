@@ -7,7 +7,7 @@ import { mockMiddlewares } from "./mock/server.mjs";
 declare const process: any;
 
 // 配置是否启用 mock 服务时
-const enableMock = true;
+const enableMock = false;
 const configuredServerPort = Number.parseInt(
     process.env.WEBSSH_RS_SERVER_PORT || "",
     10,
