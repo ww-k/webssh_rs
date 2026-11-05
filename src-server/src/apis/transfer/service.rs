@@ -271,7 +271,7 @@ impl TransferService {
     }
 
     pub async fn count_unfinished_tasks(&self, created_after: Option<i64>) -> Result<u64, ApiErr> {
-        let mut condition = Condition::any().add(Column::Status.is_in([
+        let mut condition = Condition::all().add(Column::Status.is_in([
             TransferTaskStatus::Wait,
             TransferTaskStatus::Run,
             TransferTaskStatus::Pause,

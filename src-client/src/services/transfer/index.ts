@@ -3,6 +3,7 @@ import {
     deleteTransferHistory,
     deleteTransferTask,
     getTransferTasks,
+    getTransferUnfinishedCount,
     postTransferBatchCancel,
     postTransferBatchPause,
     postTransferBatchResume,
@@ -19,9 +20,11 @@ import type { ITransferTask } from "@/api";
 
 const ACTIVE_STATUSES = new Set(["WAIT", "RUN"]);
 const FINISHED_STATUSES = new Set(["SUCCESS", "FAIL", "CANCEL"]);
+const UNFINISHED_STATUSES = new Set(["WAIT", "RUN", "PAUSE", "FAIL"]);
 const SYNC_INTERVAL = 1000;
 
 type TransferTasksListener = (tasks: ITransferTask[]) => void;
+type TransferCountListener = (count: number) => void;
 
 interface IUploadOption {
     localPath: string;
@@ -49,9 +52,13 @@ export const getTransferBatchName = (sources: string[]) => {
 
 class TransferService {
     #syncTimer?: number;
+    #countSyncTimer?: number;
     #syncing = false;
+    #countSyncing = false;
+    #countSyncQueued = false;
     #tasks: ITransferTask[] = [];
     #listeners = new Set<TransferTasksListener>();
+    #countListeners = new Set<TransferCountListener>();
 
     setConfig(_option: {
         /** 并发任务数 */
@@ -78,7 +85,7 @@ class TransferService {
             all: option.all ?? false,
             conflict_policy: option.conflictPolicy,
         });
-        this.#ensureSyncTimer();
+        this.#taskCreated();
         return batch;
     }
 
@@ -96,7 +103,7 @@ class TransferService {
             all: option.all ?? false,
             conflict_policy: option.conflictPolicy,
         });
-        this.#ensureSyncTimer();
+        this.#taskCreated();
         return batch;
     }
 
@@ -108,7 +115,7 @@ class TransferService {
     async resumeBatch(id: string) {
         const batch = await postTransferBatchResume(id);
         await this.syncTasks();
-        this.#ensureSyncTimer();
+        this.#taskCreated();
         return batch;
     }
     async cancelBatch(id: string) {
@@ -118,8 +125,13 @@ class TransferService {
     }
 
     subscribe(listener: TransferTasksListener) {
+        const wasEmpty = this.#listeners.size === 0;
         this.#listeners.add(listener);
+        if (wasEmpty) {
+            this.#clearCountSyncTimer();
+        }
         listener(this.#tasks);
+        this.#emitUnfinishedCounts();
         this.syncTasks().catch((err) => {
             console.warn("TransferService.syncTasks failed", err);
         });
@@ -128,6 +140,24 @@ class TransferService {
             this.#listeners.delete(listener);
             if (this.#listeners.size === 0) {
                 this.#clearSyncTimer();
+                this.#startCountSync();
+            }
+        };
+    }
+
+    subscribeUnfinishedCount(listener: TransferCountListener) {
+        this.#countListeners.add(listener);
+        if (this.#listeners.size > 0) {
+            this.#clearCountSyncTimer();
+            listener(this.#getUnfinishedCount());
+        } else {
+            this.#startCountSync();
+        }
+
+        return () => {
+            this.#countListeners.delete(listener);
+            if (this.#countListeners.size === 0) {
+                this.#clearCountSyncTimer();
             }
         };
     }
@@ -153,7 +183,7 @@ class TransferService {
             target_uri: option.fileUri,
         });
         this.#upsertTask(task);
-        this.#ensureSyncTimer(task);
+        this.#taskCreated(task);
         return task;
     }
 
@@ -186,7 +216,7 @@ class TransferService {
             ...task,
             total: task.total || option.size || 0,
         });
-        this.#ensureSyncTimer(task);
+        this.#taskCreated(task);
         return task;
     }
 
@@ -219,7 +249,7 @@ class TransferService {
     async resume(id: string) {
         const task = await postTransferResume(id);
         this.#upsertTask(task);
-        this.#ensureSyncTimer(task);
+        this.#taskCreated(task);
         return task;
     }
 
@@ -253,6 +283,7 @@ class TransferService {
             (task) => !FINISHED_STATUSES.has(task.status),
         );
         this.#emitTasks();
+        this.#emitUnfinishedCounts();
     }
 
     async removeBatch(id: string) {
@@ -261,6 +292,9 @@ class TransferService {
     }
 
     #ensureSyncTimer(task?: ITransferTask) {
+        if (this.#listeners.size === 0) {
+            return;
+        }
         if (task && !ACTIVE_STATUSES.has(task.status)) {
             return;
         }
@@ -282,9 +316,114 @@ class TransferService {
         }
     }
 
+    #clearCountSyncTimer() {
+        if (this.#countSyncTimer !== undefined) {
+            window.clearInterval(this.#countSyncTimer);
+            this.#countSyncTimer = undefined;
+        }
+    }
+
+    #startCountSync() {
+        if (
+            this.#listeners.size > 0 ||
+            this.#countListeners.size === 0 ||
+            this.#countSyncTimer !== undefined
+        ) {
+            return;
+        }
+        if (this.#countSyncing) {
+            this.#countSyncQueued = true;
+            return;
+        }
+        this.#syncUnfinishedCount().catch((err) => {
+            console.warn("TransferService.syncUnfinishedCount failed", err);
+            this.#scheduleCountSyncTimer();
+        });
+    }
+
+    async #syncUnfinishedCount() {
+        if (
+            this.#listeners.size > 0 ||
+            this.#countListeners.size === 0 ||
+            this.#countSyncing
+        ) {
+            if (this.#countSyncing) this.#countSyncQueued = true;
+            return;
+        }
+        this.#countSyncing = true;
+        try {
+            const results = await Promise.all(
+                [...this.#countListeners].map(async (listener) => {
+                    const count = await getTransferUnfinishedCount();
+                    if (
+                        this.#listeners.size === 0 &&
+                        this.#countListeners.has(listener)
+                    ) {
+                        listener(count);
+                    }
+                    return count;
+                }),
+            );
+            if (this.#listeners.size > 0) {
+                this.#clearCountSyncTimer();
+                return;
+            }
+            if (results.some((count) => count > 0)) {
+                this.#scheduleCountSyncTimer();
+            } else {
+                this.#clearCountSyncTimer();
+            }
+        } finally {
+            this.#countSyncing = false;
+            if (
+                this.#countSyncQueued &&
+                this.#listeners.size === 0 &&
+                this.#countListeners.size > 0
+            ) {
+                this.#countSyncQueued = false;
+                this.#clearCountSyncTimer();
+                this.#startCountSync();
+            } else {
+                this.#countSyncQueued = false;
+            }
+        }
+    }
+
+    #taskCreated(task?: ITransferTask) {
+        this.#ensureSyncTimer(task);
+        if (this.#listeners.size === 0) {
+            this.#clearCountSyncTimer();
+            this.#startCountSync();
+        }
+    }
+
+    #scheduleCountSyncTimer() {
+        if (
+            this.#listeners.size > 0 ||
+            this.#countListeners.size === 0 ||
+            this.#countSyncTimer !== undefined
+        ) {
+            return;
+        }
+        this.#countSyncTimer = window.setInterval(() => {
+            this.#syncUnfinishedCount().catch((err) => {
+                console.warn("TransferService.syncUnfinishedCount failed", err);
+            });
+        }, SYNC_INTERVAL);
+    }
+
+    #getUnfinishedCount() {
+        return this.#tasks.filter((task) =>
+            UNFINISHED_STATUSES.has(task.status),
+        ).length;
+    }
+
     #setTasks(tasks: ITransferTask[]) {
         this.#tasks = tasks;
         this.#emitTasks();
+        if (this.#listeners.size > 0) {
+            this.#emitUnfinishedCounts();
+        }
     }
 
     #upsertTask(task: ITransferTask) {
@@ -297,16 +436,25 @@ class TransferService {
             this.#tasks = tasks;
         }
         this.#emitTasks();
+        this.#emitUnfinishedCounts();
     }
 
     #deleteTask(id: string) {
         this.#tasks = this.#tasks.filter((task) => task.id !== id);
         this.#emitTasks();
+        this.#emitUnfinishedCounts();
     }
 
     #emitTasks() {
         for (const listener of this.#listeners) {
             listener(this.#tasks);
+        }
+    }
+
+    #emitUnfinishedCounts() {
+        if (this.#listeners.size === 0) return;
+        for (const listener of this.#countListeners) {
+            listener(this.#getUnfinishedCount());
         }
     }
 }

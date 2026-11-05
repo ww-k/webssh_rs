@@ -1,5 +1,5 @@
 import { Badge, ConfigProvider, Layout, Menu, theme } from "antd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import "./App.css";
 import "./styles/filelist-table.css";
@@ -19,13 +19,13 @@ import { useTranslation } from "react-i18next";
 
 import useAppStore from "@/store";
 
-import { getTransferUnfinishedCount } from "./api";
 import Home from "./components/Home";
 import ServerLogs from "./components/ServerLogs";
 import Settings from "./components/Settings";
 import SshConnections from "./components/SshConnections";
 import SshKnownHosts from "./components/SshKnownHosts";
 import Transfer from "./components/Transfer";
+import transferService from "./services/transfer";
 
 import type { MenuProps } from "antd";
 
@@ -41,13 +41,7 @@ export default function App() {
         activeMenuKey,
         setMenuKey,
     } = useAppStore();
-    const pageOpenedAt = useRef(Date.now());
-    const [lastTransferMenuClickAt, setLastTransferMenuClickAt] = useState(0);
     const [newTransferCount, setNewTransferCount] = useState(0);
-    const createdAfter = Math.max(
-        pageOpenedAt.current,
-        lastTransferMenuClickAt,
-    );
     const menusItems = useMemo<Required<MenuProps>["items"]>(() => {
         return [
             {
@@ -109,23 +103,8 @@ export default function App() {
     );
 
     useEffect(() => {
-        let disposed = false;
-        const syncCount = () => {
-            getTransferUnfinishedCount(createdAfter)
-                .then((count) => {
-                    if (!disposed) setNewTransferCount(count);
-                })
-                .catch((err) => {
-                    console.warn("Transfer unfinished count sync failed", err);
-                });
-        };
-        syncCount();
-        const timer = window.setInterval(syncCount, 1000);
-        return () => {
-            disposed = true;
-            window.clearInterval(timer);
-        };
-    }, [createdAfter]);
+        return transferService.subscribeUnfinishedCount(setNewTransferCount);
+    }, []);
 
     useEffect(() => {
         console.log("App init");
@@ -173,9 +152,6 @@ export default function App() {
 
     const handleMenuClick = useCallback(
         (evt: { key: string }) => {
-            if (evt.key === "transfer") {
-                setLastTransferMenuClickAt(Date.now());
-            }
             setMenuKey(evt.key);
         },
         [setMenuKey],
