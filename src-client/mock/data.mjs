@@ -181,14 +181,17 @@ const createTransferTasks = () => {
             ended_at: now - 54_000,
         },
     ];
-    const statuses = ["WAIT", "RUN", "PAUSE", "SUCCESS", "FAIL", "CANCEL"];
+    // Keep the seeded tasks as the small status sample used by the transfer
+    // tree. The remaining rows use the last status in the presentation order
+    // so the first screen stays representative instead of being all one status.
+    const tailStatus = "CANCEL";
     return [
         ...seed,
         ...Array.from(
             { length: MOCK_ROW_COUNT - seed.length },
             (_, offset) => {
                 const index = offset + seed.length + 1;
-                const status = statuses[index % statuses.length];
+                const status = tailStatus;
                 const total = gibibytes(1 + (index % 40) / 10);
                 const loaded = status === "SUCCESS"
                     ? total

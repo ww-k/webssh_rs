@@ -123,6 +123,14 @@ export default function TargetList({ tab }: { tab: ITab }) {
     const [dataSource, setDataSource] = useState<ITarget[]>([]);
     const [searchValue, setSearchValue] = useState("");
     const [directoryFilter, setDirectoryFilter] = useState<string>();
+    const getTargetRowId = useCallback(
+        (row: TargetTreeRow) => String(row.id),
+        [],
+    );
+    const getTargetSubRows = useCallback(
+        (row: TargetTreeRow) => row.children,
+        [],
+    );
     const { tableContainerRef, tablePageNavigationProps } =
         useTablePageNavigation();
     const [tableBodyHeight, setTableBodyHeight] = useState(0);
@@ -175,6 +183,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 id: "name",
                 header: t("target_directory"),
                 accessor: (record) => record.name,
+                width: 300,
                 sortable: false,
                 cell: (_value, record) =>
                     record.isDirectory
@@ -328,8 +337,8 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     className="targetListTable"
                     columns={columns}
                     data={treeDataSource}
-                    getRowId={(row) => String(row.id)}
-                    getSubRows={(row) => row.children}
+                    getRowId={getTargetRowId}
+                    getSubRows={getTargetSubRows}
                     defaultExpanded
                     expandIcon={TargetTreeExpandIcon}
                     rowHeight={TARGET_ROW_HEIGHT}

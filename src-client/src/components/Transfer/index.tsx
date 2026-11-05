@@ -882,6 +882,7 @@ export const TransferTable = ({
             expandIcon={TransferTreeExpandIcon}
             rowHeight={TRANSFER_ROW_HEIGHT}
             multiple={false}
+            selectable={false}
             loading={treeLoading}
             virtual={tableBodyHeight > 0}
         />

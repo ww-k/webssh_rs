@@ -4,12 +4,14 @@ import {
     CaretUpOutlined,
 } from "@ant-design/icons";
 import {
+    type Cell,
     type ColumnDef,
     createCoreRowModel,
     createExpandedRowModel,
     createSortedRowModel,
     type ExpandedState,
     flexRender,
+    type Row,
     type RowData,
     type RowSelectionState,
     rowExpandingFeature,
@@ -70,6 +72,7 @@ export interface DataTableProps<TData extends RowData> {
     columns: DataTableColumn<TData>[];
     getRowId: (row: TData, index: number) => string;
     rowHeight?: number;
+    selectable?: boolean;
     multiple?: boolean;
     virtual?: boolean;
     draggable?: boolean;
@@ -107,6 +110,7 @@ function DataTable<TData extends RowData>({
     columns,
     getRowId,
     rowHeight = 24,
+    selectable = true,
     multiple = true,
     virtual = true,
     draggable = false,
@@ -184,7 +188,9 @@ function DataTable<TData extends RowData>({
         onSortingChange: setSorting,
         onRowSelectionChange: setRowSelection,
         onExpandedChange: setExpanded,
-        enableRowSelection: (row) => isRowSelectable?.(row.original) ?? true,
+        autoResetExpanded: false,
+        enableRowSelection: (row) =>
+            selectable && (isRowSelectable?.(row.original) ?? true),
         enableMultiRowSelection: multiple,
     });
 
@@ -207,20 +213,33 @@ function DataTable<TData extends RowData>({
                 .map((index) => rows[index]),
         [rowIndexById, rowSelection, rows],
     );
+    const selectedRowsRef = useRef<Row<typeof features, TData>[]>(selectedRows);
+    selectedRowsRef.current = selectedRows;
     const visibleCount = virtual
         ? Math.ceil(viewportHeight / rowHeight) + ROW_OVERSCAN * 2
         : rows.length;
     const startIndex = virtual
         ? getVirtualStartIndex(bodyScrollTop, rowHeight)
         : 0;
-    const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
+    const visibleRows = useMemo(
+        () => rows.slice(startIndex, startIndex + visibleCount),
+        [rows, startIndex, visibleCount],
+    );
     const tableWidth = columns.reduce(
         (width, column) =>
             width + (columnWidths[column.id] ?? column.width ?? 160),
-        multiple ? 26 : 0,
+        multiple && selectable ? 26 : 0,
     );
 
     useEffect(() => {
+        if (!selectable) {
+            setRowSelection((previous) =>
+                Object.keys(previous).length > 0 ? {} : previous,
+            );
+            selectionAnchor.current = null;
+            setActiveId(null);
+            return;
+        }
         setRowSelection((previous) => {
             const ids = new Set<string>();
             const collectIds = (items: ReadonlyArray<TData>) => {
@@ -238,7 +257,7 @@ function DataTable<TData extends RowData>({
                 ? previous
                 : next;
         });
-    }, [data, getRowId, getSubRows]);
+    }, [data, getRowId, getSubRows, selectable]);
 
     useEffect(() => {
         const element = rootRef.current;
@@ -257,6 +276,7 @@ function DataTable<TData extends RowData>({
 
     const selectIndex = useCallback(
         (index: number, additive: boolean, range: boolean) => {
+            if (!selectable) return;
             const row = rows[index];
             if (!row?.getCanSelect()) return;
             if (!multiple) {
@@ -270,13 +290,15 @@ function DataTable<TData extends RowData>({
                     anchorIndex >= 0 ? anchorIndex : index,
                     index,
                 ].sort((a, b) => a - b);
-                const next: RowSelectionState = additive
-                    ? { ...rowSelection }
-                    : {};
-                for (let i = from; i <= to; i += 1) {
-                    if (rows[i].getCanSelect()) next[rows[i].id] = true;
-                }
-                setRowSelection(next);
+                setRowSelection((previous) => {
+                    const next: RowSelectionState = additive
+                        ? { ...previous }
+                        : {};
+                    for (let i = from; i <= to; i += 1) {
+                        if (rows[i].getCanSelect()) next[rows[i].id] = true;
+                    }
+                    return next;
+                });
                 setActiveId(row.id);
                 if (anchorIndex < 0) selectionAnchor.current = row.id;
             } else if (additive) {
@@ -294,7 +316,7 @@ function DataTable<TData extends RowData>({
                 setActiveId(row.id);
             }
         },
-        [multiple, rowSelection, rows],
+        [multiple, rows, selectable],
     );
 
     const ensureRowVisible = useCallback(
@@ -325,6 +347,7 @@ function DataTable<TData extends RowData>({
         const currentIndex = rows.findIndex((row) => row.id === currentId);
         const isModifier = event.ctrlKey || event.metaKey;
         if (isModifier && event.key.toLowerCase() === "a") {
+            if (!selectable || !multiple) return;
             event.preventDefault();
             const next: RowSelectionState = {};
             selectableRows.forEach((row) => {
@@ -405,40 +428,44 @@ function DataTable<TData extends RowData>({
         }
     };
 
-    const handleDrop = (target: TData | null, event: React.DragEvent) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const nativeEvent = event.nativeEvent;
-        let sourceRows = dragRows.current;
-        if (!sourceRows) {
-            const serialized = event.dataTransfer.getData(
-                "application/x-webssh-table-rows",
-            );
-            if (serialized) {
-                try {
-                    const ids = new Set(JSON.parse(serialized) as string[]);
-                    sourceRows = rows
-                        .filter((row) => ids.has(row.id))
-                        .map((row) => row.original);
-                } catch {
-                    sourceRows = [];
+    const handleDrop = useCallback(
+        (target: TData | null, event: React.DragEvent) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const nativeEvent = event.nativeEvent;
+            let sourceRows = dragRows.current;
+            if (!sourceRows) {
+                const serialized = event.dataTransfer.getData(
+                    "application/x-webssh-table-rows",
+                );
+                if (serialized) {
+                    try {
+                        const ids = new Set(JSON.parse(serialized) as string[]);
+                        sourceRows = rows
+                            .filter((row) => ids.has(row.id))
+                            .map((row) => row.original);
+                    } catch {
+                        sourceRows = [];
+                    }
                 }
             }
-        }
-        onDrop?.({
-            rows: sourceRows ?? [],
-            files: Array.from(event.dataTransfer.files),
-            target,
-            event: nativeEvent,
-        });
-        dragRows.current = null;
-    };
+            onDrop?.({
+                rows: sourceRows ?? [],
+                files: Array.from(event.dataTransfer.files),
+                target,
+                event: nativeEvent,
+            });
+            dragRows.current = null;
+        },
+        [onDrop, rows],
+    );
 
     return (
         <div
             ref={rootRef}
             className={classNames("WebSSH-DataTable", className, {
                 "WebSSH-DataTableLoading": loading,
+                "WebSSH-DataTableTextSelectable": !selectable,
             })}
             tabIndex={0}
             onKeyDown={handleKeyDown}
@@ -473,7 +500,9 @@ function DataTable<TData extends RowData>({
                     style={{ width: tableWidth }}
                 >
                     <colgroup>
-                        {multiple && <col style={{ width: 26 }} />}
+                        {multiple && selectable && (
+                            <col style={{ width: 26 }} />
+                        )}
                         {columns.map((column) => (
                             <col
                                 key={column.id}
@@ -488,7 +517,7 @@ function DataTable<TData extends RowData>({
                     </colgroup>
                     <thead>
                         <tr>
-                            {multiple && (
+                            {multiple && selectable && (
                                 <th className="WebSSH-DataTableCellColCheckbox">
                                     <input
                                         type="checkbox"
@@ -626,279 +655,424 @@ function DataTable<TData extends RowData>({
             {rows.length === 0 ? (
                 <div className="WebSSH-DataTableEmpty">{emptyContent}</div>
             ) : (
-                <div
-                    className="WebSSH-DataTableBody"
-                    style={{ height: rows.length * rowHeight }}
-                    onMouseDown={(event) => {
-                        if ((event.target as HTMLElement).closest("tbody tr"))
-                            return;
-                        dragStartIndex.current = Math.floor(
-                            (event.clientY -
-                                event.currentTarget.getBoundingClientRect()
-                                    .top) /
-                                rowHeight,
-                        );
-                    }}
-                    onMouseUp={() => {
-                        dragStartIndex.current = null;
-                    }}
-                    onMouseMove={(event) => {
-                        if (
-                            dragStartIndex.current === null ||
-                            event.buttons !== 1
-                        )
-                            return;
-                        const index = Math.max(
-                            0,
-                            Math.min(
-                                rows.length - 1,
-                                Math.floor(
-                                    (event.clientY -
-                                        event.currentTarget.getBoundingClientRect()
-                                            .top) /
-                                        rowHeight,
-                                ),
-                            ),
-                        );
-                        const [from, to] = [dragStartIndex.current, index].sort(
-                            (a, b) => a - b,
-                        );
-                        const next: RowSelectionState = {};
-                        for (let i = from; i <= to; i += 1) {
-                            if (rows[i]?.getCanSelect())
-                                next[rows[i].id] = true;
-                        }
-                        setRowSelection(next);
-                    }}
-                >
-                    <table
-                        className="WebSSH-DataTableTable WebSSH-DataTableVirtualTable"
-                        style={{
-                            width: tableWidth,
-                            top: virtual ? startIndex * rowHeight : 0,
-                        }}
-                    >
-                        <colgroup>
-                            {multiple && <col style={{ width: 26 }} />}
-                            {columns.map((column) => (
-                                <col
-                                    key={column.id}
-                                    style={{
-                                        width:
-                                            columnWidths[column.id] ??
-                                            column.width ??
-                                            160,
-                                    }}
-                                />
-                            ))}
-                        </colgroup>
-                        <tbody>
-                            {visibleRows.map((row, visibleIndex) => {
-                                const original = row.original;
-                                const disabled = !row.getCanSelect();
-                                const sortedIndex = startIndex + visibleIndex;
-                                return (
-                                    <tr
-                                        key={row.id}
-                                        className={classNames({
-                                            "WebSSH-DataTableTrActive":
-                                                row.getIsSelected(),
-                                            "WebSSH-DataTableTrDisabled":
-                                                disabled,
-                                            "WebSSH-DataTableTrActiveBorder":
-                                                activeId === row.id,
-                                        })}
-                                        style={{ height: rowHeight }}
-                                        aria-disabled={disabled}
-                                        draggable={draggable}
-                                        onClick={(event) => {
-                                            const index = sortedIndex;
-                                            const additive =
-                                                event.ctrlKey || event.metaKey;
-                                            const range = event.shiftKey;
-                                            if (
-                                                range &&
-                                                selectionAnchor.current === null
-                                            )
-                                                selectionAnchor.current =
-                                                    row.id;
-                                            if (row.getCanSelect())
-                                                selectIndex(
-                                                    index,
-                                                    additive,
-                                                    range,
-                                                );
-                                            onRowClick?.(original);
-                                        }}
-                                        onDoubleClick={(event) =>
-                                            onRowDoubleClick?.(
-                                                original,
-                                                event.nativeEvent,
-                                            )
-                                        }
-                                        onContextMenu={(event) => {
-                                            event.preventDefault();
-                                            const selected = selectedRows.some(
-                                                (item) => item.id === row.id,
-                                            )
-                                                ? selectedRows.map(
-                                                      (item) => item.original,
-                                                  )
-                                                : [original];
-                                            if (
-                                                !selectedRows.some(
-                                                    (item) =>
-                                                        item.id === row.id,
-                                                )
-                                            ) {
-                                                setRowSelection({
-                                                    [row.id]: true,
-                                                });
-                                            }
-                                            selectionAnchor.current = row.id;
-                                            onContextMenu?.(
-                                                selected,
-                                                event.nativeEvent,
-                                            );
-                                        }}
-                                        onDragStart={(event) => {
-                                            const selected =
-                                                selectedRows.length &&
-                                                row.getIsSelected()
-                                                    ? selectedRows.map(
-                                                          (item) =>
-                                                              item.original,
-                                                      )
-                                                    : [original];
-                                            dragRows.current = selected;
-                                            event.dataTransfer.effectAllowed =
-                                                "copyMove";
-                                            event.dataTransfer.setData(
-                                                "application/x-webssh-table-rows",
-                                                JSON.stringify(
-                                                    selected.map((item) =>
-                                                        getRowId(
-                                                            item,
-                                                            data.indexOf(item),
-                                                        ),
-                                                    ),
-                                                ),
-                                            );
-                                        }}
-                                        onDragEnd={() => {
-                                            dragRows.current = null;
-                                        }}
-                                        onDragOver={(event) =>
-                                            event.preventDefault()
-                                        }
-                                        onDrop={(event) =>
-                                            handleDrop(original, event)
-                                        }
-                                    >
-                                        {multiple && (
-                                            <td className="WebSSH-DataTableCellColCheckbox">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={row.getIsSelected()}
-                                                    disabled={disabled}
-                                                    aria-label={`Select row ${sortedIndex + 1}`}
-                                                    onClick={(event) =>
-                                                        event.stopPropagation()
-                                                    }
-                                                    onChange={(event) => {
-                                                        row.toggleSelected(
-                                                            event.target
-                                                                .checked,
-                                                        );
-                                                        selectionAnchor.current =
-                                                            row.id;
-                                                        setActiveId(row.id);
-                                                    }}
-                                                />
-                                            </td>
-                                        )}
-                                        {row
-                                            .getAllCells()
-                                            .map((cell, cellIndex) => {
-                                                const column =
-                                                    columns[cellIndex];
-                                                const isTreeColumn =
-                                                    Boolean(getSubRows) &&
-                                                    cellIndex === 0;
-                                                return (
-                                                    <td
-                                                        key={cell.id}
-                                                        className={
-                                                            column?.className
-                                                        }
-                                                        style={{
-                                                            textAlign:
-                                                                column?.align ??
-                                                                "left",
-                                                        }}
-                                                    >
-                                                        <div
-                                                            className={classNames(
-                                                                isTreeColumn &&
-                                                                    "WebSSH-DataTableTreeCell",
-                                                            )}
-                                                            style={
-                                                                isTreeColumn
-                                                                    ? {
-                                                                          paddingLeft:
-                                                                              row.depth *
-                                                                              20,
-                                                                      }
-                                                                    : undefined
-                                                            }
-                                                        >
-                                                            {isTreeColumn &&
-                                                                (expandIcon ? (
-                                                                    expandIcon(
-                                                                        original,
-                                                                        row.getIsExpanded(),
-                                                                        () =>
-                                                                            row.toggleExpanded(),
-                                                                    )
-                                                                ) : row.getCanExpand() ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        className="WebSSH-DataTableExpandIcon"
-                                                                        aria-label="Toggle row"
-                                                                        aria-expanded={row.getIsExpanded()}
-                                                                        onClick={(
-                                                                            event,
-                                                                        ) => {
-                                                                            event.stopPropagation();
-                                                                            row.toggleExpanded();
-                                                                        }}
-                                                                    >
-                                                                        {row.getIsExpanded() ? (
-                                                                            <CaretDownOutlined />
-                                                                        ) : (
-                                                                            <CaretRightOutlined />
-                                                                        )}
-                                                                    </button>
-                                                                ) : null)}
-                                                            {flexRender(
-                                                                cell.column
-                                                                    .columnDef
-                                                                    .cell,
-                                                                cell.getContext(),
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                );
-                                            })}
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                <MemoDataTableBody
+                    rows={rows}
+                    visibleRows={visibleRows}
+                    startIndex={startIndex}
+                    rowHeight={rowHeight}
+                    tableWidth={tableWidth}
+                    virtual={virtual}
+                    columns={columns}
+                    columnWidths={columnWidths}
+                    selectable={selectable}
+                    multiple={multiple}
+                    draggable={draggable}
+                    getRowId={getRowId}
+                    data={data}
+                    getSubRows={getSubRows}
+                    expandIcon={expandIcon}
+                    activeId={activeId}
+                    rowSelection={rowSelection}
+                    selectionAnchor={selectionAnchor}
+                    selectedRows={selectedRowsRef}
+                    setRowSelection={setRowSelection}
+                    setActiveId={setActiveId}
+                    dragRows={dragRows}
+                    dragStartIndex={dragStartIndex}
+                    selectIndex={selectIndex}
+                    onRowClick={onRowClick}
+                    onRowDoubleClick={onRowDoubleClick}
+                    onContextMenu={onContextMenu}
+                    onDrop={handleDrop}
+                />
             )}
         </div>
     );
 }
+
+interface DataTableBodyProps<TData extends RowData> {
+    rows: Row<typeof features, TData>[];
+    visibleRows: Row<typeof features, TData>[];
+    startIndex: number;
+    rowHeight: number;
+    tableWidth: number;
+    virtual: boolean;
+    columns: DataTableColumn<TData>[];
+    columnWidths: Record<string, number>;
+    selectable: boolean;
+    multiple: boolean;
+    draggable: boolean;
+    getRowId: (row: TData, index: number) => string;
+    data: TData[];
+    getSubRows?: (
+        row: TData,
+        index: number,
+    ) => ReadonlyArray<TData> | undefined;
+    expandIcon?: (
+        row: TData,
+        expanded: boolean,
+        onToggle: () => void,
+    ) => React.ReactNode;
+    activeId: string | null;
+    rowSelection: RowSelectionState;
+    selectionAnchor: React.MutableRefObject<string | null>;
+    selectedRows: React.MutableRefObject<Row<typeof features, TData>[]>;
+    setRowSelection: React.Dispatch<React.SetStateAction<RowSelectionState>>;
+    setActiveId: React.Dispatch<React.SetStateAction<string | null>>;
+    dragRows: React.MutableRefObject<TData[] | null>;
+    dragStartIndex: React.MutableRefObject<number | null>;
+    selectIndex: (index: number, additive: boolean, range: boolean) => void;
+    onRowClick?: (row: TData) => void;
+    onRowDoubleClick?: (row: TData, event: MouseEvent) => void;
+    onContextMenu?: (rows: TData[] | null, event: MouseEvent) => void;
+    onDrop: (target: TData | null, event: React.DragEvent) => void;
+}
+
+function DataTableBody<TData extends RowData>({
+    rows,
+    visibleRows,
+    startIndex,
+    rowHeight,
+    tableWidth,
+    virtual,
+    columns,
+    columnWidths,
+    selectable,
+    multiple,
+    draggable,
+    getRowId,
+    data,
+    getSubRows,
+    expandIcon,
+    activeId,
+    rowSelection,
+    selectionAnchor,
+    selectedRows,
+    setRowSelection,
+    setActiveId,
+    dragRows,
+    dragStartIndex,
+    selectIndex,
+    onRowClick,
+    onRowDoubleClick,
+    onContextMenu,
+    onDrop,
+}: DataTableBodyProps<TData>) {
+    return (
+        <div
+            className="WebSSH-DataTableBody"
+            style={{ height: rows.length * rowHeight }}
+            onMouseDown={(event) => {
+                if (!selectable || !multiple) return;
+                if ((event.target as HTMLElement).closest("tbody tr")) return;
+                dragStartIndex.current = Math.floor(
+                    (event.clientY -
+                        event.currentTarget.getBoundingClientRect().top) /
+                        rowHeight,
+                );
+            }}
+            onMouseUp={() => {
+                dragStartIndex.current = null;
+            }}
+            onMouseMove={(event) => {
+                if (
+                    !selectable ||
+                    !multiple ||
+                    dragStartIndex.current === null ||
+                    event.buttons !== 1
+                )
+                    return;
+                const index = Math.max(
+                    0,
+                    Math.min(
+                        rows.length - 1,
+                        Math.floor(
+                            (event.clientY -
+                                event.currentTarget.getBoundingClientRect()
+                                    .top) /
+                                rowHeight,
+                        ),
+                    ),
+                );
+                const [from, to] = [dragStartIndex.current, index].sort(
+                    (a, b) => a - b,
+                );
+                const next: RowSelectionState = {};
+                for (let i = from; i <= to; i += 1) {
+                    if (rows[i]?.getCanSelect()) next[rows[i].id] = true;
+                }
+                setRowSelection(next);
+            }}
+        >
+            <table
+                className="WebSSH-DataTableTable WebSSH-DataTableVirtualTable"
+                style={{
+                    width: tableWidth,
+                    top: virtual ? startIndex * rowHeight : 0,
+                }}
+            >
+                <colgroup>
+                    {multiple && selectable && <col style={{ width: 26 }} />}
+                    {columns.map((column) => (
+                        <col
+                            key={column.id}
+                            style={{
+                                width:
+                                    columnWidths[column.id] ??
+                                    column.width ??
+                                    160,
+                            }}
+                        />
+                    ))}
+                </colgroup>
+                <tbody>
+                    {visibleRows.map((row, visibleIndex) => (
+                        <MemoDataTableRow
+                            key={row.id}
+                            row={row}
+                            rowIndex={startIndex + visibleIndex}
+                            rowHeight={rowHeight}
+                            columns={columns}
+                            selectable={selectable}
+                            multiple={multiple}
+                            draggable={draggable}
+                            selected={Boolean(rowSelection[row.id])}
+                            active={activeId === row.id}
+                            getRowId={getRowId}
+                            data={data}
+                            getSubRows={getSubRows}
+                            expandIcon={expandIcon}
+                            selectionAnchor={selectionAnchor}
+                            selectedRows={selectedRows}
+                            setRowSelection={setRowSelection}
+                            setActiveId={setActiveId}
+                            dragRows={dragRows}
+                            selectIndex={selectIndex}
+                            onRowClick={onRowClick}
+                            onRowDoubleClick={onRowDoubleClick}
+                            onContextMenu={onContextMenu}
+                            onDrop={onDrop}
+                        />
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+const MemoDataTableBody = memo(DataTableBody) as typeof DataTableBody;
+
+interface DataTableRowProps<TData extends RowData> {
+    row: Row<typeof features, TData>;
+    rowIndex: number;
+    rowHeight: number;
+    columns: DataTableColumn<TData>[];
+    selectable: boolean;
+    multiple: boolean;
+    draggable: boolean;
+    selected: boolean;
+    active: boolean;
+    getRowId: (row: TData, index: number) => string;
+    data: TData[];
+    getSubRows?: (
+        row: TData,
+        index: number,
+    ) => ReadonlyArray<TData> | undefined;
+    expandIcon?: (
+        row: TData,
+        expanded: boolean,
+        onToggle: () => void,
+    ) => React.ReactNode;
+    selectionAnchor: React.MutableRefObject<string | null>;
+    selectedRows: React.MutableRefObject<Row<typeof features, TData>[]>;
+    setRowSelection: React.Dispatch<React.SetStateAction<RowSelectionState>>;
+    setActiveId: React.Dispatch<React.SetStateAction<string | null>>;
+    dragRows: React.MutableRefObject<TData[] | null>;
+    selectIndex: (index: number, additive: boolean, range: boolean) => void;
+    onRowClick?: (row: TData) => void;
+    onRowDoubleClick?: (row: TData, event: MouseEvent) => void;
+    onContextMenu?: (rows: TData[] | null, event: MouseEvent) => void;
+    onDrop: (target: TData | null, event: React.DragEvent) => void;
+}
+
+function DataTableRow<TData extends RowData>({
+    row,
+    rowIndex,
+    rowHeight,
+    columns,
+    selectable,
+    multiple,
+    draggable,
+    selected,
+    active,
+    getRowId,
+    data,
+    getSubRows,
+    expandIcon,
+    selectionAnchor,
+    selectedRows,
+    setRowSelection,
+    setActiveId,
+    dragRows,
+    selectIndex,
+    onRowClick,
+    onRowDoubleClick,
+    onContextMenu,
+    onDrop,
+}: DataTableRowProps<TData>) {
+    const original = row.original;
+    const disabled = !row.getCanSelect();
+
+    return (
+        <tr
+            className={classNames({
+                "WebSSH-DataTableTrActive": selected,
+                "WebSSH-DataTableTrDisabled": disabled,
+                "WebSSH-DataTableTrActiveBorder": active,
+            })}
+            style={{ height: rowHeight }}
+            aria-disabled={disabled}
+            draggable={draggable}
+            onClick={(event) => {
+                const additive = event.ctrlKey || event.metaKey;
+                const range = event.shiftKey;
+                if (range && selectionAnchor.current === null)
+                    selectionAnchor.current = row.id;
+                if (row.getCanSelect()) selectIndex(rowIndex, additive, range);
+                onRowClick?.(original);
+            }}
+            onDoubleClick={(event) =>
+                onRowDoubleClick?.(original, event.nativeEvent)
+            }
+            onContextMenu={(event) => {
+                event.preventDefault();
+                const currentSelectedRows = selectedRows.current;
+                const selected =
+                    row.getCanSelect() &&
+                    currentSelectedRows.some((item) => item.id === row.id);
+                const selectedForContext = selected
+                    ? currentSelectedRows.map((item) => item.original)
+                    : [original];
+                if (row.getCanSelect() && !selected) {
+                    setRowSelection({ [row.id]: true });
+                }
+                if (row.getCanSelect()) selectionAnchor.current = row.id;
+                onContextMenu?.(selectedForContext, event.nativeEvent);
+            }}
+            onDragStart={(event) => {
+                const selectedForDrag = currentSelectedRowsForDrag(
+                    selectedRows.current,
+                    row,
+                    original,
+                );
+                dragRows.current = selectedForDrag;
+                event.dataTransfer.effectAllowed = "copyMove";
+                event.dataTransfer.setData(
+                    "application/x-webssh-table-rows",
+                    JSON.stringify(
+                        selectedForDrag.map((item) =>
+                            getRowId(item, data.indexOf(item)),
+                        ),
+                    ),
+                );
+            }}
+            onDragEnd={() => {
+                dragRows.current = null;
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => onDrop(original, event)}
+        >
+            {multiple && selectable && (
+                <td className="WebSSH-DataTableCellColCheckbox">
+                    <input
+                        type="checkbox"
+                        checked={selected}
+                        disabled={disabled}
+                        aria-label={`Select row ${rowIndex + 1}`}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => {
+                            row.toggleSelected(event.target.checked);
+                            selectionAnchor.current = row.id;
+                            setActiveId(row.id);
+                        }}
+                    />
+                </td>
+            )}
+            {row
+                .getAllCells()
+                .map(
+                    (
+                        cell: Cell<typeof features, TData, unknown>,
+                        cellIndex,
+                    ) => {
+                        const column = columns[cellIndex];
+                        const isTreeColumn =
+                            Boolean(getSubRows) && cellIndex === 0;
+                        return (
+                            <td
+                                key={cell.id}
+                                className={column?.className}
+                                style={{ textAlign: column?.align ?? "left" }}
+                            >
+                                <div
+                                    className={classNames(
+                                        isTreeColumn &&
+                                            "WebSSH-DataTableTreeCell",
+                                    )}
+                                    style={
+                                        isTreeColumn
+                                            ? { paddingLeft: row.depth * 20 }
+                                            : undefined
+                                    }
+                                >
+                                    {isTreeColumn &&
+                                        (expandIcon ? (
+                                            expandIcon(
+                                                original,
+                                                row.getIsExpanded(),
+                                                () => row.toggleExpanded(),
+                                            )
+                                        ) : row.getCanExpand() ? (
+                                            <button
+                                                type="button"
+                                                className="WebSSH-DataTableExpandIcon"
+                                                aria-label="Toggle row"
+                                                aria-expanded={row.getIsExpanded()}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    row.toggleExpanded();
+                                                }}
+                                            >
+                                                {row.getIsExpanded() ? (
+                                                    <CaretDownOutlined />
+                                                ) : (
+                                                    <CaretRightOutlined />
+                                                )}
+                                            </button>
+                                        ) : null)}
+                                    {flexRender(
+                                        cell.column.columnDef.cell,
+                                        cell.getContext(),
+                                    )}
+                                </div>
+                            </td>
+                        );
+                    },
+                )}
+        </tr>
+    );
+}
+
+function currentSelectedRowsForDrag<TData extends RowData>(
+    selectedRows: Row<typeof features, TData>[],
+    row: Row<typeof features, TData>,
+    original: TData,
+) {
+    return selectedRows.length && row.getIsSelected()
+        ? selectedRows.map((item) => item.original)
+        : [original];
+}
+
+const MemoDataTableRow = memo(DataTableRow) as typeof DataTableRow;
 
 export default memo(DataTable) as typeof DataTable;

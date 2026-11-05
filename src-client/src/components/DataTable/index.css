@@ -11,6 +11,17 @@
     user-select: none;
 }
 
+.WebSSH-DataTable.WebSSH-DataTableTextSelectable {
+    user-select: text;
+}
+
+.WebSSH-DataTable.WebSSH-DataTableTextSelectable
+    .WebSSH-DataTableTable
+    tbody
+    > tr {
+    cursor: default;
+}
+
 .WebSSH-DataTable::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -146,11 +157,18 @@
 
 .WebSSH-DataTable .WebSSH-DataTableTable tbody > tr.WebSSH-DataTableTrDisabled {
     color: var(--ant-color-text-disabled);
-    cursor: not-allowed;
 }
 
 .WebSSH-DataTable .WebSSH-DataTableTable tbody > tr.WebSSH-DataTableTrDisabled:hover > td {
     background-color: transparent;
+}
+
+.WebSSH-DataTable.WebSSH-DataTableTextSelectable
+    .WebSSH-DataTableTable
+    tbody
+    > tr:hover
+    > td {
+    background-color: var(--ant-color-fill-quaternary);
 }
 
 .WebSSH-DataTable .WebSSH-DataTableCellColCheckbox {
