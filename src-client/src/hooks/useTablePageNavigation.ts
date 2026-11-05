@@ -40,9 +40,16 @@ export default function useTablePageNavigation() {
         [],
     );
 
-    const focusTable = useCallback(() => {
-        tableContainerRef.current?.focus();
-    }, []);
+    const focusTable = useCallback(
+        (event: React.MouseEvent<HTMLDivElement>) => {
+            // DataTable manages its own focus so its selected-row focus styles remain active.
+            if ((event.target as HTMLElement).closest(".WebSSH-DataTable")) {
+                return;
+            }
+            tableContainerRef.current?.focus();
+        },
+        [],
+    );
 
     return {
         tableContainerRef,
