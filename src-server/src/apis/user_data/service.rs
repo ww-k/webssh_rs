@@ -21,9 +21,9 @@ use crate::{
     apis::{
         ApiErr,
         user_data::dto::{
-            EncryptedUserDataExport, USER_DATA_VERSION, UserDataDocument, UserDataExportPayload,
-            UserDataFavoriteDirectory, UserDataImportPayload, UserDataImportResult,
-            UserDataImportUrlPayload, UserDataTarget,
+            EncryptedUserDataExport, TargetConflict, USER_DATA_VERSION, UserDataDocument,
+            UserDataExportPayload, UserDataFavoriteDirectory, UserDataImportPayload,
+            UserDataImportResult, UserDataImportUrlPayload, UserDataTarget,
         },
     },
     consts::services_err_code::{
@@ -75,7 +75,8 @@ pub async fn import(
     db: &DatabaseConnection,
     payload: UserDataImportPayload,
 ) -> Result<UserDataImportResult, ApiErr> {
-    import_document(db, payload.data, payload.password.as_deref()).await
+    let options = ImportOptions::from(&payload);
+    import_document(db, payload.data, payload.password.as_deref(), options).await
 }
 
 pub async fn import_from_url(
@@ -105,19 +106,61 @@ pub async fn import_from_url(
         return Err(fetch_error("user data response is too large"));
     }
     let data = serde_json::from_slice(body.as_ref()).map_err(|_| url_format_error())?;
-    import_document(db, data, payload.password.as_deref()).await
+    import_document(
+        db,
+        data,
+        payload.password.as_deref(),
+        ImportOptions::from(&payload),
+    )
+    .await
+}
+
+struct ImportOptions {
+    import_settings: bool,
+    import_targets: bool,
+    import_favorites: bool,
+    target_conflict: TargetConflict,
+}
+
+impl From<&UserDataImportPayload> for ImportOptions {
+    fn from(payload: &UserDataImportPayload) -> Self {
+        Self {
+            import_settings: payload.import_settings,
+            import_targets: payload.import_targets,
+            import_favorites: payload.import_favorites,
+            target_conflict: payload.target_conflict,
+        }
+    }
+}
+
+impl From<&UserDataImportUrlPayload> for ImportOptions {
+    fn from(payload: &UserDataImportUrlPayload) -> Self {
+        Self {
+            import_settings: payload.import_settings,
+            import_targets: payload.import_targets,
+            import_favorites: payload.import_favorites,
+            target_conflict: payload.target_conflict,
+        }
+    }
 }
 
 async fn import_document(
     db: &DatabaseConnection,
     data: serde_json::Value,
     password: Option<&str>,
+    options: ImportOptions,
 ) -> Result<UserDataImportResult, ApiErr> {
     let document = decode_document(data, password)?;
     let import_payload = UserDataImportPayloadData {
         version: document.version,
         targets: document.targets,
-        favorite_directories: document.favorite_directories,
+        favorite_directories: if options.import_favorites {
+            document.favorite_directories
+        } else {
+            Vec::new()
+        },
+        target_conflict: options.target_conflict,
+        import_targets: options.import_targets,
     };
     validate_payload(&import_payload)?;
     let transaction = map_db_err!(db.begin().await)?;
@@ -126,7 +169,11 @@ async fn import_document(
         Ok(result) => {
             map_db_err!(transaction.commit().await)?;
             Ok(UserDataImportResult {
-                settings: document.settings,
+                settings: if options.import_settings {
+                    document.settings
+                } else {
+                    serde_json::Value::Null
+                },
                 ..result
             })
         }
@@ -157,15 +204,39 @@ async fn import_in_transaction<C: ConnectionTrait>(
         })
         .collect::<HashMap<_, _>>();
     let mut target_ids = HashMap::new();
-    let mut added = Vec::new();
+    let mut pending = Vec::new();
     let mut added_targets = 0;
+    let mut updated_targets = 0;
     let mut skipped_targets = 0;
 
     for source in payload.targets {
         let key = target_key(&source.host, source.port, &source.method, &source.user);
+        if !payload.import_targets {
+            if let Some(existing) = existing_by_key.get(&key) {
+                target_ids.insert(source.id, existing.id);
+            }
+            continue;
+        }
         if let Some(existing) = existing_by_key.get(&key) {
             target_ids.insert(source.id, existing.id);
-            skipped_targets += 1;
+            if matches!(payload.target_conflict, TargetConflict::Overwrite) {
+                let mut model = target::ActiveModel::from(existing.clone());
+                model.name = Set(source.name.clone());
+                model.directory = Set(source.directory.clone());
+                model.host = Set(source.host.clone());
+                model.port = Set(source.port);
+                model.method = Set(source.method.clone());
+                model.user = Set(source.user.clone());
+                model.key = Set(source.key.clone());
+                model.password = Set(source.password.clone());
+                model.system = Set(source.system.clone());
+                model.jump_host_id = Set(None);
+                let updated = map_db_err!(model.update(db).await)?;
+                pending.push((source, updated));
+                updated_targets += 1;
+            } else {
+                skipped_targets += 1;
+            }
             continue;
         }
 
@@ -185,11 +256,11 @@ async fn import_in_transaction<C: ConnectionTrait>(
         let created = map_db_err!(target.insert(db).await)?;
         target_ids.insert(source.id, created.id);
         existing_by_key.insert(key, created.clone());
-        added.push((source, created));
+        pending.push((source, created));
         added_targets += 1;
     }
 
-    for (source, mut created) in added {
+    for (source, mut created) in pending {
         let Some(source_jump_host_id) = source.jump_host_id else {
             continue;
         };
@@ -266,6 +337,7 @@ async fn import_in_transaction<C: ConnectionTrait>(
 
     Ok(UserDataImportResult {
         added_targets,
+        updated_targets,
         skipped_targets,
         imported_favorites,
         settings: serde_json::Value::Null,
@@ -276,6 +348,8 @@ struct UserDataImportPayloadData {
     version: u32,
     targets: Vec<UserDataTarget>,
     favorite_directories: Vec<UserDataFavoriteDirectory>,
+    target_conflict: TargetConflict,
+    import_targets: bool,
 }
 
 fn validate_payload(payload: &UserDataImportPayloadData) -> Result<(), ApiErr> {

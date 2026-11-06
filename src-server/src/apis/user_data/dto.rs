@@ -49,12 +49,45 @@ pub struct EncryptedUserDataExport {
 pub struct UserDataImportPayload {
     pub password: Option<String>,
     pub data: Value,
+    #[serde(default = "default_true")]
+    pub import_settings: bool,
+    #[serde(default = "default_true")]
+    pub import_targets: bool,
+    #[serde(default = "default_true")]
+    pub import_favorites: bool,
+    #[serde(default)]
+    pub target_conflict: TargetConflict,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UserDataImportUrlPayload {
     pub password: Option<String>,
     pub url: String,
+    #[serde(default = "default_true")]
+    pub import_settings: bool,
+    #[serde(default = "default_true")]
+    pub import_targets: bool,
+    #[serde(default = "default_true")]
+    pub import_favorites: bool,
+    #[serde(default)]
+    pub target_conflict: TargetConflict,
+}
+
+#[derive(Debug, Deserialize, Clone, Copy, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum TargetConflict {
+    Skip,
+    Overwrite,
+}
+
+impl Default for TargetConflict {
+    fn default() -> Self {
+        Self::Overwrite
+    }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -70,6 +103,7 @@ pub struct UserDataDocument {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UserDataImportResult {
     pub added_targets: usize,
+    pub updated_targets: usize,
     pub skipped_targets: usize,
     pub imported_favorites: usize,
     pub settings: Value,

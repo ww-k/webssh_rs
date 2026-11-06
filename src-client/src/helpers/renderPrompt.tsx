@@ -1,4 +1,4 @@
-import { Input, Modal, Space } from "antd";
+import { Checkbox, Input, Modal, Radio, Space } from "antd";
 import { createRef } from "react";
 
 import type { InputRef } from "antd";
@@ -128,6 +128,104 @@ export function renderUrlPasswordPrompt(
             okText: options.okText,
             cancelText: options.cancelText,
             onOk: () => finish({ url, password }),
+            onCancel: () => finish(),
+        });
+        destroyModal = modal.destroy;
+    });
+}
+
+export interface RenderImportOptions {
+    import_settings: boolean;
+    import_targets: boolean;
+    import_favorites: boolean;
+    target_conflict: "skip" | "overwrite";
+}
+
+export function renderImportOptionsPrompt(options: {
+    title: string;
+    settingsLabel: string;
+    targetsLabel: string;
+    favoritesLabel: string;
+    conflictLabel: string;
+    skipLabel: string;
+    overwriteLabel: string;
+    okText?: string;
+    cancelText?: string;
+}): Promise<RenderImportOptions | undefined> {
+    return new Promise((resolve) => {
+        let value: RenderImportOptions = {
+            import_settings: true,
+            import_targets: true,
+            import_favorites: true,
+            target_conflict: "overwrite",
+        };
+        let settled = false;
+        let destroyModal = () => {};
+        const finish = (result?: RenderImportOptions) => {
+            if (settled) return;
+            settled = true;
+            resolve(result);
+            destroyModal();
+        };
+        const modal = Modal.confirm({
+            title: options.title,
+            content: (
+                <Space direction="vertical">
+                    <Checkbox
+                        defaultChecked
+                        onChange={(event) => {
+                            value = {
+                                ...value,
+                                import_settings: event.target.checked,
+                            };
+                        }}
+                    >
+                        {options.settingsLabel}
+                    </Checkbox>
+                    <Checkbox
+                        defaultChecked
+                        onChange={(event) => {
+                            value = {
+                                ...value,
+                                import_targets: event.target.checked,
+                            };
+                        }}
+                    >
+                        {options.targetsLabel}
+                    </Checkbox>
+                    <Checkbox
+                        defaultChecked
+                        onChange={(event) => {
+                            value = {
+                                ...value,
+                                import_favorites: event.target.checked,
+                            };
+                        }}
+                    >
+                        {options.favoritesLabel}
+                    </Checkbox>
+                    <span>{options.conflictLabel}</span>
+                    <Radio.Group
+                        defaultValue="overwrite"
+                        onChange={(event) => {
+                            value = {
+                                ...value,
+                                target_conflict: event.target.value,
+                            };
+                        }}
+                    >
+                        <Space direction="vertical">
+                            <Radio value="skip">{options.skipLabel}</Radio>
+                            <Radio value="overwrite">
+                                {options.overwriteLabel}
+                            </Radio>
+                        </Space>
+                    </Radio.Group>
+                </Space>
+            ),
+            okText: options.okText,
+            cancelText: options.cancelText,
+            onOk: () => finish(value),
             onCancel: () => finish(),
         });
         destroyModal = modal.destroy;

@@ -22,9 +22,10 @@ export interface UserDataSettings {
 }
 export interface UserDataImportResult {
     addedTargets: number;
+    updatedTargets: number;
     skippedTargets: number;
     importedFavorites: number;
-    settings: UserDataSettings;
+    settings?: UserDataSettings;
 }
 function readSettings(value: unknown): UserDataSettings {
     if (!value || typeof value !== "object") {
@@ -147,6 +148,7 @@ export async function createUserDataExport(
 export async function importUserData(
     raw: unknown,
     password?: string,
+    options?: UserDataImportOptions,
 ): Promise<UserDataImportResult> {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
         throw new Error("Invalid user data file");
@@ -166,29 +168,41 @@ export async function importUserData(
     const result = await postUserDataImport({
         ...(encrypted && password ? { password } : {}),
         data: raw,
+        ...options,
     });
     return {
         addedTargets: result.added_targets,
+        updatedTargets: result.updated_targets ?? 0,
         skippedTargets: result.skipped_targets,
         importedFavorites: result.imported_favorites,
-        settings: readSettings(result.settings),
+        settings: result.settings ? readSettings(result.settings) : undefined,
     };
 }
 
 export async function importUserDataFromUrl(
     url: string,
     password?: string,
+    options?: UserDataImportOptions,
 ): Promise<UserDataImportResult> {
     const result = await postUserDataImportUrl({
         url,
         ...(password ? { password } : {}),
+        ...options,
     });
     return {
         addedTargets: result.added_targets,
+        updatedTargets: result.updated_targets ?? 0,
         skippedTargets: result.skipped_targets,
         importedFavorites: result.imported_favorites,
-        settings: readSettings(result.settings),
+        settings: result.settings ? readSettings(result.settings) : undefined,
     };
+}
+
+export interface UserDataImportOptions {
+    import_settings: boolean;
+    import_targets: boolean;
+    import_favorites: boolean;
+    target_conflict: "skip" | "overwrite";
 }
 
 export type UserDataImportErrorType =

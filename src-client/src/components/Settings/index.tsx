@@ -25,7 +25,10 @@ import { useTranslation } from "react-i18next";
 import "./index.css";
 
 import fileSave from "@/helpers/fileSave";
-import renderPrompt, { renderUrlPasswordPrompt } from "@/helpers/renderPrompt";
+import renderPrompt, {
+    renderImportOptionsPrompt,
+    renderUrlPasswordPrompt,
+} from "@/helpers/renderPrompt";
 import {
     createUserDataExport,
     getUserDataImportErrorType,
@@ -160,6 +163,18 @@ export default function Settings() {
     const applyImportedData = (
         result: Awaited<ReturnType<typeof importUserData>>,
     ) => {
+        if (!result.settings) {
+            window.dispatchEvent(new Event("webssh:user-data-imported"));
+            message.success(
+                t("settings_data_import_success", {
+                    added: result.addedTargets,
+                    updated: result.updatedTargets,
+                    skipped: result.skippedTargets,
+                    favorites: result.importedFavorites,
+                }),
+            );
+            return;
+        }
         setTheme(result.settings.theme_mode);
         setSidebarCollapsed(result.settings.sidebar_collapsed);
         setShowTerminalCopyNotification(
@@ -189,10 +204,12 @@ export default function Settings() {
         message.success(
             t("settings_data_import_success", {
                 added: result.addedTargets,
+                updated: result.updatedTargets,
                 skipped: result.skippedTargets,
                 favorites: result.importedFavorites,
             }),
         );
+        window.dispatchEvent(new Event("webssh:user-data-imported"));
     };
 
     const importData = async (data: unknown) => {
@@ -214,7 +231,19 @@ export default function Settings() {
               })
             : undefined;
         if (encrypted && password === undefined) return;
-        const result = await importUserData(data, password);
+        const importOptions = await renderImportOptionsPrompt({
+            title: t("settings_data_import_options_title"),
+            settingsLabel: t("settings_data_import_category_settings"),
+            targetsLabel: t("settings_data_import_category_targets"),
+            favoritesLabel: t("settings_data_import_category_favorites"),
+            conflictLabel: t("settings_data_import_target_conflict"),
+            skipLabel: t("settings_data_import_target_skip"),
+            overwriteLabel: t("settings_data_import_target_overwrite"),
+            okText: t("app_btn_ok"),
+            cancelText: t("app_btn_cancel"),
+        });
+        if (!importOptions) return;
+        const result = await importUserData(data, password, importOptions);
         applyImportedData(result);
     };
 
@@ -248,9 +277,22 @@ export default function Settings() {
         if (!url) return;
 
         try {
+            const importOptions = await renderImportOptionsPrompt({
+                title: t("settings_data_import_options_title"),
+                settingsLabel: t("settings_data_import_category_settings"),
+                targetsLabel: t("settings_data_import_category_targets"),
+                favoritesLabel: t("settings_data_import_category_favorites"),
+                conflictLabel: t("settings_data_import_target_conflict"),
+                skipLabel: t("settings_data_import_target_skip"),
+                overwriteLabel: t("settings_data_import_target_overwrite"),
+                okText: t("app_btn_ok"),
+                cancelText: t("app_btn_cancel"),
+            });
+            if (!importOptions) return;
             const result = await importUserDataFromUrl(
                 url,
-                value.password || undefined,
+                value?.password || undefined,
+                importOptions,
             );
             applyImportedData(result);
         } catch (error) {

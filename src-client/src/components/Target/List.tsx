@@ -270,6 +270,13 @@ export default function TargetList({ tab }: { tab: ITab }) {
     }, [refresh]);
 
     useEffect(() => {
+        const handler = () => void refresh();
+        window.addEventListener("webssh:user-data-imported", handler);
+        return () =>
+            window.removeEventListener("webssh:user-data-imported", handler);
+    }, [refresh]);
+
+    useEffect(() => {
         const element = tableContainerRef.current;
         if (!element) return;
 
