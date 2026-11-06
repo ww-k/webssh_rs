@@ -317,10 +317,16 @@ const useAppStore = create<AppStore>((set) => {
         },
 
         activeMenuKey: "home",
-        setMenuKey: (key: string) => set({ activeMenuKey: key }),
+        setMenuKey: (key: string) =>
+            set((state) =>
+                state.activeMenuKey === key ? state : { activeMenuKey: key },
+            ),
 
         ...initialTabs,
-        setActiveTabKey: (key: string) => set({ activeTabKey: key }),
+        setActiveTabKey: (key: string) =>
+            set((state) =>
+                state.activeTabKey === key ? state : { activeTabKey: key },
+            ),
         addTab: () => {
             let newTabKey = "";
             set((state) => {
