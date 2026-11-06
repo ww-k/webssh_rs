@@ -64,11 +64,10 @@
     overflow: hidden;
 }
 
-/* CodeMirror 6 的根元素 */
-.filesviewFileEditorBody .cm-editor {
-    flex: 1; /* 填满 .editor-wrapper */
+.filesviewFileEditorMonaco {
     min-width: 0;
-    min-height: 0; /* 再次确保可以收缩 */
+    min-height: 0;
+    flex: 1;
 }
 
 .filesviewFileEditorState {
