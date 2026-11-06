@@ -1,4 +1,4 @@
-use sea_orm::ActiveValue::Set;
+use sea_orm::ActiveValue::{NotSet, Set};
 use serde::Deserialize;
 
 use crate::entities::target::{self, TargetAuthMethod};
@@ -35,6 +35,8 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
     fn from(p: TargetUpdatePayload) -> Self {
         target::ActiveModel {
             id: Set(p.id),
+            color: NotSet,
+            sort_order: NotSet,
             name: Set(p.name),
             directory: Set(p.directory),
             host: Set(p.host),
@@ -53,4 +55,10 @@ impl From<TargetUpdatePayload> for target::ActiveModel {
 pub struct TargetRemovePayload {
     /// 要删除的目标 ID
     pub id: i32,
+}
+
+#[derive(Deserialize, Debug, utoipa::ToSchema)]
+pub struct TargetReorderPayload {
+    /// 按显示顺序排列的目标 ID
+    pub ids: Vec<i32>,
 }

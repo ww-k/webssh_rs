@@ -7,6 +7,7 @@ mod m000004_target_name;
 mod m000005_ssh_known_host_endpoint;
 mod m000006_transfer_batches;
 mod m000007_target_directory;
+mod m000008_target_sort_order;
 
 pub struct Migrator;
 
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000005_ssh_known_host_endpoint::Migration),
             Box::new(m000006_transfer_batches::Migration),
             Box::new(m000007_target_directory::Migration),
+            Box::new(m000008_target_sort_order::Migration),
         ]
     }
 }
@@ -75,6 +77,8 @@ mod tests {
 
             let active_model = target::ActiveModel::from(target::Model {
                 id: 1,
+                sort_order: 0,
+                color: None,
                 name: "Test target".to_string(),
                 directory: String::new(),
                 host: "127.0.0.1".to_string(),

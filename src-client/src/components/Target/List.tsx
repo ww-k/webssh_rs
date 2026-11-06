@@ -14,7 +14,12 @@ import { Button, Input, Modal, message, Select, Space, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getTargetList, postTargetRemove, postTargetUpdate } from "@/api";
+import {
+    getTargetList,
+    postTargetRemove,
+    postTargetReorder,
+    postTargetUpdate,
+} from "@/api";
 import DataTable, {
     type DataTableColumn,
     type DataTableDropEvent,
@@ -52,9 +57,16 @@ const TARGET_ROW_HEIGHT = 33;
 const normalizeDirectory = (directory?: string) =>
     directory?.trim().replace(/^\/+|\/+$/g, "") || "";
 
+const sortTargets = (targets: ITarget[]) =>
+    [...targets].sort(
+        (left, right) =>
+            (left.sort_order ?? 0) - (right.sort_order ?? 0) ||
+            left.id - right.id,
+    );
+
 const buildTargetTree = (targets: ITarget[]): TargetTreeRow[] => {
     const grouped = new Map<string, ITarget[]>();
-    const standalone: TargetTreeRow[] = [];
+    const standalone: ITarget[] = [];
 
     for (const target of targets) {
         const directory = normalizeDirectory(target.directory);
@@ -77,10 +89,10 @@ const buildTargetTree = (targets: ITarget[]): TargetTreeRow[] => {
             user: "",
             method: 3,
             isDirectory: true as const,
-            children: children.map((target) => ({ ...target })),
+            children: sortTargets(children).map((target) => ({ ...target })),
         }));
 
-    return [...directories, ...standalone];
+    return [...directories, ...sortTargets(standalone)];
 };
 
 const TargetTreeExpandIcon = (
@@ -163,31 +175,86 @@ export default function TargetList({ tab }: { tab: ITab }) {
     }, []);
 
     const handleDrop = useCallback(
-        async ({ rows, target }: DataTableDropEvent<TargetTreeRow>) => {
-            if (!target?.isDirectory) return;
+        async ({
+            rows,
+            target,
+            dropPosition,
+        }: DataTableDropEvent<TargetTreeRow>) => {
+            if (!target) return;
 
-            const directory = normalizeDirectory(target.directory);
-            const targetsToMove = rows.filter(
-                (row): row is ITarget =>
-                    !row.isDirectory &&
-                    normalizeDirectory(row.directory) !== directory,
+            const sourceRows = rows.filter(
+                (row): row is ITarget => !row.isDirectory,
             );
-            if (targetsToMove.length === 0) return;
+            if (sourceRows.length === 0) return;
+            const sourceIds = new Set(sourceRows.map((row) => row.id));
+            if (!target.isDirectory && sourceIds.has(target.id)) return;
+            const directory = normalizeDirectory(target.directory);
+            const nextTargets = dataSource.map((row) => ({ ...row }));
+            const targetsByDirectory = new Map<string, ITarget[]>();
+            for (const row of nextTargets) {
+                if (sourceIds.has(row.id)) {
+                    row.directory = directory;
+                }
+                const key = normalizeDirectory(row.directory);
+                const group = targetsByDirectory.get(key) ?? [];
+                group.push(row);
+                targetsByDirectory.set(key, group);
+            }
+
+            const targetGroup = sortTargets(
+                targetsByDirectory.get(directory) ?? [],
+            ).filter((row) => !sourceIds.has(row.id));
+            const sourceTargets = sourceRows.map((row) => ({
+                ...row,
+                directory,
+            }));
+            let insertionIndex = targetGroup.length;
+            if (!target.isDirectory) {
+                const targetIndex = targetGroup.findIndex(
+                    (row) => row.id === target.id,
+                );
+                if (targetIndex >= 0) {
+                    insertionIndex =
+                        targetIndex + (dropPosition === "after" ? 1 : 0);
+                }
+            }
+            targetGroup.splice(insertionIndex, 0, ...sourceTargets);
+
+            const orderedIds: number[] = [];
+            for (const [groupDirectory, group] of [
+                ...targetsByDirectory.entries(),
+            ].sort(([left], [right]) => left.localeCompare(right))) {
+                const orderedGroup =
+                    groupDirectory === directory
+                        ? targetGroup
+                        : sortTargets(group).filter(
+                              (row) => !sourceIds.has(row.id),
+                          );
+                orderedIds.push(...orderedGroup.map((row) => row.id));
+            }
 
             try {
                 await Promise.all(
-                    targetsToMove.map((row) =>
-                        postTargetUpdate({ ...row, directory }),
-                    ),
+                    sourceTargets
+                        .filter(
+                            (row) =>
+                                normalizeDirectory(
+                                    sourceRows.find(
+                                        (source) => source.id === row.id,
+                                    )?.directory,
+                                ) !== directory,
+                        )
+                        .map((row) => postTargetUpdate(row)),
                 );
-                message.success(t("target_move_success"));
+                await postTargetReorder(orderedIds);
+                message.success(t("target_reorder_success"));
                 await refresh();
             } catch {
                 message.error(t("target_move_failed"));
                 await refresh();
             }
         },
-        [refresh, t],
+        [dataSource, refresh, t],
     );
 
     const treeDataSource = useMemo(
@@ -377,7 +444,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     data={treeDataSource}
                     getRowId={getTargetRowId}
                     getSubRows={getTargetSubRows}
-                    canDropRow={(row) => row.isDirectory === true}
+                    canDropRow={() => true}
                     defaultExpanded
                     draggable
                     expandIcon={TargetTreeExpandIcon}

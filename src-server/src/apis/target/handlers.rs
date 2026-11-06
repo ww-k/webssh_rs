@@ -90,3 +90,22 @@ pub async fn target_remove(
 ) -> Result<(), ApiErr> {
     service::remove(&state.db, &state.connection_pool, payload.id).await
 }
+
+#[utoipa::path(
+    post,
+    path = "/api/target/reorder",
+    tag = "target",
+    summary = "调整 SSH 目标顺序",
+    operation_id = "target_reorder",
+    request_body = crate::apis::target::dto::TargetReorderPayload,
+    responses(
+        (status = 200, description = "成功调整 SSH 目标顺序"),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn target_reorder(
+    State(state): State<Arc<AppState>>,
+    ValidJson(payload): ValidJson<crate::apis::target::dto::TargetReorderPayload>,
+) -> Result<(), ApiErr> {
+    service::reorder(&state.db, payload.ids).await
+}

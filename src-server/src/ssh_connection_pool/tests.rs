@@ -60,6 +60,8 @@ async fn context() -> TestContext {
 fn test_target() -> target::Model {
     target::Model {
         id: 1,
+        sort_order: 0,
+        color: None,
         name: "Test target".to_string(),
         directory: String::new(),
         host: "127.0.0.1".to_string(),

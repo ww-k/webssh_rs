@@ -63,6 +63,7 @@ export interface DataTableDropEvent<TData> {
     rows: TData[];
     files: File[];
     target: TData | null;
+    dropPosition: "before" | "after";
     event: DragEvent;
 }
 
@@ -457,6 +458,7 @@ function DataTable<TData extends RowData>({
                 rows: sourceRows ?? [],
                 files: Array.from(event.dataTransfer.files),
                 target,
+                dropPosition: "after",
                 event: nativeEvent,
             });
             dragRows.current = null;
@@ -662,7 +664,7 @@ function DataTable<TData extends RowData>({
             {rows.length === 0 ? (
                 <div className="WebSSH-DataTableEmpty">{emptyContent}</div>
             ) : (
-                <MemoDataTableBody
+                <MemoDataTableBody<TData>
                     rows={rows}
                     visibleRows={visibleRows}
                     startIndex={startIndex}
@@ -742,7 +744,11 @@ interface DataTableBodyProps<TData extends RowData> {
     onRowClick?: (row: TData) => void;
     onRowDoubleClick?: (row: TData, event: MouseEvent) => void;
     onContextMenu?: (rows: TData[] | null, event: MouseEvent) => void;
-    onDrop: (target: TData | null, event: React.DragEvent) => void;
+    onDrop: (
+        target: TData | null,
+        event: React.DragEvent,
+        dropPosition: "before" | "after",
+    ) => void;
 }
 
 function DataTableBody<TData extends RowData>({
@@ -849,7 +855,7 @@ function DataTableBody<TData extends RowData>({
                 </colgroup>
                 <tbody>
                     {visibleRows.map((row, visibleIndex) => (
-                        <MemoDataTableRow
+                        <MemoDataTableRow<TData>
                             key={row.id}
                             row={row}
                             rowIndex={startIndex + visibleIndex}
@@ -862,6 +868,7 @@ function DataTableBody<TData extends RowData>({
                             dragging={dragging}
                             dropTarget={dropTargetId === row.id}
                             selected={Boolean(rowSelection[row.id])}
+                            disabled={false}
                             active={activeId === row.id}
                             getRowId={getRowId}
                             data={data}
@@ -925,7 +932,11 @@ interface DataTableRowProps<TData extends RowData> {
     onRowClick?: (row: TData) => void;
     onRowDoubleClick?: (row: TData, event: MouseEvent) => void;
     onContextMenu?: (rows: TData[] | null, event: MouseEvent) => void;
-    onDrop: (target: TData | null, event: React.DragEvent) => void;
+    onDrop: (
+        target: TData | null,
+        event: React.DragEvent,
+        dropPosition: "before" | "after",
+    ) => void;
 }
 
 function DataTableRow<TData extends RowData>({
@@ -1048,7 +1059,12 @@ function DataTableRow<TData extends RowData>({
                     event.stopPropagation();
                     return;
                 }
-                onDrop(original, event);
+                const bounds = event.currentTarget.getBoundingClientRect();
+                const dropPosition =
+                    event.clientY < bounds.top + bounds.height / 2
+                        ? "before"
+                        : "after";
+                onDrop(original, event, dropPosition);
                 setDragging(false);
                 setDropTargetId(null);
             }}

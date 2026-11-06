@@ -80,6 +80,11 @@ pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
     pub id: i32,
+    /// Display order within the target list.
+    #[serde(default)]
+    pub sort_order: i32,
+    /// Optional color label for the target and its related tabs.
+    pub color: Option<String>,
     /// SSH target name
     #[serde(default)]
     pub name: String,

@@ -127,6 +127,7 @@
     "target_directory_placeholder": "可选，例如：生产环境",
     "target_move_failed": "目标移动失败",
     "target_move_success": "目标已移动",
+    "target_reorder_success": "目标顺序已更新",
     "target_new": "创建目标",
     "target_password": "密码",
     "target_port": "端口",

@@ -14,6 +14,10 @@ pub async fn list(db: &DatabaseConnection) -> Result<Vec<target::Model>, ApiErr>
     Ok(targets)
 }
 
+pub async fn reorder(db: &DatabaseConnection, ids: Vec<i32>) -> Result<(), ApiErr> {
+    map_db_err!(target_repository::reorder(db, &ids).await)
+}
+
 pub async fn add(db: &DatabaseConnection, payload: target::Model) -> Result<target::Model, ApiErr> {
     validate_jump_host(db, payload.id, payload.jump_host_id).await?;
     let target = map_db_err!(target_repository::insert(db, payload).await)?;
@@ -111,6 +115,8 @@ mod tests {
             &db,
             target::Model {
                 id: 0,
+                sort_order: 0,
+                color: None,
                 name: "Test target".to_string(),
                 directory: String::new(),
                 host: "127.0.0.1".to_string(),

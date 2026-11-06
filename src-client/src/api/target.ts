@@ -2,6 +2,7 @@ import axios from "axios";
 
 export interface ITarget {
     id: number;
+    sort_order?: number;
     name?: string;
     directory?: string;
     host: string;
@@ -32,4 +33,8 @@ export async function postTargetUpdate(data: ITarget) {
 export async function postTargetRemove(id: number) {
     const response = await axios.post<ITarget[]>("/api/target/remove", { id });
     return response.data;
+}
+
+export async function postTargetReorder(ids: number[]) {
+    await axios.post<void>("/api/target/reorder", { ids });
 }

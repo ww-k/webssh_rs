@@ -10,6 +10,8 @@ pub const USER_DATA_VERSION: u32 = 1;
 pub struct UserDataTarget {
     pub id: i32,
     #[serde(default)]
+    pub sort_order: i32,
+    #[serde(default)]
     pub name: String,
     #[serde(default)]
     pub directory: String,

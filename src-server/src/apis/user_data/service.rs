@@ -223,6 +223,7 @@ async fn import_in_transaction<C: ConnectionTrait>(
                 let mut model = target::ActiveModel::from(existing.clone());
                 model.name = Set(source.name.clone());
                 model.directory = Set(source.directory.clone());
+                model.sort_order = Set(source.sort_order);
                 model.host = Set(source.host.clone());
                 model.port = Set(source.port);
                 model.method = Set(source.method.clone());
@@ -242,6 +243,8 @@ async fn import_in_transaction<C: ConnectionTrait>(
 
         let target = target::ActiveModel {
             id: NotSet,
+            sort_order: Set(source.sort_order),
+            color: Set(None),
             name: Set(source.name.clone()),
             directory: Set(source.directory.clone()),
             host: Set(source.host.clone()),
@@ -536,6 +539,7 @@ impl From<target::Model> for UserDataTarget {
     fn from(target: target::Model) -> Self {
         Self {
             id: target.id,
+            sort_order: target.sort_order,
             name: target.name,
             directory: target.directory,
             host: target.host,
