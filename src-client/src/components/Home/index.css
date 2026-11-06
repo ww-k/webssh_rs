@@ -1,32 +1,305 @@
-.WebSSH-Home-Tabs,
-.WebSSH-Home-Tabs > .ant-tabs-content-holder > .ant-tabs-content,
-.WebSSH-Home-Tabs
-    > .ant-tabs-content-holder
-    > .ant-tabs-content
-    > .ant-tabs-tabpane-active {
+.WebSSH-Home {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    color: var(--ant-color-text);
+    background: var(--ant-color-bg-container);
+}
+
+.WebSSH-Home-Sidebar {
+    display: flex;
+    flex: 0 0 248px;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--ant-color-bg-layout);
+    border-right: 1px solid var(--ant-color-border);
+}
+
+.WebSSH-Home-Sidebar:focus-visible {
+    outline: 0;
+}
+
+.WebSSH-Home-SidebarHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: 48px;
+    padding: 0 4px 0 8px;
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.WebSSH-Home-SidebarSearch {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: 8px;
+}
+
+.WebSSH-Home-SidebarSearch > .ant-input-affix-wrapper {
+    min-width: 0;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.WebSSH-Home-AddButton,
+.WebSSH-Home-TabClose {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    cursor: pointer;
+}
+
+.WebSSH-Home-AddButton {
+    width: 30px;
+    height: 30px;
+    color: var(--ant-color-text-secondary);
+    background: transparent;
+    border-radius: 6px;
+}
+
+.WebSSH-Home-AddButton:hover {
+    color: var(--ant-color-primary);
+    background: var(--ant-color-fill-secondary);
+}
+
+.WebSSH-Home-TabList {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.WebSSH-Home-Tab {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 24px;
+    align-items: center;
     width: 100%;
-    height: 100%;
+    min-height:46px;
+    padding: 8px;
+    margin: 0 0 4px;
+    color: var(--ant-color-text);
+    text-align: left;
+    background: transparent;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.WebSSH-Home-Tab:hover {
+    background: var(--ant-control-item-bg-active-hover);
+}
+
+.WebSSH-Home-Tab:focus-visible {
+    outline: 2px solid var(--ant-control-outline);
+    outline-offset: 1px;
+}
+
+.WebSSH-Home-Tab.is-active {
+    background: var(--ant-color-primary);
+    border-color: var(--ant-color-primary-border);
+    color: var(--ant-color-white);
+}
+
+.WebSSH-Home-Sidebar:not(:focus-within) .WebSSH-Home-Tab.is-active {
+    color: var(--ant-color-text);
+    background: var(--ant-control-item-bg-active);
+}
+
+.WebSSH-Home-TabIcon,
+.WebSSH-Home-ContentIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ant-color-text-secondary);
+}
+
+.WebSSH-Home-TabIcon {
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    background: var(--ant-color-fill-tertiary);
+    border-radius: 7px;
+}
+
+.WebSSH-Home-Tab.is-active .WebSSH-Home-TabIcon {
+    color: var(--ant-color-primary);
+    background: var(--ant-color-primary-bg-hover);
+}
+
+.WebSSH-Home-TabInfo {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    padding: 0 8px;
+}
+
+.WebSSH-Home-TabName,
+.WebSSH-Home-TabType {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.WebSSH-Home-TabName {
+    font-size: 13px;
+    line-height: 18px;
+}
+
+.WebSSH-Home-TabType {
+    color: var(--ant-color-text-tertiary);
+    font-size: 11px;
+    line-height: 15px;
+}
+
+.WebSSH-Home-TabClose {
+    width: 24px;
+    height: 24px;
     padding: 0;
-    margin: 0;
+    color: var(--ant-color-text-tertiary);
+    background: transparent;
+    border-radius: 5px;
+    opacity: 0;
+}
+
+.WebSSH-Home-Tab:hover .WebSSH-Home-TabClose,
+.WebSSH-Home-Tab.is-active .WebSSH-Home-TabClose {
+    opacity: 1;
+}
+
+.WebSSH-Home-TabClose:hover {
+    color: var(--ant-color-error);
+    background: var(--ant-color-error-bg);
+}
+
+.WebSSH-Home-Content {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    background: var(--ant-color-bg-container);
+}
+
+.WebSSH-Home-ContentHeader {
+    display: flex;
+    flex: 0 0 48px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.WebSSH-Home-ContentIcon {
+    font-size: 17px;
+}
+
+.WebSSH-Home-ContentTitle {
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.WebSSH-Home-ContentType {
+    padding: 2px 7px;
+    color: var(--ant-color-text-secondary);
+    font-size: 11px;
+    line-height: 17px;
+    background: var(--ant-color-fill-secondary);
+    border-radius: 4px;
+}
+
+.WebSSH-Home-Panes {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
     overflow: hidden;
 }
 
-.WebSSH-Home-Tabs
-    > .ant-tabs-content-holder
-    > .ant-tabs-content
-    > .ant-tabs-tabpane-hidden {
+.WebSSH-Home-Pane {
     position: absolute;
     inset: 0;
     display: block;
     visibility: hidden;
-    width: 100%;
-    height: 100%;
+    min-width: 0;
+    min-height: 0;
     overflow: hidden;
     pointer-events: none;
 }
 
-.WebSSH-Home-TabLabel {
+.WebSSH-Home-Pane.is-active {
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.WebSSH-Home-Empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--ant-color-text-secondary);
+    font-size: 14px;
+}
+
+.WebSSH-Home-Empty > .anticon {
+    color: var(--ant-color-text-quaternary);
+    font-size: 34px;
+}
+
+.WebSSH-Home-Empty > button {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    padding: 6px 12px;
+    color: var(--ant-color-primary);
+    background: var(--ant-color-primary-bg);
+    border: 1px solid var(--ant-color-primary-border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.WebSSH-Home-Empty > button:hover {
+    background: var(--ant-color-primary-bg-hover);
+}
+
+@media (max-width: 720px) {
+    .WebSSH-Home-Sidebar {
+        flex-basis: 210px;
+    }
+
+    .WebSSH-Home-ContentHeader {
+        padding: 0 14px;
+    }
+}
+
+@media (max-width: 520px) {
+    .WebSSH-Home-Sidebar {
+        flex-basis: 180px;
+    }
+
+    .WebSSH-Home-Tab {
+        grid-template-columns: 30px minmax(0, 1fr) 22px;
+        padding: 7px 5px;
+    }
+
+    .WebSSH-Home-TabIcon {
+        width: 27px;
+        height: 27px;
+    }
+
+    .WebSSH-Home-TabInfo {
+        padding: 0 5px;
+    }
 }

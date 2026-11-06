@@ -3,12 +3,14 @@ import {
     CloseOutlined,
     CodeOutlined,
     CopyOutlined,
+    DesktopOutlined,
     EditOutlined,
     FolderOutlined,
-    VerticalRightOutlined,
+    PlusOutlined,
+    SearchOutlined,
 } from "@ant-design/icons";
-import { Tabs } from "antd";
-import { useCallback, useMemo } from "react";
+import { Input } from "antd";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
@@ -21,23 +23,61 @@ import Filesview from "../Filesview";
 import TargetSelector from "../Target/Selector";
 import Terminal from "../Terminal";
 
+import type { ITab } from "@/store";
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
 
-export default function Home({ active }: { active: boolean }) {
+const TabPane = memo(function TabPane({
+    active,
+    tab,
+}: {
+    active: boolean;
+    tab: ITab;
+}) {
+    let children: JSX.Element;
+    switch (true) {
+        case tab.path.startsWith("/terminal/"):
+            children = <Terminal active={active} tab={tab} />;
+            break;
+        case tab.path.startsWith("/filesview/"):
+            children = <Filesview tab={tab} />;
+            break;
+        default:
+            children = <TargetSelector active={active} tab={tab} />;
+            break;
+    }
+
+    return (
+        <div
+            className={`WebSSH-Home-Pane${active ? " is-active" : ""}`}
+            aria-hidden={!active}
+        >
+            {children}
+        </div>
+    );
+});
+
+function Home({ active }: { active: boolean }) {
     const { t } = useTranslation();
-    const {
-        activeTabKey,
-        tabs,
-        setActiveTabKey,
-        addTab,
-        removeTab,
-        removeTabs,
-        renameTab,
-        duplicateTab,
-    } = useAppStore();
+    const activeTabKey = useAppStore((state) => state.activeTabKey);
+    const tabs = useAppStore((state) => state.tabs);
+    const setActiveTabKey = useAppStore((state) => state.setActiveTabKey);
+    const addTab = useAppStore((state) => state.addTab);
+    const removeTab = useAppStore((state) => state.removeTab);
+    const removeTabs = useAppStore((state) => state.removeTabs);
+    const renameTab = useAppStore((state) => state.renameTab);
+    const duplicateTab = useAppStore((state) => state.duplicateTab);
+    const [searchValue, setSearchValue] = useState("");
+    // Keep visited panes mounted so switching tabs preserves their state.
+    const mountedTabKeys = useRef(new Set([activeTabKey]));
+
+    mountedTabKeys.current.add(activeTabKey);
+    const tabKeys = new Set(tabs.map((tab) => tab.key));
+    for (const key of mountedTabKeys.current) {
+        if (!tabKeys.has(key)) mountedTabKeys.current.delete(key);
+    }
 
     const onTabContextMenu = useCallback(
-        (evt: React.MouseEvent<HTMLSpanElement>, tabKey: string) => {
+        (evt: React.MouseEvent<HTMLElement>, tabKey: string) => {
             evt.preventDefault();
             evt.stopPropagation();
 
@@ -89,7 +129,7 @@ export default function Home({ active }: { active: boolean }) {
                     label: t("app_tab_close_right"),
                     disabled: tabIndex === tabs.length - 1,
                     click: closeTabsToRight,
-                    iconRender: () => <VerticalRightOutlined />,
+                    iconRender: () => <CloseOutlined />,
                 },
                 {
                     label: t("app_tab_close_all"),
@@ -123,56 +163,6 @@ export default function Home({ active }: { active: boolean }) {
         ],
     );
 
-    const tabsItems = useMemo(
-        () =>
-            tabs.map((tab) => {
-                let children: JSX.Element;
-                switch (true) {
-                    case tab.path.startsWith("/terminal/"):
-                        children = (
-                            <Terminal
-                                active={activeTabKey === tab.key}
-                                tab={tab}
-                            />
-                        );
-                        break;
-                    case tab.path.startsWith("/filesview/"):
-                        children = <Filesview tab={tab} />;
-                        break;
-                    default:
-                        children = (
-                            <TargetSelector
-                                active={active && activeTabKey === tab.key}
-                                tab={tab}
-                            />
-                        );
-                        break;
-                }
-
-                return {
-                    ...tab,
-                    label: (
-                        <span
-                            className="WebSSH-Home-TabLabel"
-                            onContextMenu={(evt) =>
-                                onTabContextMenu(evt, tab.key)
-                            }
-                        >
-                            {tab.path.startsWith("/terminal/") && (
-                                <CodeOutlined aria-hidden="true" />
-                            )}
-                            {tab.path.startsWith("/filesview/") && (
-                                <FolderOutlined aria-hidden="true" />
-                            )}
-                            {tab.label}
-                        </span>
-                    ),
-                    children,
-                };
-            }),
-        [active, activeTabKey, onTabContextMenu, tabs],
-    );
-
     const onEdit = useCallback(
         (
             targetKey: React.MouseEvent | React.KeyboardEvent | string,
@@ -186,19 +176,153 @@ export default function Home({ active }: { active: boolean }) {
         },
         [addTab, removeTab],
     );
+
+    const getTabIcon = (tab: (typeof tabs)[number]) => {
+        if (tab.path.startsWith("/terminal/")) {
+            return <CodeOutlined aria-hidden="true" />;
+        }
+        if (tab.path.startsWith("/filesview/")) {
+            return <FolderOutlined aria-hidden="true" />;
+        }
+        return <DesktopOutlined aria-hidden="true" />;
+    };
+
+    const filteredTabs = useMemo(() => {
+        const search = searchValue.trim().toLocaleLowerCase();
+        if (!search) return tabs;
+        return tabs.filter((tab) =>
+          tab.label.toLocaleLowerCase().includes(search),
+        );
+    }, [searchValue, tabs]);
+
+    const activeTab = tabs.find((tab) => tab.key === activeTabKey);
+
     return (
-        <Tabs
+        <div
+            className="WebSSH-Home"
             style={{ display: active ? undefined : "none" }}
-            size="small"
-            activeKey={activeTabKey}
-            className="WebSSH-Home-Tabs"
-            items={tabsItems}
-            onChange={(key) => {
-                setActiveTabKey(key);
-                document.body.click();
-            }}
-            onEdit={onEdit}
-            type="editable-card"
-        />
+        >
+            <aside className="WebSSH-Home-Sidebar" tabIndex={0}>
+                <div className="WebSSH-Home-SidebarHeader">
+                    <div className="WebSSH-Home-SidebarSearch">
+                        <Input
+                            allowClear
+                            aria-label={t("transfer_filter_keyword")}
+                            placeholder={t("transfer_filter_keyword")}
+                            prefix={<SearchOutlined aria-hidden="true" />}
+                            value={searchValue}
+                            onChange={(event) =>
+                                setSearchValue(event.target.value)
+                            }
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        className="WebSSH-Home-AddButton"
+                        aria-label={t("app_tab_new")}
+                        title={t("app_tab_new")}
+                        onClick={() => onEdit("", "add")}
+                    >
+                        <PlusOutlined aria-hidden="true" />
+                    </button>
+                </div>
+                <div className="WebSSH-Home-TabList" role="tablist">
+                    {filteredTabs.map((tab) => {
+                        const isActive = tab.key === activeTabKey;
+                        return (
+                            <div
+                                key={tab.key}
+                                role="tab"
+                                tabIndex={0}
+                                aria-selected={isActive}
+                                className={`WebSSH-Home-Tab${isActive ? " is-active" : ""}`}
+                                onClick={() => {
+                                    setActiveTabKey(tab.key);
+                                    document.body.click();
+                                }}
+                                onKeyDown={(evt) => {
+                                    if (
+                                        evt.key === "Enter" ||
+                                        evt.key === " "
+                                    ) {
+                                        evt.preventDefault();
+                                        setActiveTabKey(tab.key);
+                                        document.body.click();
+                                    }
+                                }}
+                                onContextMenu={(evt) =>
+                                    onTabContextMenu(evt, tab.key)
+                                }
+                            >
+                                <span className="WebSSH-Home-TabIcon">
+                                    {getTabIcon(tab)}
+                                </span>
+                                <span className="WebSSH-Home-TabInfo">
+                                    <span className="WebSSH-Home-TabName">
+                                        {tab.label}
+                                    </span>
+                                </span>
+                                <button
+                                    type="button"
+                                    className="WebSSH-Home-TabClose"
+                                    aria-label={t("app_tab_close_current")}
+                                    title={t("app_tab_close_current")}
+                                    onClick={(evt) => {
+                                        evt.stopPropagation();
+                                        removeTab(tab.key);
+                                    }}
+                                >
+                                    <CloseOutlined aria-hidden="true" />
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            </aside>
+            <section className="WebSSH-Home-Content">
+                <header className="WebSSH-Home-ContentHeader">
+                    {activeTab ? (
+                        <>
+                            <span className="WebSSH-Home-ContentIcon">
+                                {getTabIcon(activeTab)}
+                            </span>
+                            <span className="WebSSH-Home-ContentTitle">
+                                {activeTab.label}
+                            </span>
+                        </>
+                    ) : (
+                        <span className="WebSSH-Home-ContentTitle">
+                            {t("app_tab_new")}
+                        </span>
+                    )}
+                </header>
+                <div className="WebSSH-Home-Panes">
+                    {tabs
+                        .filter((tab) => mountedTabKeys.current.has(tab.key))
+                        .map((tab) => (
+                            <TabPane
+                                key={tab.key}
+                                active={tab.key === activeTabKey}
+                                tab={tab}
+                            />
+                        ))}
+                    {tabs.length === 0 && (
+                        <div className="WebSSH-Home-Empty">
+                            <DesktopOutlined aria-hidden="true" />
+                            <span>{t("app_tab_new")}</span>
+                            <button
+                                type="button"
+                                onClick={() => onEdit("", "add")}
+                            >
+                                <PlusOutlined aria-hidden="true" />
+                                {t("app_tab_new")}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </section>
+        </div>
     );
 }
+
+export default memo(Home) as typeof Home;

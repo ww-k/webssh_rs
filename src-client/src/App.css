@@ -8,6 +8,44 @@ body,
     overflow: hidden;
 }
 
+/* Keep application scrollbars consistent with the DataTable surface. */
+*:not(.xterm-viewport) {
+    scrollbar-color: var(--ant-color-fill) var(--ant-color-bg-container);
+    scrollbar-width: thin;
+}
+
+*:not(.xterm-viewport)::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*:not(.xterm-viewport)::-webkit-scrollbar-thumb {
+    background-color: var(--ant-color-fill);
+    border: 2px solid var(--ant-color-bg-container);
+    border-radius: 999px;
+}
+
+.monaco-editor .monaco-scrollable-element > .scrollbar {
+    background: var(--ant-color-bg-container) !important;
+}
+
+.monaco-editor .monaco-scrollable-element > .scrollbar.vertical {
+    width: 10px !important;
+}
+
+.monaco-editor .monaco-scrollable-element > .scrollbar.horizontal {
+    height: 10px !important;
+}
+
+.monaco-editor .monaco-scrollable-element > .scrollbar > .slider,
+.monaco-editor .monaco-scrollable-element > .scrollbar > .slider:hover,
+.monaco-editor .monaco-scrollable-element > .scrollbar > .slider.active {
+    box-sizing: border-box;
+    background: var(--webssh-scrollbar-thumb, var(--ant-color-fill)) !important;
+    border: 2px solid var(--ant-color-bg-container);
+    border-radius: 999px;
+}
+
 .WebSSH-Root-Menu.ant-menu-light.ant-menu-root.ant-menu-inline,
 .WebSSH-Root-Menu.ant-menu-light.ant-menu-root.ant-menu-vertical {
     border-inline-end: none;

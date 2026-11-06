@@ -10,8 +10,8 @@ import "./Base.css";
 import useAppStore from "@/store";
 
 import Filelist from "../Filelist";
-import { handlePaste } from "./remoteActions";
 import FileEditorPanel from "./FileEditorPanel";
+import { handlePaste } from "./remoteActions";
 
 import type { IViewFileStat } from "@/types";
 
@@ -58,7 +58,8 @@ export default function FilesviewBase({
     onCloseEditor,
     ...restProps
 }: IProps) {
-    const { copyData, setCopyData } = useAppStore();
+    const copyData = useAppStore((state) => state.copyData);
+    const setCopyData = useAppStore((state) => state.setCopyData);
     const searching = useMemo(() => isSearchUri(cwd), [cwd]);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: just init run

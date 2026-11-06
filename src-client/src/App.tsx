@@ -33,14 +33,14 @@ const { darkAlgorithm, defaultAlgorithm } = theme;
 const { Content, Sider } = Layout;
 export default function App() {
     const { t, i18n } = useTranslation();
-    const {
-        theme,
-        setTheme,
-        sidebarCollapsed,
-        setSidebarCollapsed,
-        activeMenuKey,
-        setMenuKey,
-    } = useAppStore();
+    const theme = useAppStore((state) => state.theme);
+    const setTheme = useAppStore((state) => state.setTheme);
+    const sidebarCollapsed = useAppStore((state) => state.sidebarCollapsed);
+    const setSidebarCollapsed = useAppStore(
+        (state) => state.setSidebarCollapsed,
+    );
+    const activeMenuKey = useAppStore((state) => state.activeMenuKey);
+    const setMenuKey = useAppStore((state) => state.setMenuKey);
     const [newTransferCount, setNewTransferCount] = useState(0);
     const menusItems = useMemo<Required<MenuProps>["items"]>(() => {
         return [

@@ -45,7 +45,9 @@ export default function FilesviewRemote({
         };
     }, [targetId]);
 
-    const { copyData, setCopyData, setTabState } = useAppStore();
+    const copyData = useAppStore((state) => state.copyData);
+    const setCopyData = useAppStore((state) => state.setCopyData);
+    const setTabState = useAppStore((state) => state.setTabState);
     const [cwd, setCwd] = useState(
         initialCwd?.startsWith(baseUrl) ? initialCwd : "",
     );

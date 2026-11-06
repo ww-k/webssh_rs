@@ -153,7 +153,7 @@ const TargetTreeExpandIcon = (
 
 export default function TargetList({ tab }: { tab: ITab }) {
     const { t } = useTranslation();
-    const { setTabPath } = useAppStore();
+    const setTabPath = useAppStore((state) => state.setTabPath);
     const [editorOpen, setEditorOpen] = useState(false);
     const [editorData, setEditorData] = useState<ITarget>();
     const [dataSource, setDataSource] = useState<ITarget[]>([]);
