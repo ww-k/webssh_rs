@@ -155,6 +155,22 @@
     background-color: var(--ant-color-fill-quaternary);
 }
 
+.WebSSH-DataTable
+    .WebSSH-DataTableTable
+    tbody
+    > tr.WebSSH-DataTableTrDropTarget
+    > td {
+    background-color: var(--ant-color-primary-bg-hover);
+}
+
+.WebSSH-DataTable
+    .WebSSH-DataTableTable
+    tbody
+    > tr.WebSSH-DataTableTrDropTarget.WebSSH-DataTableTrDropDisabled
+    > td {
+    background-color: var(--ant-color-fill-quaternary);
+}
+
 .WebSSH-DataTable .WebSSH-DataTableTable tbody > tr.WebSSH-DataTableTrDisabled {
     color: var(--ant-color-text-disabled);
 }

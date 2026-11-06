@@ -76,6 +76,7 @@ export interface DataTableProps<TData extends RowData> {
     multiple?: boolean;
     virtual?: boolean;
     draggable?: boolean;
+    canDropRow?: (row: TData) => boolean;
     loading?: boolean;
     emptyContent?: React.ReactNode;
     canSelectRow?: (row: TData) => boolean;
@@ -114,6 +115,7 @@ function DataTable<TData extends RowData>({
     multiple = true,
     virtual = true,
     draggable = false,
+    canDropRow,
     loading = false,
     emptyContent = "No data",
     canSelectRow,
@@ -141,6 +143,8 @@ function DataTable<TData extends RowData>({
         defaultExpanded ? true : {},
     );
     const [activeId, setActiveId] = useState<string | null>(null);
+    const [dragging, setDragging] = useState(false);
+    const [dropTargetId, setDropTargetId] = useState<string | null>(null);
     const [scrollTop, setScrollTop] = useState(0);
     const scrollTopRef = useRef(0);
     const [viewportHeight, setViewportHeight] = useState(0);
@@ -488,7 +492,10 @@ function DataTable<TData extends RowData>({
                 event.preventDefault();
                 onHeaderContextMenu?.(event);
             }}
-            onDragOver={(event) => event.preventDefault()}
+            onDragOver={(event) => {
+                if ((event.target as HTMLElement).closest("tbody tr")) return;
+                event.preventDefault();
+            }}
             onDrop={(event) => handleDrop(null, event)}
         >
             <div
@@ -667,6 +674,9 @@ function DataTable<TData extends RowData>({
                     selectable={selectable}
                     multiple={multiple}
                     draggable={draggable}
+                    canDropRow={canDropRow}
+                    dragging={dragging}
+                    dropTargetId={dropTargetId}
                     getRowId={getRowId}
                     data={data}
                     getSubRows={getSubRows}
@@ -677,6 +687,8 @@ function DataTable<TData extends RowData>({
                     selectedRows={selectedRowsRef}
                     setRowSelection={setRowSelection}
                     setActiveId={setActiveId}
+                    setDragging={setDragging}
+                    setDropTargetId={setDropTargetId}
                     dragRows={dragRows}
                     dragStartIndex={dragStartIndex}
                     selectIndex={selectIndex}
@@ -702,6 +714,9 @@ interface DataTableBodyProps<TData extends RowData> {
     selectable: boolean;
     multiple: boolean;
     draggable: boolean;
+    canDropRow?: (row: TData) => boolean;
+    dragging: boolean;
+    dropTargetId: string | null;
     getRowId: (row: TData, index: number) => string;
     data: TData[];
     getSubRows?: (
@@ -719,6 +734,8 @@ interface DataTableBodyProps<TData extends RowData> {
     selectedRows: React.MutableRefObject<Row<typeof features, TData>[]>;
     setRowSelection: React.Dispatch<React.SetStateAction<RowSelectionState>>;
     setActiveId: React.Dispatch<React.SetStateAction<string | null>>;
+    setDragging: React.Dispatch<React.SetStateAction<boolean>>;
+    setDropTargetId: React.Dispatch<React.SetStateAction<string | null>>;
     dragRows: React.MutableRefObject<TData[] | null>;
     dragStartIndex: React.MutableRefObject<number | null>;
     selectIndex: (index: number, additive: boolean, range: boolean) => void;
@@ -740,6 +757,9 @@ function DataTableBody<TData extends RowData>({
     selectable,
     multiple,
     draggable,
+    canDropRow,
+    dragging,
+    dropTargetId,
     getRowId,
     data,
     getSubRows,
@@ -750,6 +770,8 @@ function DataTableBody<TData extends RowData>({
     selectedRows,
     setRowSelection,
     setActiveId,
+    setDragging,
+    setDropTargetId,
     dragRows,
     dragStartIndex,
     selectIndex,
@@ -836,6 +858,9 @@ function DataTableBody<TData extends RowData>({
                             selectable={selectable}
                             multiple={multiple}
                             draggable={draggable}
+                            canDropRow={canDropRow}
+                            dragging={dragging}
+                            dropTarget={dropTargetId === row.id}
                             selected={Boolean(rowSelection[row.id])}
                             active={activeId === row.id}
                             getRowId={getRowId}
@@ -846,6 +871,8 @@ function DataTableBody<TData extends RowData>({
                             selectedRows={selectedRows}
                             setRowSelection={setRowSelection}
                             setActiveId={setActiveId}
+                            setDragging={setDragging}
+                            setDropTargetId={setDropTargetId}
                             dragRows={dragRows}
                             selectIndex={selectIndex}
                             onRowClick={onRowClick}
@@ -870,6 +897,9 @@ interface DataTableRowProps<TData extends RowData> {
     selectable: boolean;
     multiple: boolean;
     draggable: boolean;
+    canDropRow?: (row: TData) => boolean;
+    dragging: boolean;
+    dropTarget: boolean;
     selected: boolean;
     disabled: boolean;
     active: boolean;
@@ -888,6 +918,8 @@ interface DataTableRowProps<TData extends RowData> {
     selectedRows: React.MutableRefObject<Row<typeof features, TData>[]>;
     setRowSelection: React.Dispatch<React.SetStateAction<RowSelectionState>>;
     setActiveId: React.Dispatch<React.SetStateAction<string | null>>;
+    setDragging: React.Dispatch<React.SetStateAction<boolean>>;
+    setDropTargetId: React.Dispatch<React.SetStateAction<string | null>>;
     dragRows: React.MutableRefObject<TData[] | null>;
     selectIndex: (index: number, additive: boolean, range: boolean) => void;
     onRowClick?: (row: TData) => void;
@@ -904,6 +936,9 @@ function DataTableRow<TData extends RowData>({
     selectable,
     multiple,
     draggable,
+    canDropRow,
+    dragging,
+    dropTarget,
     selected,
     disabled,
     active,
@@ -915,6 +950,8 @@ function DataTableRow<TData extends RowData>({
     selectedRows,
     setRowSelection,
     setActiveId,
+    setDragging,
+    setDropTargetId,
     dragRows,
     selectIndex,
     onRowClick,
@@ -923,6 +960,7 @@ function DataTableRow<TData extends RowData>({
     onDrop,
 }: DataTableRowProps<TData>) {
     const original = row.original;
+    const canDrop = canDropRow?.(original) ?? true;
 
     return (
         <tr
@@ -930,6 +968,9 @@ function DataTableRow<TData extends RowData>({
                 "WebSSH-DataTableTrActive": selected,
                 "WebSSH-DataTableTrDisabled": disabled,
                 "WebSSH-DataTableTrActiveBorder": active,
+                "WebSSH-DataTableTrDropTarget": dropTarget,
+                "WebSSH-DataTableTrDropAllowed": dragging && canDrop,
+                "WebSSH-DataTableTrDropDisabled": dragging && !canDrop,
             })}
             style={{ height: rowHeight }}
             aria-disabled={disabled}
@@ -967,7 +1008,7 @@ function DataTableRow<TData extends RowData>({
                     original,
                 );
                 dragRows.current = selectedForDrag;
-                event.dataTransfer.effectAllowed = "copyMove";
+                event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData(
                     "application/x-webssh-table-rows",
                     JSON.stringify(
@@ -976,12 +1017,41 @@ function DataTableRow<TData extends RowData>({
                         ),
                     ),
                 );
+                event.dataTransfer.setData("text/plain", "webssh-table-row");
+                setDragging(true);
             }}
             onDragEnd={() => {
                 dragRows.current = null;
+                setDragging(false);
+                setDropTargetId(null);
             }}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => onDrop(original, event)}
+            onDragOver={(event) => {
+                setDropTargetId(row.id);
+                if (!canDrop) {
+                    event.dataTransfer.dropEffect = "none";
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                event.dataTransfer.dropEffect = "move";
+            }}
+            onDragLeave={(event) => {
+                if (
+                    !event.currentTarget.contains(event.relatedTarget as Node)
+                ) {
+                    setDropTargetId(null);
+                }
+            }}
+            onDrop={(event) => {
+                if (!canDrop) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
+                onDrop(original, event);
+                setDragging(false);
+                setDropTargetId(null);
+            }}
         >
             {multiple && selectable && (
                 <td className="WebSSH-DataTableCellColCheckbox">

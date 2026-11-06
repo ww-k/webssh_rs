@@ -41,3 +41,10 @@
 .targetTreeExpandIconDirectory:hover {
     color: var(--ant-color-primary-hover);
 }
+
+.targetListTable:focus .WebSSH-DataTableTrActive .targetTreeExpandIconDirectory,
+.targetListTable:focus-within
+    .WebSSH-DataTableTrActive
+    .targetTreeExpandIconDirectory {
+    color: var(--ant-color-white);
+}

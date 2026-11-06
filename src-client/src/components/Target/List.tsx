@@ -10,12 +10,15 @@ import {
     SearchOutlined,
     WindowsOutlined,
 } from "@ant-design/icons";
-import { Button, Input, Modal, Select, Space, Tooltip } from "antd";
+import { Button, Input, Modal, message, Select, Space, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getTargetList, postTargetRemove } from "@/api";
-import DataTable, { type DataTableColumn } from "@/components/DataTable";
+import { getTargetList, postTargetRemove, postTargetUpdate } from "@/api";
+import DataTable, {
+    type DataTableColumn,
+    type DataTableDropEvent,
+} from "@/components/DataTable";
 import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 import useAppStore from "@/store";
 
@@ -158,6 +161,34 @@ export default function TargetList({ tab }: { tab: ITab }) {
         const res = await getTargetList();
         setDataSource(res);
     }, []);
+
+    const handleDrop = useCallback(
+        async ({ rows, target }: DataTableDropEvent<TargetTreeRow>) => {
+            if (!target?.isDirectory) return;
+
+            const directory = normalizeDirectory(target.directory);
+            const targetsToMove = rows.filter(
+                (row): row is ITarget =>
+                    !row.isDirectory &&
+                    normalizeDirectory(row.directory) !== directory,
+            );
+            if (targetsToMove.length === 0) return;
+
+            try {
+                await Promise.all(
+                    targetsToMove.map((row) =>
+                        postTargetUpdate({ ...row, directory }),
+                    ),
+                );
+                message.success(t("target_move_success"));
+                await refresh();
+            } catch {
+                message.error(t("target_move_failed"));
+                await refresh();
+            }
+        },
+        [refresh, t],
+    );
 
     const treeDataSource = useMemo(
         () => buildTargetTree(filteredDataSource),
@@ -346,8 +377,11 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     data={treeDataSource}
                     getRowId={getTargetRowId}
                     getSubRows={getTargetSubRows}
+                    canDropRow={(row) => row.isDirectory === true}
                     defaultExpanded
+                    draggable
                     expandIcon={TargetTreeExpandIcon}
+                    onDrop={handleDrop}
                     rowHeight={TARGET_ROW_HEIGHT}
                     multiple={false}
                     virtual={tableBodyHeight > 0}

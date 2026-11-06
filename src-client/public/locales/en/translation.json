@@ -164,6 +164,8 @@
     "target_directory": "Directory",
     "target_directory_filter": "Filter by directory",
     "target_directory_placeholder": "Optional, for example: Production",
+    "target_move_failed": "Failed to move target",
+    "target_move_success": "Target moved",
     "target_save_and_connect": "Save and connect",
     "target_select": "Select target",
     "target_search_placeholder": "Search by name, user, or host",
