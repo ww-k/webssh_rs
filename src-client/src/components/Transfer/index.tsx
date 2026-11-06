@@ -846,7 +846,6 @@ export const TransferTable = ({
             data={tree}
             getRowId={(row) => row.id}
             getSubRows={(row) => row.children}
-            defaultExpanded
             expandIcon={TransferTreeExpandIcon}
             rowHeight={TRANSFER_ROW_HEIGHT}
             multiple={false}
