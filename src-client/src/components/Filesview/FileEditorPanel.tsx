@@ -31,6 +31,9 @@ configureMonacoWorkers();
 export default function FileEditorPanel({ file, onClose }: Props) {
     const { t } = useTranslation();
     const theme = useAppStore((state) => state.theme);
+    const terminalScrollbarThumb = useAppStore(
+        (state) => state.terminalThemes[state.theme].scrollbarThumb,
+    );
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [lineWrapping, setLineWrapping] = useState(true);
@@ -80,6 +83,11 @@ export default function FileEditorPanel({ file, onClose }: Props) {
             minimap: { enabled: false },
             model,
             scrollBeyondLastLine: false,
+            scrollbar: {
+                horizontalScrollbarSize: 10,
+                useShadows: false,
+                verticalScrollbarSize: 10,
+            },
             tabSize: 4,
             wordWrap: "on",
         });
@@ -129,6 +137,11 @@ export default function FileEditorPanel({ file, onClose }: Props) {
         <section
             className={`filesviewFileEditor${expanded ? " filesviewFileEditorExpanded" : ""}`}
             aria-label={t("file_editor_aria_label", { name: file.name })}
+            style={
+                {
+                    "--webssh-scrollbar-thumb": terminalScrollbarThumb,
+                } as React.CSSProperties
+            }
         >
             <header className="filesviewFileEditorHeader">
                 <strong title={file.name}>{file.name}</strong>
