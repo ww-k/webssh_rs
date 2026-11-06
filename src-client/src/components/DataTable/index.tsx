@@ -576,7 +576,13 @@ function DataTable<TData extends RowData>({
                                     return (
                                         <th
                                             key={header.id}
-                                            className={column?.className}
+                                            className={classNames(
+                                                column?.className,
+                                                {
+                                                    "WebSSH-DataTableSortable":
+                                                        header.column.getCanSort(),
+                                                },
+                                            )}
                                             style={{
                                                 width:
                                                     columnWidths[

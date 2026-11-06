@@ -100,7 +100,6 @@
 }
 
 .WebSSH-DataTable .WebSSH-DataTableTable th {
-    cursor: pointer;
     position: relative;
     padding: 0 10px;
     color: var(--ant-color-text-tertiary);
@@ -135,8 +134,9 @@
     content: "";
 }
 
-.WebSSH-DataTable .WebSSH-DataTableTable th:hover {
-    background-color: var(--ant-color-fill-tertiary);
+.WebSSH-DataTable .WebSSH-DataTableTable th.WebSSH-DataTableSortable:hover {
+    cursor: pointer;
+    background-color: var(--ant-control-item-bg-active-hover);
 }
 
 .WebSSH-DataTable .WebSSH-DataTableTable td {
