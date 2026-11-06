@@ -166,7 +166,6 @@
     "target_directory_placeholder": "Optional, for example: Production",
     "target_move_failed": "Failed to move target",
     "target_move_success": "Target moved",
-    "target_reorder_success": "Target order updated",
     "target_save_and_connect": "Save and connect",
     "target_select": "Select target",
     "target_search_placeholder": "Search by name, user, or host",

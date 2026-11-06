@@ -43,11 +43,11 @@ type TargetDirectoryRow = {
     user: string;
     method: number;
     isDirectory: true;
-    children: TargetTreeRow[];
+    children: ITarget[];
 };
 type TargetTreeRow =
     | (ITarget & {
-          children?: TargetTreeRow[];
+          children?: ITarget[];
           isDirectory?: false;
       })
     | TargetDirectoryRow;
@@ -79,9 +79,8 @@ const buildTargetTree = (targets: ITarget[]): TargetTreeRow[] => {
         grouped.set(directory, group);
     }
 
-    const directories = [...grouped.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([directory, children]) => ({
+    const directories: TargetDirectoryRow[] = [...grouped.entries()].map(
+        ([directory, children]) => ({
             id: `target-directory:${directory}`,
             name: directory,
             directory,
@@ -90,10 +89,32 @@ const buildTargetTree = (targets: ITarget[]): TargetTreeRow[] => {
             method: 3,
             isDirectory: true as const,
             children: sortTargets(children).map((target) => ({ ...target })),
-        }));
+        }),
+    );
 
-    return [...directories, ...sortTargets(standalone)];
+    const orderedDirectories = directories
+        .map((row, index) => ({
+            row,
+            order: Math.min(
+                ...(row.children ?? []).map(
+                    (child) => child.sort_order ?? Number.MAX_SAFE_INTEGER,
+                ),
+            ),
+            index,
+        }))
+        .sort(
+            (left, right) =>
+                left.order - right.order || left.index - right.index,
+        )
+        .map(({ row }) => row);
+
+    return [...orderedDirectories, ...sortTargets(standalone)];
 };
+
+const rootGroupKey = (row: TargetTreeRow) =>
+    row.isDirectory || normalizeDirectory(row.directory)
+        ? normalizeDirectory(row.directory)
+        : `target:${row.id}`;
 
 const TargetTreeExpandIcon = (
     record: TargetTreeRow,
@@ -180,15 +201,78 @@ export default function TargetList({ tab }: { tab: ITab }) {
             target,
             dropPosition,
         }: DataTableDropEvent<TargetTreeRow>) => {
-            if (!target) return;
-
-            const sourceRows = rows.filter(
-                (row): row is ITarget => !row.isDirectory,
+            const sourceDirectoryRows = rows.filter(
+                (row): row is TargetDirectoryRow => Boolean(row.isDirectory),
+            );
+            const sourceDirectoryKeys = new Set(
+                sourceDirectoryRows.map((row) =>
+                    normalizeDirectory(row.directory),
+                ),
+            );
+            const sourceRows = [
+                ...rows.filter((row): row is ITarget => !row.isDirectory),
+                ...dataSource.filter((row) =>
+                    sourceDirectoryKeys.has(normalizeDirectory(row.directory)),
+                ),
+            ].filter(
+                (row, index, all) =>
+                    all.findIndex((candidate) => candidate.id === row.id) ===
+                    index,
             );
             if (sourceRows.length === 0) return;
             const sourceIds = new Set(sourceRows.map((row) => row.id));
-            if (!target.isDirectory && sourceIds.has(target.id)) return;
-            const directory = normalizeDirectory(target.directory);
+
+            if (sourceDirectoryRows.length > 0) {
+                if (!target) return;
+                const rootRows = buildTargetTree(dataSource);
+                const sourceRootRows = rootRows.filter((row) =>
+                    sourceDirectoryKeys.has(
+                        row.isDirectory
+                            ? normalizeDirectory(row.directory)
+                            : "",
+                    ),
+                );
+                const targetKey = rootGroupKey(target);
+                if (
+                    !target.isDirectory ||
+                    sourceDirectoryKeys.has(targetKey) ||
+                    sourceRootRows.length === 0
+                ) {
+                    return;
+                }
+                const remainingRootRows = rootRows.filter(
+                    (row) => !sourceRootRows.includes(row),
+                );
+                const targetIndex = remainingRootRows.findIndex(
+                    (row) => rootGroupKey(row) === targetKey,
+                );
+                if (targetIndex < 0) return;
+                remainingRootRows.splice(
+                    targetIndex + (dropPosition === "after" ? 1 : 0),
+                    0,
+                    ...sourceRootRows,
+                );
+                const orderedIds = remainingRootRows.flatMap((row) =>
+                    row.isDirectory
+                        ? sortTargets(row.children ?? []).map(
+                              (child) => child.id,
+                          )
+                        : [row.id],
+                );
+                try {
+                    await postTargetReorder(orderedIds);
+                    await refresh();
+                } catch {
+                    message.error(t("target_move_failed"));
+                    await refresh();
+                }
+                return;
+            }
+
+            if (target && !target.isDirectory && sourceIds.has(target.id)) {
+                return;
+            }
+            const directory = normalizeDirectory(target?.directory);
             const nextTargets = dataSource.map((row) => ({ ...row }));
             const targetsByDirectory = new Map<string, ITarget[]>();
             for (const row of nextTargets) {
@@ -209,7 +293,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 directory,
             }));
             let insertionIndex = targetGroup.length;
-            if (!target.isDirectory) {
+            if (target && !target.isDirectory) {
                 const targetIndex = targetGroup.findIndex(
                     (row) => row.id === target.id,
                 );
@@ -221,16 +305,38 @@ export default function TargetList({ tab }: { tab: ITab }) {
             targetGroup.splice(insertionIndex, 0, ...sourceTargets);
 
             const orderedIds: number[] = [];
-            for (const [groupDirectory, group] of [
-                ...targetsByDirectory.entries(),
-            ].sort(([left], [right]) => left.localeCompare(right))) {
-                const orderedGroup =
-                    groupDirectory === directory
+            let ungroupedAdded = false;
+            for (const rootRow of buildTargetTree(dataSource)) {
+                if (rootRow.isDirectory) {
+                    const groupDirectory = normalizeDirectory(
+                        rootRow.directory,
+                    );
+                    const group =
+                        groupDirectory === directory
+                            ? targetGroup
+                            : sortTargets(
+                                  targetsByDirectory.get(groupDirectory) ?? [],
+                              ).filter((row) => !sourceIds.has(row.id));
+                    orderedIds.push(...group.map((row) => row.id));
+                } else if (!ungroupedAdded) {
+                    ungroupedAdded = true;
+                    const group =
+                        directory === ""
+                            ? targetGroup
+                            : sortTargets(
+                                  targetsByDirectory.get("") ?? [],
+                              ).filter((row) => !sourceIds.has(row.id));
+                    orderedIds.push(...group.map((row) => row.id));
+                }
+            }
+            if (!ungroupedAdded) {
+                const group =
+                    directory === ""
                         ? targetGroup
-                        : sortTargets(group).filter(
+                        : sortTargets(targetsByDirectory.get("") ?? []).filter(
                               (row) => !sourceIds.has(row.id),
                           );
-                orderedIds.push(...orderedGroup.map((row) => row.id));
+                orderedIds.push(...group.map((row) => row.id));
             }
 
             try {
@@ -247,7 +353,6 @@ export default function TargetList({ tab }: { tab: ITab }) {
                         .map((row) => postTargetUpdate(row)),
                 );
                 await postTargetReorder(orderedIds);
-                message.success(t("target_reorder_success"));
                 await refresh();
             } catch {
                 message.error(t("target_move_failed"));
@@ -285,7 +390,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 sortable: false,
                 cell: (_value, record) =>
                     record.isDirectory
-                        ? `${record.name}/`
+                        ? `${record.name}`
                         : getTargetName(record),
             },
             {
@@ -445,6 +550,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     getRowId={getTargetRowId}
                     getSubRows={getTargetSubRows}
                     canDropRow={() => true}
+                    showDropIndicator={(row) => !row.isDirectory}
                     defaultExpanded
                     draggable
                     expandIcon={TargetTreeExpandIcon}
