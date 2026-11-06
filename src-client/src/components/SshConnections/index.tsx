@@ -5,19 +5,15 @@ import {
 } from "@ant-design/icons";
 import {
     Button,
-    Empty,
     message,
     Popconfirm,
     Space,
-    Table,
     Tag,
     Tooltip,
     Typography,
 } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-
-import type { TableProps } from "antd";
 
 import "./index.css";
 
@@ -27,8 +23,8 @@ import {
     postSshConnectionClose,
     postSshConnectionExpire,
 } from "@/api";
+import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import getTargetName from "@/components/Target/getTargetName";
-import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 
 import type { ISshConnection, ITarget } from "@/api";
 
@@ -40,11 +36,6 @@ export default function SshConnections() {
     const [targets, setTargets] = useState<ITarget[]>([]);
     const [loading, setLoading] = useState(false);
     const [actionKey, setActionKey] = useState<string>();
-    const {
-        tableContainerRef,
-        tablePageNavigationProps,
-    } = useTablePageNavigation();
-    const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const loadConnections = useCallback(async () => {
         setLoading(true);
@@ -65,20 +56,6 @@ export default function SshConnections() {
     useEffect(() => {
         void loadConnections();
     }, [loadConnections]);
-
-    useEffect(() => {
-        const element = tableContainerRef.current;
-        if (!element) return;
-
-        const updateTableHeight = () => {
-            setTableBodyHeight(Math.max(element.clientHeight - 38, 160));
-        };
-        updateTableHeight();
-
-        const observer = new ResizeObserver(updateTableHeight);
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [tableContainerRef]);
 
     const runAction = useCallback(
         async (connection: ISshConnection, action: "expire" | "close") => {
@@ -110,89 +87,113 @@ export default function SshConnections() {
         [loadConnections, t],
     );
 
-    const columns: TableProps<ISshConnection>["columns"] = [
-        {
-            title: t("ssh_connections_column_id"),
-            dataIndex: "id",
-            render: (id: string) => (
-                <Text code copyable={{ text: id }}>
-                    {id}
-                </Text>
-            ),
-        },
-        {
-            title: t("ssh_connections_column_target"),
-            dataIndex: "target_id",
-            render: (targetId: number) => {
-                const target = targets.find((item) => item.id === targetId);
-                return target ? getTargetName(target) : targetId;
+    const columns: DataTableColumn<ISshConnection>[] = useMemo(
+        () => [
+            {
+                id: "id",
+                header: t("ssh_connections_column_id"),
+                accessor: (connection) => connection.id,
+                width: 260,
+                cell: (value) => {
+                    const id = String(value ?? "");
+                    return (
+                        <Text code copyable={{ text: id }}>
+                            {id}
+                        </Text>
+                    );
+                },
             },
-        },
-        {
-            title: t("ssh_connections_column_channels"),
-            key: "active_channels",
-            width: 80,
-            render: (_, connection) => connection.active_channels ?? 0,
-        },
-        {
-            title: t("ssh_connections_column_status"),
-            width: 80,
-            render: (_, connection) => {
-                const color = connection.closed
-                    ? "default"
-                    : connection.expired
-                      ? "warning"
-                      : "success";
-                const label = connection.closed
-                    ? t("ssh_connections_status_closed")
-                    : connection.expired
-                      ? t("ssh_connections_status_expiring")
-                      : t("ssh_connections_status_active");
-                return <Tag color={color}>{label}</Tag>;
+            {
+                id: "target",
+                header: t("ssh_connections_column_target"),
+                accessor: (connection) => connection.target_id,
+                cell: (value) => {
+                    const targetId = Number(value);
+                    const target = targets.find((item) => item.id === targetId);
+                    return target ? getTargetName(target) : targetId;
+                },
             },
-        },
-        {
-            title: t("app_common_action"),
-            key: "actions",
-            width: 100,
-            render: (_, connection) => (
-                <Space size="small">
-                    <Tooltip title={t("ssh_connections_expire")}>
-                        <Button
-                            aria-label={t("ssh_connections_expire")}
-                            disabled={connection.expired || connection.closed}
-                            icon={<DisconnectOutlined />}
-                            loading={actionKey === `expire:${connection.id}`}
-                            onClick={() =>
-                                void runAction(connection, "expire")
-                            }
-                            size="small"
-                            type="text"
-                        />
-                    </Tooltip>
-                    <Popconfirm
-                        disabled={connection.closed}
-                        title={t("ssh_connections_close_confirm")}
-                        onConfirm={() => void runAction(connection, "close")}
-                        okText={t("app_btn_ok")}
-                        cancelText={t("app_btn_cancel")}
-                    >
-                        <Tooltip title={t("ssh_connections_close")}>
+            {
+                id: "active_channels",
+                header: t("ssh_connections_column_channels"),
+                accessor: (connection) => connection.active_channels ?? 0,
+                width: 80,
+                align: "right",
+            },
+            {
+                id: "status",
+                header: t("ssh_connections_column_status"),
+                accessor: (connection) =>
+                    connection.closed ? 2 : connection.expired ? 1 : 0,
+                width: 80,
+                cell: (_, connection) => {
+                    const color = connection.closed
+                        ? "default"
+                        : connection.expired
+                          ? "warning"
+                          : "success";
+                    const label = connection.closed
+                        ? t("ssh_connections_status_closed")
+                        : connection.expired
+                          ? t("ssh_connections_status_expiring")
+                          : t("ssh_connections_status_active");
+                    return <Tag color={color}>{label}</Tag>;
+                },
+            },
+            {
+                id: "actions",
+                header: t("app_common_action"),
+                accessor: () => "",
+                width: 100,
+                sortable: false,
+                cell: (_, connection) => (
+                    <Space size="small">
+                        <Tooltip title={t("ssh_connections_expire")}>
                             <Button
-                                aria-label={t("ssh_connections_close")}
-                                danger
-                                disabled={connection.closed}
-                                icon={<CloseCircleOutlined />}
-                                loading={actionKey === `close:${connection.id}`}
+                                aria-label={t("ssh_connections_expire")}
+                                disabled={
+                                    connection.expired || connection.closed
+                                }
+                                icon={<DisconnectOutlined />}
+                                loading={
+                                    actionKey === `expire:${connection.id}`
+                                }
+                                onClick={() =>
+                                    void runAction(connection, "expire")
+                                }
                                 size="small"
                                 type="text"
                             />
                         </Tooltip>
-                    </Popconfirm>
-                </Space>
-            ),
-        },
-    ];
+                        <Popconfirm
+                            disabled={connection.closed}
+                            title={t("ssh_connections_close_confirm")}
+                            onConfirm={() =>
+                                void runAction(connection, "close")
+                            }
+                            okText={t("app_btn_ok")}
+                            cancelText={t("app_btn_cancel")}
+                        >
+                            <Tooltip title={t("ssh_connections_close")}>
+                                <Button
+                                    aria-label={t("ssh_connections_close")}
+                                    danger
+                                    disabled={connection.closed}
+                                    icon={<CloseCircleOutlined />}
+                                    loading={
+                                        actionKey === `close:${connection.id}`
+                                    }
+                                    size="small"
+                                    type="text"
+                                />
+                            </Tooltip>
+                        </Popconfirm>
+                    </Space>
+                ),
+            },
+        ],
+        [actionKey, runAction, t, targets],
+    );
 
     return (
         <main className="WebSSH-MenuPage WebSSH-SshConnections">
@@ -206,32 +207,17 @@ export default function SshConnections() {
                     />
                 </Tooltip>
             </div>
-            <div
-                ref={tableContainerRef}
-                className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll"
-                {...tablePageNavigationProps}
-            >
-                <Table<ISshConnection>
-                    className="WebSSH-FilelistTable WebSSH-SshConnections-Table"
+            <div className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll">
+                <DataTable
+                    className="WebSSH-SshConnections-Table"
                     columns={columns}
-                    dataSource={connections}
+                    data={connections}
+                    emptyContent={t("ssh_connections_empty")}
+                    getRowId={(connection) => connection.id}
                     loading={loading}
-                    rowKey="id"
-                    locale={{
-                        emptyText: (
-                            <Empty
-                                description={t("ssh_connections_empty")}
-                            />
-                        ),
-                    }}
-                    pagination={false}
-                    virtual={tableBodyHeight > 0}
-                    scroll={
-                        tableBodyHeight > 0
-                            ? { x: 760, y: tableBodyHeight }
-                            : undefined
-                    }
-                    size="small"
+                    rowHeight={33}
+                    selectable={false}
+                    virtual
                 />
             </div>
         </main>

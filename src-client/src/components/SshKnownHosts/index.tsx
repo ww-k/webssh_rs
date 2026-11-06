@@ -1,20 +1,11 @@
 import { DeleteOutlined, KeyOutlined, ReloadOutlined } from "@ant-design/icons";
-import {
-    Button,
-    Empty,
-    message,
-    Popconfirm,
-    Table,
-    Tooltip,
-    Typography,
-} from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { Button, message, Popconfirm, Tooltip, Typography } from "antd";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getSshKnownHostList, postSshKnownHostRemove } from "@/api";
-import useTablePageNavigation from "@/hooks/useTablePageNavigation";
+import DataTable, { type DataTableColumn } from "@/components/DataTable";
 
-import type { TableProps } from "antd";
 import type { ISshKnownHost } from "@/api";
 
 import "./index.css";
@@ -26,11 +17,6 @@ export default function SshKnownHosts() {
     const [knownHosts, setKnownHosts] = useState<ISshKnownHost[]>([]);
     const [loading, setLoading] = useState(false);
     const [removingId, setRemovingId] = useState<number>();
-    const {
-        tableContainerRef,
-        tablePageNavigationProps,
-    } = useTablePageNavigation();
-    const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const loadKnownHosts = useCallback(
         async (showError = false) => {
@@ -50,20 +36,6 @@ export default function SshKnownHosts() {
         void loadKnownHosts();
     }, [loadKnownHosts]);
 
-    useEffect(() => {
-        const element = tableContainerRef.current;
-        if (!element) return;
-
-        const updateTableHeight = () => {
-            setTableBodyHeight(Math.max(element.clientHeight - 38, 160));
-        };
-        updateTableHeight();
-
-        const observer = new ResizeObserver(updateTableHeight);
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [tableContainerRef]);
-
     const removeKnownHost = useCallback(
         async (knownHost: ISshKnownHost) => {
             setRemovingId(knownHost.id);
@@ -80,69 +52,84 @@ export default function SshKnownHosts() {
         [loadKnownHosts, t],
     );
 
-    const columns: TableProps<ISshKnownHost>["columns"] = [
-        {
-            title: t("ssh_known_hosts_column_host"),
-            key: "host",
-            render: (_, knownHost) => `${knownHost.host}:${knownHost.port}`,
-        },
-        {
-            title: t("ssh_known_hosts_column_algorithm"),
-            dataIndex: "key_algorithm",
-            width: 140,
-        },
-        {
-            title: t("ssh_known_hosts_column_fingerprint"),
-            dataIndex: "fingerprint",
-            render: (fingerprint: string) => (
-                <Text
-                    code
-                    copyable={{ text: fingerprint }}
-                    ellipsis={{ tooltip: fingerprint }}
-                >
-                    {fingerprint}
-                </Text>
-            ),
-        },
-        {
-            title: t("ssh_known_hosts_column_public_key"),
-            dataIndex: "public_key",
-            ellipsis: true,
-            render: (publicKey: string) => (
-                <Text
-                    code
-                    copyable={{ text: publicKey }}
-                    ellipsis={{ tooltip: publicKey }}
-                >
-                    {publicKey}
-                </Text>
-            ),
-        },
-        {
-            title: t("app_common_action"),
-            key: "actions",
-            width: 100,
-            render: (_, knownHost) => (
-                <Popconfirm
-                    title={t("ssh_known_hosts_remove_confirm")}
-                    onConfirm={() => void removeKnownHost(knownHost)}
-                    okText={t("app_btn_ok")}
-                    cancelText={t("app_btn_cancel")}
-                >
-                    <Tooltip title={t("app_btn_delete")}>
-                        <Button
-                            aria-label={t("app_btn_delete")}
-                            danger
-                            icon={<DeleteOutlined />}
-                            loading={removingId === knownHost.id}
-                            size="small"
-                            type="text"
-                        />
-                    </Tooltip>
-                </Popconfirm>
-            ),
-        },
-    ];
+    const columns: DataTableColumn<ISshKnownHost>[] = useMemo(
+        () => [
+            {
+                id: "host",
+                header: t("ssh_known_hosts_column_host"),
+                accessor: (knownHost) => `${knownHost.host}:${knownHost.port}`,
+                width: 220,
+            },
+            {
+                id: "algorithm",
+                header: t("ssh_known_hosts_column_algorithm"),
+                accessor: (knownHost) => knownHost.key_algorithm,
+                width: 140,
+            },
+            {
+                id: "fingerprint",
+                header: t("ssh_known_hosts_column_fingerprint"),
+                accessor: (knownHost) => knownHost.fingerprint,
+                cell: (value) => {
+                    const fingerprint = String(value ?? "");
+                    return (
+                        <Text
+                            code
+                            copyable={{ text: fingerprint }}
+                            ellipsis={{ tooltip: fingerprint }}
+                        >
+                            {fingerprint}
+                        </Text>
+                    );
+                },
+                width: 300,
+            },
+            {
+                id: "public_key",
+                header: t("ssh_known_hosts_column_public_key"),
+                accessor: (knownHost) => knownHost.public_key,
+                cell: (value) => {
+                    const publicKey = String(value ?? "");
+                    return (
+                        <Text
+                            code
+                            copyable={{ text: publicKey }}
+                            ellipsis={{ tooltip: publicKey }}
+                        >
+                            {publicKey}
+                        </Text>
+                    );
+                },
+            },
+            {
+                id: "actions",
+                header: t("app_common_action"),
+                accessor: () => "",
+                width: 100,
+                sortable: false,
+                cell: (_, knownHost) => (
+                    <Popconfirm
+                        title={t("ssh_known_hosts_remove_confirm")}
+                        onConfirm={() => void removeKnownHost(knownHost)}
+                        okText={t("app_btn_ok")}
+                        cancelText={t("app_btn_cancel")}
+                    >
+                        <Tooltip title={t("app_btn_delete")}>
+                            <Button
+                                aria-label={t("app_btn_delete")}
+                                danger
+                                icon={<DeleteOutlined />}
+                                loading={removingId === knownHost.id}
+                                size="small"
+                                type="text"
+                            />
+                        </Tooltip>
+                    </Popconfirm>
+                ),
+            },
+        ],
+        [removeKnownHost, removingId, t],
+    );
 
     return (
         <main className="WebSSH-MenuPage WebSSH-SshKnownHosts">
@@ -156,33 +143,21 @@ export default function SshKnownHosts() {
                     />
                 </Tooltip>
             </div>
-            <div
-                ref={tableContainerRef}
-                className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll"
-                {...tablePageNavigationProps}
-            >
-                <Table<ISshKnownHost>
-                    className="WebSSH-FilelistTable WebSSH-SshKnownHosts-Table"
+            <div className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll">
+                <DataTable
+                    className="WebSSH-SshKnownHosts-Table"
                     columns={columns}
-                    dataSource={knownHosts}
-                    loading={loading}
-                    rowKey="id"
-                    locale={{
-                        emptyText: (
-                            <Empty
-                                image={<KeyOutlined />}
-                                description={t("ssh_known_hosts_empty")}
-                            />
-                        ),
-                    }}
-                    pagination={false}
-                    virtual={tableBodyHeight > 0}
-                    scroll={
-                        tableBodyHeight > 0
-                            ? { x: 900, y: tableBodyHeight }
-                            : undefined
+                    data={knownHosts}
+                    emptyContent={
+                        <span>
+                            <KeyOutlined /> {t("ssh_known_hosts_empty")}
+                        </span>
                     }
-                    size="small"
+                    getRowId={(knownHost) => String(knownHost.id)}
+                    loading={loading}
+                    rowHeight={33}
+                    selectable={false}
+                    virtual
                 />
             </div>
         </main>
