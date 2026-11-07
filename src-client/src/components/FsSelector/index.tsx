@@ -12,7 +12,7 @@ import type { LocalDefaultDirectory } from "../Filesview/Local";
 type FsSelectorMode = "file" | "directory" | "any";
 
 function isDirectory(file: IViewFileStat) {
-    return file.isDir;
+    return file.isDir === true;
 }
 
 export default function FsSelector({

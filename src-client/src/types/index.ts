@@ -19,5 +19,5 @@ export interface IViewFileStat extends ISftpFileStat {
     /** 用于排序的名称，将name属性转换为小写 */
     sortName: string;
     /** 是否目录 */
-    isDir: boolean;
+    isDir?: boolean;
 }

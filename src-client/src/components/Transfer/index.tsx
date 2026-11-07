@@ -290,32 +290,6 @@ const TransferProgressCell = memo(
     },
 );
 
-const TransferNameCell = memo(
-    ({
-        record,
-        children,
-        className,
-    }: {
-        record: TransferRow;
-        children?: React.ReactNode;
-        className?: string;
-    }) => (
-        <Tooltip
-            title={
-                isBatch(record)
-                    ? record.name
-                    : record.local_path || record.target_uri || record.name
-            }
-        >
-            <Text
-                className={`WebSSH-TransferFileName${className ? ` ${className}` : ""}`}
-            >
-                {children || record.name}
-            </Text>
-        </Tooltip>
-    ),
-);
-
 type TransferAction = {
     key: string;
     label: string;
