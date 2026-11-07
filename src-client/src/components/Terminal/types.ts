@@ -1,9 +1,6 @@
-import type { ITheme } from "@xterm/xterm";
 import type { Socket } from "socket.io-client";
 
-export type TerminalTheme = ITheme & {
-    scrollbarThumb?: string;
-};
+export type TerminalTheme = TerminalThemeColors;
 
 export type TerminalThemeColorKey =
     | "background"

@@ -38,6 +38,25 @@ const terminalOutputMessageType = "webssh:terminal-output";
 const terminalContextMenuMessageType = "webssh:terminal-contextmenu";
 const maxTerminalHistoryLength = 256 * 1024;
 
+function getTargetLabel(label: string, targetId?: number): string {
+    const targetLabel = label.replace(/^ssh\s+/i, "").trim();
+    return targetLabel || `target ${targetId ?? "unknown"}`;
+}
+
+function createWebMCPOptions(targetId: number | undefined, label: string) {
+    const targetLabel = getTargetLabel(label, targetId);
+    const slug = targetLabel
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    const id = targetId === undefined ? "unknown" : targetId;
+
+    return {
+        name: `ssh-${slug || "terminal"}-${id}`,
+        description: `SSH terminal for target "${targetLabel}" (target ID ${id}).`,
+    };
+}
+
 function appendTerminalHistory(chunks: string[], data: string, length: number) {
     chunks.push(data);
     let nextLength = length + data.length;
@@ -106,6 +125,10 @@ export default function Terminal({
         const match = tab.path.match(/^\/terminal\/(\d+)/);
         return match ? Number.parseInt(match[1], 10) : undefined;
     }, [tab.path]);
+    const webmcpOptions = useMemo(
+        () => createWebMCPOptions(targetId, tab.label),
+        [tab.label, targetId],
+    );
 
     const clearCopyNotificationTimer = useCallback(() => {
         if (copyNotificationTimerRef.current) {
@@ -356,6 +379,10 @@ export default function Terminal({
         if (!contentWindow) return;
 
         contentWindow.postMessage(
+            { command: "setWebMCP", args: webmcpOptions },
+            window.location.origin,
+        );
+        contentWindow.postMessage(
             { command: "setTheme", args: terminalThemes[theme] },
             window.location.origin,
         );
@@ -375,6 +402,7 @@ export default function Terminal({
         terminalRightClickAction,
         terminalSelectionCopyEnabled,
         terminalThemes,
+        webmcpOptions,
         theme,
     ]);
 

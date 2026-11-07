@@ -3,15 +3,15 @@ import {
     terminalInteractionMessageType,
 } from "./constants";
 
-import type { Terminal } from "@xterm/xterm";
+import type { WTerm } from "@wterm/dom";
 import type { ClipboardOptions } from "./types";
 
 export function copyTerminalSelection(
-    terminal: Terminal | undefined,
+    terminal: WTerm | undefined,
     targetId: number,
     fallback = "",
 ): void {
-    const text = terminal?.getSelection() || fallback;
+    const text = terminal?.getSelectionText() || fallback;
     if (!text) return;
 
     void navigator.clipboard.writeText(text).then(() => {
@@ -25,24 +25,26 @@ export function copyTerminalSelection(
     });
 }
 
-export function pasteFromClipboard(terminal: Terminal | undefined): void {
+export function pasteFromClipboard(terminal: WTerm | undefined): void {
     if (!terminal) return;
     void navigator.clipboard.readText().then((text) => {
-        terminal.paste(text);
+        terminal.onData?.(text);
     });
 }
 
 export function enhanceMouseCopyPaste(
-    terminal: Terminal,
+    terminal: WTerm,
     targetId: number,
     getOptions: () => ClipboardOptions,
     onContextMenuSelection: (selection: string) => void,
 ): void {
     let contextMenuSelection = "";
 
-    terminal.onSelectionChange(() => {
+    document.addEventListener("selectionchange", () => {
         if (!getOptions().selectionCopyEnabled) return;
-        copyTerminalSelection(terminal, targetId);
+        if (terminal.getSelectionText()) {
+            copyTerminalSelection(terminal, targetId);
+        }
     });
 
     document.addEventListener(
@@ -57,7 +59,7 @@ export function enhanceMouseCopyPaste(
             );
 
             if (event.button === 2) {
-                contextMenuSelection = terminal.getSelection() || "";
+                contextMenuSelection = terminal.getSelectionText() || "";
                 onContextMenuSelection(contextMenuSelection);
             }
 
@@ -76,14 +78,14 @@ export function enhanceMouseCopyPaste(
         event.preventDefault();
         event.stopPropagation();
         if (getOptions().rightClickAction === "paste") return;
-        const selection = terminal.getSelection() || contextMenuSelection;
+        const selection = terminal.getSelectionText() || contextMenuSelection;
         window.parent.postMessage(
             {
                 type: terminalContextMenuMessageType,
                 targetId,
                 x: event.clientX,
                 y: event.clientY,
-                hasSelection: terminal.hasSelection() || selection !== "",
+                hasSelection: selection !== "",
                 selection,
             },
             window.location.origin,
