@@ -19,6 +19,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import "@wterm/dom/css";
 import "./index.css";
 
 import { normalizeTerminalCwd } from "@/helpers/terminal_cwd";
@@ -27,27 +28,30 @@ import useAppStore, { type ITab } from "@/store";
 
 import popContextMenu from "../Contextmenu";
 import renderFsSelector from "../FsSelector/render";
-import { terminalInteractionMessageType } from "./constants";
+import {
+    TerminalController,
+    type TerminalControllerEvents,
+} from "./controller";
 
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
 
-const terminalMessageType = "webssh:terminal-cwd";
-const terminalStatusMessageType = "webssh:terminal-status";
-const terminalCopyMessageType = "webssh:terminal-copy";
-const terminalOutputMessageType = "webssh:terminal-output";
-const terminalContextMenuMessageType = "webssh:terminal-contextmenu";
-const maxTerminalHistoryLength = 256 * 1024;
+function getTargetLabel(label: string, targetId?: number): string {
+    const targetLabel = label.replace(/^ssh\s+/i, "").trim();
+    return targetLabel || `target ${targetId ?? "unknown"}`;
+}
 
-function appendTerminalHistory(chunks: string[], data: string, length: number) {
-    chunks.push(data);
-    let nextLength = length + data.length;
+function createWebMCPOptions(targetId: number | undefined, label: string) {
+    const targetLabel = getTargetLabel(label, targetId);
+    const slug = targetLabel
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    const id = targetId === undefined ? "unknown" : targetId;
 
-    while (nextLength > maxTerminalHistoryLength && chunks.length > 1) {
-        const removed = chunks.shift();
-        nextLength -= removed?.length || 0;
-    }
-
-    return nextLength;
+    return {
+        name: `ssh-${slug || "terminal"}-${id}`,
+        description: `SSH terminal for target "${targetLabel}" (target ID ${id}).`,
+    };
 }
 
 export default function Terminal({
@@ -80,7 +84,6 @@ export default function Terminal({
     const [connectionStatus, setConnectionStatus] = useState<
         "connected" | "disconnected" | "connecting"
     >("connecting");
-    const [iframeKey, setIframeKey] = useState(0);
     const [copyNotificationVisible, setCopyNotificationVisible] =
         useState(false);
     const copyNotificationTimerRef = useRef<number>();
@@ -94,18 +97,20 @@ export default function Terminal({
             ? value
             : undefined;
     }, [tab.state?.initialCwd]);
-    const url = useMemo(
-        () => tab.path.replace("/terminal/", "terminal.html?target_id="),
-        [tab.path],
-    );
-    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const terminalId = useMemo(() => `terminal-${tab.key}`, [tab.key]);
+    const terminalControllerRef = useRef<TerminalController>();
+    const terminalElementRef = useRef<HTMLDivElement>(null);
+    const terminalEventsRef = useRef<TerminalControllerEvents>();
+    const initialCwdRestoredRef = useRef(false);
     const terminalContextMenuDestroyRef = useRef<(() => void) | undefined>();
-    const terminalHistoryChunksRef = useRef<string[]>([]);
-    const terminalHistoryLengthRef = useRef(0);
     const targetId = useMemo(() => {
         const match = tab.path.match(/^\/terminal\/(\d+)/);
         return match ? Number.parseInt(match[1], 10) : undefined;
     }, [tab.path]);
+    const webmcpOptions = useMemo(
+        () => createWebMCPOptions(targetId, tab.label),
+        [tab.label, targetId],
+    );
 
     const clearCopyNotificationTimer = useCallback(() => {
         if (copyNotificationTimerRef.current) {
@@ -127,145 +132,84 @@ export default function Terminal({
         }, remaining);
     }, [clearCopyNotificationTimer]);
 
-    useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
-            if (
-                !event.data ||
-                event.origin !== window.location.origin ||
-                event.source !== iframeRef.current?.contentWindow
-            ) {
-                return;
-            }
-
-            const data = event.data;
-            if (
-                data.type === terminalInteractionMessageType &&
-                data.targetId === targetId
-            ) {
-                terminalContextMenuDestroyRef.current?.();
-                terminalContextMenuDestroyRef.current = undefined;
-                return;
-            }
-
-            if (
-                data.type === terminalStatusMessageType &&
-                data.targetId === targetId &&
-                (data.status === "connected" || data.status === "disconnected")
-            ) {
-                setConnectionStatus(data.status);
-                return;
-            }
-
-            if (
-                data.type === terminalOutputMessageType &&
-                data.targetId === targetId &&
-                typeof data.data === "string"
-            ) {
-                terminalHistoryLengthRef.current = appendTerminalHistory(
-                    terminalHistoryChunksRef.current,
-                    data.data,
-                    terminalHistoryLengthRef.current,
-                );
-                return;
-            }
-
-            if (
-                data.type === terminalContextMenuMessageType &&
-                data.targetId === targetId &&
-                typeof data.x === "number" &&
-                typeof data.y === "number"
-            ) {
-                const iframe = iframeRef.current;
-                if (!iframe) return;
-
-                const rect = iframe.getBoundingClientRect();
-                const postCommand = (command: string, args?: string) => {
-                    iframe.contentWindow?.postMessage(
-                        { command, ...(args === undefined ? {} : { args }) },
-                        window.location.origin,
-                    );
-                };
-                const focusTerminal = () => postCommand("focus");
-                const menus: IContextmenuDataItem[] = [
-                    {
-                        label: t("files_menu_copy"),
-                        disabled: data.hasSelection !== true,
-                        click: () => {
-                            if (
-                                typeof data.selection !== "string" ||
-                                !data.selection
-                            ) {
-                                return;
-                            }
-                            void navigator.clipboard
-                                .writeText(data.selection)
-                                .then(() => {
-                                    if (!showTerminalCopyNotification) {
-                                        return;
-                                    }
-                                    setCopyNotificationVisible(true);
-                                    copyNotificationRemainingRef.current = 2200;
-                                    scheduleCopyNotification();
-                                })
-                                .catch(() => undefined)
-                                .finally(focusTerminal);
-                        },
-                        iconRender: () => <CopyOutlined />,
+    const handleTerminalContextMenu = useCallback(
+        (data: {
+            x: number;
+            y: number;
+            hasSelection: boolean;
+            selection: string;
+        }) => {
+            const postCommand = (command: string, args?: string) => {
+                terminalControllerRef.current?.handleCommand(command, args);
+            };
+            const focusTerminal = () => postCommand("focus");
+            const menus: IContextmenuDataItem[] = [
+                {
+                    label: t("files_menu_copy"),
+                    disabled: !data.hasSelection || !data.selection,
+                    click: () => {
+                        if (!data.selection) return;
+                        void navigator.clipboard
+                            .writeText(data.selection)
+                            .then(() => {
+                                if (!showTerminalCopyNotification) return;
+                                setCopyNotificationVisible(true);
+                                copyNotificationRemainingRef.current = 2200;
+                                scheduleCopyNotification();
+                            })
+                            .catch(() => undefined)
+                            .finally(focusTerminal);
                     },
-                    {
-                        label: t("files_menu_paste"),
-                        click: () => {
-                            void navigator.clipboard
-                                .readText()
-                                .then((text) => postCommand("pasteText", text))
-                                .catch(() => undefined)
-                                .finally(focusTerminal);
-                        },
-                        iconRender: () => <SnippetsOutlined />,
+                    iconRender: () => <CopyOutlined />,
+                },
+                {
+                    label: t("files_menu_paste"),
+                    click: () => {
+                        void navigator.clipboard
+                            .readText()
+                            .then((text) => postCommand("pasteText", text))
+                            .catch(() => undefined)
+                            .finally(focusTerminal);
                     },
-                    {
-                        label: t("terminal_menu_clear"),
-                        click: () => {
-                            postCommand("clear");
-                            focusTerminal();
-                        },
-                        iconRender: () => <ClearOutlined />,
+                    iconRender: () => <SnippetsOutlined />,
+                },
+                {
+                    label: t("terminal_menu_clear"),
+                    click: () => {
+                        postCommand("clear");
+                        focusTerminal();
                     },
-                ];
-                terminalContextMenuDestroyRef.current?.();
-                terminalContextMenuDestroyRef.current = popContextMenu(
-                    menus,
-                    rect.left + data.x,
-                    rect.top + data.y,
-                ).destroy;
-                return;
-            }
+                    iconRender: () => <ClearOutlined />,
+                },
+            ];
+            terminalContextMenuDestroyRef.current?.();
+            terminalContextMenuDestroyRef.current = popContextMenu(
+                menus,
+                data.x,
+                data.y,
+            ).destroy;
+        },
+        [scheduleCopyNotification, showTerminalCopyNotification, t],
+    );
 
-            if (
-                data.type === terminalCopyMessageType &&
-                data.targetId === targetId
-            ) {
-                if (!showTerminalCopyNotification) return;
-                setCopyNotificationVisible(true);
-                copyNotificationRemainingRef.current = 2200;
-                scheduleCopyNotification();
-                return;
-            }
-
-            if (
-                data.type === terminalMessageType &&
-                data.targetId === targetId &&
-                typeof data.cwd === "string"
-            ) {
-                const nextCwd = normalizeTerminalCwd(data.cwd);
-                if (nextCwd) setCwd(nextCwd);
-                return;
-            }
-        };
-
-        window.addEventListener("message", handleMessage);
-        return () => window.removeEventListener("message", handleMessage);
-    }, [scheduleCopyNotification, showTerminalCopyNotification, t, targetId]);
+    terminalEventsRef.current = {
+        onStatus: setConnectionStatus,
+        onCwd: (value) => {
+            const nextCwd = normalizeTerminalCwd(value);
+            if (nextCwd) setCwd(nextCwd);
+        },
+        onCopy: () => {
+            if (!showTerminalCopyNotification) return;
+            setCopyNotificationVisible(true);
+            copyNotificationRemainingRef.current = 2200;
+            scheduleCopyNotification();
+        },
+        onInteraction: () => {
+            terminalContextMenuDestroyRef.current?.();
+            terminalContextMenuDestroyRef.current = undefined;
+        },
+        onContextMenu: handleTerminalContextMenu,
+    };
 
     useEffect(() => {
         return () => {
@@ -345,44 +289,33 @@ export default function Terminal({
     }, [cwd, t, targetId]);
 
     const clearTerminal = useCallback(() => {
-        const contentWindow = iframeRef.current?.contentWindow;
-        if (!contentWindow) return;
-        contentWindow.postMessage({ command: "clear" }, window.location.origin);
-        contentWindow.postMessage({ command: "focus" }, window.location.origin);
+        const controller = terminalControllerRef.current;
+        if (!controller) return;
+        controller.handleCommand("clear");
+        controller.handleCommand("focus");
     }, []);
 
     const syncTerminal = useCallback(() => {
-        const contentWindow = iframeRef.current?.contentWindow;
-        if (!contentWindow) return;
-
-        contentWindow.postMessage(
-            { command: "setTheme", args: terminalThemes[theme] },
-            window.location.origin,
-        );
-        contentWindow.postMessage(
-            {
-                command: "setClipboardOptions",
-                args: {
-                    selectionCopyEnabled: terminalSelectionCopyEnabled,
-                    rightClickAction: terminalRightClickAction,
-                    middleClickPasteEnabled: terminalMiddleClickPasteEnabled,
-                },
-            },
-            window.location.origin,
-        );
+        const controller = terminalControllerRef.current;
+        if (!controller) return;
+        controller.handleCommand("setWebMCP", webmcpOptions);
+        controller.handleCommand("setTheme", terminalThemes[theme]);
+        controller.handleCommand("setClipboardOptions", {
+            selectionCopyEnabled: terminalSelectionCopyEnabled,
+            rightClickAction: terminalRightClickAction,
+            middleClickPasteEnabled: terminalMiddleClickPasteEnabled,
+        });
     }, [
         terminalMiddleClickPasteEnabled,
         terminalRightClickAction,
         terminalSelectionCopyEnabled,
         terminalThemes,
+        webmcpOptions,
         theme,
     ]);
 
     const syncTerminalActive = useCallback(() => {
-        iframeRef.current?.contentWindow?.postMessage(
-            { command: "setActive", args: active },
-            window.location.origin,
-        );
+        terminalControllerRef.current?.handleCommand("setActive", active);
     }, [active]);
 
     useLayoutEffect(() => {
@@ -392,52 +325,61 @@ export default function Terminal({
     const handleTerminalLoad = useCallback(() => {
         syncTerminal();
         syncTerminalActive();
-        if (terminalHistoryChunksRef.current.length > 0) {
-            iframeRef.current?.contentWindow?.postMessage(
-                {
-                    command: "restoreHistory",
-                    args: `${terminalHistoryChunksRef.current.join("")}\r\n[Session history restored]\r\n`,
-                },
-                window.location.origin,
-            );
-        }
 
-        const restoreCwd = cwd || initialCwd;
-        if (restoreCwd) {
-            const escapedCwd = restoreCwd.replace(/'/g, "'\\''");
-            iframeRef.current?.contentWindow?.postMessage(
-                { command: "input", args: `cd '${escapedCwd}'\n` },
-                window.location.origin,
+        if (initialCwd && !initialCwdRestoredRef.current) {
+            const escapedCwd = initialCwd.replace(/'/g, "'\\''");
+            terminalControllerRef.current?.handleCommand(
+                "input",
+                `cd '${escapedCwd}'\n`,
             );
+            initialCwdRestoredRef.current = true;
         }
 
         if (active) {
-            iframeRef.current?.contentWindow?.postMessage(
-                { command: "focus" },
-                window.location.origin,
-            );
+            terminalControllerRef.current?.handleCommand("focus");
         }
-    }, [active, cwd, initialCwd, syncTerminal, syncTerminalActive]);
+    }, [active, initialCwd, syncTerminal, syncTerminalActive]);
+
+    // biome-ignore lint/correctness/useExhaustiveDependencies: Keep one controller for each terminal id.
+    useEffect(() => {
+        if (targetId === undefined) return;
+        if (terminalControllerRef.current) {
+            return () => {
+                if (terminalControllerRef.current) {
+                    terminalControllerRef.current.destroy();
+                    terminalControllerRef.current = undefined;
+                }
+            };
+        };
+
+        const controller = new TerminalController(terminalId, targetId, {
+            onStatus: (status) => terminalEventsRef.current?.onStatus?.(status),
+            onCwd: (cwd) => terminalEventsRef.current?.onCwd?.(cwd),
+            onCopy: () => terminalEventsRef.current?.onCopy?.(),
+            onInteraction: () =>
+                terminalEventsRef.current?.onInteraction?.(),
+            onContextMenu: (data) =>
+                terminalEventsRef.current?.onContextMenu?.(data),
+        }, terminalThemes[theme]);
+        terminalControllerRef.current = controller;
+        controller.init();
+    }, [targetId, terminalId]);
+
+    useEffect(() => {
+        handleTerminalLoad();
+    }, [handleTerminalLoad]);
 
     const reconnect = useCallback(() => {
         setConnectionStatus("connecting");
-        setIframeKey((key) => key + 1);
+        terminalControllerRef.current?.reconnect();
     }, []);
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
-            if (!iframeRef.current?.contentWindow) {
-                return;
-            }
             syncTerminal();
             if (!active) return;
             console.log("Terminal active", active);
-            iframeRef.current.focus();
-            iframeRef.current.contentWindow.focus();
-            iframeRef.current.contentWindow.postMessage(
-                { command: "focus" },
-                window.location.origin,
-            );
+            terminalControllerRef.current?.handleCommand("focus");
         }, 100);
 
         return () => window.clearTimeout(timeoutId);
@@ -479,13 +421,9 @@ export default function Terminal({
                 className="terminalContainer"
                 style={{ backgroundColor: terminalThemes[theme].background }}
             >
-                <iframe
-                    key={iframeKey}
-                    ref={iframeRef}
-                    src={url}
-                    className="terminalIframe"
-                    title="terminal"
-                    onLoad={handleTerminalLoad}
+                <div
+                    id={terminalId}
+                    ref={terminalElementRef}
                 />
                 {connectionStatus === "disconnected" && (
                     <div

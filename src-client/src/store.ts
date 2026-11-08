@@ -480,11 +480,10 @@ const useAppStore = create<AppStore>((set) => {
                 const filesviewTab = state.tabs.find(
                     (tab) => tab.key === filesviewTabKey,
                 );
-                const sourceLabel = filesviewTab?.label || `SSH ${targetId}`;
-                const targetLabel = sourceLabel.replace(/^(sftp|ssh)\s+/i, "");
+                if (!filesviewTab) return state;
                 const newTab = {
                     key: nanoid(),
-                    label: `ssh ${targetLabel}`,
+                    label: `${filesviewTab.label}`,
                     path: `/terminal/${targetId}`,
                     state: cwd ? { initialCwd: cwd } : undefined,
                 };

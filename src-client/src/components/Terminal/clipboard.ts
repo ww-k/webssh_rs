@@ -1,92 +1,108 @@
-import {
-    terminalContextMenuMessageType,
-    terminalInteractionMessageType,
-} from "./constants";
-
-import type { Terminal } from "@xterm/xterm";
+import type { WTerm } from "@wterm/dom";
 import type { ClipboardOptions } from "./types";
 
+export interface TerminalClipboardCallbacks {
+    onCopy: () => void;
+    onInteraction: () => void;
+    onContextMenu: (data: {
+        x: number;
+        y: number;
+        hasSelection: boolean;
+        selection: string;
+    }) => void;
+}
+
 export function copyTerminalSelection(
-    terminal: Terminal | undefined,
-    targetId: number,
+    terminal: WTerm | undefined,
     fallback = "",
+    onCopy?: () => void,
 ): void {
-    const text = terminal?.getSelection() || fallback;
+    const text = terminal?.getSelectionText() || fallback;
     if (!text) return;
 
     void navigator.clipboard.writeText(text).then(() => {
-        window.parent.postMessage(
-            {
-                type: "webssh:terminal-copy",
-                targetId,
-            },
-            window.location.origin,
-        );
+        onCopy?.();
     });
 }
 
-export function pasteFromClipboard(terminal: Terminal | undefined): void {
+export function pasteFromClipboard(terminal: WTerm | undefined): void {
     if (!terminal) return;
-    void navigator.clipboard.readText().then((text) => {
-        terminal.paste(text);
-    });
+    void navigator.clipboard
+        .readText()
+        .then((text) => {
+            terminal.onData?.(text);
+        })
+        .finally(() => {
+            terminal.focus();
+        });
 }
 
 export function enhanceMouseCopyPaste(
-    terminal: Terminal,
-    targetId: number,
+    terminal: WTerm,
     getOptions: () => ClipboardOptions,
     onContextMenuSelection: (selection: string) => void,
-): void {
+    callbacks: TerminalClipboardCallbacks,
+): () => void {
     let contextMenuSelection = "";
 
-    terminal.onSelectionChange(() => {
+    const onSelectionChange = () => {
         if (!getOptions().selectionCopyEnabled) return;
-        copyTerminalSelection(terminal, targetId);
-    });
+        if (terminal.getSelectionText()) {
+            copyTerminalSelection(terminal, "", callbacks.onCopy);
+        }
+    };
 
-    document.addEventListener(
-        "pointerdown",
-        (event) => {
-            window.parent.postMessage(
-                {
-                    type: terminalInteractionMessageType,
-                    targetId,
-                },
-                window.location.origin,
-            );
+    const onPointerDown = (event: PointerEvent) => {
+        if (
+            !(event.target instanceof Node) ||
+            !terminal.element.contains(event.target)
+        ) {
+            return;
+        }
 
-            if (event.button === 2) {
-                contextMenuSelection = terminal.getSelection() || "";
-                onContextMenuSelection(contextMenuSelection);
-            }
+        if (event.button === 2) {
+            contextMenuSelection = terminal.getSelectionText() || "";
+            onContextMenuSelection(contextMenuSelection);
+        }
 
-            const options = getOptions();
-            if (
-                (event.button === 1 && options.middleClickPasteEnabled) ||
-                (event.button === 2 && options.rightClickAction === "paste")
-            ) {
-                pasteFromClipboard(terminal);
-            }
-        },
-        true,
-    );
+        callbacks.onInteraction();
 
-    document.addEventListener("contextmenu", (event) => {
+        const options = getOptions();
+        if (
+            (event.button === 1 && options.middleClickPasteEnabled) ||
+            (event.button === 2 && options.rightClickAction === "paste")
+        ) {
+            pasteFromClipboard(terminal);
+        }
+    };
+
+    const onContextMenu = (event: MouseEvent) => {
+        if (
+            !(event.target instanceof Node) ||
+            !terminal.element.contains(event.target)
+        ) {
+            return;
+        }
+
         event.preventDefault();
         event.stopPropagation();
         if (getOptions().rightClickAction === "paste") return;
-        const selection = terminal.getSelection() || contextMenuSelection;
-        window.parent.postMessage(
-            {
-                type: terminalContextMenuMessageType,
-                targetId,
-                x: event.clientX,
-                y: event.clientY,
-                hasSelection: terminal.hasSelection() || selection !== "",
-                selection,
-            },
-            window.location.origin,
-        );
-    });
+        const selection = terminal.getSelectionText() || contextMenuSelection;
+        callbacks.onContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            hasSelection: selection !== "",
+            selection,
+        });
+    };
+
+    document.addEventListener("selectionchange", onSelectionChange);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("contextmenu", onContextMenu);
+
+    return () => {
+        document.removeEventListener("selectionchange", onSelectionChange);
+        document.removeEventListener("pointerdown", onPointerDown, true);
+        document.removeEventListener("contextmenu", onContextMenu);
+    };
 }
