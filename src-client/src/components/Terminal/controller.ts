@@ -213,7 +213,7 @@ export class TerminalController {
                 }
                 break;
             case "clear":
-                this.terminal?.write("\u001b[2J\u001b[3J\u001b[H");
+                this.handleCommand("input", "\u000c");
                 break;
             default:
                 console.log("unknown command", command);
