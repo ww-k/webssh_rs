@@ -130,8 +130,9 @@
 }
 
 .WebSSH-Home-Tab {
+    position: relative;
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) 24px;
+    grid-template-columns: 34px minmax(0, 1fr);
     align-items: center;
     width: 100%;
     min-height:46px;
@@ -214,6 +215,10 @@
 }
 
 .WebSSH-Home-TabClose {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    z-index: 1;
     width: 24px;
     height: 24px;
     padding: 0;
@@ -221,11 +226,15 @@
     background: transparent;
     border-radius: 5px;
     opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition: opacity 0.15s ease;
 }
 
 .WebSSH-Home-Tab:hover .WebSSH-Home-TabClose,
-.WebSSH-Home-Tab.is-active .WebSSH-Home-TabClose {
+.WebSSH-Home-Tab:focus-within .WebSSH-Home-TabClose {
     opacity: 1;
+    pointer-events: auto;
 }
 
 .WebSSH-Home-TabClose:hover {
@@ -353,7 +362,7 @@
     }
 
     .WebSSH-Home-Tab {
-        grid-template-columns: 30px minmax(0, 1fr) 22px;
+        grid-template-columns: 30px minmax(0, 1fr);
         padding: 7px 5px;
     }
 
