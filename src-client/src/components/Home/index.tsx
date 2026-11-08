@@ -6,15 +6,24 @@ import {
     DesktopOutlined,
     EditOutlined,
     FolderOutlined,
+    MenuFoldOutlined,
+    MenuUnfoldOutlined,
     PlusOutlined,
     SearchOutlined,
 } from "@ant-design/icons";
 import { Input } from "antd";
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import {
+    memo,
+    useCallback,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
 
+import ResizeLine from "@/components/ResizeLine";
 import renderPrompt from "@/helpers/renderPrompt";
 import useAppStore from "@/store";
 
@@ -25,6 +34,12 @@ import Terminal from "../Terminal";
 
 import type { ITab } from "@/store";
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
+
+const DEFAULT_SIDEBAR_WIDTH = 180;
+const MIN_SIDEBAR_WIDTH = 140;
+const MAX_SIDEBAR_WIDTH = 240;
+const COLLAPSED_SIDEBAR_WIDTH = 46;
+const EXPAND_THRESHOLD_OFFSET = 10;
 
 const TabPane = memo(function TabPane({
     active,
@@ -67,6 +82,14 @@ function Home({ active }: { active: boolean }) {
     const renameTab = useAppStore((state) => state.renameTab);
     const duplicateTab = useAppStore((state) => state.duplicateTab);
     const [searchValue, setSearchValue] = useState("");
+    const [tabListCollapsed, setTabListCollapsed] = useState(false);
+    const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+    const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+    const sidebarWidthRef = useRef(sidebarWidth);
+    const tabListCollapsedRef = useRef(tabListCollapsed);
+    const sidebarResizeOriginRef = useRef<number | null>(null);
+    sidebarWidthRef.current = sidebarWidth;
+    tabListCollapsedRef.current = tabListCollapsed;
     // Keep visited panes mounted so switching tabs preserves their state.
     const mountedTabKeys = useRef(new Set([activeTabKey]));
 
@@ -197,12 +220,72 @@ function Home({ active }: { active: boolean }) {
 
     const activeTab = tabs.find((tab) => tab.key === activeTabKey);
 
+    const onSidebarResizeMoved = useCallback(() => {
+        sidebarResizeOriginRef.current = null;
+        setIsResizingSidebar(false);
+    }, []);
+
+    const onSidebarResizeMove = useCallback(
+        ({ moveX }: { moveX: number; moveY: number }) => {
+            const isCollapsed = tabListCollapsedRef.current;
+            const origin =
+                sidebarResizeOriginRef.current ??
+                (isCollapsed
+                    ? COLLAPSED_SIDEBAR_WIDTH
+                    : sidebarWidthRef.current);
+            sidebarResizeOriginRef.current = origin;
+            const requestedWidth = origin + moveX;
+            if (
+                isCollapsed &&
+                requestedWidth >= MIN_SIDEBAR_WIDTH - EXPAND_THRESHOLD_OFFSET
+            ) {
+                sidebarResizeOriginRef.current = MIN_SIDEBAR_WIDTH - moveX;
+                sidebarWidthRef.current = MIN_SIDEBAR_WIDTH;
+                setSidebarWidth(MIN_SIDEBAR_WIDTH);
+                tabListCollapsedRef.current = false;
+                setTabListCollapsed(false);
+                setIsResizingSidebar(true);
+                return;
+            }
+            if (isCollapsed) {
+                setIsResizingSidebar(true);
+                return;
+            }
+            if (!isCollapsed && requestedWidth < COLLAPSED_SIDEBAR_WIDTH + EXPAND_THRESHOLD_OFFSET) {
+                sidebarResizeOriginRef.current =
+                    COLLAPSED_SIDEBAR_WIDTH - moveX;
+                tabListCollapsedRef.current = true;
+                setTabListCollapsed(true);
+                setIsResizingSidebar(true);
+                return;
+            }
+            setIsResizingSidebar(true);
+            const nextWidth = Math.min(
+                MAX_SIDEBAR_WIDTH,
+                Math.max(MIN_SIDEBAR_WIDTH, requestedWidth),
+            );
+            setSidebarWidth(nextWidth);
+        },
+        [],
+    );
+
+    const sidebarStyle =
+        tabListCollapsed || sidebarWidth === DEFAULT_SIDEBAR_WIDTH
+            ? undefined
+            : { flexBasis: `${sidebarWidth}px` };
+
     return (
         <div
-            className="WebSSH-Home"
+            className={`WebSSH-Home${isResizingSidebar ? " is-resizing" : ""}`}
             style={{ display: active ? undefined : "none" }}
         >
-            <aside className="WebSSH-Home-Sidebar" tabIndex={0}>
+            <aside
+                className={`WebSSH-Home-Sidebar${
+                    tabListCollapsed ? " is-collapsed" : ""
+                }`}
+                style={sidebarStyle}
+                tabIndex={0}
+            >
                 <div className="WebSSH-Home-SidebarHeader">
                     <div className="WebSSH-Home-SidebarSearch">
                         <Input
@@ -226,7 +309,11 @@ function Home({ active }: { active: boolean }) {
                         <PlusOutlined aria-hidden="true" />
                     </button>
                 </div>
-                <div className="WebSSH-Home-TabList" role="tablist">
+                <div
+                    id="WebSSH-Home-TabList"
+                    className="WebSSH-Home-TabList"
+                    role="tablist"
+                >
                     {filteredTabs.map((tab) => {
                         const isActive = tab.key === activeTabKey;
                         return (
@@ -235,6 +322,7 @@ function Home({ active }: { active: boolean }) {
                                 role="tab"
                                 tabIndex={0}
                                 aria-selected={isActive}
+                                title={tab.label}
                                 className={`WebSSH-Home-Tab${isActive ? " is-active" : ""}`}
                                 onClick={() => {
                                     setActiveTabKey(tab.key);
@@ -278,6 +366,39 @@ function Home({ active }: { active: boolean }) {
                         );
                     })}
                 </div>
+                <div className="WebSSH-Home-SidebarFooter">
+                    <button
+                        type="button"
+                        className="WebSSH-Home-SidebarToggle"
+                        aria-expanded={!tabListCollapsed}
+                        aria-controls="WebSSH-Home-TabList"
+                        aria-label={t(
+                            tabListCollapsed
+                                ? "app_tab_expand"
+                                : "app_tab_collapse",
+                        )}
+                        title={t(
+                            tabListCollapsed
+                                ? "app_tab_expand"
+                                : "app_tab_collapse",
+                        )}
+                        onClick={() =>
+                            setTabListCollapsed((collapsed) => !collapsed)
+                        }
+                    >
+                        {tabListCollapsed ? (
+                            <MenuUnfoldOutlined aria-hidden="true" />
+                        ) : (
+                            <MenuFoldOutlined aria-hidden="true" />
+                        )}
+                    </button>
+                </div>
+                <ResizeLine
+                    className="WebSSH-Home-SidebarResizeHandle"
+                    direction="v"
+                    onMove={onSidebarResizeMove}
+                    onMoved={onSidebarResizeMoved}
+                />
             </aside>
             <section className="WebSSH-Home-Content">
                 <header className="WebSSH-Home-ContentHeader">
