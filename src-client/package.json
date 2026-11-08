@@ -17,6 +17,7 @@
         "@tanstack/react-table": "^9.3.1",
         "@tauri-apps/api": "^2.12.3",
         "@wterm/dom": "^0.5.9",
+        "@wterm/ghostty": "^0.5.9",
         "@wterm/react": "^0.5.9",
         "ahooks": "^3.9.0",
         "antd": "^6.1.2",

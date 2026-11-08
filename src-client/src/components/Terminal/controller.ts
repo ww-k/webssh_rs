@@ -1,4 +1,5 @@
-import { WTerm, type WebMCPOptions } from "@wterm/dom";
+import { type WebMCPOptions, WTerm } from "@wterm/dom";
+import { GhosttyCore } from "@wterm/ghostty";
 
 import { parseTerminalCwd } from "@/helpers/terminal_cwd";
 
@@ -6,28 +7,42 @@ import {
     copyTerminalSelection,
     enhanceMouseCopyPaste,
     pasteFromClipboard,
+    type TerminalClipboardCallbacks,
 } from "./clipboard";
 import { defaultClipboardOptions, defaultTheme } from "./constants";
-import { postConnectionStatus, postTerminalMessage } from "./messages";
-import { targetIdFromQuery } from "./query";
 import { createTerminalSocket } from "./socket";
 import { applyTerminalTheme } from "./theme";
 
 import type { Socket } from "socket.io-client";
 import type { ClipboardOptions, TerminalSize, TerminalTheme } from "./types";
 
-interface TerminalMessage {
-    command?: unknown;
-    args?: unknown;
+export interface TerminalControllerEvents {
+    onStatus?: (status: "connected" | "disconnected") => void;
+    onOutput?: (data: string) => void;
+    onCwd?: (cwd: string) => void;
+    onCopy?: () => void;
+    onInteraction?: () => void;
+    onContextMenu?: TerminalClipboardCallbacks["onContextMenu"];
 }
 
-class TerminalController {
-    private readonly terminalContainer = document.getElementById("root");
+export interface TerminalControllerOptions {
+    preventDocumentDrop?: boolean;
+}
+
+export class TerminalController {
+    private readonly terminalContainer: HTMLElement | null;
+    private readonly targetId: number;
+    private readonly events: TerminalControllerEvents;
+    private readonly preventDocumentDrop: boolean;
     private terminal?: WTerm;
+    private terminalCreationPromise?: Promise<void>;
+    private clipboardCleanup?: () => void;
+    private preventDefault?: (event: DragEvent) => void;
+    private destroyed = false;
     private terminalInitialized = false;
     private sizeCache?: TerminalSize;
     private terminalActive = false;
-    private pendingTheme?: TerminalTheme;
+    private theme: TerminalTheme;
     private terminalSocket?: Socket;
     private terminalReady = false;
     private pendingTerminalInputs: string[] = [];
@@ -38,59 +53,103 @@ class TerminalController {
         ...defaultClipboardOptions,
     };
     private outputBuffer = "";
-    private terminalCwdOutputBuffer = "";
+
+    constructor(
+        containerId: string,
+        targetId: number,
+        events: TerminalControllerEvents = {},
+        initialTheme: TerminalTheme = defaultTheme,
+        options: TerminalControllerOptions = {},
+    ) {
+        this.terminalContainer = document.getElementById(containerId);
+        this.targetId = targetId;
+        this.events = events;
+        this.theme = initialTheme;
+        this.preventDocumentDrop = options.preventDocumentDrop === true;
+    }
 
     init(): void {
-        const preventDefault = (event: DragEvent) => {
-            event.preventDefault();
-            if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
-        };
+        if (this.destroyed) return;
 
-        document.body.addEventListener("dragover", preventDefault, false);
-        document.body.addEventListener("drop", preventDefault, false);
-        window.addEventListener("message", this.receiveMessage);
+        if (this.preventDocumentDrop) {
+            const preventDefault = (event: DragEvent) => {
+                event.preventDefault();
+                if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
+            };
+
+            this.preventDefault = preventDefault;
+            document.body.addEventListener("dragover", preventDefault, false);
+            document.body.addEventListener("drop", preventDefault, false);
+        }
 
         this.initSocket();
     }
 
-    private readonly receiveMessage = (event: MessageEvent): void => {
-        if (event.origin !== window.location.origin) return;
+    destroy(): void {
+        if (this.destroyed) return;
+        this.destroyed = true;
 
-        const data = event.data as TerminalMessage;
-        if (!data || typeof data.command !== "string") return;
+        if (this.preventDefault) {
+            document.body.removeEventListener(
+                "dragover",
+                this.preventDefault,
+                false,
+            );
+            document.body.removeEventListener(
+                "drop",
+                this.preventDefault,
+                false,
+            );
+            this.preventDefault = undefined;
+        }
 
-        switch (data.command) {
+        this.clipboardCleanup?.();
+        this.clipboardCleanup = undefined;
+
+        this.terminalSocket?.removeAllListeners();
+        this.terminalSocket?.disconnect();
+        this.terminalSocket = undefined;
+        this.terminal?.destroy();
+        this.terminal = undefined;
+        this.terminalInitialized = false;
+        this.outputBuffer = "";
+        this.pendingTerminalInputs = [];
+        this.pendingTerminalHistory = "";
+    }
+
+    handleCommand(command: string, args?: unknown): void {
+        switch (command) {
             case "focus":
-                if (this.terminal) {
-                    this.fitTerminal();
-                    this.terminal.focus();
-                }
+                if (!this.terminal) return;
+                this.fitTerminal();
+                this.terminal.focus();
                 break;
             case "setActive":
-                this.terminalActive = data.args === true;
+                this.terminalActive = args === true;
                 console.log("setActive terminalActive", this.terminalActive);
                 break;
             case "setTheme":
-                if (data.args && typeof data.args === "object") {
-                    this.pendingTheme = {
-                        ...(this.pendingTheme || defaultTheme),
-                        ...data.args,
+                if (!this.terminal) return;
+                if (args && typeof args === "object") {
+                    this.theme = {
+                        ...this.theme,
+                        ...args,
                     };
-                    applyTerminalTheme(this.pendingTheme, this.terminal);
+                    applyTerminalTheme(this.theme, this.terminal);
                 }
                 break;
             case "setClipboardOptions":
-                if (data.args && typeof data.args === "object") {
+                if (args && typeof args === "object") {
                     this.clipboardOptions = {
                         ...this.clipboardOptions,
-                        ...data.args,
+                        ...args,
                     };
                 }
                 break;
             case "setWebMCP":
-                if (!data.args || typeof data.args !== "object") break;
+                if (!args || typeof args !== "object") break;
                 {
-                    const options = data.args as Record<string, unknown>;
+                    const options = args as Record<string, unknown>;
                     if (
                         typeof options.name !== "string" ||
                         typeof options.description !== "string"
@@ -106,16 +165,16 @@ class TerminalController {
                 }
                 break;
             case "input":
-                if (typeof data.args !== "string") break;
+                if (typeof args !== "string") break;
                 if (this.terminalSocket?.connected && this.terminalReady) {
-                    this.terminalSocket.emit("input", data.args);
+                    this.terminalSocket.emit("input", args);
                 } else {
-                    this.pendingTerminalInputs.push(data.args);
+                    this.pendingTerminalInputs.push(args);
                 }
                 break;
             case "restoreHistory":
-                if (typeof data.args !== "string") break;
-                this.pendingTerminalHistory = data.args;
+                if (typeof args !== "string") break;
+                this.pendingTerminalHistory = args;
                 if (this.terminal && this.terminalInitialized) {
                     this.terminal.write(this.pendingTerminalHistory);
                     this.pendingTerminalHistory = "";
@@ -124,37 +183,32 @@ class TerminalController {
             case "copy":
                 copyTerminalSelection(
                     this.terminal,
-                    this.getTargetId(),
                     this.terminalContextMenuSelection,
+                    this.events.onCopy,
                 );
                 break;
             case "paste":
                 pasteFromClipboard(this.terminal);
                 break;
             case "pasteText":
-                if (typeof data.args === "string") {
-                    this.terminal?.onData?.(data.args);
+                if (typeof args === "string") {
+                    this.terminal?.onData?.(args);
                 }
                 break;
             case "clear":
                 this.terminal?.write("\u001b[2J\u001b[3J\u001b[H");
                 break;
             default:
-                console.log("unknown command", data);
+                console.log("unknown command", command);
         }
-    };
+    }
 
     private initSocket(): void {
-        const targetId = targetIdFromQuery();
-        if (targetId === undefined) {
-            console.error("initTerm missing params. target_id.");
-            return;
-        }
-
+        const targetId = this.targetId;
         this.terminalSocket = createTerminalSocket(targetId, {
             onConnect: (socket, recovered) => {
                 this.terminalReady = false;
-                postConnectionStatus(targetId, "connected");
+                this.events.onStatus?.("connected");
                 if (!this.terminal) {
                     this.createTerminal(socket, targetId);
                 } else if (recovered) {
@@ -172,11 +226,11 @@ class TerminalController {
             onDisconnect: (reason) => {
                 console.log("disconnect", reason);
                 this.terminalReady = false;
-                postConnectionStatus(targetId, "disconnected");
+                this.events.onStatus?.("disconnected");
             },
             onConnectError: (error) => {
                 console.log("connect_error", error);
-                postConnectionStatus(targetId, "disconnected");
+                this.events.onStatus?.("disconnected");
             },
             onServerReady: (_option) => {
                 this.terminalReady = true;
@@ -196,27 +250,49 @@ class TerminalController {
                 }
             },
             onOutput: (data) => {
-                this.handleTerminalOutput(data, targetId);
                 if (!this.terminalInitialized || !this.terminal) {
                     this.outputBuffer += data;
                 } else {
                     this.terminal.write(data);
                 }
-                postTerminalMessage({
-                    type: "webssh:terminal-output",
-                    targetId,
-                    data,
-                });
+                this.events.onOutput?.(data);
             },
         });
     }
 
     private createTerminal(socket: Socket, targetId: number): void {
+        if (this.terminalCreationPromise) return;
         if (!this.terminalContainer) return;
+
         this.terminalContainer.innerHTML = "";
 
+        this.terminalCreationPromise = this.initializeTerminal(socket, targetId)
+            .catch((error) => {
+                if (!this.destroyed) {
+                    console.error("failed to create terminal", error);
+                }
+            })
+            .finally(() => {
+                this.terminalCreationPromise = undefined;
+            });
+    }
+
+    private async initializeTerminal(
+        socket: Socket,
+        targetId: number,
+    ): Promise<void> {
+        const container = this.terminalContainer;
+        if (!container) return;
+
+        const core = await GhosttyCore.load();
+        if (this.destroyed || this.terminal) {
+            core.dispose();
+            return;
+        }
+
         this.terminalInitialized = false;
-        this.terminal = new WTerm(this.terminalContainer, {
+        const terminal = new WTerm(container, {
+            core,
             autoResize: true,
             webmcp: this.pendingWebMCP || {
                 name: `ssh-terminal-${targetId}`,
@@ -225,11 +301,7 @@ class TerminalController {
             onWorkingDirectory: (uri) => {
                 const cwd = parseTerminalCwd(uri);
                 if (cwd) {
-                    postTerminalMessage({
-                        type: "webssh:terminal-cwd",
-                        targetId,
-                        cwd,
-                    });
+                    this.events.onCwd?.(cwd);
                 }
             },
             onResize: (cols, rows) => {
@@ -242,33 +314,36 @@ class TerminalController {
                 if (socket.connected) socket.emit("input", data);
             },
         });
-        const terminal = this.terminal;
-        applyTerminalTheme(this.pendingTheme || defaultTheme, terminal);
+        this.terminal = terminal;
+        applyTerminalTheme(this.theme, terminal);
 
-        enhanceMouseCopyPaste(
+        this.clipboardCleanup = enhanceMouseCopyPaste(
             terminal,
-            targetId,
             () => this.clipboardOptions,
             (selection) => {
                 this.terminalContextMenuSelection = selection;
             },
+            {
+                onCopy: () => this.events.onCopy?.(),
+                onInteraction: () => this.events.onInteraction?.(),
+                onContextMenu: (data) => this.events.onContextMenu?.(data),
+            },
         );
 
-        void this.terminal
-            .init()
-            .then(() => {
-                if (this.terminal !== terminal) return;
-                this.terminalInitialized = true;
-                this.flushOutputBuffer();
-                if (this.pendingTerminalHistory) {
-                    terminal.write(this.pendingTerminalHistory);
-                    this.pendingTerminalHistory = "";
-                }
-                terminal.focus();
-            })
-            .catch((error) => {
-                console.error("failed to initialize terminal", error);
-            });
+        try {
+            await terminal.init();
+        } catch (error) {
+            if (!this.destroyed) throw error;
+            return;
+        }
+        if (this.destroyed || this.terminal !== terminal) return;
+        this.terminalInitialized = true;
+        this.flushOutputBuffer();
+        if (this.pendingTerminalHistory) {
+            terminal.write(this.pendingTerminalHistory);
+            this.pendingTerminalHistory = "";
+        }
+        terminal.focus();
     }
 
     private readonly fitTerminal = (): void => {
@@ -285,62 +360,6 @@ class TerminalController {
         }
     }
 
-    /**
-     * The bundled wterm core does not expose OSC 7 through getWorkingDirectory.
-     * Keep this parser at the transport boundary so OSC 7 still works and can
-     * be split across Socket.IO output packets without changing terminal data.
-     */
-    private handleTerminalOutput(data: string, targetId: number): void {
-        const output = this.terminalCwdOutputBuffer + data;
-        this.terminalCwdOutputBuffer = "";
-        let offset = 0;
-
-        while (offset < output.length) {
-            const start = output.indexOf("\u001b]7;", offset);
-            if (start < 0) {
-                this.terminalCwdOutputBuffer = this.partialOsc7Prefix(output);
-                return;
-            }
-
-            const payloadStart = start + 4;
-            const bell = output.indexOf("\u0007", payloadStart);
-            const stringTerminator = output.indexOf("\u001b\\", payloadStart);
-            let end = bell;
-            let terminatorLength = 1;
-            if (end < 0 || (stringTerminator >= 0 && stringTerminator < end)) {
-                end = stringTerminator;
-                terminatorLength = 2;
-            }
-            if (end < 0) {
-                this.terminalCwdOutputBuffer = output.slice(start);
-                return;
-            }
-
-            const cwd = parseTerminalCwd(output.slice(payloadStart, end));
-            if (cwd) {
-                postTerminalMessage({
-                    type: "webssh:terminal-cwd",
-                    targetId,
-                    cwd,
-                });
-            }
-            offset = end + terminatorLength;
-        }
-    }
-
-    private partialOsc7Prefix(value: string): string {
-        const prefix = "\u001b]7;";
-        for (
-            let length = Math.min(prefix.length - 1, value.length);
-            length > 0;
-            length -= 1
-        ) {
-            const suffix = value.slice(-length);
-            if (prefix.startsWith(suffix)) return suffix;
-        }
-        return "";
-    }
-
     private emitResize(): void {
         if (!this.terminalReady || !this.terminalSocket?.connected) return;
 
@@ -351,12 +370,4 @@ class TerminalController {
                 : undefined);
         if (size) this.terminalSocket.emit("resize", size);
     }
-
-    private getTargetId(): number {
-        return targetIdFromQuery() ?? 0;
-    }
-}
-
-export function initTerminal(): void {
-    new TerminalController().init();
 }

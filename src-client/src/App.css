@@ -9,17 +9,17 @@ body,
 }
 
 /* Keep application scrollbars consistent with the DataTable surface. */
-*:not(.wterm) {
+* {
     scrollbar-color: var(--ant-color-fill) var(--ant-color-bg-container);
     scrollbar-width: thin;
 }
 
-*:not(.wterm)::-webkit-scrollbar {
+*::-webkit-scrollbar {
     width: 10px;
     height: 10px;
 }
 
-*:not(.wterm)::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
     background-color: var(--ant-color-fill);
     border: 2px solid var(--ant-color-bg-container);
     border-radius: 999px;
