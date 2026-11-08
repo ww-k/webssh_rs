@@ -16,6 +16,10 @@ import { applyTerminalTheme } from "./theme";
 import type { Socket } from "socket.io-client";
 import type { ClipboardOptions, TerminalSize, TerminalTheme } from "./types";
 
+function quoteShellPath(path: string): string {
+    return `'${path.replace(/'/g, "'\\''")}'`;
+}
+
 export interface TerminalControllerEvents {
     onStatus?: (status: "connected" | "disconnected") => void;
     onOutput?: (data: string) => void;
@@ -48,6 +52,8 @@ export class TerminalController {
     private pendingTerminalInputs: string[] = [];
     private pendingTerminalHistory = "";
     private terminalContextMenuSelection = "";
+    private terminalCwd?: string;
+    private pendingTerminalCwd?: string;
     private pendingWebMCP?: WebMCPOptions;
     private clipboardOptions: ClipboardOptions = {
         ...defaultClipboardOptions,
@@ -85,6 +91,15 @@ export class TerminalController {
         this.initSocket();
     }
 
+    reconnect(): void {
+        if (this.destroyed || !this.terminalSocket) return;
+        if (this.terminalSocket.connected) return;
+
+        this.terminalReady = false;
+        this.pendingTerminalCwd = this.terminalCwd;
+        this.terminalSocket.connect();
+    }
+
     destroy(): void {
         if (this.destroyed) return;
         this.destroyed = true;
@@ -115,6 +130,8 @@ export class TerminalController {
         this.outputBuffer = "";
         this.pendingTerminalInputs = [];
         this.pendingTerminalHistory = "";
+        this.terminalCwd = undefined;
+        this.pendingTerminalCwd = undefined;
     }
 
     handleCommand(command: string, args?: unknown): void {
@@ -226,6 +243,7 @@ export class TerminalController {
             onDisconnect: (reason) => {
                 console.log("disconnect", reason);
                 this.terminalReady = false;
+                this.pendingTerminalCwd = this.terminalCwd;
                 this.events.onStatus?.("disconnected");
             },
             onConnectError: (error) => {
@@ -238,6 +256,14 @@ export class TerminalController {
                     this.terminalSocket?.emit("input", input);
                 }
                 this.pendingTerminalInputs = [];
+                const cwdToRestore = this.pendingTerminalCwd;
+                this.pendingTerminalCwd = undefined;
+                if (cwdToRestore && this.terminalSocket?.connected) {
+                    this.terminalSocket.emit(
+                        "input",
+                        `cd ${quoteShellPath(cwdToRestore)}\n`,
+                    );
+                }
                 if (this.terminal) {
                     window.setTimeout(() => {
                         this.fitTerminal();
@@ -301,6 +327,7 @@ export class TerminalController {
             onWorkingDirectory: (uri) => {
                 const cwd = parseTerminalCwd(uri);
                 if (cwd) {
+                    this.terminalCwd = cwd;
                     this.events.onCwd?.(cwd);
                 }
             },

@@ -84,7 +84,6 @@ export default function Terminal({
     const [connectionStatus, setConnectionStatus] = useState<
         "connected" | "disconnected" | "connecting"
     >("connecting");
-    const [, setIframeKey] = useState(0);
     const [copyNotificationVisible, setCopyNotificationVisible] =
         useState(false);
     const copyNotificationTimerRef = useRef<number>();
@@ -372,7 +371,7 @@ export default function Terminal({
 
     const reconnect = useCallback(() => {
         setConnectionStatus("connecting");
-        setIframeKey((key) => key + 1);
+        terminalControllerRef.current?.reconnect();
     }, []);
 
     useEffect(() => {
