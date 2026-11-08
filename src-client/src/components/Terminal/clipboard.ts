@@ -60,13 +60,12 @@ export function enhanceMouseCopyPaste(
             return;
         }
 
-        terminal.focus();
-        callbacks.onInteraction();
-
         if (event.button === 2) {
             contextMenuSelection = terminal.getSelectionText() || "";
             onContextMenuSelection(contextMenuSelection);
         }
+
+        callbacks.onInteraction();
 
         const options = getOptions();
         if (
