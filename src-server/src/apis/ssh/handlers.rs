@@ -128,15 +128,22 @@ impl SshTerminalSession {
         info!("sid={} open_session_channel_request_pty_shell", sid);
 
         let channel = result.unwrap();
-        term_session.open_socket_channel_tunnel(channel).await;
+        term_session
+            .open_socket_channel_tunnel(channel, target_system)
+            .await;
         info!("sid={} tunnel closed", sid);
 
         anyhow::Ok(term_session)
     }
 
-    async fn open_socket_channel_tunnel(&self, channel_guard: SshChannelGuard) {
+    async fn open_socket_channel_tunnel(
+        &self,
+        channel_guard: SshChannelGuard,
+        target_system: Option<String>,
+    ) {
         let socket = self.socket.clone();
         let sid = socket.id;
+        let server_ready = serde_json::json!({ "system": target_system });
         let (mut read_half, write_half, channel_lease) = channel_guard.split().unwrap();
         let write_half_arc = Arc::new(write_half);
 
@@ -173,7 +180,7 @@ impl SshTerminalSession {
             match msg {
                 ChannelMsg::Success => {
                     let _ = {
-                        let _ = socket.emit("server_ready", "");
+                        let _ = socket.emit("server_ready", &server_ready);
                         info!("sid={} socket channel tunnel opened", sid);
                     };
                 }

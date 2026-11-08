@@ -26,6 +26,7 @@ export interface TerminalSize {
 
 export interface ServerReadyOption {
     maxDisconnectionDuration?: number;
+    system?: string;
 }
 
 export interface TerminalSocketCallbacks {

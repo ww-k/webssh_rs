@@ -4,10 +4,16 @@ import type { ServerReadyOption, TerminalSocketCallbacks } from "./types";
 
 function parseServerReadyOption(option: unknown): ServerReadyOption {
     if (!option || typeof option !== "object") return {};
-    const value = option as { maxDisconnectionDuration?: unknown };
-    return typeof value.maxDisconnectionDuration === "number"
-        ? { maxDisconnectionDuration: value.maxDisconnectionDuration }
-        : {};
+    const value = option as {
+        maxDisconnectionDuration?: unknown;
+        system?: unknown;
+    };
+    return {
+        ...(typeof value.maxDisconnectionDuration === "number"
+            ? { maxDisconnectionDuration: value.maxDisconnectionDuration }
+            : {}),
+        ...(typeof value.system === "string" ? { system: value.system } : {}),
+    };
 }
 
 export function createTerminalSocket(

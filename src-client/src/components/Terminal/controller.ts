@@ -49,6 +49,7 @@ export class TerminalController {
     private theme: TerminalTheme;
     private terminalSocket?: Socket;
     private terminalReady = false;
+    private terminalSystem?: string;
     private pendingTerminalInputs: string[] = [];
     private pendingTerminalHistory = "";
     private terminalContextMenuSelection = "";
@@ -213,7 +214,12 @@ export class TerminalController {
                 }
                 break;
             case "clear":
-                this.handleCommand("input", "\u000c");
+                this.handleCommand(
+                    "input",
+                    this.terminalSystem?.toLowerCase() === "windows"
+                        ? "cls\r"
+                        : "\u000c",
+                );
                 break;
             default:
                 console.log("unknown command", command);
@@ -250,7 +256,8 @@ export class TerminalController {
                 console.log("connect_error", error);
                 this.events.onStatus?.("disconnected");
             },
-            onServerReady: (_option) => {
+            onServerReady: (option) => {
+                this.terminalSystem = option.system;
                 this.terminalReady = true;
                 for (const input of this.pendingTerminalInputs) {
                     this.terminalSocket?.emit("input", input);
