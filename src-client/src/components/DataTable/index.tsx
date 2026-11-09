@@ -40,6 +40,29 @@ const ROW_OVERSCAN = 10;
 const VIRTUAL_WINDOW_STEP = 8;
 type DropPosition = "before" | "after";
 
+function supportsNativeDragAndDrop() {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+        return false;
+    }
+    const userAgent = navigator.userAgent;
+    // Some WebKit webviews expose the complete drag-and-drop API but never
+    // dispatch dragenter/dragover/drop for HTML elements. Their UA contains
+    // AppleWebKit without the browser token added by Safari or Chromium.
+    const isWebKitWebView =
+        /AppleWebKit\//i.test(userAgent) &&
+        !/(Safari|Chrome|CriOS|Edg|OPR|Firefox)\//i.test(userAgent);
+    if (isWebKitWebView) return false;
+    const probe = document.createElement("div");
+    return (
+        "draggable" in probe &&
+        "ondragstart" in probe &&
+        "ondragover" in probe &&
+        "ondrop" in probe &&
+        typeof window.DragEvent === "function" &&
+        typeof window.DataTransfer === "function"
+    );
+}
+
 function getVirtualStartIndex(bodyScrollTop: number, rowHeight: number) {
     const firstVisibleIndex = Math.floor(bodyScrollTop / rowHeight);
     const windowStart =
@@ -163,6 +186,7 @@ function DataTable<TData extends RowData>({
     const dragStartIndex = useRef<number | null>(null);
     const selectionAnchor = useRef<string | null>(null);
     const dragRows = useRef<TData[] | null>(null);
+    const pointerDragEnabled = draggable && !supportsNativeDragAndDrop();
     const typeAhead = useRef("");
     const typeAheadTimer = useRef<number | undefined>(undefined);
 
@@ -437,44 +461,257 @@ function DataTable<TData extends RowData>({
         }
     };
 
-    const handleDrop = useCallback(
+    const finishDrop = useCallback(
         (
             target: TData | null,
-            event: React.DragEvent,
-            position: DropPosition = "after",
+            sourceRows: TData[],
+            position: DropPosition,
+            event: DragEvent,
+            files: File[] = [],
         ) => {
-            event.preventDefault();
-            event.stopPropagation();
-            const nativeEvent = event.nativeEvent;
-            let sourceRows = dragRows.current;
-            if (!sourceRows) {
-                const serialized = event.dataTransfer.getData(
-                    "application/x-webssh-table-rows",
-                );
-                if (serialized) {
-                    try {
-                        const ids = new Set(JSON.parse(serialized) as string[]);
-                        sourceRows = rows
-                            .filter((row) => ids.has(row.id))
-                            .map((row) => row.original);
-                    } catch {
-                        sourceRows = [];
-                    }
-                }
-            }
             onDrop?.({
-                rows: sourceRows ?? [],
-                files: Array.from(event.dataTransfer.files),
+                rows: sourceRows,
+                files,
                 target,
                 dropPosition: position,
-                event: nativeEvent,
+                event,
             });
             dragRows.current = null;
             setDropTargetId(null);
             setDropPosition(null);
         },
-        [onDrop, rows],
+        [onDrop],
     );
+
+    const handleDrop = useCallback(
+        (
+            target: TData | null,
+            event: React.DragEvent | DragEvent,
+            position: DropPosition = "after",
+        ) => {
+            const dataTransfer = event.dataTransfer;
+            if (!dataTransfer) return;
+            console.log("[drag-debug] DataTable handleDrop", {
+                targetId: target
+                    ? (target as { id?: string | number }).id
+                    : null,
+                position,
+                types: Array.from(dataTransfer.types),
+                memoryRows: dragRows.current?.length ?? 0,
+            });
+            event.preventDefault();
+            event.stopPropagation();
+            const nativeEvent =
+                "nativeEvent" in event ? event.nativeEvent : event;
+            let sourceRows = dragRows.current;
+            if (!sourceRows) {
+                const serialized = dataTransfer.getData(
+                    "application/x-webssh-table-rows",
+                );
+                if (serialized) {
+                    try {
+                        const ids = new Set(JSON.parse(serialized) as string[]);
+                        console.log("[drag-debug] DataTable serialized rows", [
+                            ...ids,
+                        ]);
+                        sourceRows = rows
+                            .filter((row) => ids.has(row.id))
+                            .map((row) => row.original);
+                    } catch (error) {
+                        console.log(
+                            "[drag-debug] DataTable serialized rows parse failed",
+                            error,
+                        );
+                        sourceRows = [];
+                    }
+                }
+            }
+            console.log("[drag-debug] DataTable resolved drop rows", {
+                count: sourceRows?.length ?? 0,
+                rowIds: sourceRows?.map(
+                    (item) => (item as { id?: string | number }).id,
+                ),
+            });
+            finishDrop(
+                target,
+                sourceRows ?? [],
+                position,
+                nativeEvent,
+                Array.from(dataTransfer.files),
+            );
+        },
+        [finishDrop, rows],
+    );
+
+    useEffect(() => {
+        if (!pointerDragEnabled) return;
+        const root = rootRef.current;
+        if (!root) return;
+
+        let pointerDrag: {
+            pointerId: number;
+            startX: number;
+            startY: number;
+            sourceRows: TData[];
+            active: boolean;
+            target: Row<typeof features, TData> | null;
+            position: DropPosition | null;
+            overRoot: boolean;
+        } | null = null;
+        let suppressClick = false;
+
+        const getRowElement = (target: EventTarget | null) => {
+            if (!(target instanceof Element)) return null;
+            return target.closest<HTMLElement>("tbody tr[data-row-id]");
+        };
+        const getRow = (
+            rowElement: HTMLElement,
+        ): Row<typeof features, TData> | null =>
+            rows.find((row) => row.id === rowElement.dataset.rowId) ?? null;
+        const getPosition = (event: PointerEvent, rowElement: HTMLElement) => {
+            const bounds = rowElement.getBoundingClientRect();
+            return event.clientY < bounds.top + bounds.height / 2
+                ? "before"
+                : "after";
+        };
+
+        const onPointerDown = (event: PointerEvent) => {
+            if (event.button !== 0) return;
+            const target = event.target;
+            if (
+                target instanceof Element &&
+                target.closest("button, input, a")
+            ) {
+                return;
+            }
+            const rowElement = getRowElement(target);
+            if (!rowElement) return;
+            const row = getRow(rowElement);
+            if (!row) return;
+            pointerDrag = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                sourceRows: currentSelectedRowsForDrag(
+                    selectedRowsRef.current,
+                    row,
+                    row.original,
+                ),
+                active: false,
+                target: null,
+                position: null,
+                overRoot: false,
+            };
+        };
+        const onPointerMove = (event: PointerEvent) => {
+            if (!pointerDrag || pointerDrag.pointerId !== event.pointerId)
+                return;
+            if (!pointerDrag.active) {
+                const distance = Math.hypot(
+                    event.clientX - pointerDrag.startX,
+                    event.clientY - pointerDrag.startY,
+                );
+                if (distance < 5) return;
+                pointerDrag.active = true;
+                dragRows.current = pointerDrag.sourceRows;
+                document.body.dataset.websshTableDragging = "true";
+                console.log("[drag-debug] DataTable pointerDragStart", {
+                    rowIds: pointerDrag.sourceRows.map(
+                        (item) => (item as { id?: string | number }).id,
+                    ),
+                });
+                setDragging(true);
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            const rowElement = getRowElement(
+                document.elementFromPoint(event.clientX, event.clientY),
+            );
+            if (!rowElement) {
+                pointerDrag.target = null;
+                pointerDrag.position = "after";
+                const pointTarget = document.elementFromPoint(
+                    event.clientX,
+                    event.clientY,
+                );
+                pointerDrag.overRoot =
+                    pointTarget instanceof Node && root.contains(pointTarget);
+                setDropTargetId(null);
+                setDropPosition(null);
+                return;
+            }
+            const row = getRow(rowElement);
+            if (!row) return;
+            pointerDrag.target = row;
+            pointerDrag.position = getPosition(event, rowElement);
+            pointerDrag.overRoot = true;
+            setDropTargetId(row.id);
+            setDropPosition(pointerDrag.position);
+        };
+        const onPointerUp = (event: PointerEvent) => {
+            if (!pointerDrag || pointerDrag.pointerId !== event.pointerId)
+                return;
+            const currentDrag = pointerDrag;
+            pointerDrag = null;
+            if (currentDrag.active) {
+                suppressClick = true;
+                const canDrop = currentDrag.target
+                    ? (canDropRow?.(currentDrag.target.original) ?? true)
+                    : currentDrag.overRoot;
+                if (canDrop && currentDrag.position) {
+                    console.log("[drag-debug] DataTable pointer drop", {
+                        targetId: currentDrag.target?.id ?? null,
+                        position: currentDrag.position,
+                    });
+                    finishDrop(
+                        currentDrag.target?.original ?? null,
+                        currentDrag.sourceRows,
+                        currentDrag.position,
+                        event as unknown as DragEvent,
+                    );
+                } else {
+                    dragRows.current = null;
+                    setDropTargetId(null);
+                    setDropPosition(null);
+                }
+                delete document.body.dataset.websshTableDragging;
+                setDragging(false);
+            }
+        };
+        const onPointerCancel = (event: PointerEvent) => {
+            if (!pointerDrag || pointerDrag.pointerId !== event.pointerId)
+                return;
+            pointerDrag = null;
+            dragRows.current = null;
+            delete document.body.dataset.websshTableDragging;
+            setDragging(false);
+            setDropTargetId(null);
+            setDropPosition(null);
+        };
+        const onClick = (event: MouseEvent) => {
+            if (!suppressClick) return;
+            suppressClick = false;
+            event.preventDefault();
+            event.stopPropagation();
+        };
+
+        root.addEventListener("pointerdown", onPointerDown, true);
+        document.addEventListener("pointermove", onPointerMove, true);
+        document.addEventListener("pointerup", onPointerUp, true);
+        document.addEventListener("pointercancel", onPointerCancel, true);
+        root.addEventListener("click", onClick, true);
+        return () => {
+            root.removeEventListener("pointerdown", onPointerDown, true);
+            document.removeEventListener("pointermove", onPointerMove, true);
+            document.removeEventListener("pointerup", onPointerUp, true);
+            document.removeEventListener(
+                "pointercancel",
+                onPointerCancel,
+                true,
+            );
+            root.removeEventListener("click", onClick, true);
+        };
+    }, [canDropRow, finishDrop, pointerDragEnabled, rows]);
 
     return (
         <div
@@ -505,7 +742,17 @@ function DataTable<TData extends RowData>({
                 onHeaderContextMenu?.(event);
             }}
             onDragOverCapture={(event) => {
-                if ((event.target as HTMLElement).closest("tbody tr")) return;
+                console.log(
+                    "[drag-debug] DataTable root dragOverCapture",
+                    event.target,
+                );
+                const target = event.target as HTMLElement;
+                if (target.closest("tbody tr")) return;
+                console.log("[drag-debug] DataTable root dragOverCapture", {
+                    tagName: target.tagName,
+                    className: target.className,
+                    types: Array.from(event.dataTransfer.types),
+                });
                 event.preventDefault();
                 event.stopPropagation();
                 event.dataTransfer.dropEffect = "move";
@@ -698,7 +945,7 @@ function DataTable<TData extends RowData>({
                     columnWidths={columnWidths}
                     selectable={selectable}
                     multiple={multiple}
-                    draggable={draggable}
+                    draggable={draggable && !pointerDragEnabled}
                     canDropRow={canDropRow}
                     showDropIndicator={showDropIndicator}
                     dragging={dragging}
@@ -1019,6 +1266,7 @@ function DataTableRow<TData extends RowData>({
 
     return (
         <tr
+            data-row-id={row.id}
             className={classNames({
                 "WebSSH-DataTableTrActive": selected,
                 "WebSSH-DataTableTrDisabled": disabled,
@@ -1067,25 +1315,47 @@ function DataTableRow<TData extends RowData>({
                     original,
                 );
                 dragRows.current = selectedForDrag;
+                document.body.dataset.websshTableDragging = "true";
                 event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData(
-                    "application/x-webssh-table-rows",
-                    JSON.stringify(
-                        selectedForDrag.map((item) =>
-                            getRowId(item, data.indexOf(item)),
-                        ),
+                const rowIds = JSON.stringify(
+                    selectedForDrag.map((item) =>
+                        getRowId(item, data.indexOf(item)),
                     ),
                 );
-                event.dataTransfer.setData("text/plain", "webssh-table-row");
+                // WKWebView can reject custom drag formats. The in-memory
+                // source is used for same-page drops, while text/plain keeps
+                // the native drag operation alive as a fallback.
+                try {
+                    event.dataTransfer.setData(
+                        "application/x-webssh-table-rows",
+                        rowIds,
+                    );
+                } catch (error) {
+                    console.log(
+                        "[drag-debug] DataTable custom setData failed",
+                        error,
+                    );
+                    // Ignore unsupported custom formats in WebKit.
+                }
+                event.dataTransfer.setData("text/plain", rowIds);
+                console.log("[drag-debug] DataTable dragStart", {
+                    rowId: getRowId(original, data.indexOf(original)),
+                    selectedCount: selectedForDrag.length,
+                    rowIds,
+                    types: Array.from(event.dataTransfer.types),
+                });
                 setDragging(true);
             }}
             onDragEnd={() => {
+                console.log("[drag-debug] DataTable dragEnd");
                 dragRows.current = null;
+                delete document.body.dataset.websshTableDragging;
                 setDragging(false);
                 setDropTargetId(null);
                 setDropPosition(null);
             }}
             onDragOver={(event) => {
+                console.log("[drag-debug] DataTable onDragOver");
                 const bounds = event.currentTarget.getBoundingClientRect();
                 const nextDropPosition =
                     event.clientY < bounds.top + bounds.height / 2
@@ -1094,6 +1364,10 @@ function DataTableRow<TData extends RowData>({
                 setDropTargetId(row.id);
                 setDropPosition(nextDropPosition);
                 if (!canDrop) {
+                    console.log("[drag-debug] DataTable dragOver rejected", {
+                        rowId: getRowId(original, data.indexOf(original)),
+                        position: nextDropPosition,
+                    });
                     event.dataTransfer.dropEffect = "none";
                     return;
                 }
@@ -1110,6 +1384,10 @@ function DataTableRow<TData extends RowData>({
                 }
             }}
             onDrop={(event) => {
+                console.log("[drag-debug] DataTable row drop", {
+                    rowId: getRowId(original, data.indexOf(original)),
+                    canDrop,
+                });
                 if (!canDrop) {
                     event.preventDefault();
                     event.stopPropagation();
@@ -1121,6 +1399,7 @@ function DataTableRow<TData extends RowData>({
                         ? "before"
                         : "after";
                 onDrop(original, event, dropPosition);
+                delete document.body.dataset.websshTableDragging;
                 setDragging(false);
                 setDropTargetId(null);
                 setDropPosition(null);

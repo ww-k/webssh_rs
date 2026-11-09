@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Native Drag Test</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        body {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .meta {
+            padding: 12px;
+            border: 1px solid #8886;
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            white-space: pre-wrap;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(120px, 1fr));
+            gap: 12px;
+            margin: 20px 0;
+        }
+        .item {
+            min-height: 80px;
+            padding: 16px;
+            border: 2px solid #8888;
+            border-radius: 6px;
+            cursor: grab;
+            user-select: none;
+        }
+        .item:active { cursor: grabbing; }
+        .item.over { border-color: #2f80ed; background: #2f80ed22; }
+        button { padding: 6px 12px; }
+        #log {
+            min-height: 220px;
+            max-height: 420px;
+            overflow: auto;
+            padding: 12px;
+            background: #000b;
+            color: #9f9;
+            font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Native Drag and Drop Test</h1>
+    <div id="meta" class="meta"></div>
+    <p>拖动任意一个方块到另一个方块，观察下方事件日志。</p>
+    <div class="board">
+        <div class="item" draggable="true" data-id="one">One</div>
+        <div class="item" draggable="true" data-id="two">Two</div>
+        <div class="item" draggable="true" data-id="three">Three</div>
+    </div>
+    <button id="clear" type="button">Clear log</button>
+    <pre id="log"></pre>
+    <script>
+        (() => {
+            const meta = document.querySelector("#meta");
+            const log = document.querySelector("#log");
+            const items = [...document.querySelectorAll(".item")];
+            let sequence = 0;
+
+            const capability = {
+                draggable: "draggable" in document.createElement("div"),
+                ondragstart: "ondragstart" in document.createElement("div"),
+                ondragover: "ondragover" in document.createElement("div"),
+                ondrop: "ondrop" in document.createElement("div"),
+                dragEvent: typeof window.DragEvent,
+                dataTransfer: typeof window.DataTransfer,
+                webKitWebView: /AppleWebKit\//i.test(navigator.userAgent) &&
+                    !/(Safari|Chrome|CriOS|Edg|OPR|Firefox)\//i.test(navigator.userAgent),
+                userAgent: navigator.userAgent,
+            };
+            meta.textContent = JSON.stringify(capability, null, 2);
+
+            function describe(event) {
+                const transfer = event.dataTransfer;
+                return {
+                    target: event.target instanceof Element
+                        ? `${event.target.tagName}.${event.target.className}`
+                        : String(event.target),
+                    types: transfer ? [...transfer.types] : [],
+                    dropEffect: transfer ? transfer.dropEffect : null,
+                    effectAllowed: transfer ? transfer.effectAllowed : null,
+                    client: [event.clientX, event.clientY],
+                };
+            }
+
+            function write(label, event) {
+                sequence += 1;
+                log.textContent += `${sequence} ${label} ${JSON.stringify(describe(event))}\n`;
+                log.scrollTop = log.scrollHeight;
+            }
+
+            document.addEventListener("dragstart", event => write("document dragstart", event), true);
+            document.addEventListener("dragenter", event => write("document dragenter", event), true);
+            document.addEventListener("dragover", event => write("document dragover", event), true);
+            document.addEventListener("dragleave", event => write("document dragleave", event), true);
+            document.addEventListener("drop", event => write("document drop", event), true);
+            document.addEventListener("dragend", event => write("document dragend", event), true);
+            document.addEventListener("pointerdown", event => write("document pointerdown", event), true);
+            // document.addEventListener("pointermove", event => write("document pointermove", event), true);
+            document.addEventListener("pointerup", event => write("document pointerup", event), true);
+
+            items.forEach(item => {
+                item.addEventListener("dragstart", event => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", item.dataset.id);
+                    write(`${item.dataset.id} dragstart`, event);
+                });
+                item.addEventListener("dragenter", event => {
+                    event.preventDefault();
+                    item.classList.add("over");
+                    write(`${item.dataset.id} dragenter`, event);
+                });
+                item.addEventListener("dragover", event => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    write(`${item.dataset.id} dragover`, event);
+                });
+                item.addEventListener("dragleave", event => {
+                    item.classList.remove("over");
+                    write(`${item.dataset.id} dragleave`, event);
+                });
+                item.addEventListener("drop", event => {
+                    event.preventDefault();
+                    item.classList.remove("over");
+                    write(`${item.dataset.id} drop`, event);
+                });
+                item.addEventListener("dragend", event => {
+                    item.classList.remove("over");
+                    write(`${item.dataset.id} dragend`, event);
+                });
+            });
+
+            document.querySelector("#clear").addEventListener("click", () => {
+                sequence = 0;
+                log.textContent = "";
+            });
+        })();
+    </script>
+</body>
+</html>

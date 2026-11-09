@@ -201,6 +201,19 @@ export default function TargetList({ tab }: { tab: ITab }) {
             target,
             dropPosition,
         }: DataTableDropEvent<TargetTreeRow>) => {
+            const targetSummary = target
+                ? {
+                      id: target.id,
+                      name: target.name,
+                      directory: normalizeDirectory(target.directory),
+                      isDirectory: target.isDirectory === true,
+                  }
+                : null;
+            console.log("[drag-debug] TargetList drop received", {
+                rowIds: rows.map((row) => row.id),
+                target: targetSummary,
+                dropPosition,
+            });
             const sourceDirectoryRows = rows.filter(
                 (row): row is TargetDirectoryRow => Boolean(row.isDirectory),
             );
@@ -219,7 +232,12 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     all.findIndex((candidate) => candidate.id === row.id) ===
                     index,
             );
-            if (sourceRows.length === 0) return;
+            if (sourceRows.length === 0) {
+                console.log(
+                    "[drag-debug] TargetList drop ignored: no source rows",
+                );
+                return;
+            }
             const sourceIds = new Set(sourceRows.map((row) => row.id));
 
             if (sourceDirectoryRows.length > 0) {
@@ -259,10 +277,22 @@ export default function TargetList({ tab }: { tab: ITab }) {
                           )
                         : [row.id],
                 );
+                console.log("[drag-debug] TargetList reorder directories", {
+                    sourceDirectories: [...sourceDirectoryKeys],
+                    target: targetSummary,
+                    orderedIds,
+                });
                 try {
                     await postTargetReorder(orderedIds);
+                    console.log(
+                        "[drag-debug] TargetList reorder directories success",
+                    );
                     await refresh();
-                } catch {
+                } catch (error) {
+                    console.log(
+                        "[drag-debug] TargetList reorder directories failed",
+                        error,
+                    );
                     message.error(t("target_move_failed"));
                     await refresh();
                 }
@@ -270,6 +300,12 @@ export default function TargetList({ tab }: { tab: ITab }) {
             }
 
             if (target && !target.isDirectory && sourceIds.has(target.id)) {
+                console.log(
+                    "[drag-debug] TargetList drop ignored: target is source",
+                    {
+                        targetId: target.id,
+                    },
+                );
                 return;
             }
             const directory = normalizeDirectory(target?.directory);
@@ -339,6 +375,13 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 orderedIds.push(...group.map((row) => row.id));
             }
 
+            console.log("[drag-debug] TargetList move targets", {
+                sourceIds: [...sourceIds],
+                directory,
+                target: targetSummary,
+                insertionIndex,
+                orderedIds,
+            });
             try {
                 await Promise.all(
                     sourceTargets
@@ -353,8 +396,15 @@ export default function TargetList({ tab }: { tab: ITab }) {
                         .map((row) => postTargetUpdate(row)),
                 );
                 await postTargetReorder(orderedIds);
+                console.log("[drag-debug] TargetList move targets success", {
+                    sourceIds: [...sourceIds],
+                });
                 await refresh();
-            } catch {
+            } catch (error) {
+                console.log(
+                    "[drag-debug] TargetList move targets failed",
+                    error,
+                );
                 message.error(t("target_move_failed"));
                 await refresh();
             }
