@@ -223,7 +223,6 @@ export default function TargetList({ tab }: { tab: ITab }) {
             const sourceIds = new Set(sourceRows.map((row) => row.id));
 
             if (sourceDirectoryRows.length > 0) {
-                if (!target) return;
                 const rootRows = buildTargetTree(dataSource);
                 const sourceRootRows = rootRows.filter((row) =>
                     sourceDirectoryKeys.has(
@@ -232,26 +231,27 @@ export default function TargetList({ tab }: { tab: ITab }) {
                             : "",
                     ),
                 );
-                const targetKey = rootGroupKey(target);
-                if (
-                    !target.isDirectory ||
-                    sourceDirectoryKeys.has(targetKey) ||
-                    sourceRootRows.length === 0
-                ) {
+                if (sourceRootRows.length === 0) {
                     return;
                 }
                 const remainingRootRows = rootRows.filter(
                     (row) => !sourceRootRows.includes(row),
                 );
-                const targetIndex = remainingRootRows.findIndex(
-                    (row) => rootGroupKey(row) === targetKey,
-                );
-                if (targetIndex < 0) return;
-                remainingRootRows.splice(
-                    targetIndex + (dropPosition === "after" ? 1 : 0),
-                    0,
-                    ...sourceRootRows,
-                );
+                if (target) {
+                    const targetKey = rootGroupKey(target);
+                    if (sourceDirectoryKeys.has(targetKey)) return;
+                    const targetIndex = remainingRootRows.findIndex(
+                        (row) => rootGroupKey(row) === targetKey,
+                    );
+                    if (targetIndex < 0) return;
+                    remainingRootRows.splice(
+                        targetIndex + (dropPosition === "after" ? 1 : 0),
+                        0,
+                        ...sourceRootRows,
+                    );
+                } else {
+                    remainingRootRows.push(...sourceRootRows);
+                }
                 const orderedIds = remainingRootRows.flatMap((row) =>
                     row.isDirectory
                         ? sortTargets(row.children ?? []).map(
@@ -550,7 +550,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     getRowId={getTargetRowId}
                     getSubRows={getTargetSubRows}
                     canDropRow={() => true}
-                    showDropIndicator={(row) => !row.isDirectory}
+                    showDropIndicator={() => true}
                     defaultExpanded
                     draggable
                     expandIcon={TargetTreeExpandIcon}
