@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - name: macOS-Apple-Silicon
-            os: macos-14
+            os: macos-15
           - name: Windows
             os: windows-latest
           - name: Linux
