@@ -21,6 +21,8 @@ pub struct PreferenceSettings {
     pub terminal_right_click_paste_enabled: bool,
     #[serde(default = "default_enabled")]
     pub terminal_middle_click_paste_enabled: bool,
+    #[serde(default = "default_target_double_click_action")]
+    pub target_double_click_action: String,
     #[serde(default)]
     pub terminal_themes: TerminalThemes,
     pub language: String,
@@ -36,6 +38,7 @@ impl Default for PreferenceSettings {
             terminal_selection_copy_enabled: true,
             terminal_right_click_paste_enabled: true,
             terminal_middle_click_paste_enabled: true,
+            target_double_click_action: default_target_double_click_action(),
             terminal_themes: TerminalThemes::default(),
             language: "zh".to_string(),
             last_local_directory: None,
@@ -93,6 +96,10 @@ fn default_terminal_light_theme() -> TerminalTheme {
 
 fn default_enabled() -> bool {
     true
+}
+
+fn default_target_double_click_action() -> String {
+    "ssh".to_string()
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, ToSchema)]

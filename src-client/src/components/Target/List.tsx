@@ -154,6 +154,9 @@ const TargetTreeExpandIcon = (
 export default function TargetList({ tab }: { tab: ITab }) {
     const { t } = useTranslation();
     const setTabPath = useAppStore((state) => state.setTabPath);
+    const targetDoubleClickAction = useAppStore(
+        (state) => state.targetDoubleClickAction,
+    );
     const [editorOpen, setEditorOpen] = useState(false);
     const [editorData, setEditorData] = useState<ITarget>();
     const [dataSource, setDataSource] = useState<ITarget[]>([]);
@@ -430,6 +433,19 @@ export default function TargetList({ tab }: { tab: ITab }) {
         [dataSource],
     );
 
+    const openTarget = useCallback(
+        (target: ITarget, action: "ssh" | "sftp") => {
+            setTabPath(
+                tab.key,
+                action === "sftp"
+                    ? `/filesview/${target.id}`
+                    : `/terminal/${target.id}`,
+                getTargetName(target),
+            );
+        },
+        [setTabPath, tab.key],
+    );
+
     const columns: DataTableColumn<TargetTreeRow>[] = useMemo(
         () => [
             {
@@ -458,11 +474,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                                     icon={<CodeOutlined />}
                                     type="text"
                                     onClick={() => {
-                                        setTabPath(
-                                            tab.key,
-                                            `/terminal/${record.id}`,
-                                            `${getTargetName(record)}`,
-                                        );
+                                        openTarget(record, "ssh");
                                     }}
                                 />
                             </Tooltip>
@@ -472,11 +484,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                                     icon={<FolderOutlined />}
                                     type="text"
                                     onClick={() => {
-                                        setTabPath(
-                                            tab.key,
-                                            `/filesview/${record.id}`,
-                                            `${getTargetName(record)}`,
-                                        );
+                                        openTarget(record, "sftp");
                                     }}
                                 />
                             </Tooltip>
@@ -515,7 +523,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     ),
             },
         ],
-        [refresh, setTabPath, t, tab.key],
+        [openTarget, refresh, t],
     );
 
     useEffect(() => {
@@ -599,6 +607,18 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     data={treeDataSource}
                     getRowId={getTargetRowId}
                     getSubRows={getTargetSubRows}
+                    onRowDoubleClick={(record, event) => {
+                        if (
+                            record.isDirectory ||
+                            (event.target instanceof Element &&
+                                event.target.closest(
+                                    "button, a, input, textarea, select",
+                                ))
+                        ) {
+                            return;
+                        }
+                        openTarget(record, targetDoubleClickAction);
+                    }}
                     canDropRow={() => true}
                     showDropIndicator={() => true}
                     defaultExpanded

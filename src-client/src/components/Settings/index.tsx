@@ -1,4 +1,5 @@
 import {
+    AimOutlined,
     CodeOutlined,
     DatabaseOutlined,
     DownloadOutlined,
@@ -35,7 +36,11 @@ import {
     importUserData,
     importUserDataFromUrl,
 } from "@/services/userData";
-import useAppStore, { type ResolvedTheme, type ThemeMode } from "@/store";
+import useAppStore, {
+    type ResolvedTheme,
+    type TargetDoubleClickAction,
+    type ThemeMode,
+} from "@/store";
 
 import { terminalThemeDefaults } from "../Terminal/constants";
 
@@ -70,6 +75,8 @@ export default function Settings() {
         setTerminalRightClickAction,
         terminalMiddleClickPasteEnabled,
         setTerminalMiddleClickPasteEnabled,
+        targetDoubleClickAction,
+        setTargetDoubleClickAction,
         terminalThemes,
         setTerminalThemeColor,
         language,
@@ -141,6 +148,7 @@ export default function Settings() {
                         terminalRightClickAction === "paste",
                     terminal_middle_click_paste_enabled:
                         terminalMiddleClickPasteEnabled,
+                    target_double_click_action: targetDoubleClickAction,
                     terminal_themes: terminalThemes,
                     language,
                 },
@@ -190,6 +198,10 @@ export default function Settings() {
         );
         setTerminalMiddleClickPasteEnabled(
             result.settings.terminal_middle_click_paste_enabled,
+        );
+        setTargetDoubleClickAction(
+            result.settings
+                .target_double_click_action as TargetDoubleClickAction,
         );
         for (const mode of ["light", "dark"] as const) {
             for (const { key } of terminalThemeColorFields) {
@@ -481,6 +493,47 @@ export default function Settings() {
                         {renderTerminalTheme("light")}
                         {renderTerminalTheme("dark")}
                     </div>
+                </div>
+            </section>
+
+            <section className="WebSSH-Settings-Section">
+                <div className="WebSSH-Settings-SectionHeading">
+                    <div className="WebSSH-Settings-SectionIcon">
+                        <AimOutlined />
+                    </div>
+                    <div>
+                        <Title level={4}>{t("settings_targets")}</Title>
+                        <Text type="secondary">
+                            {t("settings_targets_description")}
+                        </Text>
+                    </div>
+                </div>
+
+                <div className="WebSSH-Settings-Row">
+                    <div className="WebSSH-Settings-RowText">
+                        <Text strong>{t("settings_target_double_click")}</Text>
+                        <Text type="secondary">
+                            {t("settings_target_double_click_help")}
+                        </Text>
+                    </div>
+                    <Segmented
+                        value={targetDoubleClickAction}
+                        options={[
+                            {
+                                value: "ssh",
+                                label: t("settings_target_double_click_ssh"),
+                            },
+                            {
+                                value: "sftp",
+                                label: t("settings_target_double_click_sftp"),
+                            },
+                        ]}
+                        onChange={(value) =>
+                            setTargetDoubleClickAction(
+                                value as TargetDoubleClickAction,
+                            )
+                        }
+                    />
                 </div>
             </section>
 

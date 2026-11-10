@@ -19,6 +19,7 @@ export type ITabState = Record<string, unknown>;
 export type ThemeMode = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 export type Language = "zh" | "en";
+export type TargetDoubleClickAction = "ssh" | "sftp";
 
 export interface ITab<T = ITabState>
     extends Omit<TabPaneProps, "tab" | "children" | "closeIcon" | "icon"> {
@@ -45,6 +46,8 @@ type AppStore = {
     setTerminalRightClickAction: (action: TerminalRightClickAction) => void;
     terminalMiddleClickPasteEnabled: boolean;
     setTerminalMiddleClickPasteEnabled: (enabled: boolean) => void;
+    targetDoubleClickAction: TargetDoubleClickAction;
+    setTargetDoubleClickAction: (action: TargetDoubleClickAction) => void;
     terminalThemes: Record<ResolvedTheme, TerminalThemeColors>;
     setTerminalThemeColor: (
         theme: ResolvedTheme,
@@ -187,6 +190,10 @@ function getInitialTerminalMiddleClickPasteEnabled() {
     return getStoredTerminalClipboardSettings().middleClickPasteEnabled ?? true;
 }
 
+function getInitialTargetDoubleClickAction(): TargetDoubleClickAction {
+    return "ssh";
+}
+
 function parseTerminalThemes(
     value: unknown,
 ): Record<ResolvedTheme, TerminalThemeColors> | undefined {
@@ -291,6 +298,10 @@ const useAppStore = create<AppStore>((set) => {
                 middleClickPasteEnabled: enabled,
             });
             set({ terminalMiddleClickPasteEnabled: enabled });
+        },
+        targetDoubleClickAction: getInitialTargetDoubleClickAction(),
+        setTargetDoubleClickAction: (action: TargetDoubleClickAction) => {
+            set({ targetDoubleClickAction: action });
         },
         terminalThemes: {
             dark: { ...terminalThemeDefaults.dark },
@@ -505,6 +516,7 @@ const useAppStore = create<AppStore>((set) => {
                         terminal_selection_copy_enabled?: boolean;
                         terminal_right_click_paste_enabled?: boolean;
                         terminal_middle_click_paste_enabled?: boolean;
+                        target_double_click_action?: string;
                         terminal_themes?: unknown;
                         language?: string;
                         last_local_directory?: string | null;
@@ -567,6 +579,13 @@ const useAppStore = create<AppStore>((set) => {
                                   settings.terminal_middle_click_paste_enabled,
                           }
                         : {}),
+                    ...(settings?.target_double_click_action === "ssh" ||
+                    settings?.target_double_click_action === "sftp"
+                        ? {
+                              targetDoubleClickAction:
+                                  settings.target_double_click_action,
+                          }
+                        : {}),
                     ...(terminalThemes ? { terminalThemes } : {}),
                     ...(language === "zh" || language === "en"
                         ? { language }
@@ -625,6 +644,8 @@ useAppStore.subscribe((state, previousState) => {
             previousState.terminalRightClickAction &&
         state.terminalMiddleClickPasteEnabled ===
             previousState.terminalMiddleClickPasteEnabled &&
+        state.targetDoubleClickAction ===
+            previousState.targetDoubleClickAction &&
         state.terminalThemes === previousState.terminalThemes &&
         state.language === previousState.language &&
         state.lastLocalDirectory === previousState.lastLocalDirectory
@@ -658,6 +679,7 @@ useAppStore.subscribe((state, previousState) => {
                         current.terminalRightClickAction === "paste",
                     terminal_middle_click_paste_enabled:
                         current.terminalMiddleClickPasteEnabled,
+                    target_double_click_action: current.targetDoubleClickAction,
                     terminal_themes: serializeTerminalThemes(
                         current.terminalThemes,
                     ),

@@ -17,6 +17,7 @@ export interface UserDataSettings {
     terminal_selection_copy_enabled: boolean;
     terminal_right_click_paste_enabled: boolean;
     terminal_middle_click_paste_enabled: boolean;
+    target_double_click_action: "ssh" | "sftp";
     terminal_themes: UserDataTerminalThemes;
     language: string;
 }
@@ -36,6 +37,7 @@ function readSettings(value: unknown): UserDataSettings {
             terminal_selection_copy_enabled: true,
             terminal_right_click_paste_enabled: true,
             terminal_middle_click_paste_enabled: true,
+            target_double_click_action: "ssh",
             terminal_themes: {
                 dark: { ...terminalThemeDefaults.dark },
                 light: { ...terminalThemeDefaults.light },
@@ -56,6 +58,7 @@ function readSettings(value: unknown): UserDataSettings {
             terminal_selection_copy_enabled: true,
             terminal_right_click_paste_enabled: true,
             terminal_middle_click_paste_enabled: true,
+            target_double_click_action: "ssh",
             terminal_themes: {
                 dark: { ...terminalThemeDefaults.dark },
                 light: { ...terminalThemeDefaults.light },
@@ -86,6 +89,8 @@ function readSettings(value: unknown): UserDataSettings {
             typeof settings.terminal_middle_click_paste_enabled === "boolean"
                 ? settings.terminal_middle_click_paste_enabled
                 : true,
+        target_double_click_action:
+            settings.target_double_click_action === "sftp" ? "sftp" : "ssh",
         terminal_themes: terminalThemes,
         language:
             settings.language === "en" || settings.language === "zh"
