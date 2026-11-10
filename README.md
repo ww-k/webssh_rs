@@ -141,7 +141,7 @@ cargo run --manifest-path src-server/Cargo.toml
 - `/api/target`：SSH 目标配置
 - `/api/favorite_directory`：收藏目录
 - `/api/transfer`：上传、下载和传输任务
-- `/api/preferences`：用户偏好设置
+- `/api/app_state`：应用状态
 
 启动后端后，可以访问：
 

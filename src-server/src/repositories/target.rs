@@ -3,7 +3,10 @@ use sea_orm::{
     EntityTrait, QueryFilter, QueryOrder, TransactionTrait,
 };
 
-use crate::entities::{favorite_directory, favorite_directory_initialization, target};
+use crate::{
+    entities::{favorite_directory, preference, target},
+    repositories::favorite_directory::INITIALIZED_KEY_PREFIX,
+};
 
 pub async fn list(db: &DatabaseConnection) -> Result<Vec<target::Model>, DbErr> {
     target::Entity::find()
@@ -59,7 +62,7 @@ pub async fn delete_with_favorite_directories(
             .filter(favorite_directory::Column::TargetId.eq(id))
             .exec(&transaction)
             .await?;
-        favorite_directory_initialization::Entity::delete_by_id(id)
+        preference::Entity::delete_by_id(format!("{INITIALIZED_KEY_PREFIX}{id}"))
             .exec(&transaction)
             .await?;
     }

@@ -3,7 +3,13 @@ use sea_orm::{
     EntityTrait, QueryFilter, QueryOrder, TransactionTrait, TryInsertResult, sea_query::OnConflict,
 };
 
-use crate::entities::{favorite_directory, favorite_directory_initialization};
+use crate::entities::{favorite_directory, preference};
+
+pub(crate) const INITIALIZED_KEY_PREFIX: &str = "favorite_directory.initialized.";
+
+fn initialized_key(target_id: i32) -> String {
+    format!("{INITIALIZED_KEY_PREFIX}{target_id}")
+}
 
 pub async fn list_by_target(
     db: &DatabaseConnection,
@@ -74,12 +80,10 @@ pub async fn is_initialized<C>(db: &C, target_id: i32) -> Result<bool, DbErr>
 where
     C: ConnectionTrait,
 {
-    Ok(
-        favorite_directory_initialization::Entity::find_by_id(target_id)
-            .one(db)
-            .await?
-            .is_some(),
-    )
+    Ok(preference::Entity::find_by_id(initialized_key(target_id))
+        .one(db)
+        .await?
+        .is_some())
 }
 
 pub async fn initialize_defaults(
@@ -89,13 +93,13 @@ pub async fn initialize_defaults(
     defaults: Vec<favorite_directory::ActiveModel>,
 ) -> Result<bool, DbErr> {
     let transaction = db.begin().await?;
-    let marker = favorite_directory_initialization::ActiveModel {
-        target_id: Set(target_id),
-        initialized_at: Set(initialized_at),
+    let marker = preference::ActiveModel {
+        key: Set(initialized_key(target_id)),
+        value: Set(initialized_at.to_string()),
     };
-    let marker_result = favorite_directory_initialization::Entity::insert(marker)
+    let marker_result = preference::Entity::insert(marker)
         .on_conflict(
-            OnConflict::column(favorite_directory_initialization::Column::TargetId)
+            OnConflict::column(preference::Column::Key)
                 .do_nothing()
                 .to_owned(),
         )

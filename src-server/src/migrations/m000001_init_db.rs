@@ -193,7 +193,7 @@ enum FavoriteDirectoryInitialization {
 #[cfg(test)]
 mod tests {
     use crate::{
-        entities::{favorite_directory, favorite_directory_initialization, ssh_known_host},
+        entities::{favorite_directory, ssh_known_host},
         migrations::Migrator,
     };
     use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database};
@@ -248,18 +248,5 @@ mod tests {
 
         favorite_directory.clone().insert(&db).await.unwrap();
         assert!(favorite_directory.insert(&db).await.is_err());
-    }
-
-    #[tokio::test]
-    async fn init_db_enforces_one_favorite_directory_initialization_per_target() {
-        let db = Database::connect("sqlite::memory:").await.unwrap();
-        Migrator::up(&db, None).await.unwrap();
-
-        let initialization = favorite_directory_initialization::ActiveModel {
-            target_id: Set(0),
-            initialized_at: Set(1),
-        };
-        initialization.clone().insert(&db).await.unwrap();
-        assert!(initialization.insert(&db).await.is_err());
     }
 }

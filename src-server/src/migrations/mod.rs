@@ -8,6 +8,7 @@ mod m000005_ssh_known_host_endpoint;
 mod m000006_transfer_batches;
 mod m000007_target_directory;
 mod m000008_target_sort_order;
+mod m000009_preference_tabs;
 
 pub struct Migrator;
 
@@ -23,6 +24,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000006_transfer_batches::Migration),
             Box::new(m000007_target_directory::Migration),
             Box::new(m000008_target_sort_order::Migration),
+            Box::new(m000009_preference_tabs::Migration),
         ]
     }
 }
@@ -68,8 +70,8 @@ mod tests {
                     "ssh_known_host",
                     "transfer_task",
                     "favorite_directory",
-                    "favorite_directory_initialization",
-                    "preference"
+                    "tabs",
+                    "app_state"
                 ],
                 "Unexpected tables: {:?}",
                 rows

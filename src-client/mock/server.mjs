@@ -106,7 +106,7 @@ async function route(request, response) {
     if (pathname === "/api/logs") {
         return handleLogs(request, response);
     }
-    if (pathname === "/api/preferences") {
+    if (pathname === "/api/app_state") {
         return handlePreferences(request, response);
     }
     if (pathname.startsWith("/api/ssh_known_host/")) {

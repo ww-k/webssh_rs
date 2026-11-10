@@ -10,8 +10,8 @@ use axum::{Router, routing::get};
 pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route(
-            "/api/preferences",
-            get(handlers::get_preferences).put(handlers::put_preferences),
+            "/api/app_state",
+            get(handlers::get_app_state).put(handlers::put_app_state),
         )
         .with_state(app_state)
 }

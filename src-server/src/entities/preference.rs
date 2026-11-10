@@ -1,10 +1,10 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "preference")]
+#[sea_orm(table_name = "app_state")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub key: String,
     pub value: String,
 }
 

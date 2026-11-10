@@ -27,7 +27,32 @@ export interface ITab<T = ITabState>
     label: string;
     path: string;
     state?: T;
+    parentKey?: string | null;
+    splitDirection?: "horizontal" | "vertical" | null;
+    splitRatio?: number | null;
+    position?: number;
 }
+
+type TabLayoutNode = {
+    key: string;
+    label?: string | null;
+    path?: string | null;
+    state?: ITabState;
+    parentKey?: string | null;
+    splitDirection?: "horizontal" | "vertical" | null;
+    splitRatio?: number | null;
+    position?: number;
+};
+
+type PreferenceTabResponse = Omit<
+    TabLayoutNode,
+    "parentKey" | "splitDirection" | "splitRatio"
+> & {
+    parent_key?: string | null;
+    split_direction?: "horizontal" | "vertical" | null;
+    split_ratio?: number | null;
+    position?: number;
+};
 
 type AppStore = {
     theme: ResolvedTheme;
@@ -66,6 +91,7 @@ type AppStore = {
 
     activeTabKey: string;
     tabs: ITab[];
+    tabNodes: TabLayoutNode[];
     setActiveTabKey: (key: string) => void;
     addTab: () => string;
     removeTab: (key: string) => void;
@@ -88,15 +114,17 @@ type AppStore = {
 
 function getInitialTabs() {
     const firstTabKey = nanoid();
+    const tabs = [
+        {
+            key: firstTabKey,
+            label: i18n.t("app_tab_new"),
+            path: "/",
+        },
+    ];
     const fallback = {
         activeTabKey: firstTabKey,
-        tabs: [
-            {
-                key: firstTabKey,
-                label: i18n.t("app_tab_new"),
-                path: "/",
-            },
-        ],
+        tabs,
+        tabNodes: tabs,
     };
 
     return fallback;
@@ -508,7 +536,7 @@ const useAppStore = create<AppStore>((set) => {
             try {
                 const response = await axios.get<{
                     active_tab_key: string;
-                    tabs: ITab[];
+                    tabs: PreferenceTabResponse[];
                     settings?: {
                         theme_mode?: string;
                         sidebar_collapsed?: boolean;
@@ -521,7 +549,7 @@ const useAppStore = create<AppStore>((set) => {
                         language?: string;
                         last_local_directory?: string | null;
                     };
-                } | null>("/api/preferences");
+                } | null>("/api/app_state");
                 const saved = response.data;
                 const settings = saved?.settings;
                 const storedTerminalSettings =
@@ -600,13 +628,35 @@ const useAppStore = create<AppStore>((set) => {
                     await i18n.changeLanguage(language);
                 }
                 if (saved?.tabs?.length) {
-                    const tabs = saved.tabs.filter(
-                        (tab) =>
-                            typeof tab.key === "string" &&
-                            typeof tab.label === "string" &&
-                            typeof tab.path === "string" &&
-                            tab.path.startsWith("/"),
-                    );
+                    const tabNodes = saved.tabs.map((tab) => ({
+                        key: tab.key,
+                        label: tab.label,
+                        path: tab.path,
+                        ...(tab.state ? { state: tab.state } : {}),
+                        parentKey: tab.parent_key,
+                        splitDirection: tab.split_direction,
+                        splitRatio: tab.split_ratio,
+                        position: tab.position,
+                    }));
+                    const tabs = tabNodes
+                        .filter(
+                            (tab) =>
+                                typeof tab.key === "string" &&
+                                typeof tab.label === "string" &&
+                                typeof tab.path === "string" &&
+                                tab.path.startsWith("/"),
+                        )
+                        .map((tab) => ({
+                            key: tab.key,
+                            label: tab.label as string,
+                            path: tab.path as string,
+                            ...(tab.state ? { state: tab.state } : {}),
+                            parentKey: tab.parentKey,
+                            splitDirection: tab.splitDirection,
+                            splitRatio: tab.splitRatio,
+                            position: tab.position,
+                        }));
+                    set({ tabNodes });
                     if (tabs.length) {
                         set({
                             tabs,
@@ -633,6 +683,7 @@ const useAppStore = create<AppStore>((set) => {
 useAppStore.subscribe((state, previousState) => {
     if (
         state.tabs === previousState.tabs &&
+        state.tabNodes === previousState.tabNodes &&
         state.activeTabKey === previousState.activeTabKey &&
         state.themeMode === previousState.themeMode &&
         state.sidebarCollapsed === previousState.sidebarCollapsed &&
@@ -657,14 +708,45 @@ useAppStore.subscribe((state, previousState) => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
         const current = useAppStore.getState();
+        const currentTabs = new Map(current.tabs.map((tab) => [tab.key, tab]));
+        const savedKeys = new Set<string>();
+        const tabNodes = current.tabNodes
+            .filter((node) => node.splitDirection || currentTabs.has(node.key))
+            .map((node) => {
+                const tab = currentTabs.get(node.key);
+                savedKeys.add(node.key);
+                return tab ? { ...node, ...tab } : node;
+            });
+        for (const tab of current.tabs) {
+            if (!savedKeys.has(tab.key)) tabNodes.push(tab);
+        }
         void axios
-            .put("/api/preferences", {
+            .put("/api/app_state", {
                 active_tab_key: current.activeTabKey,
-                tabs: current.tabs.map(
-                    ({ key, label, path, state: tabState }) => ({
+                tabs: tabNodes.map(
+                    ({
                         key,
                         label,
                         path,
+                        state: tabState,
+                        parentKey,
+                        splitDirection,
+                        splitRatio,
+                        position,
+                    }) => ({
+                        key,
+                        label,
+                        path,
+                        ...(parentKey !== undefined
+                            ? { parent_key: parentKey }
+                            : {}),
+                        ...(splitDirection !== undefined
+                            ? { split_direction: splitDirection }
+                            : {}),
+                        ...(splitRatio !== undefined
+                            ? { split_ratio: splitRatio }
+                            : {}),
+                        ...(position !== undefined ? { position } : {}),
                         ...(tabState ? { state: tabState } : {}),
                     }),
                 ),

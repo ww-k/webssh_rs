@@ -8,8 +8,8 @@ use utoipa::OpenApi;
         crate::apis::target::handlers::target_add,
         crate::apis::target::handlers::target_update,
         crate::apis::target::handlers::target_remove,
-        crate::apis::preferences::handlers::get_preferences,
-        crate::apis::preferences::handlers::put_preferences,
+        crate::apis::preferences::handlers::get_app_state,
+        crate::apis::preferences::handlers::put_app_state,
         crate::apis::favorite_directory::handlers::favorite_directory_list,
         crate::apis::favorite_directory::handlers::favorite_directory_initialize,
         crate::apis::favorite_directory::handlers::favorite_directory_add,
@@ -91,6 +91,7 @@ use utoipa::OpenApi;
     ),
     tags(
         (name = "user_data", description = "User data import/export API"),
+        (name = "app_state", description = "Application state API"),
         (name = "target", description = "SSH 目标管理 API"),
         (name = "favorite_directory", description = "收藏目录 API"),
         (name = "ssh_connection", description = "SSH 连接管理 API"),

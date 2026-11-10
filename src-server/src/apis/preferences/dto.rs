@@ -105,8 +105,16 @@ fn default_target_double_click_action() -> String {
 #[derive(Debug, Deserialize, Serialize, Clone, ToSchema)]
 pub struct PreferenceTab {
     pub key: String,
-    pub label: String,
-    pub path: String,
+    pub label: Option<String>,
+    pub path: Option<String>,
     #[schema(value_type = Object)]
     pub state: Option<Value>,
+    #[serde(default)]
+    pub parent_key: Option<String>,
+    #[serde(default)]
+    pub split_direction: Option<String>,
+    #[serde(default)]
+    pub split_ratio: Option<f64>,
+    #[serde(default)]
+    pub position: Option<i32>,
 }
