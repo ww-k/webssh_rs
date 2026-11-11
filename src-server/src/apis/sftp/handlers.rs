@@ -1,4 +1,8 @@
-use std::{io::SeekFrom, pin::pin, sync::Arc};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    pin::pin,
+    sync::Arc,
+};
 
 use axum::{
     Json,
@@ -27,14 +31,104 @@ use crate::{
     },
     consts::services_err_code::*,
     map_db_err, map_ssh_err,
-    sftp_client::{SftpAttrs, SftpFileType, SftpOpenOptions},
+    sftp_client::{
+        SftpClientGuard, SftpFileType,
+        transfer::{
+            DEFAULT_PIPELINE_CHUNK_SIZE, DEFAULT_READ_MAX_IN_FLIGHT,
+            DEFAULT_READ_PIPELINE_CHUNK_SIZE, DEFAULT_WRITE_MAX_IN_FLIGHT,
+            DEFAULT_WRITE_RESPONSE_TIMEOUT,
+        },
+    },
     ssh_connection_pool::ChannelMode,
 };
 
 use super::service::{discover_user_dirs, get_file_name, parse_file_uri, resolve_user_dir_home};
 
 const WINDOWS: &str = "windows";
-const CHUNK_SIZE: usize = 8192;
+
+struct DownloadHandleGuard {
+    client: Option<SftpClientGuard>,
+    handle: Arc<[u8]>,
+}
+
+impl DownloadHandleGuard {
+    fn new(client: SftpClientGuard, handle: Arc<[u8]>) -> Self {
+        Self {
+            client: Some(client),
+            handle,
+        }
+    }
+
+    fn client(&self) -> &SftpClientGuard {
+        self.client
+            .as_ref()
+            .expect("download handle guard is empty")
+    }
+
+    async fn shutdown(mut self) {
+        let Some(client) = self.client.take() else {
+            return;
+        };
+        let sftp = std::ops::Deref::deref(&client).clone();
+        let _ = sftp.close(self.handle.to_vec()).await;
+        client.shutdown().await;
+    }
+}
+
+impl Drop for DownloadHandleGuard {
+    fn drop(&mut self) {
+        let Some(client) = self.client.take() else {
+            return;
+        };
+        let sftp = std::ops::Deref::deref(&client).clone();
+        let handle = Arc::clone(&self.handle);
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.spawn(async move {
+                let _ = sftp.close(handle.to_vec()).await;
+                client.shutdown().await;
+            });
+        }
+    }
+}
+
+struct UploadHandleGuard {
+    client: Option<SftpClientGuard>,
+    handle: Arc<[u8]>,
+}
+
+impl UploadHandleGuard {
+    fn new(client: SftpClientGuard, handle: Vec<u8>) -> Self {
+        Self {
+            client: Some(client),
+            handle: Arc::from(handle),
+        }
+    }
+
+    fn client(&self) -> &SftpClientGuard {
+        self.client.as_ref().expect("upload handle guard is empty")
+    }
+
+    async fn close(mut self) -> Result<(), crate::sftp_client::SftpError> {
+        let client = self.client.take().expect("upload handle guard is empty");
+        client.close(self.handle.to_vec()).await
+    }
+}
+
+impl Drop for UploadHandleGuard {
+    fn drop(&mut self) {
+        let Some(client) = self.client.take() else {
+            return;
+        };
+        let sftp = std::ops::Deref::deref(&client).clone();
+        let handle = Arc::clone(&self.handle);
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.spawn(async move {
+                let _ = sftp.close(handle.to_vec()).await;
+                drop(client);
+            });
+        }
+    }
+}
 
 #[utoipa::path(
     get,
@@ -491,48 +585,83 @@ pub async fn upload(
             .await
     )?;
 
-    let mut file = map_ssh_err!(
-        sftp.open_with_flags(
-            uri.path,
-            SftpOpenOptions::WRITE | SftpOpenOptions::READ | SftpOpenOptions::CREATE
-        )
-        .await
-    )?;
-
+    let handle = map_ssh_err!(sftp.open_upload_range(uri.path).await)?;
+    let handle_guard = UploadHandleGuard::new(sftp, handle);
+    let sftp = handle_guard.client();
     map_ssh_err!(
-        file.set_metadata(SftpAttrs::with_size(file_size as u64))
+        sftp.set_size(handle_guard.handle.as_ref(), file_size as u64)
             .await
     )?;
-
-    if start > 0 {
-        map_ssh_err!(file.seek(SeekFrom::Start(start as u64)).await)?;
-    }
 
     let mut hasher = Sha256::new();
     let mut total_written = 0usize;
 
     let body_stream = body.into_data_stream().map_err(std::io::Error::other);
     let mut body_reader = pin!(StreamReader::new(body_stream));
+    let mut buffer = vec![0; DEFAULT_PIPELINE_CHUNK_SIZE];
+    let mut pending = VecDeque::with_capacity(DEFAULT_WRITE_MAX_IN_FLIGHT);
+    let mut eof = false;
+    while total_written < range_len && !eof {
+        let chunk_len = std::cmp::min(buffer.len(), range_len - total_written);
+        let mut filled = 0;
+        while filled < chunk_len {
+            let bytes_read = map_ssh_err!(
+                AsyncReadExt::read(&mut body_reader, &mut buffer[filled..chunk_len]).await
+            )?;
+            if bytes_read == 0 {
+                eof = true;
+                break;
+            }
+            filled += bytes_read;
+        }
 
-    let mut buffer = vec![0; CHUNK_SIZE];
-    loop {
-        let bytes_read = map_ssh_err!(AsyncReadExt::read(&mut body_reader, &mut buffer).await)?;
-
-        if bytes_read == 0 {
+        if filled == 0 {
             break;
         }
 
-        if total_written + bytes_read > range_len {
+        hasher.update(&buffer[..filled]);
+        let data: Box<[u8]> = buffer[..filled].into();
+        let write = map_ssh_err!(
+            sftp.begin_write(
+                Arc::clone(&handle_guard.handle),
+                (start + total_written) as u64,
+                data
+            )
+            .await
+        )?;
+        pending.push_back(write);
+        total_written += filled;
+
+        if pending.len() >= DEFAULT_WRITE_MAX_IN_FLIGHT {
+            let write = pending.pop_front().expect("pending write queue is full");
+            let result = tokio::time::timeout(DEFAULT_WRITE_RESPONSE_TIMEOUT, write.wait())
+                .await
+                .map_err(|err| ApiErr {
+                    code: ERR_CODE_SSH_ERR,
+                    message: err.to_string(),
+                })?;
+            map_ssh_err!(result)?;
+        }
+    }
+
+    if total_written == range_len {
+        let mut extra_byte = [0; 1];
+        if map_ssh_err!(AsyncReadExt::read(&mut body_reader, &mut extra_byte).await)? > 0 {
             return Err(ApiErr {
                 code: ERR_CODE_SFTP_UPLOAD_INVALID_REQUEST,
                 message: "body length exceeds expected range length".to_string(),
             });
         }
+    }
 
-        let chunk = &buffer[0..bytes_read];
-        map_ssh_err!(file.write_all(chunk).await)?;
-        hasher.update(chunk);
-        total_written += bytes_read;
+    while let Some(write) = pending.pop_front() {
+        let result = tokio::time::timeout(DEFAULT_WRITE_RESPONSE_TIMEOUT, write.wait())
+            .await
+            .map_err(|err| ApiErr {
+                code: ERR_CODE_SSH_ERR,
+                message: err.to_string(),
+            })?;
+        map_ssh_err!(result)?;
     }
 
     if total_written != range_len {
@@ -545,7 +674,7 @@ pub async fn upload(
         });
     }
 
-    map_ssh_err!(file.flush().await)?;
+    map_ssh_err!(handle_guard.close().await)?;
 
     let hash = hasher.finalize();
     let hex_hash = hex::encode(hash);
@@ -659,34 +788,144 @@ pub async fn download(
         is_partial_content = false;
     }
 
-    let mut file = map_ssh_err!(sftp.open(uri.path).await)?;
-
-    if start > 0 {
-        map_ssh_err!(file.seek(SeekFrom::Start(start as u64)).await)?;
-        debug!("@sftp_download file seek {}", start);
-    }
+    let handle = map_ssh_err!(sftp.open_read_handle(uri.path).await)?;
+    let handle: Arc<[u8]> = Arc::from(handle);
+    let range_end = (start + range_len - 1) as u64;
 
     let stream = async_stream::stream! {
-        // Keep the SFTP session alive until the response body is consumed or dropped.
-        let sftp_guard = sftp;
-        let mut remaining = range_len;
-        while remaining > 0 {
-            let chunk_size = std::cmp::min(CHUNK_SIZE, remaining);
-            let mut buffer = vec![0; chunk_size];
+        // Keep the SFTP handle alive until the response body is consumed or dropped.
+        let handle_guard = DownloadHandleGuard::new(sftp, Arc::clone(&handle));
+        let sftp = handle_guard.client();
+        let mut read_stream = sftp.read_stream();
+        let mut pending_responses: BTreeMap<u64, (u64, Vec<u8>)> = BTreeMap::new();
+        let mut request_ends = BTreeMap::new();
+        let mut retry_requests = VecDeque::new();
+        let mut read_requests = Vec::with_capacity(DEFAULT_READ_MAX_IN_FLIGHT);
+        let mut next_offset = start as u64;
+        let mut contiguous_done = start as u64;
+        let mut in_flight = 0usize;
 
-            match file.read_exact(&mut buffer).await {
-                Ok(_) => {
-                    yield Ok(Bytes::from(buffer));
-                    remaining -= chunk_size;
+        loop {
+            read_requests.clear();
+            while in_flight + pending_responses.len() + read_requests.len()
+                < DEFAULT_READ_MAX_IN_FLIGHT
+            {
+                let (offset, chunk_size) = if let Some(request) = retry_requests.pop_front() {
+                    request
+                } else if next_offset <= range_end {
+                    let offset = next_offset;
+                    let chunk_size = std::cmp::min(
+                        DEFAULT_READ_PIPELINE_CHUNK_SIZE as u64,
+                        range_end - next_offset + 1,
+                    ) as usize;
+                    next_offset += chunk_size as u64;
+                    (offset, chunk_size)
+                } else {
+                    break;
+                };
+                read_requests.push((offset, chunk_size));
+            }
+
+            match read_stream
+                .begin_reads(Arc::clone(&handle), &read_requests)
+                .await
+            {
+                Ok(started) => {
+                    in_flight += started;
+                    for &(offset, len) in read_requests.iter().take(started) {
+                        request_ends.insert(offset, offset + len as u64 - 1);
+                    }
                 }
-                Err(e) => {
-                    yield Err(axum::Error::new(e));
+                Err(err) => {
+                    yield Err(axum::Error::new(err));
                     break;
                 }
             }
+
+            if let Some((requested_end, data)) = pending_responses.remove(&contiguous_done) {
+                if data.is_empty() {
+                    yield Err(axum::Error::new(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        format!("sftp download reached eof before offset {}", range_end + 1),
+                    )));
+                    break;
+                }
+                let data_end = contiguous_done + data.len() as u64 - 1;
+                if data_end > requested_end {
+                    yield Err(axum::Error::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!(
+                            "sftp download read past request end: got {data_end}, expected {requested_end}"
+                        ),
+                    )));
+                    break;
+                }
+                yield Ok(Bytes::from(data));
+                contiguous_done = data_end + 1;
+                if data_end < requested_end {
+                    retry_requests.push_front((
+                        contiguous_done,
+                        (requested_end - data_end) as usize,
+                    ));
+                }
+                continue;
+            }
+
+            if in_flight == 0 {
+                break;
+            }
+
+            let (offset, data) = match read_stream.recv_data().await {
+                Ok(response) => response,
+                Err(err) => {
+                    yield Err(axum::Error::new(err));
+                    break;
+                }
+            };
+            in_flight -= 1;
+            let Some(requested_end) = request_ends.remove(&offset) else {
+                yield Err(axum::Error::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("missing sftp download request for response offset {offset}"),
+                )));
+                break;
+            };
+            let data = data.into_vec();
+            if offset == contiguous_done {
+                if data.is_empty() {
+                    yield Err(axum::Error::new(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        format!("sftp download reached eof before offset {}", range_end + 1),
+                    )));
+                    break;
+                }
+                let data_end = offset + data.len() as u64 - 1;
+                if data_end > requested_end {
+                    yield Err(axum::Error::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!(
+                            "sftp download read past request end: got {data_end}, expected {requested_end}"
+                        ),
+                    )));
+                    break;
+                }
+                yield Ok(Bytes::from(data));
+                contiguous_done = data_end + 1;
+                if data_end < requested_end {
+                    retry_requests.push_front((
+                        contiguous_done,
+                        (requested_end - data_end) as usize,
+                    ));
+                }
+            } else if pending_responses.insert(offset, (requested_end, data)).is_some() {
+                yield Err(axum::Error::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("duplicate sftp download response for offset {offset}"),
+                )));
+                break;
+            }
         }
-        drop(file);
-        sftp_guard.shutdown().await;
+        handle_guard.shutdown().await;
     };
 
     headers.insert(
