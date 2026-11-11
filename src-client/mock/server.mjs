@@ -591,6 +591,7 @@ function createTransferBatch(upload, payload) {
             created_at: now,
             updated_at: now,
             batch_id: id,
+            parent_id: null,
             conflict_policy: payload.conflict_policy || "OVERWRITE",
             all: Boolean(payload.all),
         };
@@ -673,6 +674,7 @@ function createTransferTask(upload, payload) {
         ranges: [],
         created_at: now,
         updated_at: now,
+        parent_id: null,
     };
 }
 

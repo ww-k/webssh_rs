@@ -65,6 +65,7 @@ pub struct TransferTaskResponse {
     pub updated_at: i64,
     pub ended_at: Option<i64>,
     pub batch_id: Option<String>,
+    pub parent_id: Option<String>,
     pub relative_path: Option<String>,
     pub conflict_policy: Option<TransferConflictPolicy>,
     pub all: bool,

@@ -313,6 +313,7 @@ impl IntoTransferResponse for TransferTaskModel {
             updated_at: self.updated_at,
             ended_at: self.ended_at,
             batch_id: self.batch_id,
+            parent_id: self.parent_id,
             relative_path: self.relative_path,
             conflict_policy: self.conflict_policy,
             all: self.all,

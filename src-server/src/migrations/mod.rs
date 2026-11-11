@@ -9,6 +9,7 @@ mod m000006_transfer_batches;
 mod m000007_target_directory;
 mod m000008_target_sort_order;
 mod m000009_preference_tabs;
+mod m000010_transfer_task_parent;
 
 pub struct Migrator;
 
@@ -25,6 +26,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000007_target_directory::Migration),
             Box::new(m000008_target_sort_order::Migration),
             Box::new(m000009_preference_tabs::Migration),
+            Box::new(m000010_transfer_task_parent::Migration),
         ]
     }
 }

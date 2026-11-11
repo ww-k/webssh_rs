@@ -33,6 +33,7 @@ export interface ITransferTask {
     updated_at: number;
     ended_at?: number;
     batch_id?: string;
+    parent_id?: string;
     relative_path?: string;
     conflict_policy?: ITransferConflictPolicy;
     all?: boolean;

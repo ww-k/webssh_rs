@@ -89,6 +89,7 @@ impl TransferService {
                     match child.kind {
                         ChildKind::Directory => models.push(directory_model(
                             batch_id,
+                            &task.id,
                             TransferTaskType::Upload,
                             child.path.into(),
                             format!("sftp:{}:{}", target.target_id, child_target),
@@ -106,6 +107,7 @@ impl TransferService {
                                 resolve_remote_conflict(&sftp, child_target, &policy).await?;
                             models.push(file_model(
                                 batch_id,
+                                &task.id,
                                 TransferTaskType::Upload,
                                 child.path,
                                 format!("sftp:{}:{}", target.target_id, path),
@@ -153,6 +155,7 @@ impl TransferService {
                     match attrs.file_type() {
                         SftpFileType::Dir => models.push(directory_model(
                             batch_id,
+                            &task.id,
                             TransferTaskType::Download,
                             local_root.join(&name),
                             format!("sftp:{}:{}", target.target_id, child_remote),
@@ -166,6 +169,7 @@ impl TransferService {
                                 resolve_local_conflict(local, &policy).await?;
                             models.push(file_model(
                                 batch_id,
+                                &task.id,
                                 TransferTaskType::Download,
                                 local,
                                 format!("sftp:{}:{}", target.target_id, child_remote),
@@ -271,6 +275,7 @@ async fn read_local_children(path: &str, all: bool) -> Result<Vec<Child>, ApiErr
 
 fn directory_model(
     batch_id: &str,
+    parent_id: &str,
     direction: TransferTaskType,
     local: PathBuf,
     target: String,
@@ -280,6 +285,7 @@ fn directory_model(
 ) -> ActiveModel {
     task_model(
         batch_id,
+        Some(parent_id),
         direction,
         TransferTaskKind::Directory,
         local.to_string_lossy().to_string(),
@@ -295,6 +301,7 @@ fn directory_model(
 
 fn file_model(
     batch_id: &str,
+    parent_id: &str,
     direction: TransferTaskType,
     local: String,
     target: String,
@@ -305,6 +312,7 @@ fn file_model(
 ) -> ActiveModel {
     task_model(
         batch_id,
+        Some(parent_id),
         direction,
         TransferTaskKind::File,
         local,
@@ -320,6 +328,7 @@ fn file_model(
 
 fn task_model(
     batch_id: &str,
+    parent_id: Option<&str>,
     direction: TransferTaskType,
     kind: TransferTaskKind,
     local: String,
@@ -362,6 +371,7 @@ fn task_model(
         updated_at: Set(now),
         ended_at: Set(ended.then_some(now)),
         batch_id: Set(Some(batch_id.to_string())),
+        parent_id: Set(parent_id.map(str::to_owned)),
         relative_path: Set(Some(relative)),
         conflict_policy: Set(conflict_policy),
         all: Set(all),
