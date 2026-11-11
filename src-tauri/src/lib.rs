@@ -1,9 +1,56 @@
-use std::{net::TcpStream, time::Duration};
+use std::{net::TcpStream, path::PathBuf, time::Duration};
 
-use tauri::{Manager, WindowEvent};
+use tauri::{AppHandle, Manager, WindowEvent};
 use tokio::sync::oneshot;
 
+const DEFAULT_SERVER_PORT: u16 = 10086;
+const SERVER_PORT_CONFIG_FILE: &str = "server-port";
+
 struct ServerShutdown(std::sync::Mutex<Option<oneshot::Sender<()>>>);
+
+fn server_port_config_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|path| path.join(SERVER_PORT_CONFIG_FILE))
+        .map_err(|error| format!("failed to resolve server port config path: {error}"))
+}
+
+fn parse_server_port(value: &str) -> Option<u16> {
+    value.parse::<u16>().ok().filter(|port| *port > 0)
+}
+
+fn server_port(app: &AppHandle) -> u16 {
+    server_port_config_path(app)
+        .ok()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|value| parse_server_port(value.trim()))
+        .or_else(|| {
+            std::env::var("WEBSSH_RS_SERVER_PORT")
+                .ok()
+                .and_then(|value| parse_server_port(value.as_str()))
+        })
+        .unwrap_or(DEFAULT_SERVER_PORT)
+}
+
+#[tauri::command]
+fn get_server_port(app: AppHandle) -> u16 {
+    server_port(&app)
+}
+
+#[tauri::command]
+fn set_server_port(app: AppHandle, port: u16) -> Result<(), String> {
+    if port == 0 {
+        return Err("server port must be between 1 and 65535".to_string());
+    }
+
+    let path = server_port_config_path(&app)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| format!("failed to create server port config directory: {error}"))?;
+    }
+    std::fs::write(path, port.to_string())
+        .map_err(|error| format!("failed to save server port: {error}"))
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -35,6 +82,7 @@ pub fn run() {
             let window = app
                 .get_webview_window("main")
                 .expect("main window is not configured");
+            let app_handle = app.handle().clone();
 
             tauri::async_runtime::spawn(async move {
                 let client_port = std::env::var("WEBSSH_RS_CLIENT_PORT")
@@ -42,10 +90,20 @@ pub fn run() {
                     .and_then(|value| value.parse::<u16>().ok())
                     .unwrap_or(3000);
 
-                let port = 0;
-                let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
+                let requested_port = server_port(&app_handle);
+                let listener = match tokio::net::TcpListener::bind(("127.0.0.1", requested_port))
                     .await
-                    .expect("failed to bind embedded server");
+                {
+                    Ok(listener) => listener,
+                    Err(error) => {
+                        eprintln!(
+                            "failed to bind embedded server on port {requested_port}: {error}; falling back to a dynamic port"
+                        );
+                        tokio::net::TcpListener::bind(("127.0.0.1", 0))
+                            .await
+                            .expect("failed to bind embedded server on a dynamic port")
+                    }
+                };
                 let address = listener
                     .local_addr()
                     .expect("failed to resolve embedded server address");
@@ -98,6 +156,7 @@ pub fn run() {
                 }
             }
         })
+        .invoke_handler(tauri::generate_handler![get_server_port, set_server_port])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -4,10 +4,12 @@ import { pluginReact } from "@rsbuild/plugin-react";
 import { mockMiddlewares } from "./mock/server.mjs";
 
 // fix ts typechecking errors
-declare const process: any;
+declare const process: {
+    env: Record<string, string | undefined>;
+};
 
 // 配置是否启用 mock 服务时
-const enableMock = false;
+const enableMock = process.env.WEBSSH_RS_MOCK === "true";
 const configuredServerPort = Number.parseInt(
     process.env.WEBSSH_RS_SERVER_PORT || "",
     10,
@@ -17,7 +19,7 @@ const serverPort =
     configuredServerPort > 0 &&
     configuredServerPort <= 65535
         ? configuredServerPort
-        : 8080;
+        : 10086;
 const serverOrigin = `http://127.0.0.1:${serverPort}`;
 const serverWebSocketOrigin = `ws://127.0.0.1:${serverPort}`;
 const configuredClientPort = Number.parseInt(

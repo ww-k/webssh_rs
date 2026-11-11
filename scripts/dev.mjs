@@ -13,8 +13,8 @@ const args = process.argv.slice(2);
 const modeArgument = args.find((argument) => argument.startsWith("--mode="));
 const mode = modeArgument?.slice("--mode=".length) || "desktop";
 
-if (!new Set(["browser", "desktop"]).has(mode)) {
-  console.error(`[dev] Unsupported mode: ${mode}. Use browser or desktop.`);
+if (!new Set(["browser", "desktop", "mock"]).has(mode)) {
+  console.error(`[dev] Unsupported mode: ${mode}. Use browser, desktop, or mock.`);
   process.exit(1);
 }
 
@@ -30,14 +30,18 @@ const clientPort =
     : "3000";
 const baseEnv = {
   ...process.env,
-  // Let the server choose an unused port. The actual port is read from its
-  // startup log before the frontend process is launched.
-  WEBSSH_RS_SERVER_PORT: "0",
   WEBSSH_RS_CLIENT_PORT: clientPort,
   FORCE_COLOR: "3", // 强制启用颜色
   COLOR: "1",
   NPM_CONFIG_COLOR: "always",
 };
+if (mode === "browser") {
+  // Browser development keeps the server on an automatically selected port.
+  baseEnv.WEBSSH_RS_SERVER_PORT = "0";
+}
+if (mode === "mock") {
+  baseEnv.WEBSSH_RS_MOCK = "true";
+}
 const isWin32 = process.platform === "win32";
 
 // 确保安装依赖
@@ -56,26 +60,28 @@ let isShuttingDown = false;
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
-// Browser mode runs the server directly; desktop mode starts the embedded
-// server through Tauri. Both servers bind port 0 and report their actual port
-// through the same startup log.
-const serverName = mode === "browser" ? "server" : "tauri";
-const serverChild = startServer(mode, serverName);
-children.push(serverChild);
-
+let serverChild;
 let serverPort;
-try {
-  serverPort = await waitForServerPort(serverChild);
-} catch (error) {
-  console.error(`[dev] Failed to start ${serverName}: ${error.message}`);
-  shutdown(1);
+if (mode !== "mock") {
+  // Browser mode runs the server directly; desktop mode starts the embedded
+  // server through Tauri. Both report their actual port through the startup log.
+  const serverName = mode === "browser" ? "server" : "tauri";
+  serverChild = startServer(mode, serverName);
+  children.push(serverChild);
+
+  try {
+    serverPort = await waitForServerPort(serverChild);
+  } catch (error) {
+    console.error(`[dev] Failed to start ${serverName}: ${error.message}`);
+    shutdown(1);
+  }
 }
 
 // Rsbuild reads WEBSSH_RS_SERVER_PORT while its config is evaluated, so it
 // must be started only after the server has reported its selected port.
 const clientEnv = {
   ...baseEnv,
-  WEBSSH_RS_SERVER_PORT: String(serverPort),
+  ...(serverPort ? { WEBSSH_RS_SERVER_PORT: String(serverPort) } : {}),
 };
 const clientChild = spawn("npm", ["run", "dev"], {
   cwd: resolve(projectRoot, "./src-client"),
@@ -89,13 +95,17 @@ if (mode === "browser") {
   console.log(
     `[dev] Browser mode. Open http://localhost:${clientPort} in your browser (API server: ${serverPort}).`,
   );
-} else {
+} else if (mode === "desktop") {
   console.log(
     `[dev] Desktop mode. Tauri server: http://127.0.0.1:${serverPort}.`,
   );
+} else {
+  console.log(
+    `[dev] Mock mode. Open http://localhost:${clientPort} in your browser (API mock enabled).`,
+  );
 }
 
-serverChild.on("exit", shutdown);
+serverChild?.on("exit", shutdown);
 clientChild.on("exit", shutdown);
 
 function shutdown(code) {

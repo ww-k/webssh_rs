@@ -1,5 +1,6 @@
 import {
     AimOutlined,
+    ApiOutlined,
     CodeOutlined,
     DatabaseOutlined,
     DownloadOutlined,
@@ -7,12 +8,14 @@ import {
     LinkOutlined,
     MoonOutlined,
     ReloadOutlined,
+    SaveOutlined,
     SunOutlined,
     UploadOutlined,
 } from "@ant-design/icons";
 import {
     Button,
     ColorPicker,
+    InputNumber,
     message,
     Segmented,
     Select,
@@ -20,7 +23,7 @@ import {
     Switch,
     Typography,
 } from "antd";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
@@ -30,6 +33,12 @@ import renderPrompt, {
     renderImportOptionsPrompt,
     renderUrlPasswordPrompt,
 } from "@/helpers/renderPrompt";
+import {
+    DEFAULT_SERVER_PORT,
+    getServerPort,
+    isDesktopApp as isDesktopAppEnvironment,
+    setServerPort,
+} from "@/services/serverPort";
 import {
     createUserDataExport,
     getUserDataImportErrorType,
@@ -64,6 +73,9 @@ const terminalThemeColorFields: Array<{
 
 export default function Settings() {
     const { t } = useTranslation();
+    const desktopApp = isDesktopAppEnvironment();
+    const [serverPort, setServerPortValue] = useState(DEFAULT_SERVER_PORT);
+    const [serverPortSaving, setServerPortSaving] = useState(false);
     const { themeMode, setTheme, sidebarCollapsed, setSidebarCollapsed } =
         useAppStore();
     const {
@@ -86,6 +98,35 @@ export default function Settings() {
     const resetTerminalTheme = (mode: ResolvedTheme) => {
         for (const { key } of terminalThemeColorFields) {
             setTerminalThemeColor(mode, key, terminalThemeDefaults[mode][key]);
+        }
+    };
+
+    useEffect(() => {
+        if (!desktopApp) return;
+        void getServerPort()
+            .then((port) => {
+                if (port >= 1 && port <= 65535) setServerPortValue(port);
+            })
+            .catch(() => undefined);
+    }, [desktopApp]);
+
+    const handleServerPortSave = async () => {
+        if (
+            !Number.isInteger(serverPort) ||
+            serverPort < 1 ||
+            serverPort > 65535
+        ) {
+            message.error(t("settings_server_port_invalid"));
+            return;
+        }
+        setServerPortSaving(true);
+        try {
+            await setServerPort(serverPort);
+            message.success(t("settings_server_port_saved"));
+        } catch {
+            message.error(t("settings_server_port_save_failed"));
+        } finally {
+            setServerPortSaving(false);
         }
     };
 
@@ -405,6 +446,51 @@ export default function Settings() {
                     />
                 </div>
             </section>
+
+            {desktopApp && (
+                <section className="WebSSH-Settings-Section">
+                    <div className="WebSSH-Settings-SectionHeading">
+                        <div className="WebSSH-Settings-SectionIcon">
+                            <ApiOutlined />
+                        </div>
+                        <div>
+                            <Title level={4}>{t("settings_server")}</Title>
+                            <Text type="secondary">
+                                {t("settings_server_description")}
+                            </Text>
+                        </div>
+                    </div>
+
+                    <div className="WebSSH-Settings-Row">
+                        <div className="WebSSH-Settings-RowText">
+                            <Text strong>{t("settings_server_port")}</Text>
+                            <Text type="secondary">
+                                {t("settings_server_port_help")}
+                            </Text>
+                        </div>
+                        <Space>
+                            <InputNumber
+                                min={1}
+                                max={65535}
+                                precision={0}
+                                value={serverPort}
+                                onChange={(value) => {
+                                    if (typeof value === "number") {
+                                        setServerPortValue(value);
+                                    }
+                                }}
+                            />
+                            <Button
+                                icon={<SaveOutlined />}
+                                loading={serverPortSaving}
+                                onClick={() => void handleServerPortSave()}
+                            >
+                                {t("settings_server_port_save")}
+                            </Button>
+                        </Space>
+                    </div>
+                </section>
+            )}
 
             <section className="WebSSH-Settings-Section">
                 <div className="WebSSH-Settings-SectionHeading">

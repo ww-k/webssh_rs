@@ -51,6 +51,10 @@ pnpm install
 pnpm dev
 ```
 
+The Tauri embedded server uses port `10086` by default. Set
+`WEBSSH_RS_SERVER_PORT` in the root `.env` file to choose another fixed port.
+If that port is unavailable, the desktop app falls back to an available port.
+
 ### 浏览器模式
 
 只启动 Rust 后端和前端开发服务器，然后在浏览器访问 `http://localhost:<客户端端口>`：
@@ -59,9 +63,17 @@ pnpm dev
 pnpm run dev:browser
 ```
 
+### Mock 模式
+
+只启动前端开发服务器，并使用内置 mock API，不启动 Rust 后端：
+
+```bash
+pnpm run dev:mock
+```
+
 如需修改前端开发端口，可复制 `.env.template` 为根目录的 `.env` 后调整 `WEBSSH_RS_CLIENT_PORT`。
 
-开发脚本会加载项目根目录的 `.env` 文件，为后端始终分配动态可用端口，并通过环境变量传给前端和后端。开发启动时不会使用 `WEBSSH_RS_SERVER_PORT`。前端开发服务器默认使用 3000 端口，也可以通过 `WEBSSH_RS_CLIENT_PORT` 修改；后端单独运行时默认使用 8080 端口。
+开发脚本会加载项目根目录的 `.env` 文件。桌面模式默认使用固定的 `10086` 端口，也可以通过 `WEBSSH_RS_SERVER_PORT` 修改；如果端口被占用，Tauri 会回退到系统分配的可用端口。浏览器模式仍使用动态端口。前端开发服务器默认使用 3000 端口，也可以通过 `WEBSSH_RS_CLIENT_PORT` 修改。
 
 ### 单独运行前端
 
@@ -70,7 +82,7 @@ cd src-client
 pnpm dev
 ```
 
-单独运行前端时，默认会把 `/api` 和 `/api/ssh` 代理到 `127.0.0.1:8080`。如果后端使用其他端口，需要先设置环境变量：
+单独运行前端时，默认会把 `/api` 和 `/api/ssh` 代理到 `127.0.0.1:10086`。如果后端使用其他端口，需要先设置环境变量：
 
 ```bash
 WEBSSH_RS_SERVER_PORT=18080 pnpm dev
@@ -101,7 +113,7 @@ pnpm format               # Biome 格式化
 
 ```bash
 cd src-server
-cargo run                 # 启动后端，默认监听 127.0.0.1:8080
+cargo run                 # 启动后端，默认使用系统分配的动态端口
 cargo test                # 运行 Rust 测试
 cargo fmt --check         # 检查 Rust 格式
 ```
@@ -114,7 +126,7 @@ cargo fmt --check         # 检查 Rust 格式
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `WEBSSH_RS_SERVER_PORT` | `8080` | 后端监听端口 |
+| `WEBSSH_RS_SERVER_PORT` | `10086`（Tauri、独立 server）/ `0`（浏览器开发） | 后端监听端口 |
 | `WEBSSH_RS_CLIENT_PORT` | `3000` | 前端开发服务器端口（`pnpm dev`） |
 | `WEBSSH_RS_DB_PATH` | 系统数据目录下的 `webssh_rs_server/db.sqlite` | SQLite 数据库路径；Tauri 会使用应用数据目录中的 `db.sqlite` |
 | `WEBSSH_RS_CHECK_SERVER_KEY` | `accept-new` | SSH 主机密钥策略，可选 `accept-new`、`strict`、`disabled` |
@@ -145,10 +157,10 @@ cargo run --manifest-path src-server/Cargo.toml
 
 启动后端后，可以访问：
 
-- `http://127.0.0.1:8080/api-docs`：ReDoc API 文档
-- `http://127.0.0.1:8080/api-docs/openapi.json`：OpenAPI JSON
+- `http://127.0.0.1:10086/api-docs`：ReDoc API 文档
+- `http://127.0.0.1:10086/api-docs/openapi.json`：OpenAPI JSON
 
-如果端口通过 `WEBSSH_RS_SERVER_PORT` 修改，请将地址中的 `8080` 替换为实际端口。
+如果端口通过 `WEBSSH_RS_SERVER_PORT` 修改，请将地址中的 `10086` 替换为实际端口。
 
 ## 数据库和迁移
 

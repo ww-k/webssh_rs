@@ -34,6 +34,8 @@ use utoipa::OpenApi;
 
 use crate::{api_doc::ApiDoc, ssh_connection_pool::SshConnectionPool};
 
+const DEFAULT_SERVER_PORT: u16 = 10086;
+
 static CLIENT_DIST: include_dir::Dir<'static> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/../src-client/dist");
 
@@ -61,7 +63,7 @@ pub async fn run_server() {
     let port = std::env::var("WEBSSH_RS_SERVER_PORT")
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
-        .unwrap_or(0);
+        .unwrap_or(DEFAULT_SERVER_PORT);
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
         .await
         .unwrap();
