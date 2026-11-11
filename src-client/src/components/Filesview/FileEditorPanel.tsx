@@ -28,6 +28,27 @@ type MonacoEnvironment = {
 
 configureMonacoWorkers();
 
+const fileContentRequests = new Map<string, Promise<string>>();
+
+function loadFileContent(fileUri: string) {
+    const existingRequest = fileContentRequests.get(fileUri);
+    if (existingRequest) return existingRequest;
+
+    const request = getSftpDownload(fileUri).then((response) =>
+        response.text(),
+    );
+    fileContentRequests.set(fileUri, request);
+
+    const clearRequest = () => {
+        if (fileContentRequests.get(fileUri) === request) {
+            fileContentRequests.delete(fileUri);
+        }
+    };
+    void request.then(clearRequest, clearRequest);
+
+    return request;
+}
+
 export default function FileEditorPanel({ file, onClose }: Props) {
     const { t } = useTranslation();
     const theme = useAppStore((state) => state.theme);
@@ -48,8 +69,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
         setLoading(true);
         setError(undefined);
         setExpanded(false);
-        getSftpDownload(file.uri)
-            .then((response) => response.text())
+        loadFileContent(file.uri)
             .then((text) => {
                 if (!disposed) {
                     contentRef.current = text;
