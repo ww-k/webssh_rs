@@ -73,7 +73,7 @@ pnpm run dev:mock
 
 如需修改前端开发端口，可复制 `.env.template` 为根目录的 `.env` 后调整 `WEBSSH_RS_CLIENT_PORT`。
 
-开发脚本会加载项目根目录的 `.env` 文件。桌面模式默认使用固定的 `10086` 端口，也可以通过 `WEBSSH_RS_SERVER_PORT` 修改；如果端口被占用，Tauri 会回退到系统分配的可用端口。浏览器模式仍使用动态端口。前端开发服务器默认使用 3000 端口，也可以通过 `WEBSSH_RS_CLIENT_PORT` 修改。
+开发脚本会加载项目根目录的 `.env` 文件。桌面模式和浏览器模式默认使用固定的 `10086` 端口，也可以通过 `WEBSSH_RS_SERVER_PORT` 修改；如果端口被占用，Tauri 会回退到系统分配的可用端口。前端开发服务器默认使用 3000 端口，也可以通过 `WEBSSH_RS_CLIENT_PORT` 修改。
 
 ### 单独运行前端
 
@@ -126,7 +126,7 @@ cargo fmt --check         # 检查 Rust 格式
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `WEBSSH_RS_SERVER_PORT` | `10086`（Tauri、独立 server）/ `0`（浏览器开发） | 后端监听端口 |
+| `WEBSSH_RS_SERVER_PORT` | `10086`（Tauri、浏览器开发、独立 server） | 后端监听端口 |
 | `WEBSSH_RS_CLIENT_PORT` | `3000` | 前端开发服务器端口（`pnpm dev`） |
 | `WEBSSH_RS_DB_PATH` | 系统数据目录下的 `webssh_rs_server/db.sqlite` | SQLite 数据库路径；Tauri 会使用应用数据目录中的 `db.sqlite` |
 | `WEBSSH_RS_CHECK_SERVER_KEY` | `accept-new` | SSH 主机密钥策略，可选 `accept-new`、`strict`、`disabled` |

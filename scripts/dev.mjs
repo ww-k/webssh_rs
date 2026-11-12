@@ -28,6 +28,16 @@ const clientPort =
   configuredClientPort <= 65535
     ? configuredClientPort.toString()
     : "3000";
+const configuredServerPort = Number.parseInt(
+  process.env.WEBSSH_RS_SERVER_PORT || "",
+  10,
+);
+const defaultServerPort =
+  Number.isInteger(configuredServerPort) &&
+  configuredServerPort > 0 &&
+  configuredServerPort <= 65535
+    ? configuredServerPort.toString()
+    : "10086";
 const baseEnv = {
   ...process.env,
   WEBSSH_RS_CLIENT_PORT: clientPort,
@@ -36,8 +46,8 @@ const baseEnv = {
   NPM_CONFIG_COLOR: "always",
 };
 if (mode === "browser") {
-  // Browser development keeps the server on an automatically selected port.
-  baseEnv.WEBSSH_RS_SERVER_PORT = "0";
+  // Browser development uses the same default port as the standalone server.
+  baseEnv.WEBSSH_RS_SERVER_PORT = defaultServerPort;
 }
 if (mode === "mock") {
   baseEnv.WEBSSH_RS_MOCK = "true";
