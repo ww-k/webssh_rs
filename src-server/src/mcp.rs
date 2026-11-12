@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use axum::{
     Router,
@@ -9,6 +9,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use tracing::{info, warn};
 
 use crate::{
     AppState, apis::ssh, entities::target::Model as TargetModel,
@@ -76,7 +77,22 @@ async fn handle(
     request: axum::Json<JsonRpcRequest>,
 ) -> Response {
     let request = request.0;
+    let started_at = Instant::now();
+    info!(
+        target: "webssh_rs_server::mcp",
+        method = %request.method,
+        request_id = ?request.id,
+        "MCP request received"
+    );
+
     if request.jsonrpc != "2.0" {
+        warn!(
+            target: "webssh_rs_server::mcp",
+            method = %request.method,
+            request_id = ?request.id,
+            elapsed_ms = started_at.elapsed().as_millis() as u64,
+            "MCP request rejected: invalid JSON-RPC version"
+        );
         return json_rpc_error(request.id, -32600, "Invalid Request");
     }
 
@@ -148,21 +164,50 @@ fn tool_definitions() -> Value {
 }
 
 async fn call_tool(id: Value, state: Arc<AppState>, params: ToolCallParams) -> Response {
+    let tool_name = params.name.clone();
+    let started_at = Instant::now();
+    info!(
+        target: "webssh_rs_server::mcp",
+        tool = %tool_name,
+        request_id = ?id,
+        "MCP tool call started"
+    );
+
     match params.name.as_str() {
         "list_targets" => {
             let result = target_repository::list(&state.db).await;
             match result {
-                Ok(targets) => tool_result(
-                    id,
-                    serde_json::to_value(
-                        targets
-                            .into_iter()
-                            .map(PublicTarget::from)
-                            .collect::<Vec<_>>(),
+                Ok(targets) => {
+                    info!(
+                        target: "webssh_rs_server::mcp",
+                        tool = %tool_name,
+                        request_id = ?id,
+                        target_count = targets.len(),
+                        elapsed_ms = started_at.elapsed().as_millis() as u64,
+                        "MCP tool call completed"
+                    );
+                    tool_result(
+                        id,
+                        serde_json::to_value(
+                            targets
+                                .into_iter()
+                                .map(PublicTarget::from)
+                                .collect::<Vec<_>>(),
+                        )
+                        .expect("public targets are serializable"),
                     )
-                    .expect("public targets are serializable"),
-                ),
-                Err(error) => tool_error(id, format!("failed to list targets: {error}")),
+                }
+                Err(error) => {
+                    warn!(
+                        target: "webssh_rs_server::mcp",
+                        tool = %tool_name,
+                        request_id = ?id,
+                        elapsed_ms = started_at.elapsed().as_millis() as u64,
+                        error = %error,
+                        "MCP tool call failed"
+                    );
+                    tool_error(id, format!("failed to list targets: {error}"))
+                }
             }
         }
         "execute_command" => {
@@ -170,6 +215,14 @@ async fn call_tool(id: Value, state: Arc<AppState>, params: ToolCallParams) -> R
                 match serde_json::from_value::<ExecuteCommandArguments>(params.arguments) {
                     Ok(arguments) => arguments,
                     Err(error) => {
+                        warn!(
+                            target: "webssh_rs_server::mcp",
+                            tool = %tool_name,
+                            request_id = ?id,
+                            elapsed_ms = started_at.elapsed().as_millis() as u64,
+                            error = %error,
+                            "MCP tool call rejected: invalid arguments"
+                        );
                         return tool_error(
                             id,
                             format!("invalid execute_command arguments: {error}"),
@@ -182,14 +235,63 @@ async fn call_tool(id: Value, state: Arc<AppState>, params: ToolCallParams) -> R
                 .await
             {
                 Ok(channel) => channel,
-                Err(error) => return tool_error(id, error.to_string()),
+                Err(error) => {
+                    warn!(
+                        target: "webssh_rs_server::mcp",
+                        tool = %tool_name,
+                        request_id = ?id,
+                        target_id = arguments.target_id,
+                        elapsed_ms = started_at.elapsed().as_millis() as u64,
+                        error = %error,
+                        "MCP tool call failed to open SSH channel"
+                    );
+                    return tool_error(id, error.to_string());
+                }
             };
+            info!(
+                target: "webssh_rs_server::mcp",
+                tool = %tool_name,
+                request_id = ?id,
+                target_id = arguments.target_id,
+                command = %arguments.command,
+                "MCP executing SSH command"
+            );
             match ssh::exec(channel, &arguments.command).await {
-                Ok(output) => tool_result(id, json!(output)),
-                Err(error) => tool_error(id, error.message),
+                Ok(output) => {
+                    info!(
+                        target: "webssh_rs_server::mcp",
+                        tool = %tool_name,
+                        request_id = ?id,
+                        target_id = arguments.target_id,
+                        elapsed_ms = started_at.elapsed().as_millis() as u64,
+                        "MCP tool call completed"
+                    );
+                    tool_result(id, json!(output))
+                }
+                Err(error) => {
+                    warn!(
+                        target: "webssh_rs_server::mcp",
+                        tool = %tool_name,
+                        request_id = ?id,
+                        target_id = arguments.target_id,
+                        elapsed_ms = started_at.elapsed().as_millis() as u64,
+                        error = %error.message,
+                        "MCP tool call failed"
+                    );
+                    tool_error(id, error.message)
+                }
             }
         }
-        _ => tool_error(id, format!("unknown tool: {}", params.name)),
+        _ => {
+            warn!(
+                target: "webssh_rs_server::mcp",
+                tool = %tool_name,
+                request_id = ?id,
+                elapsed_ms = started_at.elapsed().as_millis() as u64,
+                "MCP tool call rejected: unknown tool"
+            );
+            tool_error(id, format!("unknown tool: {}", tool_name))
+        }
     }
 }
 
