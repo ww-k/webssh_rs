@@ -35,7 +35,7 @@ pub async fn exec(mut channel: SshChannelGuard, command: &str) -> Result<String,
     let str_e = String::from_utf8_lossy(&buf_e);
     debug!("@exec done {:?}", command);
     debug!("exit_status {:?}. result ", code);
-    debug!("{:?}", str);
+
     match code {
         Some(0) => Ok(str.to_string()),
         _ => Err(ApiErr {
