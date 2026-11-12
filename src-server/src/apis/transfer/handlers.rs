@@ -48,11 +48,7 @@ pub async fn create_upload_batch(
     Json(payload): Json<CreateUploadBatchPayload>,
 ) -> Result<Json<TransferBatchResponse>, ApiErr> {
     Ok(Json(
-        state
-            .transfer_service
-            .create_upload_batch(payload)
-            .await?
-            .into(),
+        state.transfer_service.create_upload_batch(payload).await?,
     ))
 }
 
@@ -64,8 +60,7 @@ pub async fn create_download_batch(
         state
             .transfer_service
             .create_download_batch(payload)
-            .await?
-            .into(),
+            .await?,
     ))
 }
 

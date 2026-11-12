@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::entities::{
-    transfer_batch::{TransferBatchStatus, TransferBatchType, TransferConflictPolicy},
-    transfer_task::{TransferTaskKind, TransferTaskStatus, TransferTaskType},
+use crate::entities::transfer_task::{
+    TransferConflictPolicy, TransferTaskKind, TransferTaskStatus, TransferTaskType,
 };
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -79,23 +78,4 @@ pub struct TransferTaskCountResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct TransferBatchResponse {
     pub id: String,
-    pub r#type: TransferBatchType,
-    pub status: TransferBatchStatus,
-    pub name: String,
-    pub target_id: Option<i32>,
-    pub conflict_policy: TransferConflictPolicy,
-    pub item_count: i64,
-    pub completed_count: i64,
-    pub failed_count: i64,
-    pub directory_count: i64,
-    pub directory_failed_count: i64,
-    pub total: i64,
-    pub loaded: i64,
-    pub percent: Option<f64>,
-    pub speed: i64,
-    pub estimated_time: Option<i64>,
-    pub fail_reason: Option<String>,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub ended_at: Option<i64>,
 }

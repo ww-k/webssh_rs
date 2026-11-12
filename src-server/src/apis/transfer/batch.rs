@@ -12,14 +12,9 @@ use crate::{
     consts::services_err_code::{
         ERR_CODE_DB_ERR, ERR_CODE_TRANSFER_INVALID_REQUEST, ERR_CODE_TRANSFER_NOT_FOUND,
     },
-    entities::{
-        transfer_batch::{
-            Model as BatchModel, TransferBatchStatus, TransferBatchType, TransferConflictPolicy,
-        },
-        transfer_task::{
-            self, ActiveModel, Entity as TaskEntity, Model as TaskModel, TransferTaskKind,
-            TransferTaskStatus, TransferTaskType,
-        },
+    entities::transfer_task::{
+        self, ActiveModel, Entity as TaskEntity, Model as TaskModel, TransferConflictPolicy,
+        TransferTaskKind, TransferTaskStatus, TransferTaskType,
     },
     map_db_err,
     sftp_client::SftpFileType,
@@ -36,7 +31,7 @@ impl TransferService {
     pub async fn create_upload_batch(
         &self,
         payload: CreateUploadBatchPayload,
-    ) -> Result<BatchModel, ApiErr> {
+    ) -> Result<TransferBatchResponse, ApiErr> {
         if payload.sources.is_empty() {
             return Err(invalid("sources must not be empty"));
         }
@@ -114,13 +109,13 @@ impl TransferService {
             "upload batch persisted"
         );
         self.start_batch_tasks(&batch_id).await?;
-        self.get_batch_model(&batch_id).await
+        Ok(TransferBatchResponse { id: batch_id })
     }
 
     pub async fn create_download_batch(
         &self,
         payload: CreateDownloadBatchPayload,
-    ) -> Result<BatchModel, ApiErr> {
+    ) -> Result<TransferBatchResponse, ApiErr> {
         if payload.sources.is_empty() {
             return Err(invalid("sources must not be empty"));
         }
@@ -201,7 +196,7 @@ impl TransferService {
             "download batch persisted"
         );
         self.start_batch_tasks(&batch_id).await?;
-        self.get_batch_model(&batch_id).await
+        Ok(TransferBatchResponse { id: batch_id })
     }
 
     fn batch_file_model(
@@ -325,18 +320,13 @@ impl TransferService {
         Ok(())
     }
 
-    pub async fn get_batch_model(&self, id: &str) -> Result<BatchModel, ApiErr> {
-        let tasks = self.batch_tasks_only(id).await?;
-        synthetic_batch(id, &tasks)
+    pub async fn pause_batch(&self, id: &str) -> Result<TransferBatchResponse, ApiErr> {
+        self.change_batch(id, TransferTaskStatus::Pause).await
     }
-
-    pub async fn pause_batch(&self, id: &str) -> Result<BatchModel, ApiErr> {
-        self.change_batch(id, TransferBatchStatus::Pause).await
+    pub async fn cancel_batch(&self, id: &str) -> Result<TransferBatchResponse, ApiErr> {
+        self.change_batch(id, TransferTaskStatus::Cancel).await
     }
-    pub async fn cancel_batch(&self, id: &str) -> Result<BatchModel, ApiErr> {
-        self.change_batch(id, TransferBatchStatus::Cancel).await
-    }
-    pub async fn resume_batch(&self, id: &str) -> Result<BatchModel, ApiErr> {
+    pub async fn resume_batch(&self, id: &str) -> Result<TransferBatchResponse, ApiErr> {
         let tasks = self.batch_tasks(id).await?;
         for task in tasks {
             if matches!(
@@ -346,13 +336,13 @@ impl TransferService {
                 self.resume_task(&task.id).await?;
             }
         }
-        self.get_batch_model(id).await
+        Ok(TransferBatchResponse { id: id.to_string() })
     }
     async fn change_batch(
         &self,
         id: &str,
-        status: TransferBatchStatus,
-    ) -> Result<BatchModel, ApiErr> {
+        status: TransferTaskStatus,
+    ) -> Result<TransferBatchResponse, ApiErr> {
         let tasks = self.batch_tasks(id).await?;
         for task in tasks {
             if matches!(
@@ -360,17 +350,17 @@ impl TransferService {
                 TransferTaskStatus::Wait | TransferTaskStatus::Run | TransferTaskStatus::Pause
             ) {
                 match status {
-                    TransferBatchStatus::Pause => {
+                    TransferTaskStatus::Pause => {
                         self.pause_task(&task.id).await?;
                     }
-                    TransferBatchStatus::Cancel => {
+                    TransferTaskStatus::Cancel => {
                         self.cancel_task(&task.id).await?;
                     }
                     _ => {}
                 }
             }
         }
-        self.get_batch_model(id).await
+        Ok(TransferBatchResponse { id: id.to_string() })
     }
     async fn batch_tasks(&self, id: &str) -> Result<Vec<TaskModel>, ApiErr> {
         self.batch_tasks_only(id).await
@@ -412,218 +402,6 @@ impl TransferService {
     }
 }
 
-struct BatchSummary {
-    status: TransferBatchStatus,
-    item_count: i64,
-    completed_count: i64,
-    failed_count: i64,
-    directory_count: i64,
-    directory_failed_count: i64,
-    total: i64,
-    loaded: i64,
-    percent: Option<f64>,
-    speed: i64,
-    estimated_time: Option<i64>,
-    fail_reason: Option<String>,
-    terminal: bool,
-}
-
-fn summarize_tasks(tasks: &[TaskModel]) -> BatchSummary {
-    let item_count = tasks
-        .iter()
-        .filter(|task| task.kind == TransferTaskKind::File)
-        .count() as i64;
-    let completed_count = tasks
-        .iter()
-        .filter(|task| {
-            task.kind == TransferTaskKind::File && task.status == TransferTaskStatus::Success
-        })
-        .count() as i64;
-    let failed_count = tasks
-        .iter()
-        .filter(|task| {
-            task.kind == TransferTaskKind::File && task.status == TransferTaskStatus::Fail
-        })
-        .count() as i64;
-    let directory_count = tasks
-        .iter()
-        .filter(|task| task.kind == TransferTaskKind::Directory)
-        .count() as i64;
-    let directory_failed_count = tasks
-        .iter()
-        .filter(|task| {
-            task.kind == TransferTaskKind::Directory && task.status == TransferTaskStatus::Fail
-        })
-        .count() as i64;
-    let total = tasks
-        .iter()
-        .filter(|task| task.kind == TransferTaskKind::File)
-        .map(|task| task.total)
-        .sum();
-    let loaded = tasks
-        .iter()
-        .filter(|task| task.kind == TransferTaskKind::File)
-        .map(|task| task.loaded)
-        .sum();
-    let status = if tasks
-        .iter()
-        .any(|task| task.status == TransferTaskStatus::Run)
-    {
-        TransferBatchStatus::Run
-    } else if tasks
-        .iter()
-        .any(|task| task.status == TransferTaskStatus::Wait)
-    {
-        TransferBatchStatus::Wait
-    } else if tasks
-        .iter()
-        .any(|task| task.status == TransferTaskStatus::Pause)
-    {
-        TransferBatchStatus::Pause
-    } else if tasks
-        .iter()
-        .any(|task| task.status == TransferTaskStatus::Fail)
-    {
-        TransferBatchStatus::Fail
-    } else if tasks
-        .iter()
-        .any(|task| task.status == TransferTaskStatus::Cancel)
-    {
-        TransferBatchStatus::Cancel
-    } else if !tasks.is_empty()
-        && tasks
-            .iter()
-            .all(|task| task.status == TransferTaskStatus::Success)
-    {
-        TransferBatchStatus::Success
-    } else {
-        TransferBatchStatus::Wait
-    };
-    let discovery_active = tasks.iter().any(|task| {
-        task.kind == TransferTaskKind::Directory
-            && matches!(
-                task.status,
-                TransferTaskStatus::Wait | TransferTaskStatus::Run | TransferTaskStatus::Pause
-            )
-    });
-    let percent = if discovery_active {
-        None
-    } else if matches!(
-        status,
-        TransferBatchStatus::Success | TransferBatchStatus::Cancel
-    ) {
-        Some(100.0)
-    } else if total == 0 {
-        Some(0.0)
-    } else {
-        Some(loaded as f64 * 100.0 / total as f64)
-    };
-    let speed = tasks
-        .iter()
-        .filter(|task| task.kind == TransferTaskKind::File)
-        .map(|task| task.speed)
-        .sum();
-    let terminal = matches!(
-        status,
-        TransferBatchStatus::Success | TransferBatchStatus::Fail | TransferBatchStatus::Cancel
-    );
-    let estimated_time = if discovery_active {
-        None
-    } else if total > loaded && speed > 0 {
-        Some((total - loaded) / speed)
-    } else if terminal {
-        Some(0)
-    } else {
-        None
-    };
-    BatchSummary {
-        status,
-        item_count,
-        completed_count,
-        failed_count,
-        directory_count,
-        directory_failed_count,
-        total,
-        loaded,
-        percent,
-        speed,
-        estimated_time,
-        fail_reason: tasks.iter().find_map(|task| task.fail_reason.clone()),
-        terminal,
-    }
-}
-
-fn batch_name(tasks: &[TaskModel]) -> String {
-    let mut sources = Vec::new();
-    for task in tasks {
-        let relative = task.relative_path.as_deref().unwrap_or(&task.name);
-        let source = relative
-            .trim_matches(['/', '\\'])
-            .split(['/', '\\'])
-            .next()
-            .filter(|value| !value.is_empty())
-            .unwrap_or(&task.name);
-        if !sources.iter().any(|item| item == source) {
-            sources.push(source.to_string());
-        }
-    }
-    let first = sources
-        .first()
-        .cloned()
-        .unwrap_or_else(|| "Transfer".to_string());
-    if sources.len() == 1 {
-        first
-    } else {
-        format!("{} 等 {} 个", first, sources.len())
-    }
-}
-
-fn synthetic_batch(id: &str, tasks: &[TaskModel]) -> Result<BatchModel, ApiErr> {
-    let first = tasks
-        .first()
-        .ok_or_else(|| invalid_not_found("transfer batch not found"))?;
-    let summary = summarize_tasks(tasks);
-    Ok(BatchModel {
-        id: id.to_string(),
-        r#type: match first.r#type {
-            TransferTaskType::Upload => TransferBatchType::Upload,
-            TransferTaskType::Download => TransferBatchType::Download,
-        },
-        status: summary.status,
-        name: batch_name(tasks),
-        target_id: first.target_id,
-        conflict_policy: TransferConflictPolicy::Overwrite,
-        item_count: summary.item_count,
-        completed_count: summary.completed_count,
-        failed_count: summary.failed_count,
-        directory_count: summary.directory_count,
-        directory_failed_count: summary.directory_failed_count,
-        total: summary.total,
-        loaded: summary.loaded,
-        percent: summary.percent,
-        speed: summary.speed,
-        estimated_time: summary.estimated_time,
-        fail_reason: summary.fail_reason,
-        created_at: tasks
-            .iter()
-            .map(|task| task.created_at)
-            .min()
-            .unwrap_or_default(),
-        updated_at: tasks
-            .iter()
-            .map(|task| task.updated_at)
-            .max()
-            .unwrap_or_default(),
-        ended_at: summary.terminal.then(|| {
-            tasks
-                .iter()
-                .filter_map(|task| task.ended_at)
-                .max()
-                .unwrap_or_default()
-        }),
-    })
-}
-
 fn join_remote(base: &str, relative: &str) -> String {
     format!(
         "{}/{}",
@@ -653,31 +431,5 @@ fn ssh_err(message: String) -> ApiErr {
     ApiErr {
         code: crate::consts::services_err_code::ERR_CODE_SSH_ERR,
         message,
-    }
-}
-impl From<BatchModel> for TransferBatchResponse {
-    fn from(value: BatchModel) -> Self {
-        Self {
-            id: value.id,
-            r#type: value.r#type,
-            status: value.status,
-            name: value.name,
-            target_id: value.target_id,
-            conflict_policy: value.conflict_policy,
-            item_count: value.item_count,
-            completed_count: value.completed_count,
-            failed_count: value.failed_count,
-            directory_count: value.directory_count,
-            directory_failed_count: value.directory_failed_count,
-            total: value.total,
-            loaded: value.loaded,
-            percent: value.percent,
-            speed: value.speed,
-            estimated_time: value.estimated_time,
-            fail_reason: value.fail_reason,
-            created_at: value.created_at,
-            updated_at: value.updated_at,
-            ended_at: value.ended_at,
-        }
     }
 }

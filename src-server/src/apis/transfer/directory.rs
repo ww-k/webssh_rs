@@ -10,12 +10,9 @@ use crate::{
     consts::services_err_code::{
         ERR_CODE_DB_ERR, ERR_CODE_SSH_ERR, ERR_CODE_TRANSFER_INVALID_REQUEST,
     },
-    entities::{
-        transfer_batch::TransferConflictPolicy,
-        transfer_task::{
-            ActiveModel, Column, Entity, Model, TransferTaskKind, TransferTaskStatus,
-            TransferTaskType,
-        },
+    entities::transfer_task::{
+        ActiveModel, Column, Entity, Model, TransferConflictPolicy, TransferTaskKind,
+        TransferTaskStatus, TransferTaskType,
     },
     sftp_client::{FastSftpClient, SftpError, SftpFileType},
     ssh_connection_pool::ChannelMode,

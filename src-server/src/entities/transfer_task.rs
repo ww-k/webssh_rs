@@ -2,7 +2,24 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::transfer_batch::TransferConflictPolicy;
+#[derive(
+    Copy, Deserialize, Serialize, Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, ToSchema,
+)]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(16))")]
+pub enum TransferConflictPolicy {
+    #[serde(rename = "OVERWRITE")]
+    #[sea_orm(string_value = "OVERWRITE")]
+    Overwrite,
+    #[serde(rename = "SKIP")]
+    #[sea_orm(string_value = "SKIP")]
+    Skip,
+    #[serde(rename = "RENAME")]
+    #[sea_orm(string_value = "RENAME")]
+    Rename,
+    #[serde(rename = "FAIL")]
+    #[sea_orm(string_value = "FAIL")]
+    Fail,
+}
 
 #[derive(
     Deserialize, Serialize, Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum, ToSchema,
