@@ -3,6 +3,5 @@
 - [] [feat] ssh terminal支持缓存历史会话信息，重连时保留历史会话
 - [] [feat] ssh terminal的断开重连，区分ssh通道断开和websocket链接断开。websocket链接断开可重连websocket，并连上断开前的通道。ssh通道断开则完重连。
 - [] [feat] sftp 支持拖拽上传
-- [] [feat] 增加MCP，支持agent连接操作，并提供agent连接状态监控，包括操作日志
-- [] [feat] 导入可选择导入的数据分类，如设置，连接目标；还可以选择覆盖或跳过导入已存在的连接目标。
+- [] [feat] MCP，支持agent直接操作界面
 - [] [refactor] 传输列表，目录任务的进度显示完成，下面还有子任务在运行。
