@@ -12,8 +12,11 @@ use serde_json::{Value, json};
 use tracing::{info, warn};
 
 use crate::{
-    AppState, apis::ssh, entities::target::Model as TargetModel,
-    repositories::target as target_repository, ssh_connection_pool::ChannelMode,
+    AppState,
+    apis::{ssh, transfer::CreateUploadTaskPayload},
+    entities::{target::Model as TargetModel, transfer_task::Model as TransferTaskModel},
+    repositories::target as target_repository,
+    ssh_connection_pool::ChannelMode,
 };
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
@@ -39,6 +42,18 @@ struct ToolCallParams {
 struct ExecuteCommandArguments {
     target_id: i32,
     command: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct UploadFileArguments {
+    target_id: i32,
+    local_path: String,
+    remote_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GetTransferTaskArguments {
+    task_id: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -168,6 +183,44 @@ fn tool_definitions() -> Value {
                     }
                 },
                 "required": ["target_id", "command"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "upload_file",
+            "description": "将 MCP 服务端可访问的本地文件上传到指定的 SSH 目标。上传任务会进入持久化传输队列，返回任务 ID 供后续查询。",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "target_id": {
+                        "type": "integer",
+                        "description": "目标 ID，可通过 list_targets 获取"
+                    },
+                    "local_path": {
+                        "type": "string",
+                        "description": "MCP 服务端上的本地文件路径"
+                    },
+                    "remote_path": {
+                        "type": "string",
+                        "description": "远程目标文件的绝对路径，例如 /tmp/app.tar.gz"
+                    }
+                },
+                "required": ["target_id", "local_path", "remote_path"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "get_transfer_task",
+            "description": "查询文件传输任务的状态和进度。可用 upload_file 返回的 task_id 查询上传是否已经完成。",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "string",
+                        "description": "传输任务 ID"
+                    }
+                },
+                "required": ["task_id"],
                 "additionalProperties": false
             }
         }
@@ -311,6 +364,104 @@ async fn call_tool(id: Value, state: Arc<AppState>, params: ToolCallParams) -> R
                 }
             }
         }
+        "upload_file" => {
+            let arguments = match serde_json::from_value::<UploadFileArguments>(params.arguments) {
+                Ok(arguments) => arguments,
+                Err(error) => {
+                    warn!(
+                        target: "webssh_rs_server::mcp",
+                        tool = %tool_name,
+                        request_id = ?id,
+                        elapsed_ms = started_at.elapsed().as_millis() as u64,
+                        error = %error,
+                        "MCP tool call rejected: invalid arguments"
+                    );
+                    return tool_error(id, format!("invalid upload_file arguments: {error}"));
+                }
+            };
+
+            if !arguments.remote_path.starts_with('/') {
+                return tool_error(
+                    id,
+                    "invalid upload_file arguments: remote_path must be absolute".to_string(),
+                );
+            }
+
+            let target_uri = format!("sftp:{}:{}", arguments.target_id, arguments.remote_path);
+            let task = match state
+                .transfer_service
+                .create_upload(CreateUploadTaskPayload {
+                    local_path: arguments.local_path,
+                    target_uri,
+                })
+                .await
+            {
+                Ok(task) => task,
+                Err(error) => {
+                    warn!(
+                        target: "webssh_rs_server::mcp",
+                        tool = %tool_name,
+                        request_id = ?id,
+                        target_id = arguments.target_id,
+                        elapsed_ms = started_at.elapsed().as_millis() as u64,
+                        error = %error,
+                        "MCP tool call failed"
+                    );
+                    return tool_error(id, format!("failed to create upload task: {error}"));
+                }
+            };
+
+            info!(
+                target: "webssh_rs_server::mcp",
+                tool = %tool_name,
+                request_id = ?id,
+                target_id = arguments.target_id,
+                task_id = %task.id,
+                elapsed_ms = started_at.elapsed().as_millis() as u64,
+                "MCP upload task created"
+            );
+            tool_result(id, transfer_task_value(task))
+        }
+        "get_transfer_task" => {
+            let arguments =
+                match serde_json::from_value::<GetTransferTaskArguments>(params.arguments) {
+                    Ok(arguments) => arguments,
+                    Err(error) => {
+                        warn!(
+                            target: "webssh_rs_server::mcp",
+                            tool = %tool_name,
+                            request_id = ?id,
+                            elapsed_ms = started_at.elapsed().as_millis() as u64,
+                            error = %error,
+                            "MCP tool call rejected: invalid arguments"
+                        );
+                        return tool_error(
+                            id,
+                            format!("invalid get_transfer_task arguments: {error}"),
+                        );
+                    }
+                };
+
+            match state
+                .transfer_service
+                .get_task_model(&arguments.task_id)
+                .await
+            {
+                Ok(task) => tool_result(id, transfer_task_value(task)),
+                Err(error) => {
+                    warn!(
+                        target: "webssh_rs_server::mcp",
+                        tool = %tool_name,
+                        request_id = ?id,
+                        task_id = %arguments.task_id,
+                        elapsed_ms = started_at.elapsed().as_millis() as u64,
+                        error = %error,
+                        "MCP transfer task query failed"
+                    );
+                    tool_error(id, format!("failed to query transfer task: {error}"))
+                }
+            }
+        }
         _ => {
             warn!(
                 target: "webssh_rs_server::mcp",
@@ -322,6 +473,21 @@ async fn call_tool(id: Value, state: Arc<AppState>, params: ToolCallParams) -> R
             tool_error(id, format!("unknown tool: {}", tool_name))
         }
     }
+}
+
+fn transfer_task_value(task: TransferTaskModel) -> Value {
+    json!({
+        "task_id": task.id,
+        "status": task.status,
+        "local_path": task.local_path,
+        "target_uri": task.target_uri,
+        "loaded": task.loaded,
+        "total": task.total,
+        "percent": task.percent,
+        "speed": task.speed,
+        "estimated_time": task.estimated_time,
+        "fail_reason": task.fail_reason,
+    })
 }
 
 fn tool_result(id: Value, value: Value) -> Response {
