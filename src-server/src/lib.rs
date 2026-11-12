@@ -4,6 +4,7 @@ mod config;
 mod consts;
 pub mod entities;
 pub mod log_buffer;
+mod mcp;
 mod migrations;
 mod repositories;
 pub mod sftp_client;
@@ -155,6 +156,8 @@ where
             "/api/user_data",
             user_data::router_builder(app_state.clone()),
         )
+        .nest("/mcp", mcp::router_builder(app_state.clone()))
+        .nest("/api/mcp", mcp::router_builder(app_state.clone()))
         .merge(preferences::router_builder(app_state.clone()))
         .route(
             "/api-docs/openapi.json",
