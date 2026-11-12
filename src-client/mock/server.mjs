@@ -128,7 +128,7 @@ async function route(request, response) {
     }
 
     if (pathname.startsWith("/api/target/")) {
-        return handleTarget(request, response, pathname);
+        return handleTarget(request, response, pathname, searchParams);
     }
     if (pathname.startsWith("/api/transfer/")) {
         return handleTransfer(request, response, pathname, searchParams);
@@ -146,9 +146,18 @@ async function route(request, response) {
     });
 }
 
-async function handleTarget(request, response, pathname) {
+async function handleTarget(request, response, pathname, searchParams) {
     if (request.method === "GET" && pathname === "/api/target/list") {
-        return sendJson(response, 200, state.targets);
+        const keyword = searchParams.get("keyword")?.trim().toLocaleLowerCase();
+        const targets = keyword
+            ? state.targets.filter((target) =>
+                  [target.directory, target.name, target.user, target.host].some(
+                      (value) =>
+                          value?.toLocaleLowerCase().includes(keyword),
+                  ),
+              )
+            : state.targets;
+        return sendJson(response, 200, targets);
     }
 
     const payload = await readJson(request);

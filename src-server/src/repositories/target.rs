@@ -1,3 +1,4 @@
+use sea_orm::sea_query::Condition;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, DeleteResult,
     EntityTrait, QueryFilter, QueryOrder, TransactionTrait,
@@ -8,8 +9,22 @@ use crate::{
     repositories::favorite_directory::INITIALIZED_KEY_PREFIX,
 };
 
-pub async fn list(db: &DatabaseConnection) -> Result<Vec<target::Model>, DbErr> {
-    target::Entity::find()
+pub async fn list(
+    db: &DatabaseConnection,
+    keyword: Option<&str>,
+) -> Result<Vec<target::Model>, DbErr> {
+    let mut query = target::Entity::find();
+    if let Some(keyword) = keyword.map(str::trim).filter(|keyword| !keyword.is_empty()) {
+        let pattern = format!("%{keyword}%");
+        query = query.filter(
+            Condition::any()
+                .add(target::Column::Name.like(&pattern))
+                .add(target::Column::Directory.like(&pattern))
+                .add(target::Column::User.like(&pattern))
+                .add(target::Column::Host.like(&pattern)),
+        );
+    }
+    query
         .order_by_asc(target::Column::SortOrder)
         .order_by_asc(target::Column::Id)
         .all(db)

@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use axum::{Json, extract::State};
+use axum::{Json, extract::Query, extract::State};
 
 use crate::{
     AppState,
     apis::{
         ApiErr, InternalErrorResponse, ValidJson,
         target::{
-            dto::{TargetRemovePayload, TargetUpdatePayload},
+            dto::{TargetListQuery, TargetRemovePayload, TargetUpdatePayload},
             service,
         },
     },
@@ -20,6 +20,7 @@ use crate::{
     tag = "target",
     summary = "获取 SSH 目标列表",
     operation_id = "target_list",
+    params(TargetListQuery),
     responses(
         (status = 200, description = "成功获取 SSH 目标列表", body = [target::Model]),
         (status = 500, response = InternalErrorResponse)
@@ -27,8 +28,9 @@ use crate::{
 )]
 pub async fn target_list(
     State(state): State<Arc<AppState>>,
+    Query(query): Query<TargetListQuery>,
 ) -> Result<Json<Vec<target::Model>>, ApiErr> {
-    let targets = service::list(&state.db).await?;
+    let targets = service::list(&state.db, query.keyword.as_deref()).await?;
     Ok(Json(targets))
 }
 

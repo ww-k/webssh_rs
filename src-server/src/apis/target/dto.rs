@@ -1,7 +1,14 @@
 use sea_orm::ActiveValue::{NotSet, Set};
 use serde::Deserialize;
+use utoipa::IntoParams;
 
 use crate::entities::target::{self, TargetAuthMethod};
+
+#[derive(Deserialize, Debug, IntoParams)]
+pub struct TargetListQuery {
+    /// Optional keyword matched against the target name, directory, user, or host.
+    pub keyword: Option<String>,
+}
 
 #[derive(Deserialize, Debug, utoipa::ToSchema)]
 pub struct TargetUpdatePayload {

@@ -41,6 +41,12 @@ struct ExecuteCommandArguments {
     command: String,
 }
 
+#[derive(Debug, Default, Deserialize)]
+struct ListTargetsArguments {
+    #[serde(default)]
+    keyword: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 struct PublicTarget {
     id: i32,
@@ -134,10 +140,15 @@ fn tool_definitions() -> Value {
     json!([
         {
             "name": "list_targets",
-            "description": "列出可用的 SSH 目标。返回目标 ID、名称和连接信息，不包含密码或私钥。",
+            "description": "列出可用的 SSH 目标，可按关键字匹配名称、目录、用户名或主机。返回目标 ID、名称和连接信息，不包含密码或私钥。",
             "inputSchema": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "keyword": {
+                        "type": "string",
+                        "description": "可选关键字，匹配目标名称、目录、用户名或主机"
+                    }
+                },
                 "additionalProperties": false
             }
         },
@@ -175,7 +186,25 @@ async fn call_tool(id: Value, state: Arc<AppState>, params: ToolCallParams) -> R
 
     match params.name.as_str() {
         "list_targets" => {
-            let result = target_repository::list(&state.db).await;
+            let arguments = if params.arguments.is_null() {
+                ListTargetsArguments::default()
+            } else {
+                match serde_json::from_value::<ListTargetsArguments>(params.arguments) {
+                    Ok(arguments) => arguments,
+                    Err(error) => {
+                        warn!(
+                            target: "webssh_rs_server::mcp",
+                            tool = %tool_name,
+                            request_id = ?id,
+                            elapsed_ms = started_at.elapsed().as_millis() as u64,
+                            error = %error,
+                            "MCP tool call rejected: invalid arguments"
+                        );
+                        return tool_error(id, format!("invalid list_targets arguments: {error}"));
+                    }
+                }
+            };
+            let result = target_repository::list(&state.db, arguments.keyword.as_deref()).await;
             match result {
                 Ok(targets) => {
                     info!(

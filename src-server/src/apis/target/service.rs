@@ -9,8 +9,11 @@ use crate::{
     ssh_connection_pool::SshConnectionPool,
 };
 
-pub async fn list(db: &DatabaseConnection) -> Result<Vec<target::Model>, ApiErr> {
-    let targets = map_db_err!(target_repository::list(db).await)?;
+pub async fn list(
+    db: &DatabaseConnection,
+    keyword: Option<&str>,
+) -> Result<Vec<target::Model>, ApiErr> {
+    let targets = map_db_err!(target_repository::list(db, keyword).await)?;
     Ok(targets)
 }
 

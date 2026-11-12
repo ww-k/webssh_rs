@@ -15,8 +15,10 @@ export interface ITarget {
     jump_host_id?: number;
 }
 
-export async function getTargetList() {
-    const response = await axios.get<ITarget[]>("/api/target/list");
+export async function getTargetList(keyword?: string) {
+    const response = await axios.get<ITarget[]>("/api/target/list", {
+        params: keyword ? { keyword } : undefined,
+    });
     return response.data;
 }
 
