@@ -238,6 +238,8 @@ export default class Pathbar extends Component<IProps, IState> {
     componentWillUnmount() {
         this.favoriteDirectoryListRequestId += 1;
         this.favoriteDirectoryMutationRequestId += 1;
+        // A remount must be allowed to reload a request invalidated by unmount.
+        this.favoriteDirectoryTargetId = undefined;
         this._resizeObserver.disconnect();
         this._resizeObserver = null as unknown as ResizeObserver;
         document.removeEventListener("click", this.handleClickOutside);
