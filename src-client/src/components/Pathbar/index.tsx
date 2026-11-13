@@ -132,6 +132,7 @@ export default class Pathbar extends Component<IProps, IState> {
     breadcrumbRef: React.RefObject<HTMLDivElement>;
     routeItemRefsMap: Record<string, HTMLSpanElement | null>;
     favoriteDirectoryListRequestId = 0;
+    favoriteDirectoryTargetId?: number;
     favoriteDirectoryMutationRequestId = 0;
     _resizeObserver!: ResizeObserver;
 
@@ -227,9 +228,8 @@ export default class Pathbar extends Component<IProps, IState> {
         if (
             preProps.cwd !== cwd &&
             cwd &&
-            (!preProps.cwd ||
-                getFavoriteDirectoryLocation(preProps.cwd).targetId !==
-                    getFavoriteDirectoryLocation(cwd).targetId)
+            getFavoriteDirectoryLocation(preProps.cwd).targetId !==
+                getFavoriteDirectoryLocation(cwd).targetId
         ) {
             this.getFavoriteDirectories();
         }
@@ -928,6 +928,8 @@ export default class Pathbar extends Component<IProps, IState> {
     getFavoriteDirectories() {
         const { cwd } = this.props;
         const targetId = getFavoriteDirectoryLocation(cwd).targetId;
+        if (this.favoriteDirectoryTargetId === targetId) return;
+        this.favoriteDirectoryTargetId = targetId;
         const requestId = ++this.favoriteDirectoryListRequestId;
         this.favoriteDirectoryMutationRequestId += 1;
         this.setState({

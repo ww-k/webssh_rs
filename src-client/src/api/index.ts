@@ -1,5 +1,7 @@
 import axios from "axios";
 
+axios.defaults.timeout = 10_000;
+
 axios.interceptors.response.use(
     (response) => response,
     (err) => {

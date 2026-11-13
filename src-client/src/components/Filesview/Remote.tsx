@@ -1,6 +1,6 @@
 import { useMemoizedFn, useRequest } from "ahooks";
 import { Spin } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import "./index.css";
 
@@ -53,6 +53,7 @@ export default function FilesviewRemote({
     );
     const [pathHistory, setPathHistory] = useState<string[]>([]);
     const [editingFile, setEditingFile] = useState<IViewFileStat>();
+    const previousShowAllFiles = useRef(showAllFiles);
 
     const pushPathHistory = useMemoizedFn((newPath: string) => {
         setPathHistory((history) => {
@@ -98,14 +99,13 @@ export default function FilesviewRemote({
         },
     );
 
-    // Re-fetch the current directory when the hidden-file visibility changes.
-    // The base view already fetches when the path changes.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: only refresh when the toggle changes
+    // Re-fetch only after the hidden-file visibility actually changes. The
+    // base view owns the initial and path-change fetches.
     useEffect(() => {
-        if (cwd) {
-            void getCwdFiles();
-        }
-    }, [showAllFiles]);
+        if (previousShowAllFiles.current === showAllFiles) return;
+        previousShowAllFiles.current = showAllFiles;
+        if (cwd) void getCwdFiles().catch(() => undefined);
+    }, [showAllFiles, cwd, getCwdFiles]);
 
     const getHome = useMemoizedFn(() => getSftpUserDirHome(targetId));
     const getDirs = useMemoizedFn(async (fileUrl: string) => {

@@ -28,7 +28,7 @@ use super::{
     known_hosts::{KnownHosts, ServerPublicKey, verify_server_key},
 };
 
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 trait SshStream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> SshStream for T {}
@@ -285,7 +285,17 @@ impl SshConnector {
     pub(crate) async fn connect(&self, spec: &SshConnectionSpec) -> SshPoolResult<ConnectedSsh> {
         let timeout = self.connect_timeout;
         let deadline = ConnectDeadline::new(timeout);
-        self.connect_inner(spec, deadline).await
+        let result = self.connect_inner(spec, deadline).await;
+        if let Err(SshPoolError::ConnectTimeout { timeout }) = &result {
+            debug!(
+                target_id = spec.target_id(),
+                host = %spec.host,
+                port = spec.port,
+                ?timeout,
+                "SSH connection timed out"
+            );
+        }
+        result
     }
 
     async fn connect_inner(

@@ -1,6 +1,6 @@
 import { useMemoizedFn } from "ahooks";
 import { Spin } from "antd";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import Pathbar from "@/components/Pathbar";
 import { isSearchUri } from "@/components/Pathbar/search";
@@ -61,17 +61,27 @@ export default function FilesviewBase({
     const copyData = useAppStore((state) => state.copyData);
     const setCopyData = useAppStore((state) => state.setCopyData);
     const searching = useMemo(() => isSearchUri(cwd), [cwd]);
+    const homeRequested = useRef(false);
+    const loadedCwd = useRef<string>();
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: just init run
     useEffect(() => {
         if (cwd) return;
-        getHome().then(setCwd);
+        if (homeRequested.current) return;
+        homeRequested.current = true;
+        void getHome()
+            .then(setCwd)
+            .catch(() => {
+                homeRequested.current = false;
+            });
     }, []);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: false
     useEffect(() => {
         if (!cwd) return;
-        getCwdFiles();
+        if (loadedCwd.current === cwd) return;
+        loadedCwd.current = cwd;
+        void getCwdFiles().catch(() => undefined);
     }, [cwd]);
 
     const onPathChange = useMemoizedFn((newFileUrl: string) => {
@@ -89,16 +99,18 @@ export default function FilesviewBase({
 
     return (
         <div className={`filesviewBase ${className || ""}`} style={style}>
-            <Pathbar
-                className="filesviewBasePathbar"
-                posix={posix}
-                cwd={cwd}
-                history={history}
-                enableSearch={false}
-                getDirs={getDirs}
-                getCwdFiles={getCwdFiles}
-                onChange={onPathChange}
-            />
+            {cwd && (
+                <Pathbar
+                    className="filesviewBasePathbar"
+                    posix={posix}
+                    cwd={cwd}
+                    history={history}
+                    enableSearch={false}
+                    getDirs={getDirs}
+                    getCwdFiles={getCwdFiles}
+                    onChange={onPathChange}
+                />
+            )}
             <div className="filesviewBaseContent">
                 <Filelist
                     className="filesviewBaseFilelist"
