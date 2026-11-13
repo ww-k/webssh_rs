@@ -2,7 +2,6 @@ import { Badge, ConfigProvider, Layout, Menu, theme } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import "./App.css";
-import "./styles/filelist-table.css";
 import "./styles/menu-page.css";
 
 import {

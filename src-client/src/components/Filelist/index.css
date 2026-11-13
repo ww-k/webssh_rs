@@ -210,7 +210,7 @@
 }
 
 .filelistTable > tbody > tr:hover > td {
-    background-color: var(--ant-color-fill-quaternary);
+    background-color: var(--ant-control-item-bg-active-hover);
 }
 
 .filelistTable > tbody > tr.filelistTableTrDisabled {
@@ -226,7 +226,7 @@
 }
 
 .filelistTable > tbody > .hover > td {
-    background-color: var(--ant-color-fill-quaternary);
+    background-color: var(--ant-control-item-bg-active-hover);
 }
 
 .filelistTable > tbody > tr.filelistTableTrActive > td {

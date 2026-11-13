@@ -162,11 +162,6 @@
     color: var(--ant-color-white);
 }
 
-.WebSSH-Home-Sidebar:not(:focus-within) .WebSSH-Home-Tab.is-active {
-    color: var(--ant-color-text);
-    background: var(--ant-control-item-bg-active);
-}
-
 .WebSSH-Home-TabIcon,
 .WebSSH-Home-ContentIcon {
     display: inline-flex;
