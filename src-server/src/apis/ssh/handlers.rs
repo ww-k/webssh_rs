@@ -5,7 +5,7 @@ use axum::{
     Router,
     extract::{Query, State},
 };
-use russh::ChannelMsg;
+use russh::{ChannelMsg, Pty};
 use socketioxide::{
     SocketIo,
     extract::{Data, SocketRef},
@@ -216,13 +216,18 @@ impl SshTerminalSession {
         channel: SshChannelGuard,
         target_system: Option<&str>,
     ) -> Result<SshChannelGuard> {
-        // Set PROMPT_COMMAND inside the remote shell process instead of using
-        // SSH env requests, which are commonly rejected by sshd AcceptEnv.
-        // The child shell inherits it and Bash executes it before each prompt.
-        const SHELL_BOOTSTRAP: &str = r#"if [ -n "$BASH_VERSION" ]; then export PROMPT_COMMAND="printf '\\033]7;file://webssh%s\\007' \"\$PWD\""; fi; exec "${SHELL:-/bin/sh}" -il"#;
+        const PROMPT_COMMAND_APPEND: &str = r#"if [ -n "$BASH_VERSION" ]; then __webssh_prompt_command() { printf '\033]7;file://webssh%s\007' "$PWD"; }; case ";${PROMPT_COMMAND-};" in *";__webssh_prompt_command;"*) ;; *) PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }__webssh_prompt_command" ;; esac; fi; stty echo
+"#;
+        const NO_TERMINAL_MODES: &[(Pty, u32)] = &[];
+        const NO_ECHO_TERMINAL_MODES: &[(Pty, u32)] = &[(Pty::ECHO, 0)];
+        let terminal_modes = if target_system == Some("windows") {
+            NO_TERMINAL_MODES
+        } else {
+            NO_ECHO_TERMINAL_MODES
+        };
 
         channel
-            .request_pty(false, "xterm-256color", 80, 25, 0, 0, &[])
+            .request_pty(false, "xterm-256color", 80, 25, 0, 0, terminal_modes)
             .await?;
         channel
             .set_env(
@@ -231,10 +236,9 @@ impl SshTerminalSession {
                 env::var("LANG").unwrap_or("zh_CN.UTF-8".to_string()),
             )
             .await?;
-        if target_system == Some("windows") {
-            channel.request_shell(true).await?;
-        } else {
-            channel.exec(true, SHELL_BOOTSTRAP).await?;
+        channel.request_shell(true).await?;
+        if target_system != Some("windows") {
+            channel.data(PROMPT_COMMAND_APPEND.as_bytes()).await?;
         }
 
         anyhow::Ok(channel)
