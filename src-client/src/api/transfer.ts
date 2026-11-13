@@ -62,6 +62,41 @@ export interface ITransferBatch {
     ended_at?: number;
 }
 
+export type ITransferTreeNodeType = "BATCH" | "DIRECTORY" | "FILE";
+
+export interface ITransferTreeNode {
+    id: string;
+    node_type: ITransferTreeNodeType;
+    type: ITransferTaskType;
+    kind?: ITransferTaskKind;
+    status: ITransferTaskStatus;
+    local_path?: string;
+    target_uri?: string;
+    target_id?: number;
+    name: string;
+    loaded: number;
+    total: number;
+    percent: number;
+    speed: number;
+    estimated_time?: number;
+    ranges: ITransferRange[];
+    fail_reason?: string;
+    created_at: number;
+    updated_at: number;
+    ended_at?: number;
+    batch_id?: string;
+    parent_id?: string;
+    relative_path?: string;
+    conflict_policy?: ITransferConflictPolicy;
+    all?: boolean;
+    item_count?: number;
+    completed_count?: number;
+    failed_count?: number;
+    directory_count?: number;
+    directory_failed_count?: number;
+    children: ITransferTreeNode[];
+}
+
 export async function postTransferUploadBatch(payload: {
     target_uri: string;
     sources: string[];
@@ -148,6 +183,16 @@ export async function getTransferTasks(params?: { batch_id?: string }) {
     return response.data;
 }
 
+export async function getTransferTree(params?: { batch_id?: string }) {
+    const response = await axios.get<ITransferTreeNode[]>(
+        "/api/transfer/tree",
+        {
+            params,
+        },
+    );
+    return response.data;
+}
+
 export async function getTransferUnfinishedCount(createdAfter?: number) {
     const response = await axios.get<{ count: number }>(
         "/api/transfer/unfinished-count",
@@ -181,4 +226,32 @@ export async function postTransferCancel(id: string) {
 
 export async function deleteTransferTask(id: string) {
     await axios.delete(`/api/transfer/${id}`);
+}
+
+export async function postTransferDirectoryPause(id: string) {
+    return (
+        await axios.post<ITransferBatch>(
+            `/api/transfer/directories/${id}/pause`,
+        )
+    ).data;
+}
+
+export async function postTransferDirectoryResume(id: string) {
+    return (
+        await axios.post<ITransferBatch>(
+            `/api/transfer/directories/${id}/resume`,
+        )
+    ).data;
+}
+
+export async function postTransferDirectoryCancel(id: string) {
+    return (
+        await axios.post<ITransferBatch>(
+            `/api/transfer/directories/${id}/cancel`,
+        )
+    ).data;
+}
+
+export async function deleteTransferDirectory(id: string) {
+    await axios.delete(`/api/transfer/directories/${id}`);
 }

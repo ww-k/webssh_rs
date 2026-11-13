@@ -14,11 +14,12 @@ use crate::{
     entities::transfer_task::Model as TransferTaskModel,
 };
 
+use super::tree::build_transfer_tree;
 use super::{
     dto::{
         CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
         CreateUploadTaskPayload, TransferBatchResponse, TransferRangeSchema,
-        TransferTaskCountResponse, TransferTaskResponse,
+        TransferTaskCountResponse, TransferTaskResponse, TransferTreeNode,
     },
     ranges::ranges_from_json,
 };
@@ -173,6 +174,28 @@ pub async fn list_tasks(
 
 #[utoipa::path(
     get,
+    path = "/api/transfer/tree",
+    tag = "transfer",
+    summary = "查询树状传输任务列表",
+    params(("batch_id" = Option<String>, Query, description = "按批次 ID 筛选任务")),
+    responses(
+        (status = 200, description = "成功查询树状传输任务列表", body = Vec<TransferTreeNode>),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn list_tree(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListTasksQuery>,
+) -> Result<Json<Vec<TransferTreeNode>>, ApiErr> {
+    let tasks = state
+        .transfer_service
+        .list_tasks(query.batch_id.as_deref())
+        .await?;
+    Ok(Json(build_transfer_tree(tasks)?))
+}
+
+#[utoipa::path(
+    get,
     path = "/api/transfer/unfinished-count",
     tag = "transfer",
     summary = "查询未完成传输任务数量",
@@ -279,7 +302,35 @@ pub async fn delete_task(
     state.transfer_service.delete_task(&id).await
 }
 
-trait IntoTransferResponse {
+pub async fn pause_directory(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(state.transfer_service.pause_directory(&id).await?))
+}
+
+pub async fn resume_directory(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(state.transfer_service.resume_directory(&id).await?))
+}
+
+pub async fn cancel_directory(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferBatchResponse>, ApiErr> {
+    Ok(Json(state.transfer_service.cancel_directory(&id).await?))
+}
+
+pub async fn delete_directory(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<(), ApiErr> {
+    state.transfer_service.delete_directory(&id).await
+}
+
+pub(crate) trait IntoTransferResponse {
     fn into_response(self) -> Result<TransferTaskResponse, ApiErr>;
 }
 

@@ -34,6 +34,12 @@ rs.mock("@/api", () => ({
         tasks[task.id] = task;
         return task;
     },
+    getTransferTree: async () =>
+        Object.values(tasks).map((task) => ({
+            ...task,
+            node_type: "FILE" as const,
+            children: [],
+        })),
     getTransferTask: async (id: string) => tasks[id],
     getTransferTasks: async () => Object.values(tasks),
     postTransferPause: async (id: string) => {
@@ -60,7 +66,7 @@ test("[TransferService] upload creates server task", async () => {
     });
 
     expect(
-        transferService.getTasks().find((task) => task.id === "upload-1"),
+        transferService.getTree().find((task) => task.id === "upload-1"),
     ).toMatchObject({
         id: "upload-1",
         type: "UPLOAD",
@@ -78,7 +84,7 @@ test("[TransferService] download creates server task", async () => {
     });
 
     expect(
-        transferService.getTasks().find((task) => task.id === "download-1"),
+        transferService.getTree().find((task) => task.id === "download-1"),
     ).toMatchObject({
         id: "download-1",
         type: "DOWNLOAD",

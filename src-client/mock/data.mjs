@@ -181,17 +181,75 @@ const createTransferTasks = () => {
             ended_at: now - 54_000,
         },
     ];
-    // Keep the seeded tasks as the small status sample used by the transfer
-    // tree. The remaining rows use the last status in the presentation order
-    // so the first screen stays representative instead of being all one status.
-    const tailStatus = "CANCEL";
+    const representativeStatuses = [
+        "FAIL",
+        "RUN",
+        "WAIT",
+        "PAUSE",
+        "SUCCESS",
+        "CANCEL",
+    ];
+    const representativeTasks = representativeStatuses.flatMap((status) => {
+        const batchId = `mock-representative-batch-${status.toLowerCase()}`;
+        const total = gibibytes(1);
+        const terminal = ["SUCCESS", "FAIL", "CANCEL"].includes(status);
+        const createTask = (id, kind, taskBatchId) => ({
+            id,
+            type:
+                status === "RUN" || status === "SUCCESS"
+                    ? "DOWNLOAD"
+                    : "UPLOAD",
+            kind,
+            status,
+            local_path: `/Users/demo/Downloads/${id}`,
+            target_uri: `sftp:1:/mock/${id}`,
+            target_id: 1,
+            name: id,
+            loaded: kind === "FILE" && status === "SUCCESS" ? total : 0,
+            total: kind === "FILE" ? total : 0,
+            percent: kind === "FILE" && status === "SUCCESS" ? 100 : 0,
+            speed: status === "RUN" ? mebibytes(16) : 0,
+            estimated_time: status === "RUN" ? 120 : undefined,
+            ranges: [],
+            fail_reason: status === "FAIL" ? "Mock transfer failed" : undefined,
+            created_at: now - 500_000 + representativeStatuses.indexOf(status),
+            updated_at: now,
+            ended_at: terminal ? now : undefined,
+            batch_id: taskBatchId,
+            parent_id: null,
+            relative_path: id,
+        });
+        return [
+            createTask(
+                `mock-${status.toLowerCase()}-batch-directory`,
+                "DIRECTORY",
+                batchId,
+            ),
+            createTask(
+                `mock-${status.toLowerCase()}-batch-file`,
+                "FILE",
+                batchId,
+            ),
+            createTask(
+                `mock-${status.toLowerCase()}-directory`,
+                "DIRECTORY",
+                undefined,
+            ),
+            createTask(
+                `mock-${status.toLowerCase()}-file`,
+                "FILE",
+                undefined,
+            ),
+        ];
+    });
     return [
+        ...representativeTasks,
         ...seed,
         ...Array.from(
-            { length: MOCK_ROW_COUNT - seed.length },
+            { length: MOCK_ROW_COUNT - seed.length - representativeTasks.length },
             (_, offset) => {
                 const index = offset + seed.length + 1;
-                const status = tailStatus;
+                const status = "SUCCESS";
                 const total = gibibytes(1 + (index % 40) / 10);
                 const loaded = status === "SUCCESS"
                     ? total

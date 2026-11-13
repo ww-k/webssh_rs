@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use nanoid::nanoid;
 use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
@@ -378,6 +381,91 @@ impl TransferService {
         if tasks.is_empty() {
             return Err(invalid_not_found("transfer batch not found"));
         }
+        for task in tasks {
+            self.delete_task(&task.id).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn pause_directory(&self, id: &str) -> Result<TransferBatchResponse, ApiErr> {
+        self.change_directory(id, TransferTaskStatus::Pause).await
+    }
+
+    pub async fn cancel_directory(&self, id: &str) -> Result<TransferBatchResponse, ApiErr> {
+        self.change_directory(id, TransferTaskStatus::Cancel).await
+    }
+
+    pub async fn resume_directory(&self, id: &str) -> Result<TransferBatchResponse, ApiErr> {
+        let tasks = self.directory_tasks(id).await?;
+        for task in tasks {
+            if matches!(
+                task.status,
+                TransferTaskStatus::Pause | TransferTaskStatus::Fail | TransferTaskStatus::Cancel
+            ) {
+                self.resume_task(&task.id).await?;
+            }
+        }
+        Ok(TransferBatchResponse { id: id.to_string() })
+    }
+
+    async fn change_directory(
+        &self,
+        id: &str,
+        status: TransferTaskStatus,
+    ) -> Result<TransferBatchResponse, ApiErr> {
+        let tasks = self.directory_tasks(id).await?;
+        for task in tasks {
+            if matches!(
+                task.status,
+                TransferTaskStatus::Wait | TransferTaskStatus::Run | TransferTaskStatus::Pause
+            ) {
+                match status {
+                    TransferTaskStatus::Pause => {
+                        self.pause_task(&task.id).await?;
+                    }
+                    TransferTaskStatus::Cancel => {
+                        self.cancel_task(&task.id).await?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(TransferBatchResponse { id: id.to_string() })
+    }
+
+    async fn directory_tasks(&self, id: &str) -> Result<Vec<TaskModel>, ApiErr> {
+        let root = self.get_task_model(id).await?;
+        if root.kind != TransferTaskKind::Directory {
+            return Err(invalid("transfer task is not a directory"));
+        }
+        let batch_id = root
+            .batch_id
+            .as_deref()
+            .ok_or_else(|| invalid("directory task requires batch_id"))?;
+        let tasks = self.batch_tasks_only(batch_id).await?;
+        let mut ids = HashSet::from([id.to_string()]);
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for task in &tasks {
+                if task
+                    .parent_id
+                    .as_deref()
+                    .is_some_and(|parent| ids.contains(parent))
+                    && ids.insert(task.id.clone())
+                {
+                    changed = true;
+                }
+            }
+        }
+        Ok(tasks
+            .into_iter()
+            .filter(|task| ids.contains(&task.id))
+            .collect())
+    }
+
+    pub async fn delete_directory(&self, id: &str) -> Result<(), ApiErr> {
+        let tasks = self.directory_tasks(id).await?;
         for task in tasks {
             self.delete_task(&task.id).await?;
         }

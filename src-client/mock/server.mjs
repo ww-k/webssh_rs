@@ -475,6 +475,10 @@ async function handleTransfer(request, response, pathname, searchParams) {
                 : state.transferTasks,
         );
     }
+    if (request.method === "GET" && pathname === "/api/transfer/tree") {
+        const batchId = searchParams.get("batch_id");
+        return sendJson(response, 200, buildMockTransferTree(batchId));
+    }
     if (request.method === "DELETE" && pathname === "/api/transfer/history") {
         state.transferTasks = state.transferTasks.filter(
             (task) => !["SUCCESS", "FAIL", "CANCEL"].includes(task.status),
@@ -526,6 +530,31 @@ async function handleTransfer(request, response, pathname, searchParams) {
         }
         return sendMethodNotAllowed(response);
     }
+    const directoryMatch = pathname.match(
+        /^\/api\/transfer\/directories\/([^/]+)(?:\/(pause|resume|cancel))?$/,
+    );
+    if (directoryMatch) {
+        const [, directoryId, action] = directoryMatch;
+        const directory = state.transferTasks.find(
+            (task) => task.id === directoryId && task.kind === "DIRECTORY",
+        );
+        if (!directory) return sendNotFound(response, "Transfer directory", directoryId);
+        if (request.method === "DELETE" && !action) {
+            state.transferTasks = state.transferTasks.filter(
+                (task) => task.id !== directoryId && task.parent_id !== directoryId,
+            );
+            return endResponse(response);
+        }
+        if (request.method === "POST" && action) {
+            const status = { pause: "PAUSE", resume: "RUN", cancel: "CANCEL" }[action];
+            state.transferTasks = state.transferTasks.map((task) =>
+                task.id === directoryId || task.parent_id === directoryId
+                    ? { ...task, status, updated_at: Date.now() }
+                    : task,
+            );
+            return sendJson(response, 200, { id: directoryId });
+        }
+    }
     if (
         request.method === "POST" &&
         ["/api/transfer/upload", "/api/transfer/download"].includes(pathname)
@@ -568,6 +597,97 @@ async function handleTransfer(request, response, pathname, searchParams) {
         return sendJson(response, 200, state.transferTasks[index]);
     }
     return sendMethodNotAllowed(response);
+}
+
+function buildMockTransferTree(batchId) {
+    const tasks = batchId
+        ? state.transferTasks.filter((task) => task.batch_id === batchId)
+        : state.transferTasks;
+    const node = (task) => ({
+        ...task,
+        node_type: task.kind === "DIRECTORY" ? "DIRECTORY" : "FILE",
+        children: [],
+    });
+    const result = tasks.filter((task) => !task.batch_id).map(node);
+    const batchIds = new Set([
+        ...state.transferBatches.keys(),
+        ...tasks.map((task) => task.batch_id).filter(Boolean),
+    ]);
+    for (const id of batchIds) {
+        if (batchId && batchId !== id) continue;
+        const batchTasks = tasks.filter((task) => task.batch_id === id);
+        if (batchTasks.length === 0) continue;
+        const batch = state.transferBatches.get(id) || {
+            id,
+            type: batchTasks[0].type,
+            status: batchTasks.some((task) => task.status === "RUN")
+                ? "RUN"
+                : batchTasks[0].status,
+            name: batchTasks[0].name,
+            target_id: batchTasks[0].target_id,
+            conflict_policy: batchTasks[0].conflict_policy || "OVERWRITE",
+            item_count: batchTasks.length,
+            completed_count: batchTasks.filter((task) => task.status === "SUCCESS").length,
+            failed_count: batchTasks.filter((task) => task.status === "FAIL").length,
+            directory_count: batchTasks.filter((task) => task.kind === "DIRECTORY").length,
+            directory_failed_count: batchTasks.filter(
+                (task) => task.kind === "DIRECTORY" && task.status === "FAIL",
+            ).length,
+            total: batchTasks.reduce((sum, task) => sum + task.total, 0),
+            loaded: batchTasks.reduce((sum, task) => sum + task.loaded, 0),
+            percent: 0,
+            speed: batchTasks.reduce((sum, task) => sum + task.speed, 0),
+            created_at: Math.min(...batchTasks.map((task) => task.created_at)),
+            updated_at: Math.max(...batchTasks.map((task) => task.updated_at)),
+        };
+        const batchChildren = batchTasks
+            .filter((task) => !task.parent_id)
+            .map(node);
+        if (batchChildren.length === 1) {
+            result.push(batchChildren[0]);
+            continue;
+        }
+        result.push({
+            ...withoutBatchTasks(batch),
+            id,
+            node_type: "BATCH",
+            kind: undefined,
+            batch_id: id,
+            children: batchChildren,
+        });
+    }
+    sortMockTransferTree(result);
+    return result;
+}
+
+const MOCK_TRANSFER_STATUS_ORDER = {
+    FAIL: 0,
+    RUN: 1,
+    WAIT: 2,
+    PAUSE: 3,
+    SUCCESS: 4,
+    CANCEL: 4,
+};
+
+const MOCK_TRANSFER_NODE_TYPE_ORDER = {
+    BATCH: 0,
+    DIRECTORY: 1,
+    FILE: 2,
+};
+
+function sortMockTransferTree(nodes) {
+    nodes.sort(
+        (left, right) =>
+            (MOCK_TRANSFER_NODE_TYPE_ORDER[left.node_type] ?? 99) -
+                (MOCK_TRANSFER_NODE_TYPE_ORDER[right.node_type] ?? 99) ||
+            (MOCK_TRANSFER_STATUS_ORDER[left.status] ?? 99) -
+                (MOCK_TRANSFER_STATUS_ORDER[right.status] ?? 99) ||
+            right.created_at - left.created_at ||
+            right.id.localeCompare(left.id),
+    );
+    for (const node of nodes) {
+        if (node.children.length > 0) sortMockTransferTree(node.children);
+    }
 }
 
 function createTransferBatch(upload, payload) {

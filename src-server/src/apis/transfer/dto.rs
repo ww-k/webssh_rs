@@ -70,6 +70,53 @@ pub struct TransferTaskResponse {
     pub all: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+pub enum TransferTreeNodeType {
+    #[serde(rename = "BATCH")]
+    Batch,
+    #[serde(rename = "DIRECTORY")]
+    Directory,
+    #[serde(rename = "FILE")]
+    File,
+}
+
+/// A transfer list node. Batch and directory nodes contain their descendants
+/// so the client does not need to rebuild the hierarchy from every task.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TransferTreeNode {
+    pub id: String,
+    pub node_type: TransferTreeNodeType,
+    pub r#type: TransferTaskType,
+    pub kind: Option<TransferTaskKind>,
+    pub status: TransferTaskStatus,
+    pub local_path: Option<String>,
+    pub target_uri: Option<String>,
+    pub target_id: Option<i32>,
+    pub name: String,
+    pub loaded: i64,
+    pub total: i64,
+    pub percent: f64,
+    pub speed: i64,
+    pub estimated_time: Option<i64>,
+    pub ranges: Vec<TransferRangeSchema>,
+    pub fail_reason: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub ended_at: Option<i64>,
+    pub batch_id: Option<String>,
+    pub parent_id: Option<String>,
+    pub relative_path: Option<String>,
+    pub conflict_policy: Option<TransferConflictPolicy>,
+    pub all: bool,
+    pub item_count: Option<usize>,
+    pub completed_count: Option<usize>,
+    pub failed_count: Option<usize>,
+    pub directory_count: Option<usize>,
+    pub directory_failed_count: Option<usize>,
+    #[serde(default)]
+    pub children: Vec<TransferTreeNode>,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct TransferTaskCountResponse {
     pub count: u64,

@@ -32,22 +32,17 @@ import "./index.css";
 import { postFsShowInFolder } from "@/api";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import useTablePageNavigation from "@/hooks/useTablePageNavigation";
-import transferService, { getTransferBatchName } from "@/services/transfer";
+import transferService from "@/services/transfer";
 
 import type { TFunction } from "i18next";
 import type {
-    ITransferBatch,
-    ITransferTask,
     ITransferTaskStatus,
     ITransferTaskType,
+    ITransferTreeNode,
 } from "@/api";
 
 const { Text } = Typography;
-type TransferRow = ITransferTask | ITransferBatch;
-type TransferTreeRow = TransferRow & {
-    children?: TransferTreeRow[];
-    isVirtual?: boolean;
-};
+type TransferTreeRow = ITransferTreeNode;
 const TRANSFER_ROW_HEIGHT = 40;
 type TransferTypeFilter = "ALL" | ITransferTaskType;
 type TransferFilterState = {
@@ -66,13 +61,7 @@ const STATUS_TEXT_KEY: Record<ITransferTaskStatus, string> = {
     CANCEL: "transfer_status_cancelled",
 };
 
-const isFinishedTransferStatus = (status: ITransferTaskStatus) =>
-    ["SUCCESS", "FAIL", "CANCEL"].includes(status);
-
-const getFinishedHistoryCount = () =>
-    transferService
-        .getTasks()
-        .filter((task) => isFinishedTransferStatus(task.status)).length;
+const getFinishedHistoryCount = () => transferService.getFinishedHistoryCount();
 
 const getStoredTransferFilters = (): TransferFilterState => {
     try {
@@ -127,8 +116,9 @@ const formatDuration = (seconds?: number): string => {
         .join(":");
 };
 
-const isBatch = (record: TransferRow): record is ITransferBatch =>
-    "item_count" in record;
+const isBatch = (record: TransferTreeRow) => record.node_type === "BATCH";
+const isDirectory = (record: TransferTreeRow) =>
+    record.node_type === "DIRECTORY";
 
 const TransferTreeExpandIcon = (
     record: TransferTreeRow,
@@ -211,7 +201,7 @@ const TransferTypeCell = memo(
 );
 
 const TransferProgressCell = memo(
-    ({ record, t }: { record: TransferRow; t: TFunction }) => {
+    ({ record, t }: { record: TransferTreeRow; t: TFunction }) => {
         const batch = isBatch(record);
         const progressPercent =
             record.status === "SUCCESS"
@@ -300,9 +290,10 @@ type TransferAction = {
 };
 
 const getActionItems = (
-    record: ITransferTask,
+    record: TransferTreeRow,
     t: TFunction,
 ): TransferAction[] => {
+    const directory = isDirectory(record);
     const canPause = record.status === "RUN" || record.status === "WAIT";
     const canResume = record.status === "PAUSE";
     const canCancel = canPause || canResume;
@@ -314,6 +305,22 @@ const getActionItems = (
             message.error(t("transfer_show_in_folder_failed"));
         });
     };
+    const cancel = () =>
+        directory
+            ? transferService.cancelDirectory(record)
+            : transferService.cancel(record);
+    const remove = () =>
+        directory
+            ? transferService.removeDirectory(record)
+            : transferService.remove(record);
+    const pause = () =>
+        directory
+            ? transferService.pauseDirectory(record)
+            : transferService.pause(record);
+    const resume = () =>
+        directory
+            ? transferService.resumeDirectory(record)
+            : transferService.resume(record);
     const handleCancel = () =>
         Modal.confirm({
             title: t("transfer_confirm_cancel_title"),
@@ -322,7 +329,7 @@ const getActionItems = (
             }),
             okText: t("app_btn_ok"),
             cancelText: t("app_btn_cancel"),
-            onOk: () => transferService.cancel(record.id),
+            onOk: cancel,
         });
     const handleDelete = () =>
         Modal.confirm({
@@ -332,7 +339,7 @@ const getActionItems = (
             }),
             okText: t("app_btn_ok"),
             cancelText: t("app_btn_cancel"),
-            onOk: () => transferService.remove(record.id),
+            onOk: remove,
         });
 
     return [
@@ -343,8 +350,8 @@ const getActionItems = (
                 : t("transfer_action_pause"),
             icon: canResume ? <PlayCircleOutlined /> : <PauseCircleOutlined />,
             onClick: canResume
-                ? () => transferService.resume(record.id).catch(console.warn)
-                : () => transferService.pause(record.id),
+                ? () => resume().catch(console.warn)
+                : () => pause(),
             disabled: !canPause && !canResume,
         },
         {
@@ -358,7 +365,7 @@ const getActionItems = (
             key: "retry",
             label: t("transfer_action_retry"),
             icon: <ReloadOutlined />,
-            onClick: () => transferService.resume(record.id).catch(console.warn),
+            onClick: () => resume().catch(console.warn),
             disabled: !canRetry,
         },
         {
@@ -378,11 +385,7 @@ const getActionItems = (
     ];
 };
 
-const ActionButtons = ({
-    actions,
-}: {
-    actions: TransferAction[];
-}) => (
+const ActionButtons = ({ actions }: { actions: TransferAction[] }) => (
     <Space className="WebSSH-TransferActions" size="small">
         {actions.map((action) => (
             <Tooltip key={action.key} title={action.label}>
@@ -400,6 +403,7 @@ const ActionButtons = ({
     </Space>
 );
 
+/*
 const getUnavailableActionItems = (t: TFunction): TransferAction[] => [
     {
         key: "pause-resume",
@@ -438,15 +442,12 @@ const getUnavailableActionItems = (t: TFunction): TransferAction[] => [
         disabled: true,
     },
 ];
+*/
 
-const getTableColumns = (
-    t: TFunction,
-): DataTableColumn<TransferTreeRow>[] => {
+const getTableColumns = (t: TFunction): DataTableColumn<TransferTreeRow>[] => {
     const renderAction = (record: TransferTreeRow) =>
         isBatch(record) ? (
             <ActionButtons actions={getBatchActionItems(record, t)} />
-        ) : record.isVirtual ? (
-            <ActionButtons actions={getUnavailableActionItems(t)} />
         ) : (
             <ActionButtons actions={getActionItems(record, t)} />
         );
@@ -492,6 +493,7 @@ const getTableColumns = (
     ];
 };
 
+/*
 const normalizeTransferPath = (value: string) =>
     value
         .replace(/\\/g, "/")
@@ -703,9 +705,41 @@ const buildTransferFileTree = (tasks: ITransferTask[]): TransferTreeRow[] => {
     }
     return sortTransferTree(result);
 };
+*/
+
+const filterTransferTree = (
+    rows: ITransferTreeNode[],
+    type: TransferTypeFilter,
+    keyword: string,
+): ITransferTreeNode[] => {
+    const normalizedKeyword = keyword.trim().toLocaleLowerCase();
+    const matches = (row: ITransferTreeNode) => {
+        if (type !== "ALL" && row.type !== type) return false;
+        if (!normalizedKeyword) return true;
+        return [
+            row.name,
+            row.relative_path,
+            row.local_path,
+            row.target_uri,
+        ].some((value) =>
+            value?.toLocaleLowerCase().includes(normalizedKeyword),
+        );
+    };
+    const visit = (row: ITransferTreeNode): ITransferTreeNode | null => {
+        const children = row.children
+            .map(visit)
+            .filter((child): child is ITransferTreeNode => child !== null);
+        return matches(row) || children.length > 0
+            ? { ...row, children }
+            : null;
+    };
+    return rows
+        .map(visit)
+        .filter((row): row is ITransferTreeNode => row !== null);
+};
 
 const getBatchActionItems = (
-    record: ITransferBatch,
+    record: TransferTreeRow,
     t: TFunction,
     refresh?: () => void,
 ): TransferAction[] => {
@@ -769,62 +803,35 @@ export const TransferTable = ({
     tableBodyHeight: number;
 }) => {
     const { t } = useTranslation();
-    const [list, setList] = useState<ITransferTask[]>(() =>
-        transferService.getTasks(),
+    const [tree, setTree] = useState<ITransferTreeNode[]>(() =>
+        transferService.getTree(),
     );
-
     useEffect(() => {
-        const unsubscribeTasks = transferService.subscribe(setList);
+        const unsubscribeTree = transferService.subscribeTree(setTree);
         return () => {
-            unsubscribeTasks();
+            unsubscribeTree();
         };
     }, []);
-    const [tree, setTree] = useState<TransferTreeRow[]>([]);
-    const [treeLoading, setTreeLoading] = useState(true);
-    useEffect(() => {
-        let disposed = false;
-        setTreeLoading(true);
-        const timer = window.setTimeout(() => {
-            const normalizedKeyword = keyword.trim().toLocaleLowerCase();
-            const filteredList = list.filter((item) => {
-                if (type !== "ALL" && item.type !== type) return false;
-                if (!normalizedKeyword) return true;
-                return [
-                    item.name,
-                    item.relative_path,
-                    item.local_path,
-                    item.target_uri,
-                ].some((value) =>
-                    value?.toLocaleLowerCase().includes(normalizedKeyword),
-                );
-            });
-            const nextTree = buildTransferFileTree(filteredList);
-            if (disposed) return;
-            setTree(nextTree);
-            setTreeLoading(false);
-        }, 0);
-        return () => {
-            disposed = true;
-            window.clearTimeout(timer);
-        };
-    }, [keyword, list, type]);
+    const filteredTree = useMemo(
+        () => filterTransferTree(tree, type, keyword),
+        [keyword, tree, type],
+    );
 
     const columns: DataTableColumn<TransferTreeRow>[] = useMemo(
-        () =>
-            getTableColumns(t),
+        () => getTableColumns(t),
         [t],
     );
     return (
         <DataTable
             columns={columns}
-            data={tree}
+            data={filteredTree}
             getRowId={(row) => row.id}
             getSubRows={(row) => row.children}
             expandIcon={TransferTreeExpandIcon}
             rowHeight={TRANSFER_ROW_HEIGHT}
             multiple={false}
             selectable={false}
-            loading={treeLoading}
+            loading={false}
             virtual={tableBodyHeight > 0}
         />
     );
@@ -832,10 +839,8 @@ export const TransferTable = ({
 
 export default function Transfer() {
     const { t } = useTranslation();
-    const {
-        tableContainerRef,
-        tablePageNavigationProps,
-    } = useTablePageNavigation();
+    const { tableContainerRef, tablePageNavigationProps } =
+        useTablePageNavigation();
     const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const [filters, setFilters] = useState<TransferFilterState>(
@@ -850,9 +855,9 @@ export default function Transfer() {
     );
     useEffect(() => {
         const update = () => setFinishedHistoryCount(getFinishedHistoryCount());
-        const unsubscribeTasks = transferService.subscribe(update);
+        const unsubscribeTree = transferService.subscribeTree(update);
         return () => {
-            unsubscribeTasks();
+            unsubscribeTree();
         };
     }, []);
     useEffect(() => {
