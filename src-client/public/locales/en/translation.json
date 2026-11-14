@@ -146,6 +146,7 @@
     "settings_data_import_target_skip": "Skip",
     "settings_data_import_target_overwrite": "Overwrite",
     "terminal_open_sftp": "Open in SFTP",
+    "terminal_open_sftp_disabled": "Unable to get the current directory. Set the PROMPT_COMMAND environment variable on the target host to support OSC 7.",
     "filesview_open_terminal": "Open in SSH",
     "filesview_show_all_files": "Show all files",
     "filesview_hide_hidden_files": "Hide hidden files",

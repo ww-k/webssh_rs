@@ -388,14 +388,23 @@ export default function Terminal({
     return (
         <div className="terminalView">
             <div className="terminalToolbar">
-                <Tooltip title={t("terminal_open_sftp")}>
-                    <Button
-                        disabled={cwd === undefined}
-                        icon={<FolderOutlined />}
-                        onClick={openSftp}
-                        size="small"
-                        type="text"
-                    />
+                <Tooltip
+                    title={t(
+                        cwd === undefined
+                            ? "terminal_open_sftp_disabled"
+                            : "terminal_open_sftp",
+                    )}
+                >
+                    <span>
+                        <Button
+                            aria-label={t("terminal_open_sftp")}
+                            disabled={cwd === undefined}
+                            icon={<FolderOutlined />}
+                            onClick={openSftp}
+                            size="small"
+                            type="text"
+                        />
+                    </span>
                 </Tooltip>
                 <Tooltip title={t("files_menu_upload")}>
                     <Button
