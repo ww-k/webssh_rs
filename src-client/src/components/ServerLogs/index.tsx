@@ -1,7 +1,4 @@
-import {
-    FileTextOutlined,
-    SearchOutlined,
-} from "@ant-design/icons";
+import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
 import { Empty, Input, message, Select, Space } from "antd";
 import {
     type ReactNode,
@@ -13,12 +10,11 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getServerLogs } from "@/api";
-
 import "./index.css";
 
 const LOG_LEVELS = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"] as const;
 type LogLevel = (typeof LOG_LEVELS)[number];
+const MAX_LOG_LINES = 2_000;
 
 const ANSI_COLORS: Record<number, string> = {
     30: "#1f1f1f",
@@ -112,6 +108,10 @@ function renderAnsiText(text: string) {
     return nodes;
 }
 
+function splitEventLines(data: string) {
+    return data ? data.split("\n") : [];
+}
+
 export default function ServerLogs() {
     const { t } = useTranslation();
     const [logs, setLogs] = useState<string[]>([]);
@@ -119,38 +119,65 @@ export default function ServerLogs() {
     const [level, setLevel] = useState<LogLevel | "ALL">("ALL");
     const outputRef = useRef<HTMLPreElement>(null);
     const shouldStickToBottom = useRef(true);
-    const normalizedKeyword = keyword.trim().toLocaleLowerCase();
-    const visibleLogs = useMemo(
-        () =>
-            logs.filter((line) => {
-                const plainLine = stripAnsi(line);
-                const lineLevel = plainLine.match(
-                    /\b(TRACE|DEBUG|INFO|WARN|ERROR)\b/,
-                )?.[1];
-                return (
-                    (level === "ALL" || lineLevel === level) &&
-                    plainLine.toLocaleLowerCase().includes(normalizedKeyword)
-                );
-            }),
-        [level, logs, normalizedKeyword],
-    );
+    const visibleLogs = useMemo(() => {
+        const normalizedKeyword = keyword.trim().toLocaleLowerCase();
+        return logs.filter((line) => {
+            const plainLine = stripAnsi(line);
+            const lineLevel = plainLine.match(
+                /\b(TRACE|DEBUG|INFO|WARN|ERROR)\b/,
+            )?.[1];
+            return (
+                (level === "ALL" || lineLevel === level) &&
+                plainLine.toLocaleLowerCase().includes(normalizedKeyword)
+            );
+        });
+    }, [keyword, level, logs]);
 
-    const loadLogs = useCallback(
-        async (showError = false) => {
-            try {
-                setLogs(await getServerLogs());
-            } catch {
-                if (showError) message.error(t("server_logs_load_failed"));
-            }
-        },
-        [t],
-    );
+    const appendLines = useCallback((data: string) => {
+        const lines = splitEventLines(data);
+        if (!lines.length) return;
+        setLogs((previous) => [...previous, ...lines].slice(-MAX_LOG_LINES));
+    }, []);
 
     useEffect(() => {
-        void loadLogs();
-        const timer = window.setInterval(() => void loadLogs(), 2000);
-        return () => window.clearInterval(timer);
-    }, [loadLogs]);
+        const eventSource = new EventSource(
+            new URL("/api/logs/stream", window.location.origin),
+        );
+        let errorReported = false;
+
+        const handleSnapshot = (event: Event) => {
+            setLogs(splitEventLines((event as MessageEvent<string>).data));
+        };
+        const handleResume = (event: Event) => {
+            appendLines((event as MessageEvent<string>).data);
+        };
+        const handleLog = (event: Event) => {
+            appendLines((event as MessageEvent<string>).data);
+        };
+
+        eventSource.addEventListener("snapshot", handleSnapshot);
+        eventSource.addEventListener("resume", handleResume);
+        eventSource.addEventListener("log", handleLog);
+        eventSource.onopen = () => {
+            errorReported = false;
+        };
+        eventSource.onerror = () => {
+            if (
+                eventSource.readyState === EventSource.CLOSED &&
+                !errorReported
+            ) {
+                errorReported = true;
+                message.error(t("server_logs_load_failed"));
+            }
+        };
+
+        return () => {
+            eventSource.close();
+            eventSource.removeEventListener("snapshot", handleSnapshot);
+            eventSource.removeEventListener("resume", handleResume);
+            eventSource.removeEventListener("log", handleLog);
+        };
+    }, [appendLines, t]);
 
     useEffect(() => {
         if (
@@ -161,6 +188,7 @@ export default function ServerLogs() {
             outputRef.current.scrollTop = outputRef.current.scrollHeight;
         }
     }, [visibleLogs]);
+
     const logOccurrences = new Map<string, number>();
     const renderedLogs = visibleLogs.map((line, index) => {
         const occurrence = logOccurrences.get(line) ?? 0;
@@ -168,7 +196,7 @@ export default function ServerLogs() {
         return (
             <span key={`${line}-${occurrence}`}>
                 {renderAnsiText(line)}
-                {index < logs.length - 1 ? "\n" : ""}
+                {index < visibleLogs.length - 1 ? "\n" : ""}
             </span>
         );
     });

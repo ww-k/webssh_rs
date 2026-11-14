@@ -4,6 +4,7 @@ use utoipa::OpenApi;
 #[openapi(
     paths(
         crate::get_logs,
+        crate::stream_logs,
         crate::apis::target::handlers::target_list,
         crate::apis::target::handlers::target_add,
         crate::apis::target::handlers::target_update,

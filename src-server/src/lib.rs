@@ -12,16 +12,22 @@ pub mod ssh_connection_pool;
 #[cfg(test)]
 mod tests;
 
-use std::{future::Future, ops::Deref, path::PathBuf, sync::Arc};
+use std::{
+    convert::Infallible, future::Future, ops::Deref, path::PathBuf, sync::Arc, time::Duration,
+};
 
 use axum::{
     Router,
     body::Body,
-    http::{StatusCode, header},
-    response::Response,
+    http::{HeaderMap, StatusCode, header},
+    response::{
+        Response,
+        sse::{Event, KeepAlive, Sse},
+    },
     routing::get,
 };
 use config::Config;
+use futures_util::stream::Stream;
 use sea_orm::{Database, DatabaseConnection};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
@@ -131,6 +137,7 @@ where
 
     let app = Router::new()
         .route("/api/logs", get(get_logs))
+        .route("/api/logs/stream", get(stream_logs))
         .nest(
             "/api/ssh_known_host",
             ssh_known_host::router_builder(app_state.clone()),
@@ -189,6 +196,86 @@ where
 )]
 pub async fn get_logs() -> axum::Json<Vec<String>> {
     axum::Json(log_buffer::log_buffer().lines())
+}
+
+fn snapshot_event(
+    entries: &[log_buffer::LogEntry],
+    latest_id: Option<u64>,
+    replace_terminal: bool,
+) -> Event {
+    let data = entries
+        .iter()
+        .map(|entry| entry.line.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let event = Event::default()
+        .event(if replace_terminal {
+            "snapshot"
+        } else {
+            "resume"
+        })
+        .data(data);
+    if let Some(id) = latest_id {
+        event.id(id.to_string())
+    } else {
+        event
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/logs/stream",
+    tag = "server_logs",
+    summary = "实时推送服务端日志",
+    responses(
+        (status = 200, description = "服务端日志 SSE 流", content_type = "text/event-stream")
+    )
+)]
+pub async fn stream_logs(headers: HeaderMap) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let after_id = headers
+        .get("last-event-id")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok());
+    let buffer = log_buffer::log_buffer();
+    let (entries, latest_id, mut receiver, mut replace_terminal) =
+        buffer.subscribe_with_snapshot(after_id);
+
+    let stream = async_stream::stream! {
+        yield Ok(snapshot_event(
+            &entries,
+            latest_id,
+            replace_terminal,
+        ));
+
+        loop {
+            match receiver.recv().await {
+                Ok(entry) => {
+                    yield Ok(Event::default()
+                        .event("log")
+                        .id(entry.id.to_string())
+                        .data(entry.line));
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                    let (entries, latest_id, next_receiver, next_replace_terminal) =
+                        buffer.subscribe_with_snapshot(None);
+                    receiver = next_receiver;
+                    replace_terminal = next_replace_terminal;
+                    yield Ok(snapshot_event(
+                        &entries,
+                        latest_id,
+                        replace_terminal,
+                    ));
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    };
+
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("keep-alive"),
+    )
 }
 
 async fn serve_client(uri: axum::http::Uri) -> Response<Body> {
