@@ -5,14 +5,13 @@ import {
     DownloadOutlined,
     DownOutlined,
     FileTextOutlined,
-    FolderTwoTone,
+    FolderOutlined,
     HomeOutlined,
     LaptopOutlined,
     ReloadOutlined,
     SearchOutlined,
     StarFilled,
     StarOutlined,
-    UnorderedListOutlined,
 } from "@ant-design/icons";
 import { Input, message, Popconfirm, Spin } from "antd";
 import classNames from "clsx";
@@ -31,6 +30,7 @@ import {
 } from "@/api";
 import { getFilePath, isSftpFileUri } from "@/helpers/file_uri";
 
+import FavoritesDirOutlined from "../icons/FavoritesDirOutlined";
 import {
     appendFavoriteDirectoryMenuItem,
     favoriteDirectoryToMenuItem,
@@ -135,6 +135,7 @@ export default class Pathbar extends Component<IProps, IState> {
     favoriteDirectoryTargetId?: number;
     favoriteDirectoryMutationRequestId = 0;
     _resizeObserver!: ResizeObserver;
+    _onLanguageChanged?: () => void;
 
     static defaultProps = {
         className: "",
@@ -196,6 +197,13 @@ export default class Pathbar extends Component<IProps, IState> {
         if (this.props.cwd) {
             this.getFavoriteDirectories();
         }
+        this._onLanguageChanged = () => {
+            this.setState(
+                { routes: this.generateRoutes(this.props.cwd) },
+                () => this.resizeViewThrottle(),
+            );
+        };
+        i18n.on("languageChanged", this._onLanguageChanged);
 
         this._resizeObserver = new ResizeObserver((_entries, observer) => {
             const rootEl = this.rootElRef.current;
@@ -242,6 +250,10 @@ export default class Pathbar extends Component<IProps, IState> {
         this.favoriteDirectoryTargetId = undefined;
         this._resizeObserver.disconnect();
         this._resizeObserver = null as unknown as ResizeObserver;
+        if (this._onLanguageChanged) {
+            i18n.off("languageChanged", this._onLanguageChanged);
+            this._onLanguageChanged = undefined;
+        }
         document.removeEventListener("click", this.handleClickOutside);
     }
 
@@ -315,7 +327,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                 breadcrumbLeft < 5 ? (
                                     <DoubleLeftOutlined />
                                 ) : (
-                                    <UnorderedListOutlined />
+                                    <FavoritesDirOutlined />
                                 )
                             ) : (
                                 <DownOutlined />
@@ -338,7 +350,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                     )}
                                 >
                                     <div>
-                                        <FolderTwoTone />
+                                        <FolderOutlined />
                                         <span>{item.name}</span>
                                     </div>
                                 </li>
@@ -356,7 +368,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                                       `pathbar_favorite_directory_default_${defaultKind}`,
                                                   )
                                                 : item.name;
-                                            let icon = <FolderTwoTone />;
+                                            let icon = <FolderOutlined />;
                                             switch (defaultKind) {
                                                 case "/":
                                                     icon = <LaptopOutlined />;
@@ -434,7 +446,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                                     item.uri === activedPath,
                                             })}
                                         >
-                                            <FolderTwoTone />
+                                            <FolderOutlined />
                                             <span>{item.name}</span>
                                         </div>
                                     </li>
@@ -1023,7 +1035,7 @@ export default class Pathbar extends Component<IProps, IState> {
         }
 
         routes.push({
-            name: "/",
+            name: i18n.t("pathbar_favorite_directory_default_/"),
             title: "/",
             path: `${fullpath}/`,
             link: true,

@@ -92,7 +92,17 @@
     vertical-align: middle;
 }
 
+.pathbarEdgeFavoritesIcon {
+    display: block;
+    width: 18px;
+    height: 18px;
+    color: var(--ant-color-text);
+}
+
 .pathbarFavoriteDirectoryMenuBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-right: 1px solid transparent;
 }
 .pathbarFavoriteDirectoryMenuBtn:hover,
@@ -148,7 +158,7 @@
 
 .pathbarRouteSelect .pathbarRouteName,
 .pathbarRoute:hover .pathbarRouteName {
-    border-right: 1px solid var(--ant-color-primary-border);
+    border-right: 1px solid var(--ant-color-border);
 }
 
 .pathbarRoute {
@@ -215,7 +225,7 @@
 }
 
 .pathbarFavoriteDirectoryBtn.active .anticon {
-    color: var(--ant-color-warning);
+    color: var(--ant-color-primary);
 }
 
 .pathbarFavoriteDirectoryBtn:disabled {
