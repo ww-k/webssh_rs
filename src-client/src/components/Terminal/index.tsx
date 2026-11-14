@@ -2,8 +2,14 @@ import {
     ClearOutlined,
     CloseOutlined,
     CopyOutlined,
+    DesktopOutlined,
+    DownloadOutlined,
+    DownOutlined,
     EyeInvisibleOutlined,
+    FileTextOutlined,
     FolderOutlined,
+    HomeOutlined,
+    LaptopOutlined,
     ReloadOutlined,
     SnippetsOutlined,
     UploadOutlined,
@@ -22,18 +28,29 @@ import { useTranslation } from "react-i18next";
 import "@wterm/dom/css";
 import "./index.css";
 
+import {
+    getFavoriteDirectoryList,
+    postFavoriteDirectoryInitialize,
+} from "@/api";
+import { getFilePath } from "@/helpers/file_uri";
 import { normalizeTerminalCwd } from "@/helpers/terminal_cwd";
 import transferService from "@/services/transfer";
 import useAppStore, { type ITab } from "@/store";
 
 import popContextMenu from "../Contextmenu";
 import renderFsSelector from "../FsSelector/render";
+import FavoritesDirOutlined from "../icons/FavoritesDirOutlined";
+import {
+    favoriteDirectoryToMenuItem,
+    getFavoriteDirectoryDefaultKind,
+} from "../Pathbar/favorite_directory";
 import {
     TerminalController,
     type TerminalControllerEvents,
 } from "./controller";
 
 import type { IContextmenuDataItem } from "../Contextmenu/typings";
+import type { IFavoriteDirectoryMenuItem } from "../Pathbar/favorite_directory";
 
 function getTargetLabel(label: string, targetId?: number): string {
     const targetLabel = label.replace(/^ssh\s+/i, "").trim();
@@ -81,6 +98,14 @@ export default function Terminal({
         (state) => state.setShowTerminalCopyNotification,
     );
     const [cwd, setCwd] = useState<string>();
+    const [favoriteDirectories, setFavoriteDirectories] = useState<
+        IFavoriteDirectoryMenuItem[]
+    >([]);
+    const [favoriteDirectoriesLoaded, setFavoriteDirectoriesLoaded] =
+        useState(false);
+    const [favoriteDirectoryMenuVisible, setFavoriteDirectoryMenuVisible] =
+        useState(false);
+    const [terminalSystem, setTerminalSystem] = useState<string>();
     const [connectionStatus, setConnectionStatus] = useState<
         "connected" | "disconnected" | "connecting"
     >("connecting");
@@ -103,6 +128,8 @@ export default function Terminal({
     const terminalEventsRef = useRef<TerminalControllerEvents>();
     const initialCwdRestoredRef = useRef(false);
     const terminalContextMenuDestroyRef = useRef<(() => void) | undefined>();
+    const favoriteDirectoryRequestIdRef = useRef(0);
+    const favoriteDirectoryMenuBoxRef = useRef<HTMLDivElement>(null);
     const targetId = useMemo(() => {
         const match = tab.path.match(/^\/terminal\/(\d+)/);
         return match ? Number.parseInt(match[1], 10) : undefined;
@@ -111,6 +138,59 @@ export default function Terminal({
         () => createWebMCPOptions(targetId, tab.label),
         [tab.label, targetId],
     );
+    const isWindowsTarget = terminalSystem?.toLowerCase() === "windows";
+
+    useEffect(() => {
+        const requestId = ++favoriteDirectoryRequestIdRef.current;
+        setFavoriteDirectoryMenuVisible(false);
+        setFavoriteDirectories([]);
+        setFavoriteDirectoriesLoaded(false);
+
+        if (targetId === undefined || isWindowsTarget) {
+            setFavoriteDirectoriesLoaded(true);
+            return;
+        }
+
+        postFavoriteDirectoryInitialize(targetId)
+            .catch(() => undefined)
+            .then(() => getFavoriteDirectoryList(targetId))
+            .then((list) => {
+                if (requestId !== favoriteDirectoryRequestIdRef.current) {
+                    return;
+                }
+                setFavoriteDirectories(list.map(favoriteDirectoryToMenuItem));
+                setFavoriteDirectoriesLoaded(true);
+            })
+            .catch(() => {
+                if (requestId !== favoriteDirectoryRequestIdRef.current) {
+                    return;
+                }
+                setFavoriteDirectoriesLoaded(true);
+            });
+
+        return () => {
+            favoriteDirectoryRequestIdRef.current += 1;
+        };
+    }, [isWindowsTarget, targetId]);
+
+    useEffect(() => {
+        if (!favoriteDirectoryMenuVisible) return;
+
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target;
+            if (
+                target instanceof Node &&
+                !favoriteDirectoryMenuBoxRef.current?.contains(target)
+            ) {
+                setFavoriteDirectoryMenuVisible(false);
+            }
+        };
+
+        document.addEventListener("click", handleClickOutside);
+        return () => {
+            document.removeEventListener("click", handleClickOutside);
+        };
+    }, [favoriteDirectoryMenuVisible]);
 
     const clearCopyNotificationTimer = useCallback(() => {
         if (copyNotificationTimerRef.current) {
@@ -295,6 +375,22 @@ export default function Terminal({
         controller.handleCommand("focus");
     }, []);
 
+    const favoriteDirectoryItemClick = useCallback((item: string) => {
+        const directory = getFilePath(item);
+        const escapedDirectory = directory.replace(/'/g, "'\\''");
+        terminalControllerRef.current?.handleCommand(
+            "input",
+            `cd '${escapedDirectory}'\n`,
+        );
+        terminalControllerRef.current?.handleCommand("focus");
+        setFavoriteDirectoryMenuVisible(false);
+    }, []);
+
+    const favoriteDirectoryMenuClick = useCallback(() => {
+        if (targetId === undefined) return;
+        setFavoriteDirectoryMenuVisible((visible) => !visible);
+    }, [targetId]);
+
     const syncTerminal = useCallback(() => {
         const controller = terminalControllerRef.current;
         if (!controller) return;
@@ -350,17 +446,24 @@ export default function Terminal({
                     terminalControllerRef.current = undefined;
                 }
             };
-        };
+        }
 
-        const controller = new TerminalController(terminalId, targetId, {
-            onStatus: (status) => terminalEventsRef.current?.onStatus?.(status),
-            onCwd: (cwd) => terminalEventsRef.current?.onCwd?.(cwd),
-            onCopy: () => terminalEventsRef.current?.onCopy?.(),
-            onInteraction: () =>
-                terminalEventsRef.current?.onInteraction?.(),
-            onContextMenu: (data) =>
-                terminalEventsRef.current?.onContextMenu?.(data),
-        }, terminalThemes[theme]);
+        const controller = new TerminalController(
+            terminalId,
+            targetId,
+            {
+                onStatus: (status) =>
+                    terminalEventsRef.current?.onStatus?.(status),
+                onSystem: (system) => setTerminalSystem(system),
+                onCwd: (cwd) => terminalEventsRef.current?.onCwd?.(cwd),
+                onCopy: () => terminalEventsRef.current?.onCopy?.(),
+                onInteraction: () =>
+                    terminalEventsRef.current?.onInteraction?.(),
+                onContextMenu: (data) =>
+                    terminalEventsRef.current?.onContextMenu?.(data),
+            },
+            terminalThemes[theme],
+        );
         terminalControllerRef.current = controller;
         controller.init();
     }, [targetId, terminalId]);
@@ -388,6 +491,95 @@ export default function Terminal({
     return (
         <div className="terminalView">
             <div className="terminalToolbar">
+                {!isWindowsTarget && (
+                    <div
+                        ref={favoriteDirectoryMenuBoxRef}
+                        className="terminalFavoriteDirectoryMenuBox"
+                    >
+                        <Tooltip title={t("terminal_favorite_directory_list")}>
+                            <Button
+                                aria-label={t(
+                                    "terminal_favorite_directory_list",
+                                )}
+                                aria-expanded={favoriteDirectoryMenuVisible}
+                                disabled={targetId === undefined}
+                                icon={
+                                    favoriteDirectoryMenuVisible ? (
+                                        <DownOutlined />
+                                    ) : (
+                                        <FavoritesDirOutlined />
+                                    )
+                                }
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    favoriteDirectoryMenuClick();
+                                }}
+                                size="small"
+                                type="text"
+                            />
+                        </Tooltip>
+                        {favoriteDirectoryMenuVisible && (
+                            <ul className="terminalFavoriteDirectoryMenu">
+                                {!favoriteDirectoriesLoaded ? (
+                                    <li className="terminalFavoriteDirectoryEmpty">
+                                        {t(
+                                            "terminal_favorite_directory_loading",
+                                        )}
+                                    </li>
+                                ) : favoriteDirectories.length === 0 ? (
+                                    <li className="terminalFavoriteDirectoryEmpty">
+                                        {t("terminal_favorite_directory_empty")}
+                                    </li>
+                                ) : (
+                                    favoriteDirectories.map((item) => {
+                                        const defaultKind =
+                                            getFavoriteDirectoryDefaultKind(
+                                                item,
+                                            );
+                                        const name = defaultKind
+                                            ? t(
+                                                  `pathbar_favorite_directory_default_${defaultKind}`,
+                                              )
+                                            : item.name;
+                                        let icon = <FolderOutlined />;
+                                        switch (defaultKind) {
+                                            case "/":
+                                                icon = <LaptopOutlined />;
+                                                break;
+                                            case "Home":
+                                                icon = <HomeOutlined />;
+                                                break;
+                                            case "Desktop":
+                                                icon = <DesktopOutlined />;
+                                                break;
+                                            case "Documents":
+                                                icon = <FileTextOutlined />;
+                                                break;
+                                            case "Downloads":
+                                                icon = <DownloadOutlined />;
+                                                break;
+                                        }
+                                        return (
+                                            <li key={item.path}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        favoriteDirectoryItemClick(
+                                                            item.path,
+                                                        )
+                                                    }
+                                                >
+                                                    {icon}
+                                                    <span>{name}</span>
+                                                </button>
+                                            </li>
+                                        );
+                                    })
+                                )}
+                            </ul>
+                        )}
+                    </div>
+                )}
                 <Tooltip
                     title={t(
                         cwd === undefined
@@ -430,10 +622,7 @@ export default function Terminal({
                 className="terminalContainer"
                 style={{ backgroundColor: terminalThemes[theme].background }}
             >
-                <div
-                    id={terminalId}
-                    ref={terminalElementRef}
-                />
+                <div id={terminalId} ref={terminalElementRef} />
                 {connectionStatus === "disconnected" && (
                     <div
                         className="terminalDisconnected"

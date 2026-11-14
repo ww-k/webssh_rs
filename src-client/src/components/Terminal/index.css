@@ -8,11 +8,82 @@
 }
 
 .terminalToolbar {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 0 10px;
     margin-top: 10px;
+}
+
+.terminalFavoriteDirectoryMenuBox {
+    position: relative;
+}
+
+.terminalFavoriteDirectoryMenu {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    z-index: 1050;
+    width: 190px;
+    max-height: 270px;
+    margin: 0;
+    padding: 4px 0;
+    overflow: auto;
+    color: var(--ant-color-text);
+    font-size: 12px;
+    list-style: none;
+    background: var(--ant-color-bg-elevated);
+    border: 1px solid var(--ant-color-border);
+    border-radius: 6px;
+    box-shadow: var(--ant-box-shadow-secondary);
+}
+
+.terminalFavoriteDirectoryMenu button,
+.terminalFavoriteDirectoryEmpty {
+    display: flex;
+    box-sizing: border-box;
+    align-items: center;
+    width: 100%;
+    min-height: 30px;
+    padding: 5px 12px;
+    overflow: hidden;
+    color: var(--ant-color-text-secondary);
+    font: inherit;
+    font-weight: normal;
+    line-height: 1.42857143;
+    text-align: left;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    background: transparent;
+    border: 0;
+}
+
+.terminalFavoriteDirectoryMenu button {
+    cursor: pointer;
+}
+
+.terminalFavoriteDirectoryMenu button:hover,
+.terminalFavoriteDirectoryMenu button:focus-visible {
+    background: var(--ant-control-item-bg-active-hover);
+    outline: 0;
+}
+
+.terminalFavoriteDirectoryMenu .anticon {
+    flex: 0 0 16px;
+    margin-right: 10px;
+    color: var(--ant-color-primary);
+}
+
+.terminalFavoriteDirectoryMenu button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.terminalFavoriteDirectoryEmpty {
+    justify-content: center;
+    color: var(--ant-color-text-tertiary);
 }
 
 .terminalContainer {
