@@ -110,7 +110,11 @@ impl UploadHandleGuard {
 
     async fn close(mut self) -> Result<(), crate::sftp_client::SftpError> {
         let client = self.client.take().expect("upload handle guard is empty");
-        client.close(self.handle.to_vec()).await
+        let result = client.close(self.handle.to_vec()).await;
+        if result.is_err() {
+            client.abort().await;
+        }
+        result
     }
 }
 
@@ -119,12 +123,11 @@ impl Drop for UploadHandleGuard {
         let Some(client) = self.client.take() else {
             return;
         };
-        let sftp = std::ops::Deref::deref(&client).clone();
-        let handle = Arc::clone(&self.handle);
         if let Ok(runtime) = tokio::runtime::Handle::try_current() {
             runtime.spawn(async move {
-                let _ = sftp.close(handle.to_vec()).await;
-                drop(client);
+                // A failed upload can leave the SFTP channel unusable. Abort
+                // it immediately so the shared cache creates a fresh channel.
+                client.abort().await;
             });
         }
     }
@@ -598,7 +601,16 @@ pub(crate) async fn upload_to_sftp(
             .await
     )?;
 
-    let handle = map_ssh_err!(sftp.open_upload_range(uri.path).await)?;
+    let handle = match sftp.open_upload_range(uri.path).await {
+        Ok(handle) => handle,
+        Err(err) => {
+            sftp.abort().await;
+            return Err(ApiErr {
+                code: ERR_CODE_SSH_ERR,
+                message: err.to_string(),
+            });
+        }
+    };
     let handle_guard = UploadHandleGuard::new(sftp, handle);
     let sftp = handle_guard.client();
     map_ssh_err!(
