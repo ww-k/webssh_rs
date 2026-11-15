@@ -20,6 +20,13 @@ function preventDefault(e: Event) {
     e.preventDefault();
 }
 
+function hasExternalFiles(dataTransfer: DataTransfer) {
+    return (
+        Array.from(dataTransfer.types).includes("Files") ||
+        Array.from(dataTransfer.items).some((item) => item.kind === "file")
+    );
+}
+
 interface IProps {
     scrollOffset?: number;
     layoutRowHeight?: number;
@@ -825,6 +832,13 @@ export default class Tbody extends Component<IProps, IState> {
         e.stopPropagation();
 
         if (e.dataTransfer) {
+            if (
+                hasExternalFiles(e.dataTransfer) &&
+                !this.props.enableDragFromOS
+            ) {
+                e.dataTransfer.dropEffect = "none";
+                return;
+            }
             e.dataTransfer.dropEffect = this._dragTarget ? "move" : "copy";
         }
 
@@ -848,9 +862,24 @@ export default class Tbody extends Component<IProps, IState> {
         // }
     }
 
-    dragLeaveHandle(_e: DragEvent) {
-        // clearTimeout(this._dragLeaveTimer);
-        // this._dragLeaveTimer = setTimeout(() => this.setState({ dropDir: null }), 50);
+    dragLeaveHandle(e: DragEvent) {
+        const root = this.rootElRef.current;
+        const relatedTarget = e.relatedTarget;
+        if (
+            root &&
+            relatedTarget instanceof Node &&
+            root.contains(relatedTarget)
+        ) {
+            return;
+        }
+
+        clearTimeout(this._dragLeaveTimer);
+        this.setState({
+            dragFiles: null,
+            dropDir: null,
+            dropFileHover: null,
+        });
+        this._dragTarget = null;
     }
 
     dragOverHandle(e: DragEvent) {
@@ -859,7 +888,8 @@ export default class Tbody extends Component<IProps, IState> {
         clearTimeout(this._dragLeaveTimer);
         if (!e.dataTransfer) return;
 
-        if (e.dataTransfer.files.length > 0 && !this.props.enableDragFromOS) {
+        const hasFiles = hasExternalFiles(e.dataTransfer);
+        if (hasFiles && !this.props.enableDragFromOS) {
             e.dataTransfer.dropEffect = "none";
             return;
         }
@@ -878,6 +908,7 @@ export default class Tbody extends Component<IProps, IState> {
             dropDir: null,
             dropFileHover: null,
         });
+        this._dragTarget = null;
     }
 
     dropHandle(file: IViewFileStat | null, e: DragEvent) {
@@ -890,7 +921,7 @@ export default class Tbody extends Component<IProps, IState> {
 
         let dragTarget = null;
         switch (true) {
-            case dataTransfer.files.length > 0 && enableDragFromOS: {
+            case hasExternalFiles(dataTransfer) && enableDragFromOS: {
                 const readFiles = new DragFilesReader().read(e);
                 readFiles.then((files) => {
                     dragEvent.dragTarget = {
@@ -914,6 +945,7 @@ export default class Tbody extends Component<IProps, IState> {
                     this.setState({
                         dragFiles: null,
                         dropDir: null,
+                        dropFileHover: null,
                     });
                     this._dragTarget = null;
                 });
@@ -977,6 +1009,7 @@ export default class Tbody extends Component<IProps, IState> {
         this.setState({
             dragFiles: null,
             dropDir: null,
+            dropFileHover: null,
             lasterSelected: file,
         });
         this._dragTarget = null;

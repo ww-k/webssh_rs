@@ -35,6 +35,7 @@ interface IProps {
     sortOrderDefault?: "ascend" | "descend";
     posix?: boolean;
     multiple?: boolean;
+    enableDragFromOS?: boolean;
     isFileSelectable?: (file: IViewFileStat) => boolean;
     onSelecteChange?: (files: IViewFileStat[]) => void;
     onFileClick?: (file: IViewFileStat) => void;
@@ -352,6 +353,7 @@ export default class Filelist extends Component<IProps, IState> {
                         cwd={cwd}
                         activeKey={activeKey}
                         draggable={draggable}
+                        enableDragFromOS={this.props.enableDragFromOS}
                         multiple={multiple}
                         isFileSelectable={this.props.isFileSelectable}
                         parentFile={this.parentFile}

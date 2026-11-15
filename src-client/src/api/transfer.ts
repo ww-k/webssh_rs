@@ -1,5 +1,6 @@
 import axios from "axios";
 
+import type { AxiosProgressEvent, GenericAbortSignal } from "axios";
 import type { ITransferRange } from "@/services/transfer/types";
 
 export type ITransferTaskType = "UPLOAD" | "DOWNLOAD";
@@ -155,6 +156,55 @@ export async function postTransferUpload(payload: {
     const response = await axios.post<ITransferTask>(
         "/api/transfer/upload",
         payload,
+    );
+    return response.data;
+}
+
+export async function postTransferClientUpload(payload: {
+    target_uri: string;
+    name: string;
+    size: number;
+}) {
+    const response = await axios.post<ITransferTask>(
+        "/api/transfer/client-upload",
+        payload,
+    );
+    return response.data;
+}
+
+export async function putTransferClientUploadChunk(
+    id: string,
+    fileSlice: Blob,
+    option: {
+        start: number;
+        end: number;
+        size: number;
+        signal?: GenericAbortSignal;
+        onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
+    },
+) {
+    const response = await axios.put<{ hash: string }>(
+        `/api/transfer/client-upload/${encodeURIComponent(id)}`,
+        fileSlice,
+        {
+            headers: {
+                "content-type": "application/octet-stream",
+                "content-range": `bytes ${option.start}-${option.end}/${option.size}`,
+            },
+            signal: option.signal,
+            onUploadProgress: option.onUploadProgress,
+            timeout: Math.max(
+                Math.ceil((option.end - option.start + 1) / 5),
+                30_000,
+            ),
+        },
+    );
+    return response.data;
+}
+
+export async function postTransferClientUploadComplete(id: string) {
+    const response = await axios.post<ITransferTask>(
+        `/api/transfer/client-upload/${encodeURIComponent(id)}/complete`,
     );
     return response.data;
 }

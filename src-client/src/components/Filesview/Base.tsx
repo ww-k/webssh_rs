@@ -14,6 +14,7 @@ import FileEditorPanel from "./FileEditorPanel";
 import { handlePaste } from "./remoteActions";
 
 import type { IViewFileStat } from "@/types";
+import type { IFileListDragDropEvent } from "../Filelist/types";
 
 type IProps = {
     className?: string;
@@ -28,6 +29,7 @@ type IProps = {
     getDirs?: (fileUrlOrPath: string) => Promise<IViewFileStat[]>;
     getCwdFiles: () => Promise<IViewFileStat[]>;
     multiple?: boolean;
+    enableDragFromOS?: boolean;
     isFileSelectable?: (file: IViewFileStat) => boolean;
     onSelecteChange?: (files: IViewFileStat[]) => void;
     onFileDoubleClick?: (file: IViewFileStat) => void;
@@ -38,6 +40,7 @@ type IProps = {
     onEnter?: (file: IViewFileStat) => void;
     onDelete?: (files: IViewFileStat[]) => void;
     onRename?: (file: IViewFileStat) => void;
+    onDrop?: (evt: IFileListDragDropEvent) => void;
     editingFile?: IViewFileStat;
     onCloseEditor?: () => void;
 };

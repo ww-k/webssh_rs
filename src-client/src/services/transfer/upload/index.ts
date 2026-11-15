@@ -7,7 +7,11 @@ import { sumRangesSize } from "../helpers";
 import TransferError from "../TransferError";
 import uploadFile from "./uploadFile";
 
-import type { ITransferProgressEvent, ITransferRange } from "../types";
+import type {
+    ITransferProgressEvent,
+    ITransferRange,
+    IUploadSlice,
+} from "../types";
 
 interface IUploadTaskOption {
     file: File;
@@ -15,6 +19,7 @@ interface IUploadTaskOption {
     signal: AbortSignal;
     ranges?: ITransferRange[];
     onProgress?: (progress: ITransferProgressEvent) => void;
+    uploadSlice?: IUploadSlice;
 }
 
 export default async function upload({
@@ -23,6 +28,7 @@ export default async function upload({
     signal,
     ranges,
     onProgress,
+    uploadSlice,
 }: IUploadTaskOption): Promise<void> {
     const { promise, resolve, reject } = PromiseWithResolvers<void>();
 
@@ -86,6 +92,7 @@ export default async function upload({
                 fileUri,
                 signal: abortController.signal,
                 ranges,
+                uploadSlice,
                 onFlow: (newLoaded) => {
                     sumLoaded += newLoaded;
                 },
@@ -102,8 +109,10 @@ export default async function upload({
     }
 
     function abort() {
+        if (isEnd()) return;
         abortController?.abort();
         dispose();
+        reject(new TransferError("Aborted"));
     }
 
     function dispose() {

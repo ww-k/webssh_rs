@@ -1,10 +1,13 @@
 import { postSftpUpload } from "@/api";
 import calcHashHex from "@/helpers/calcHashHex";
 
-import type { ISliceUploadOption } from "../types";
+import type { ISliceUploadOption, IUploadSlice } from "../types";
 
-export default async function sliceUploader(option: ISliceUploadOption) {
-    const { fileUri, file, start, end, signal, onFlow, onDone } = option;
+export default async function sliceUploader(
+    option: ISliceUploadOption & { uploadSlice?: IUploadSlice },
+) {
+    const { fileUri, file, start, end, signal, onFlow, onDone, uploadSlice } =
+        option;
 
     console.debug(`Transfer/upload: sliceUploader start`, start);
 
@@ -13,7 +16,7 @@ export default async function sliceUploader(option: ISliceUploadOption) {
 
     const [expectHash, responseHash] = await Promise.all([
         calcHashHex(fileSlice),
-        postSftpUpload(fileUri, fileSlice, {
+        (uploadSlice || postSftpUpload)(fileUri, fileSlice, {
             start,
             end,
             size: file.size,

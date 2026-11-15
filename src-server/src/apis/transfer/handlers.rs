@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use axum::{
     Json,
+    body::Body,
     extract::{Path as AxumPath, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode, header},
 };
 use serde::Deserialize;
 use tracing::info;
@@ -17,12 +18,106 @@ use crate::{
 use super::tree::build_transfer_tree;
 use super::{
     dto::{
-        CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
-        CreateUploadTaskPayload, TransferBatchResponse, TransferRangeSchema,
-        TransferTaskCountResponse, TransferTaskResponse, TransferTreeNode,
+        CreateClientUploadPayload, CreateDownloadBatchPayload, CreateDownloadTaskPayload,
+        CreateUploadBatchPayload, CreateUploadTaskPayload, TransferBatchResponse,
+        TransferRangeSchema, TransferTaskCountResponse, TransferTaskResponse, TransferTreeNode,
     },
-    ranges::ranges_from_json,
+    ranges::{invalid_task, ranges_from_json},
 };
+use crate::apis::sftp::{
+    dto::{ContentRange, SftpUploadResponse},
+    handlers::upload_to_sftp,
+};
+
+#[utoipa::path(
+    post,
+    path = "/api/transfer/client-upload",
+    tag = "transfer",
+    summary = "创建浏览器文件上传任务",
+    request_body = CreateClientUploadPayload,
+    responses(
+        (status = 200, description = "成功创建上传任务", body = TransferTaskResponse),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn create_client_upload(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateClientUploadPayload>,
+) -> Result<Json<TransferTaskResponse>, ApiErr> {
+    let task = state.transfer_service.create_client_upload(payload).await?;
+    Ok(Json(task.into_response()?))
+}
+
+/// Accept a browser chunk, write it to SFTP, then persist the completed range.
+#[utoipa::path(
+    put,
+    path = "/api/transfer/client-upload/{id}",
+    tag = "transfer",
+    params(("id" = String, Path, description = "上传任务 ID")),
+    request_body(
+        content = Vec<u8>,
+        content_type = "application/octet-stream"
+    ),
+    responses(
+        (status = 200, description = "分片上传成功", body = SftpUploadResponse),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn client_upload_chunk(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+    headers: HeaderMap,
+    body: Body,
+) -> Result<Json<SftpUploadResponse>, ApiErr> {
+    let task = state.transfer_service.get_task_model(&id).await?;
+    if task.local_path.is_some()
+        || task.r#type != crate::entities::transfer_task::TransferTaskType::Upload
+    {
+        return Err(invalid_task("task is not a client upload"));
+    }
+    if !matches!(
+        task.status,
+        crate::entities::transfer_task::TransferTaskStatus::Run
+            | crate::entities::transfer_task::TransferTaskStatus::Wait
+            | crate::entities::transfer_task::TransferTaskStatus::Success
+    ) {
+        return Err(invalid_task("client upload task is not running"));
+    }
+
+    let range = ContentRange::from_header_value(headers.get(header::CONTENT_RANGE))
+        .ok_or_else(|| invalid_task("content-range is required"))?;
+    if range.total != task.total as usize || range.end >= range.total {
+        return Err(invalid_task("content-range does not match task"));
+    }
+    let target_uri = task
+        .target_uri
+        .as_deref()
+        .ok_or_else(|| invalid_task("client upload target is missing"))?;
+    let response = upload_to_sftp(state.clone(), target_uri, headers, body).await?;
+    state
+        .transfer_service
+        .mark_client_range_done(&id, [range.start as i64, range.end as i64])
+        .await?;
+    Ok(Json(response))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/transfer/client-upload/{id}/complete",
+    tag = "transfer",
+    params(("id" = String, Path, description = "上传任务 ID")),
+    responses(
+        (status = 200, description = "上传任务完成", body = TransferTaskResponse),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn complete_client_upload(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Json<TransferTaskResponse>, ApiErr> {
+    let task = state.transfer_service.complete_client_upload(&id).await?;
+    Ok(Json(task.into_response()?))
+}
 
 #[utoipa::path(
     post,

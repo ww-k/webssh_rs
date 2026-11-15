@@ -8,6 +8,7 @@ import { postFavoriteDirectoryInitialize } from "@/api";
 import { getSftpUserDirHome } from "@/api/sftp";
 import { isSftpFileUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
+import transferService from "@/services/transfer";
 import useAppStore from "@/store";
 
 import { isSearchUri } from "../Pathbar/search";
@@ -16,6 +17,7 @@ import { handleDelete, handleRename } from "./remoteActions";
 import handleContextmenu from "./remoteHandleContextmenu";
 
 import type { IViewFileStat } from "@/types";
+import type { IFileListDragDropEvent } from "../Filelist/types";
 
 export default function FilesviewRemote({
     baseUrl,
@@ -128,6 +130,25 @@ export default function FilesviewRemote({
     const onRename = useMemoizedFn((file: IViewFileStat) => {
         handleRename(file, getCwdFiles);
     });
+    const onDrop = useMemoizedFn((event: IFileListDragDropEvent) => {
+        const targetUri = event.dropTarget.fileUri || cwd;
+        if (!targetUri) return;
+        const files = event.dragTarget.files.filter(
+            (file): file is File => file instanceof File,
+        );
+        void Promise.all(
+            files.map((file) =>
+                transferService.createClientUpload({
+                    file,
+                    targetUri,
+                    relativePath: (file as File & { _relativePath?: string })
+                        ._relativePath,
+                }),
+            ),
+        )
+            .then(() => getCwdFiles())
+            .catch((err) => console.warn("Remote file drop failed", err));
+    });
 
     if (!favoriteDirectoriesInitialized) {
         return (
@@ -149,6 +170,7 @@ export default function FilesviewRemote({
             getHome={getHome}
             getCwdFiles={getCwdFiles}
             editingFile={editingFile}
+            enableDragFromOS={true}
             onCloseEditor={() => setEditingFile(undefined)}
             onContextMenu={(files, evt) => {
                 handleContextmenu(files, evt, {
@@ -164,6 +186,7 @@ export default function FilesviewRemote({
             onEnter={onEnter}
             onDelete={onDelete}
             onRename={onRename}
+            onDrop={onDrop}
         />
     );
 }

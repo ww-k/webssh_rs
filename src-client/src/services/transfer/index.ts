@@ -3,12 +3,16 @@ import {
     deleteTransferDirectory,
     deleteTransferHistory,
     deleteTransferTask,
+    getSftpStat,
     getTransferTree,
     getTransferUnfinishedCount,
+    postSftpMkdir,
     postTransferBatchCancel,
     postTransferBatchPause,
     postTransferBatchResume,
     postTransferCancel,
+    postTransferClientUpload,
+    postTransferClientUploadComplete,
     postTransferDirectoryCancel,
     postTransferDirectoryPause,
     postTransferDirectoryResume,
@@ -18,7 +22,11 @@ import {
     postTransferResume,
     postTransferUpload,
     postTransferUploadBatch,
+    putTransferClientUploadChunk,
 } from "@/api";
+import { joinFileUri } from "@/helpers/file_uri";
+
+import browserUpload from "./upload";
 
 import type { ITransferTask, ITransferTreeNode } from "@/api";
 
@@ -46,6 +54,12 @@ interface IDownloadOption {
     localDir?: string;
     size?: number;
     all?: boolean;
+}
+
+interface IClientUploadRecord {
+    file: File;
+    targetUri: string;
+    controller: AbortController;
 }
 
 const getTransferItemName = (source: string) => {
@@ -123,6 +137,8 @@ class TransferService {
     #tree: ITransferTreeNode[] = [];
     #treeListeners = new Set<TransferTreeListener>();
     #countListeners = new Set<TransferCountListener>();
+    #clientUploads = new Map<string, IClientUploadRecord>();
+    #clientUploadFiles = new Map<string, { file: File; targetUri: string }>();
 
     setConfig(_option: {
         /** 并发任务数 */
@@ -155,6 +171,51 @@ class TransferService {
         });
         this.#taskCreated();
         return batch;
+    }
+
+    async createClientUpload(option: {
+        file: File;
+        targetUri: string;
+        relativePath?: string;
+    }) {
+        const relativeParts = (option.relativePath || option.file.name)
+            .split(/[\\/]+/)
+            .filter((part) => part && part !== "." && part !== "..");
+        const fileName = relativeParts.pop() || option.file.name;
+        let fileUri = option.targetUri;
+        for (const directory of relativeParts) {
+            fileUri = joinFileUri(fileUri, directory);
+            try {
+                const stat = await getSftpStat(fileUri);
+                if (!stat.isDir) {
+                    throw new Error(`${fileUri} is not a directory`);
+                }
+            } catch (statError) {
+                try {
+                    await postSftpMkdir(fileUri);
+                } catch (mkdirError) {
+                    const stat = await getSftpStat(fileUri).catch(() => null);
+                    if (!stat?.isDir) {
+                        throw mkdirError || statError;
+                    }
+                }
+            }
+        }
+        fileUri = joinFileUri(fileUri, fileName);
+
+        const task = await postTransferClientUpload({
+            target_uri: fileUri,
+            name: fileName,
+            size: option.file.size,
+        });
+        this.#clientUploadFiles.set(task.id, {
+            file: option.file,
+            targetUri: fileUri,
+        });
+        this.#taskCreated(task);
+        await this.#startClientUpload(task, option.file);
+        await this.syncTree();
+        return task;
     }
 
     async createDownloadBatch(option: {
@@ -342,6 +403,7 @@ class TransferService {
     }
 
     async pause(record: TransferOperationRecord) {
+        this.#clientUploads.get(record.id)?.controller.abort();
         const task = await postTransferPause(record.id);
         await this.syncTree();
         return task;
@@ -351,16 +413,24 @@ class TransferService {
         const task = await postTransferResume(record.id);
         await this.syncTree();
         this.#taskCreated(task);
+        const upload = this.#clientUploadFiles.get(record.id);
+        if (upload) {
+            await this.#startClientUpload(task, upload.file);
+        }
         return task;
     }
 
     async cancel(record: TransferOperationRecord) {
+        this.#clientUploads.get(record.id)?.controller.abort();
+        this.#clientUploadFiles.delete(record.id);
         const task = await postTransferCancel(record.id);
         await this.syncTree();
         return task;
     }
 
     async remove(record: TransferOperationRecord) {
+        this.#clientUploads.get(record.id)?.controller.abort();
+        this.#clientUploadFiles.delete(record.id);
         if (["WAIT", "RUN", "PAUSE"].includes(record.status)) {
             try {
                 await postTransferCancel(record.id);
@@ -409,6 +479,12 @@ class TransferService {
     resumeAll() {}
 
     async removeAll() {
+        for (const [id, upload] of this.#clientUploads) {
+            upload.controller.abort();
+            await postTransferCancel(id).catch(() => undefined);
+        }
+        this.#clientUploads.clear();
+        this.#clientUploadFiles.clear();
         await deleteTransferHistory();
         await this.syncTree();
     }
@@ -569,6 +645,52 @@ class TransferService {
         const count = countUnfinishedNodes(this.#tree);
         for (const listener of this.#countListeners) {
             listener(count);
+        }
+    }
+
+    async #startClientUpload(task: ITransferTask, file: File) {
+        const previous = this.#clientUploads.get(task.id);
+        previous?.controller.abort();
+        const controller = new AbortController();
+        const record: IClientUploadRecord = {
+            file,
+            targetUri: task.target_uri || "",
+            controller,
+        };
+        this.#clientUploads.set(task.id, record);
+
+        try {
+            await browserUpload({
+                file,
+                fileUri: record.targetUri,
+                signal: controller.signal,
+                ranges: task.ranges,
+                uploadSlice: (_fileUri, fileSlice, option) =>
+                    putTransferClientUploadChunk(task.id, fileSlice, option),
+            });
+            if (!controller.signal.aborted) {
+                await postTransferClientUploadComplete(task.id);
+                this.#clientUploadFiles.delete(task.id);
+                await this.syncTree();
+            }
+        } catch (err) {
+            if (!controller.signal.aborted) {
+                console.warn("TransferService.clientUpload failed", err);
+                const completed = await postTransferClientUploadComplete(
+                    task.id,
+                ).catch(() => undefined);
+                if (completed) {
+                    this.#clientUploadFiles.delete(task.id);
+                    await this.syncTree();
+                    return;
+                }
+                await postTransferPause(task.id).catch(() => undefined);
+                await this.syncTree();
+            }
+        } finally {
+            if (this.#clientUploads.get(task.id)?.controller === controller) {
+                this.#clientUploads.delete(task.id);
+            }
         }
     }
 }

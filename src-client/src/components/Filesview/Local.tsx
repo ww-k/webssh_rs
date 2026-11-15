@@ -123,6 +123,7 @@ export default function FilesviewLocal({
             files={files}
             loading={loading}
             posix={!isMSWindows}
+            enableDragFromOS={false}
             setCwd={setCwdPath}
             getDirs={getDirs}
             getHome={getHome}

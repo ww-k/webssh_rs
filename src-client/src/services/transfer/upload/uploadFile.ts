@@ -6,7 +6,8 @@ import sliceUploader from "./sliceUploader";
 import type { IFileUploadOption } from "../types";
 
 export default async function uploadFile(option: IFileUploadOption) {
-    const { fileUri, file, signal, interval, onProgress, onFlow } = option;
+    const { fileUri, file, signal, interval, onProgress, onFlow, uploadSlice } =
+        option;
 
     if (!file) {
         throw new Error("missing file");
@@ -47,6 +48,7 @@ export default async function uploadFile(option: IFileUploadOption) {
             fileSize,
             file,
             signal,
+            uploadSlice,
             onFlow,
             onDone: onSliceUploadDone.bind(null, start, end),
         });

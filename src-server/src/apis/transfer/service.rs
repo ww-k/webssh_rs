@@ -51,6 +51,7 @@ pub struct TransferService {
     pub(super) db: DatabaseConnection,
     pub(super) connection_pool: Arc<SshConnectionPool>,
     running_tasks: Arc<Mutex<HashMap<String, RunningTask>>>,
+    client_upload_locks: Arc<Mutex<HashMap<String, Arc<Mutex<()>>>>>,
     pub(super) scheduler_notify: Arc<Notify>,
     scheduler_started: Arc<AtomicBool>,
     max_concurrent_tasks: usize,
@@ -77,6 +78,7 @@ impl TransferService {
             db: app_state.db.clone(),
             connection_pool,
             running_tasks: Arc::new(Mutex::new(HashMap::new())),
+            client_upload_locks: Arc::new(Mutex::new(HashMap::new())),
             scheduler_notify: Arc::new(Notify::new()),
             scheduler_started: Arc::new(AtomicBool::new(false)),
             max_concurrent_tasks: app_state.config.transfer_task_concurrency,
@@ -156,6 +158,56 @@ impl TransferService {
         };
         let task = map_db_err!(task.insert(&self.db).await)?;
         self.queue_task(task.id.clone()).await?;
+        self.get_task_model(&task.id).await
+    }
+
+    pub async fn create_client_upload(
+        &self,
+        payload: super::dto::CreateClientUploadPayload,
+    ) -> Result<TransferTaskModel, ApiErr> {
+        if payload.size < 0 {
+            return Err(ApiErr {
+                code: ERR_CODE_TRANSFER_INVALID_REQUEST,
+                message: "size must be non-negative".to_string(),
+            });
+        }
+        if payload.name.trim().is_empty() {
+            return Err(ApiErr {
+                code: ERR_CODE_TRANSFER_INVALID_REQUEST,
+                message: "name must not be empty".to_string(),
+            });
+        }
+
+        let target_id = parse_file_uri(&payload.target_uri)?.target_id;
+        let now = now_ms();
+        let task = ActiveModel {
+            id: Set(nanoid!()),
+            r#type: Set(TransferTaskType::Upload),
+            kind: Set(TransferTaskKind::File),
+            // Client uploads are driven by the browser and must not enter the
+            // server-side scheduler.
+            status: Set(TransferTaskStatus::Run),
+            local_path: Set(None),
+            target_uri: Set(Some(payload.target_uri)),
+            target_id: Set(Some(target_id)),
+            name: Set(payload.name),
+            loaded: Set(0),
+            total: Set(payload.size),
+            percent: Set(if payload.size == 0 { 100.0 } else { 0.0 }),
+            speed: Set(0),
+            estimated_time: Set(None),
+            ranges: Set(ranges_to_json(&initial_ranges(payload.size))?),
+            fail_reason: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ended_at: Set(None),
+            batch_id: Set(None),
+            parent_id: Set(None),
+            relative_path: Set(None),
+            conflict_policy: Set(None),
+            all: Set(false),
+        };
+        let task = map_db_err!(task.insert(&self.db).await)?;
         self.get_task_model(&task.id).await
     }
 
@@ -319,7 +371,16 @@ impl TransferService {
         let task = self.get_task_model(id).await?;
         match task.status {
             TransferTaskStatus::Pause | TransferTaskStatus::Fail | TransferTaskStatus::Cancel => {
-                self.queue_task(id.to_string()).await?;
+                if task.local_path.is_none() {
+                    let mut active: ActiveModel = task.into();
+                    active.status = Set(TransferTaskStatus::Run);
+                    active.fail_reason = Set(None);
+                    active.ended_at = Set(None);
+                    active.updated_at = Set(now_ms());
+                    map_db_err!(active.update(&self.db).await)?;
+                } else {
+                    self.queue_task(id.to_string()).await?;
+                }
                 self.get_task_model(id).await
             }
             _ => Err(ApiErr {
@@ -630,8 +691,19 @@ impl TransferService {
         let ranges = subtract_range(old_ranges, done_range);
         let loaded = task.total - ranges_size(&ranges);
         let now = now_ms();
-        let elapsed_ms = (now - task.updated_at).max(1);
-        let speed = ((loaded - task.loaded).max(0) * 1000) / elapsed_ms;
+        let is_client_upload = task.local_path.is_none();
+        let elapsed_ms = if is_client_upload {
+            // Browser chunks finish concurrently, so measuring each chunk
+            // against the previous database write produces large spikes.
+            (now - task.created_at).max(1)
+        } else {
+            (now - task.updated_at).max(1)
+        };
+        let speed = if is_client_upload {
+            loaded * 1000 / elapsed_ms
+        } else {
+            ((loaded - task.loaded).max(0) * 1000) / elapsed_ms
+        };
         let remaining = (task.total - loaded).max(0);
         let estimated_time = if speed > 0 {
             Some(remaining / speed)
@@ -669,6 +741,43 @@ impl TransferService {
         map_db_err!(active.update(&self.db).await)?;
 
         Ok(())
+    }
+
+    pub(super) async fn mark_client_range_done(
+        &self,
+        id: &str,
+        done_range: TransferRange,
+    ) -> Result<(), ApiErr> {
+        let lock = {
+            let mut locks = self.client_upload_locks.lock().await;
+            locks
+                .entry(id.to_string())
+                .or_insert_with(|| Arc::new(Mutex::new(())))
+                .clone()
+        };
+        let _guard = lock.lock().await;
+        self.mark_range_done(id, done_range).await
+    }
+
+    pub async fn complete_client_upload(&self, id: &str) -> Result<TransferTaskModel, ApiErr> {
+        let task = self.get_task_model(id).await?;
+        if task.local_path.is_some() || task.r#type != TransferTaskType::Upload {
+            return Err(ApiErr {
+                code: ERR_CODE_TRANSFER_INVALID_REQUEST,
+                message: "task is not a client upload".to_string(),
+            });
+        }
+        let ranges = ranges_from_json(&task.ranges)?;
+        if !ranges.is_empty() {
+            return Err(ApiErr {
+                code: ERR_CODE_TRANSFER_INVALID_REQUEST,
+                message: "client upload is not complete".to_string(),
+            });
+        }
+        if task.status != TransferTaskStatus::Success {
+            self.finish_success(task, ranges).await?;
+        }
+        self.get_task_model(id).await
     }
 
     async fn finish_success(

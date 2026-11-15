@@ -15,6 +15,13 @@ pub struct CreateUploadTaskPayload {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateClientUploadPayload {
+    pub target_uri: String,
+    pub name: String,
+    pub size: i64,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateDownloadTaskPayload {
     pub source_uri: String,
     pub local_path: Option<String>,

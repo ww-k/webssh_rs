@@ -11,21 +11,22 @@ use std::sync::Arc;
 
 use axum::{
     Router,
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
 };
 
 use crate::AppState;
 
 pub use dto::{
-    CreateDownloadBatchPayload, CreateDownloadTaskPayload, CreateUploadBatchPayload,
-    CreateUploadTaskPayload, TransferBatchResponse, TransferRangeSchema, TransferTaskCountResponse,
-    TransferTaskResponse, TransferTreeNode, TransferTreeNodeType,
+    CreateClientUploadPayload, CreateDownloadBatchPayload, CreateDownloadTaskPayload,
+    CreateUploadBatchPayload, CreateUploadTaskPayload, TransferBatchResponse, TransferRangeSchema,
+    TransferTaskCountResponse, TransferTaskResponse, TransferTreeNode, TransferTreeNodeType,
 };
 pub use handlers::{
-    cancel_batch, cancel_directory, cancel_task, count_unfinished_tasks, create_download_batch,
-    create_download_task, create_upload_batch, create_upload_task, delete_batch, delete_directory,
-    delete_finished_history, delete_task, get_task, list_tasks, list_tree, pause_batch,
-    pause_directory, pause_task, resume_batch, resume_directory, resume_task,
+    cancel_batch, cancel_directory, cancel_task, count_unfinished_tasks, create_client_upload,
+    create_download_batch, create_download_task, create_upload_batch, create_upload_task,
+    delete_batch, delete_directory, delete_finished_history, delete_task, get_task, list_tasks,
+    list_tree, pause_batch, pause_directory, pause_task, resume_batch, resume_directory,
+    resume_task,
 };
 pub use ranges::TransferRange;
 pub use service::TransferService;
@@ -33,6 +34,12 @@ pub use service::TransferService;
 pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route("/upload", post(create_upload_task))
+        .route("/client-upload", post(create_client_upload))
+        .route("/client-upload/{id}", put(handlers::client_upload_chunk))
+        .route(
+            "/client-upload/{id}/complete",
+            post(handlers::complete_client_upload),
+        )
         .route("/download", post(create_download_task))
         .route("/batches/upload", post(create_upload_batch))
         .route("/batches/download", post(create_download_batch))

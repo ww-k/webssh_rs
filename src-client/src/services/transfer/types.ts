@@ -1,5 +1,17 @@
 export type ITransferRange = [number, number];
 
+export type IUploadSlice = (
+    fileUri: string,
+    fileSlice: Blob,
+    option: {
+        start: number;
+        end: number;
+        size: number;
+        signal: AbortSignal;
+        onUploadProgress?: (progressEvent: { loaded: number }) => void;
+    },
+) => Promise<{ hash: string }>;
+
 export interface ITransferProgressEvent {
     percent: number;
     total: number;
@@ -56,6 +68,7 @@ export type ISliceUploadOption = ISliceLoadOption & {
 export type IFileUploadOption = IFileLoadOption & {
     /** 浏览器上传的文件对象 */
     file: File;
+    uploadSlice?: IUploadSlice;
 };
 
 export type ISliceDownloadOption = ISliceLoadOption & {

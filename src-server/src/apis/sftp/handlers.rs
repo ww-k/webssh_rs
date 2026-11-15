@@ -555,6 +555,19 @@ pub async fn upload(
 ) -> Result<Json<SftpUploadResponse>, ApiErr> {
     info!("@sftp_upload {:?}", payload);
 
+    Ok(Json(
+        upload_to_sftp(state, &payload.uri, headers, body).await?,
+    ))
+}
+
+/// Upload one complete or ranged request to an SFTP path. Transfer tasks use
+/// this helper so the write and task progress update share the same protocol.
+pub(crate) async fn upload_to_sftp(
+    state: Arc<AppState>,
+    file_uri: &str,
+    headers: HeaderMap,
+    body: Body,
+) -> Result<SftpUploadResponse, ApiErr> {
     let h_range = headers.get(header::CONTENT_RANGE);
     let range = ContentRange::from_header_value(h_range);
     let content_len = headers
@@ -577,7 +590,7 @@ pub async fn upload(
         range_len = range.end - start + 1;
     }
 
-    let uri = parse_file_uri(payload.uri.as_str())?;
+    let uri = parse_file_uri(file_uri)?;
     let sftp = map_ssh_err!(
         state
             .connection_pool
@@ -679,9 +692,9 @@ pub async fn upload(
     let hash = hasher.finalize();
     let hex_hash = hex::encode(hash);
 
-    info!("@sftp_upload done {:?}", payload);
+    info!("@sftp_upload done {:?}", file_uri);
 
-    Ok(Json(SftpUploadResponse { hash: hex_hash }))
+    Ok(SftpUploadResponse { hash: hex_hash })
 }
 
 #[utoipa::path(
