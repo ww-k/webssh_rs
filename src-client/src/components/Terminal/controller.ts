@@ -22,6 +22,7 @@ function quoteShellPath(path: string): string {
 
 export interface TerminalControllerEvents {
     onStatus?: (status: "connected" | "disconnected") => void;
+    onSystem?: (system: string) => void;
     onOutput?: (data: string) => void;
     onCwd?: (cwd: string) => void;
     onCopy?: () => void;
@@ -258,6 +259,7 @@ export class TerminalController {
             },
             onServerReady: (option) => {
                 this.terminalSystem = option.system;
+                if (option.system) this.events.onSystem?.(option.system);
                 this.terminalReady = true;
                 for (const input of this.pendingTerminalInputs) {
                     this.terminalSocket?.emit("input", input);
@@ -372,6 +374,11 @@ export class TerminalController {
         }
         if (this.destroyed || this.terminal !== terminal) return;
         this.terminalInitialized = true;
+        // server_ready can arrive while Ghostty is still loading. In that
+        // case the first resize attempt has no terminal to measure, so sync
+        // the PTY size again once the terminal is ready.
+        this.fitTerminal();
+        this.emitResize();
         this.flushOutputBuffer();
         if (this.pendingTerminalHistory) {
             terminal.write(this.pendingTerminalHistory);

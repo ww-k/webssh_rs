@@ -10,6 +10,7 @@ use socketioxide::{
     SocketIo,
     extract::{Data, SocketRef},
 };
+use tokio::sync::RwLock;
 use tracing::{debug, error, info};
 
 use crate::{
@@ -143,9 +144,11 @@ impl SshTerminalSession {
     ) {
         let socket = self.socket.clone();
         let sid = socket.id;
+        let mut prompt_redraw_pending = target_system.as_deref() != Some("windows");
         let server_ready = serde_json::json!({ "system": target_system });
         let (mut read_half, write_half, channel_lease) = channel_guard.split().unwrap();
         let write_half_arc = Arc::new(write_half);
+        let terminal_size = Arc::new(RwLock::new(Resize { col: 80, row: 25 }));
 
         socket.on_disconnect({
             let channel_write_half = write_half_arc.clone();
@@ -157,11 +160,13 @@ impl SshTerminalSession {
 
         socket.on("resize", {
             let channel_write_half = write_half_arc.clone();
+            let terminal_size = terminal_size.clone();
             async move |Data::<Resize>(data)| {
                 debug!("sid={} socket resize: {:?}", sid, &data);
-                let _ = channel_write_half
-                    .window_change(data.col, data.row, 0, 0)
-                    .await;
+                let col = data.col;
+                let row = data.row;
+                *terminal_size.write().await = Resize { col, row };
+                let _ = channel_write_half.window_change(col, row, 0, 0).await;
             }
         });
 
@@ -187,6 +192,18 @@ impl SshTerminalSession {
                 ChannelMsg::Data { ref data } => {
                     let str = String::from_utf8_lossy(data);
                     let _ = socket.emit("output", &str);
+                    if prompt_redraw_pending && str.contains("\u{1b}]7;file://webssh") {
+                        prompt_redraw_pending = false;
+                        let size = {
+                            let size = terminal_size.read().await;
+                            (size.col, size.row)
+                        };
+                        let redraw_rows = size.1.saturating_add(1);
+                        let _ = write_half_arc
+                            .window_change(size.0, redraw_rows, 0, 0)
+                            .await;
+                        let _ = write_half_arc.window_change(size.0, size.1, 0, 0).await;
+                    }
                 }
                 ChannelMsg::ExitStatus { exit_status } => {
                     debug!("sid={} Exitcode: {}", sid, exit_status);
