@@ -32,6 +32,8 @@ use utoipa::OpenApi;
         crate::apis::sftp::handlers::rm_rf,
         crate::apis::sftp::handlers::upload,
         crate::apis::sftp::handlers::download,
+        crate::apis::sftp::handlers::read,
+        crate::apis::sftp::handlers::tail,
         crate::apis::fs::handlers::ls,
         crate::apis::fs::handlers::user_dir_home,
         crate::apis::fs::handlers::user_dir_download,

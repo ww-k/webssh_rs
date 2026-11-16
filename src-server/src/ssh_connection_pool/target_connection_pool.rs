@@ -27,6 +27,7 @@ pub(crate) struct TargetConnectionPool {
     expired: AtomicBool,
     sftp_client: Mutex<Option<FastSftpClient>>,
     sftp_init_lock: Mutex<()>,
+    sftp_usage_lock: Arc<Mutex<()>>,
 }
 
 impl TargetConnectionPool {
@@ -47,6 +48,7 @@ impl TargetConnectionPool {
             expired: AtomicBool::new(false),
             sftp_client: Mutex::new(None),
             sftp_init_lock: Mutex::new(()),
+            sftp_usage_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -140,6 +142,11 @@ impl TargetConnectionPool {
         self: &Arc<Self>,
         mode: ChannelMode,
     ) -> anyhow::Result<SftpClientGuard> {
+        if mode == ChannelMode::SharedConnection {
+            let channel = self.acquire(mode).await?;
+            return Ok(SftpClientGuard::new(FastSftpClient::new(channel).await?));
+        }
+
         if mode != ChannelMode::Shared
             || self.max_connections <= 1
             || self.max_channels_per_connection <= 1
@@ -148,18 +155,20 @@ impl TargetConnectionPool {
             return Ok(SftpClientGuard::new(FastSftpClient::new(channel).await?));
         }
 
+        let shared_lease = Arc::clone(&self.sftp_usage_lock).lock_owned().await;
         let _init_guard = self.sftp_init_lock.lock().await;
         self.ensure_active()?;
         let mut cached = self.sftp_client.lock().await;
         if let Some(client) = cached.as_ref() {
             if client.is_usable().await {
-                return Ok(SftpClientGuard::cached(client.clone()));
+                return Ok(SftpClientGuard::cached(client.clone(), shared_lease));
             }
             let stale = cached.take();
             drop(cached);
-            if let Some(stale) = stale {
-                stale.abort().await;
-            }
+            // A cached client may still be held by an active SFTP request.
+            // Remove it from the cache, but do not abort it: the next request
+            // will acquire another shared channel and wait for pool capacity.
+            drop(stale);
             cached = self.sftp_client.lock().await;
             self.ensure_active()?;
         }
@@ -175,7 +184,7 @@ impl TargetConnectionPool {
             target_id = self.spec.target_id(),
             "cached shared SFTP client"
         );
-        Ok(SftpClientGuard::cached(client))
+        Ok(SftpClientGuard::cached(client, shared_lease))
     }
 
     async fn clear_sftp_client(&self) {
@@ -189,11 +198,13 @@ impl TargetConnectionPool {
         connections.retain(|connection| connection.state() != ConnectionState::Closed);
 
         match mode {
-            ChannelMode::Shared => connections.iter().find_map(|connection| {
-                connection
-                    .try_reserve()
-                    .map(|permit| (Arc::clone(connection), permit))
-            }),
+            ChannelMode::Shared | ChannelMode::SharedConnection => {
+                connections.iter().find_map(|connection| {
+                    connection
+                        .try_reserve()
+                        .map(|permit| (Arc::clone(connection), permit))
+                })
+            }
             ChannelMode::Dedicated => connections.iter().find_map(|connection| {
                 if !connection.is_idle() {
                     return None;

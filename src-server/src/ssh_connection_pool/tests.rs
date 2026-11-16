@@ -329,13 +329,24 @@ async fn dropping_dedicated_sftp_releases_its_connection(context: &TestContext) 
 async fn shared_sftp_client_is_reused(context: &TestContext) {
     let pool = connection_pool(context, 2, 2);
     let first = pool.sftp(1, ChannelMode::Shared).await.unwrap();
-    let second = pool.sftp(1, ChannelMode::Shared).await.unwrap();
 
     assert_eq!(
         pool.connection_snapshots(Some(1)).await[0].active_channels,
         1
     );
+
+    let second_pool = Arc::clone(&pool);
+    let second_task = tokio::spawn(async move {
+        second_pool
+            .sftp(1, ChannelMode::Shared)
+            .await
+            .expect("second shared SFTP client should acquire after the first is released")
+    });
     drop(first);
+    let second = tokio::time::timeout(Duration::from_secs(2), second_task)
+        .await
+        .expect("second shared SFTP client should not remain blocked")
+        .expect("shared SFTP acquisition task should complete");
     drop(second);
 
     let connection_id = pool.connection_snapshots(Some(1)).await[0].id.clone();

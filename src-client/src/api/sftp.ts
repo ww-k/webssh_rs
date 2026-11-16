@@ -199,3 +199,24 @@ export async function getSftpDownload(
     );
     return response.data;
 }
+
+export interface ISftpTextPage {
+    content: string;
+    next_offset: number;
+    eof: boolean;
+}
+
+export async function getSftpTextPage(
+    fileUri: string,
+    option?: { offset?: number; lines?: number; signal?: GenericAbortSignal },
+) {
+    const response = await axios.get<ISftpTextPage>("/api/sftp/read", {
+        params: {
+            uri: fileUri,
+            offset: option?.offset,
+            lines: option?.lines,
+        },
+        signal: option?.signal,
+    });
+    return response.data;
+}

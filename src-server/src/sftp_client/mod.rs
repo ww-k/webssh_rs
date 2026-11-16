@@ -17,7 +17,7 @@ use smallvec::SmallVec;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::{
     io::{AsyncWrite, AsyncWriteExt},
-    sync::{Mutex, mpsc, oneshot},
+    sync::{Mutex, OwnedMutexGuard, mpsc, oneshot},
     task::JoinHandle,
 };
 use tracing::debug;
@@ -505,6 +505,7 @@ pub struct FastSftpClient {
 pub struct SftpClientGuard {
     client: Option<FastSftpClient>,
     abort_on_drop: bool,
+    _shared_lease: Option<OwnedMutexGuard<()>>,
 }
 
 impl SftpClientGuard {
@@ -512,13 +513,15 @@ impl SftpClientGuard {
         Self {
             client: Some(client),
             abort_on_drop: true,
+            _shared_lease: None,
         }
     }
 
-    pub(crate) fn cached(client: FastSftpClient) -> Self {
+    pub(crate) fn cached(client: FastSftpClient, shared_lease: OwnedMutexGuard<()>) -> Self {
         Self {
             client: Some(client),
             abort_on_drop: false,
+            _shared_lease: Some(shared_lease),
         }
     }
 

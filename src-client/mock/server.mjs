@@ -869,6 +869,12 @@ async function handleFileApi(request, response, pathname, searchParams, sftp) {
         const hash = createHash("sha256").update(body).digest("hex");
         return sendJson(response, 200, { hash });
     }
+    if (sftp && request.method === "GET" && pathname === `${prefix}/read`) {
+        return sendTextPage(response, requestedUri, searchParams);
+    }
+    if (sftp && request.method === "GET" && pathname === `${prefix}/tail`) {
+        return sendTail(response, requestedUri);
+    }
     if (sftp && request.method === "GET" && pathname === `${prefix}/download`) {
         return sendDownload(request, response, requestedUri);
     }
@@ -1021,7 +1027,7 @@ function mockFileStat(name, type, size) {
 }
 
 function sendDownload(request, response, uri) {
-    const content = Buffer.from(`Mock file content for ${uri}\n`);
+    const content = mockTextContent(uri);
     const range = request.headers.range?.match(/^bytes=(\d+)-(\d+)$/);
     if (!range) {
         response.writeHead(200, {
@@ -1040,6 +1046,44 @@ function sendDownload(request, response, uri) {
         "content-range": `bytes ${start}-${end}/${content.length}`,
     });
     response.end(chunk);
+}
+
+function mockTextContent(uri) {
+    return Buffer.from(`Mock file content for ${uri}\n`);
+}
+
+function sendTextPage(response, uri, searchParams) {
+    const content = mockTextContent(uri);
+    const offset = Math.min(
+        Number.parseInt(searchParams.get("offset") || "0", 10) || 0,
+        content.length,
+    );
+    const lineCount = Math.max(
+        1,
+        Number.parseInt(searchParams.get("lines") || "500", 10) || 500,
+    );
+    let end = offset;
+    let lines = 0;
+    while (end < content.length && lines < lineCount) {
+        if (content[end] === 10) lines += 1;
+        end += 1;
+    }
+    const chunk = content.subarray(offset, end);
+    return sendJson(response, 200, {
+        content: chunk.toString("utf8"),
+        next_offset: end,
+        eof: end >= content.length,
+    });
+}
+
+function sendTail(response, uri) {
+    const content = mockTextContent(uri).toString("utf8");
+    response.writeHead(200, {
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+        "content-type": "text/event-stream; charset=utf-8",
+    });
+    response.write(`event: snapshot\ndata: ${JSON.stringify(content)}\n\n`);
 }
 
 function getTargetId(uri) {

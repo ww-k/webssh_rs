@@ -65,8 +65,7 @@ export default function remoteHandleContextmenu(
             label: i18n.t("files_menu_view_edit"),
             disabled: !(
                 files.length === 1 &&
-                !files[0].isDir &&
-                files[0].size <= 20 * 1024 * 1024
+                !files[0].isDir
             ),
             click: async () => {
                 context.onViewEdit(files[0]);

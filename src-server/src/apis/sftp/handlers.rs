@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, VecDeque},
+    convert::Infallible,
     pin::pin,
     sync::Arc,
 };
@@ -13,10 +14,12 @@ use axum::{
         header::{self, HeaderValue},
     },
     response::IntoResponse,
+    response::sse::{Event, KeepAlive, Sse},
 };
 use futures_util::TryStreamExt;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncReadExt;
+use tokio::time::{Duration, sleep};
 use tokio_util::io::StreamReader;
 use tracing::{debug, info};
 
@@ -26,7 +29,7 @@ use crate::{
         ApiErr, InternalErrorResponse,
         sftp::dto::{
             ContentRange, QueryTargetId, Range, SftpFile, SftpFileUriPayload, SftpLsPayload,
-            SftpRenamePayload, SftpUploadResponse, SftpUserDir,
+            SftpReadPayload, SftpReadResponse, SftpRenamePayload, SftpUploadResponse, SftpUserDir,
         },
     },
     consts::services_err_code::*,
@@ -45,10 +48,20 @@ use crate::{
 use super::service::{discover_user_dirs, get_file_name, parse_file_uri, resolve_user_dir_home};
 
 const WINDOWS: &str = "windows";
+const TEXT_READ_CHUNK_SIZE: usize = 64 * 1024;
+const TEXT_READ_DEFAULT_LINES: usize = 500;
+const TAIL_INITIAL_BYTES: u64 = 256 * 1024;
+
+fn text_event(name: &'static str, text: &str) -> Event {
+    Event::default()
+        .event(name)
+        .data(serde_json::to_string(text).expect("text event serialization cannot fail"))
+}
 
 struct DownloadHandleGuard {
     client: Option<SftpClientGuard>,
     handle: Arc<[u8]>,
+    shutdown_client: bool,
 }
 
 impl DownloadHandleGuard {
@@ -56,6 +69,15 @@ impl DownloadHandleGuard {
         Self {
             client: Some(client),
             handle,
+            shutdown_client: true,
+        }
+    }
+
+    fn new_shared(client: SftpClientGuard, handle: Arc<[u8]>) -> Self {
+        Self {
+            client: Some(client),
+            handle,
+            shutdown_client: false,
         }
     }
 
@@ -71,7 +93,9 @@ impl DownloadHandleGuard {
         };
         let sftp = std::ops::Deref::deref(&client).clone();
         let _ = sftp.close(self.handle.to_vec()).await;
-        client.shutdown().await;
+        if self.shutdown_client {
+            client.shutdown().await;
+        }
     }
 }
 
@@ -82,10 +106,13 @@ impl Drop for DownloadHandleGuard {
         };
         let sftp = std::ops::Deref::deref(&client).clone();
         let handle = Arc::clone(&self.handle);
+        let shutdown_client = self.shutdown_client;
         if let Ok(runtime) = tokio::runtime::Handle::try_current() {
             runtime.spawn(async move {
                 let _ = sftp.close(handle.to_vec()).await;
-                client.shutdown().await;
+                if shutdown_client {
+                    client.shutdown().await;
+                }
             });
         }
     }
@@ -563,6 +590,230 @@ pub async fn upload(
     ))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/sftp/read",
+    tag = "sftp",
+    summary = "按行读取文本文件",
+    params(SftpReadPayload),
+    responses(
+        (status = 200, description = "文本分页内容", body = SftpReadResponse),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn read(
+    State(state): State<Arc<AppState>>,
+    Query(payload): Query<SftpReadPayload>,
+) -> Result<Json<SftpReadResponse>, ApiErr> {
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let target_id = uri.target_id;
+    let path = uri.path.to_string();
+    let sftp = map_ssh_err!(
+        state
+            .connection_pool
+            .sftp(target_id, ChannelMode::Shared)
+            .await
+    )?;
+    let attr = map_ssh_err!(sftp.metadata(path.clone()).await)?;
+    if attr.file_type() == SftpFileType::Dir {
+        return Err(ApiErr {
+            code: ERR_CODE_SFTP_DOWNLOAD_INVALID_REQUEST,
+            message: "file is a directory".to_string(),
+        });
+    }
+
+    let handle: Arc<[u8]> = Arc::from(map_ssh_err!(sftp.open_read_handle(path.clone()).await)?);
+    let offset = payload.offset.unwrap_or(0).min(attr.size.unwrap_or(0));
+    let max_lines = payload
+        .lines
+        .unwrap_or(TEXT_READ_DEFAULT_LINES)
+        .clamp(1, 10_000);
+    let file_size = attr.size.unwrap_or(0);
+    let result = read_lines(&sftp, handle.clone(), offset, max_lines, file_size).await;
+    let _ = sftp.close(handle.to_vec()).await;
+    let (bytes, next_offset, eof) = result.map_err(|err| ApiErr {
+        code: ERR_CODE_SSH_ERR,
+        message: err.to_string(),
+    })?;
+
+    Ok(Json(SftpReadResponse {
+        content: String::from_utf8_lossy(&bytes).into_owned(),
+        next_offset,
+        eof,
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/sftp/tail",
+    tag = "sftp",
+    summary = "实时读取文本文件尾部",
+    params(SftpFileUriPayload),
+    responses(
+        (status = 200, description = "文本文件 SSE 流", content_type = "text/event-stream"),
+        (status = 500, response = InternalErrorResponse)
+    )
+)]
+pub async fn tail(
+    State(state): State<Arc<AppState>>,
+    Query(payload): Query<SftpFileUriPayload>,
+) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, Infallible>>>, ApiErr> {
+    let uri = parse_file_uri(payload.uri.as_str())?;
+    let target_id = uri.target_id;
+    let path = uri.path.to_string();
+    let sftp = map_ssh_err!(
+        state
+            .connection_pool
+            .sftp(target_id, ChannelMode::SharedConnection)
+            .await
+    )?;
+    let attr = map_ssh_err!(sftp.metadata(path.clone()).await)?;
+    if attr.file_type() == SftpFileType::Dir {
+        return Err(ApiErr {
+            code: ERR_CODE_SFTP_DOWNLOAD_INVALID_REQUEST,
+            message: "file is a directory".to_string(),
+        });
+    }
+    let handle: Arc<[u8]> = Arc::from(map_ssh_err!(sftp.open_read_handle(path.clone()).await)?);
+    let initial_size = attr.size.unwrap_or(0);
+    let initial_offset = initial_size.saturating_sub(TAIL_INITIAL_BYTES);
+    let initial_result = read_bytes(
+        &sftp,
+        handle.clone(),
+        initial_offset,
+        initial_size - initial_offset,
+    )
+    .await;
+    let initial_bytes = match initial_result {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            let _ = sftp.close(handle.to_vec()).await;
+            return Err(ApiErr {
+                code: ERR_CODE_SSH_ERR,
+                message: err.to_string(),
+            });
+        }
+    };
+    let initial_bytes = initial_bytes
+        .iter()
+        .position(|byte| *byte == b'\n')
+        .map(|index| initial_bytes[index + 1..].to_vec())
+        .unwrap_or(initial_bytes);
+
+    let stream = async_stream::stream! {
+        let handle_guard = DownloadHandleGuard::new(sftp, Arc::clone(&handle));
+        let sftp = handle_guard.client();
+        let mut offset = initial_size;
+        yield Ok(text_event("snapshot", &String::from_utf8_lossy(&initial_bytes)));
+        loop {
+            sleep(Duration::from_secs(1)).await;
+            let size = match sftp.metadata(path.as_str()).await {
+                Ok(attrs) => attrs.size.unwrap_or(0),
+                Err(err) => {
+                    yield Ok(text_event("error", &err.to_string()));
+                    break;
+                }
+            };
+            if size < offset {
+                offset = size.saturating_sub(TAIL_INITIAL_BYTES);
+                match read_bytes(&sftp, handle.clone(), offset, size - offset).await {
+                    Ok(bytes) => {
+                        offset = size;
+                        yield Ok(text_event("snapshot", &String::from_utf8_lossy(&bytes)));
+                    }
+                    Err(err) => {
+                        yield Ok(text_event("error", &err.to_string()));
+                        break;
+                    }
+                }
+                continue;
+            }
+            if size == offset {
+                continue;
+            }
+            match read_bytes(&sftp, handle.clone(), offset, size - offset).await {
+                Ok(bytes) => {
+                    offset = size;
+                    yield Ok(text_event("append", &String::from_utf8_lossy(&bytes)));
+                }
+                Err(err) => {
+                    yield Ok(text_event("error", &err.to_string()));
+                    break;
+                }
+            }
+        }
+        handle_guard.shutdown().await;
+    };
+
+    Ok(Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("keep-alive"),
+    ))
+}
+
+async fn read_bytes(
+    sftp: &crate::sftp_client::SftpClientGuard,
+    handle: Arc<[u8]>,
+    offset: u64,
+    length: u64,
+) -> Result<Vec<u8>, crate::sftp_client::SftpError> {
+    let mut result = Vec::with_capacity(length.min(TEXT_READ_CHUNK_SIZE as u64) as usize);
+    let mut cursor = offset;
+    let end = offset.saturating_add(length);
+    while cursor < end {
+        let request_len = (end - cursor).min(TEXT_READ_CHUNK_SIZE as u64) as usize;
+        let data = sftp
+            .begin_read(Arc::clone(&handle), cursor, request_len)
+            .await?
+            .wait()
+            .await?;
+        if data.is_empty() {
+            break;
+        }
+        cursor += data.len() as u64;
+        result.extend_from_slice(&data);
+    }
+    Ok(result)
+}
+
+async fn read_lines(
+    sftp: &crate::sftp_client::SftpClientGuard,
+    handle: Arc<[u8]>,
+    offset: u64,
+    max_lines: usize,
+    file_size: u64,
+) -> Result<(Vec<u8>, u64, bool), crate::sftp_client::SftpError> {
+    let mut result = Vec::new();
+    let mut cursor = offset;
+    loop {
+        let data = sftp
+            .begin_read(Arc::clone(&handle), cursor, TEXT_READ_CHUNK_SIZE)
+            .await?
+            .wait()
+            .await?;
+        if data.is_empty() {
+            return Ok((result, cursor, true));
+        }
+        cursor += data.len() as u64;
+        result.extend_from_slice(&data);
+        if let Some(end) = result
+            .iter()
+            .enumerate()
+            .filter(|(_, byte)| **byte == b'\n')
+            .nth(max_lines - 1)
+            .map(|(index, _)| index + 1)
+        {
+            result.truncate(end);
+            let next_offset = offset + end as u64;
+            return Ok((result, next_offset, next_offset >= file_size));
+        }
+        if data.len() < TEXT_READ_CHUNK_SIZE {
+            return Ok((result, cursor, true));
+        }
+    }
+}
+
 /// Upload one complete or ranged request to an SFTP path. Transfer tasks use
 /// this helper so the write and task progress update share the same protocol.
 pub(crate) async fn upload_to_sftp(
@@ -819,7 +1070,7 @@ pub async fn download(
 
     let stream = async_stream::stream! {
         // Keep the SFTP handle alive until the response body is consumed or dropped.
-        let handle_guard = DownloadHandleGuard::new(sftp, Arc::clone(&handle));
+        let handle_guard = DownloadHandleGuard::new_shared(sftp, Arc::clone(&handle));
         let sftp = handle_guard.client();
         let mut read_stream = sftp.read_stream();
         let mut pending_responses: BTreeMap<u64, (u64, Vec<u8>)> = BTreeMap::new();

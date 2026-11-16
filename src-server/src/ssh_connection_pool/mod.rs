@@ -27,6 +27,8 @@ use target_connection_pool::TargetConnectionPool;
 pub enum ChannelMode {
     #[default]
     Shared,
+    /// Reuse an SSH connection but allocate a separate channel/client.
+    SharedConnection,
     Dedicated,
 }
 

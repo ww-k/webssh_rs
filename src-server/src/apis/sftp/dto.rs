@@ -89,6 +89,23 @@ pub struct SftpFileUriPayload {
     pub uri: String,
 }
 
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+pub struct SftpReadPayload {
+    /// SFTP 文件 URI
+    pub uri: String,
+    /// 字节游标，分页从上一页返回的 next_offset 开始
+    pub offset: Option<u64>,
+    /// 返回的最大行数
+    pub lines: Option<usize>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct SftpReadResponse {
+    pub content: String,
+    pub next_offset: u64,
+    pub eof: bool,
+}
+
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct SftpRenamePayload {
     /// 源文件 URI

@@ -13,7 +13,7 @@ use crate::AppState;
 
 pub use dto::{SftpFile, SftpUserDir};
 pub use handlers::{
-    cp, download, ls, mkdir, rename, rm, rm_rf, stat, upload, user_dir_home, user_dirs,
+    cp, download, ls, mkdir, read, rename, rm, rm_rf, stat, tail, upload, user_dir_home, user_dirs,
 };
 pub(crate) use service::{discover_user_dirs, get_file_name, parse_file_uri};
 
@@ -30,6 +30,8 @@ pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
         .route("/rm/rf", post(rm_rf))
         .route("/upload", post(upload))
         .route("/download", get(download))
+        .route("/read", get(read))
+        .route("/tail", get(tail))
         .fallback(|| async { "not supported" })
         .with_state(app_state)
 }
