@@ -3,6 +3,17 @@ import type { features } from "./table";
 
 export const ROW_OVERSCAN = 10;
 export const VIRTUAL_WINDOW_STEP = 8;
+export const TABLE_ROWS_DRAG_TYPE = "application/x-webssh-table-rows";
+
+export function isTableRowsDrag(
+    dataTransfer: DataTransfer | null | undefined,
+    hasDraggedRows = false,
+) {
+    return (
+        hasDraggedRows ||
+        dataTransfer?.types.includes(TABLE_ROWS_DRAG_TYPE) === true
+    );
+}
 
 export function supportsNativeDragAndDrop() {
     if (typeof window === "undefined" || typeof document === "undefined") {

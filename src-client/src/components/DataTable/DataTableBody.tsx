@@ -9,7 +9,11 @@ import {
 import classNames from "clsx";
 import { memo } from "react";
 
-import { currentSelectedRowsForDrag } from "./utils";
+import {
+    currentSelectedRowsForDrag,
+    isTableRowsDrag,
+    TABLE_ROWS_DRAG_TYPE,
+} from "./utils";
 
 import type { features } from "./table";
 import type { DataTableColumn, DropPosition } from "./types";
@@ -360,10 +364,7 @@ function DataTableRow<TData extends RowData>({
                     ),
                 );
                 try {
-                    event.dataTransfer.setData(
-                        "application/x-webssh-table-rows",
-                        rowIds,
-                    );
+                    event.dataTransfer.setData(TABLE_ROWS_DRAG_TYPE, rowIds);
                 } catch (error) {
                     console.log(
                         "[drag-debug] DataTable custom setData failed",
@@ -381,6 +382,9 @@ function DataTableRow<TData extends RowData>({
                 setDropPosition(null);
             }}
             onDragOver={(event) => {
+                if (!isTableRowsDrag(event.dataTransfer, !!dragRows.current)) {
+                    return;
+                }
                 const bounds = event.currentTarget.getBoundingClientRect();
                 const nextDropPosition =
                     event.clientY < bounds.top + bounds.height / 2

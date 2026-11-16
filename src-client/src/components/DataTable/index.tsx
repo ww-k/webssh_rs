@@ -16,8 +16,10 @@ import { features } from "./table";
 import {
     currentSelectedRowsForDrag,
     getVirtualStartIndex,
+    isTableRowsDrag,
     ROW_OVERSCAN,
     supportsNativeDragAndDrop,
+    TABLE_ROWS_DRAG_TYPE,
 } from "./utils";
 
 import type { DataTableProps, DropPosition } from "./types";
@@ -389,6 +391,7 @@ function DataTable<TData extends RowData>({
         ) => {
             const dataTransfer = event.dataTransfer;
             if (!dataTransfer) return;
+            if (!isTableRowsDrag(dataTransfer, !!dragRows.current)) return;
             console.log("[drag-debug] DataTable handleDrop", {
                 targetId: target
                     ? (target as { id?: string | number }).id
@@ -403,9 +406,7 @@ function DataTable<TData extends RowData>({
                 "nativeEvent" in event ? event.nativeEvent : event;
             let sourceRows = dragRows.current;
             if (!sourceRows) {
-                const serialized = dataTransfer.getData(
-                    "application/x-webssh-table-rows",
-                );
+                const serialized = dataTransfer.getData(TABLE_ROWS_DRAG_TYPE);
                 if (serialized) {
                     try {
                         const ids = new Set(JSON.parse(serialized) as string[]);
@@ -640,6 +641,12 @@ function DataTable<TData extends RowData>({
                 onHeaderContextMenu?.(event);
             }}
             onDragOverCapture={(event) => {
+                if (!isTableRowsDrag(event.dataTransfer, !!dragRows.current)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.dataTransfer.dropEffect = "none";
+                    return;
+                }
                 console.log(
                     "[drag-debug] DataTable root dragOverCapture",
                     event.target,
@@ -658,6 +665,11 @@ function DataTable<TData extends RowData>({
                 setDropPosition(null);
             }}
             onDropCapture={(event) => {
+                if (!isTableRowsDrag(event.dataTransfer, !!dragRows.current)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
                 if ((event.target as HTMLElement).closest("tbody tr")) return;
                 handleDrop(null, event);
             }}
