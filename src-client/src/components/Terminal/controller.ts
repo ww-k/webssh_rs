@@ -240,7 +240,6 @@ export class TerminalController {
                 } else {
                     console.log(new Date(), socket.id, "socket new connection");
                     this.fitTerminal();
-                    this.terminal.write("\r\n");
                 }
 
                 if (this.outputBuffer) {
