@@ -81,6 +81,7 @@ export default function FilesviewLocal({
     const {
         data: files = [],
         loading,
+        error,
         runAsync: getCwdFiles,
     } = useRequest(async () => await getFsLsMapFiles(cwd), {
         manual: true,
@@ -122,6 +123,7 @@ export default function FilesviewLocal({
             history={pathHistory}
             files={files}
             loading={loading}
+            loadError={!!error}
             posix={!isMSWindows}
             enableDragFromOS={false}
             setCwd={setCwdPath}

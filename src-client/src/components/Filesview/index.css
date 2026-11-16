@@ -26,3 +26,16 @@
     flex-grow: 1;
     margin: 10px;
 }
+
+.filesviewFilelistRetry {
+    padding: 0;
+    border: 0;
+    color: var(--ant-color-primary);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+}
+
+.filesviewFilelistRetry:hover {
+    text-decoration: underline;
+}

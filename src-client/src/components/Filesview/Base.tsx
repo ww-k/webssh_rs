@@ -1,6 +1,7 @@
 import { useMemoizedFn } from "ahooks";
 import { Spin } from "antd";
 import { useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 import Pathbar from "@/components/Pathbar";
 import { isSearchUri } from "@/components/Pathbar/search";
@@ -23,6 +24,7 @@ type IProps = {
     cwd: string;
     history?: string[];
     loading: boolean;
+    loadError?: boolean;
     posix?: boolean;
     setCwd: (cwd: string) => void;
     getHome: () => Promise<string>;
@@ -57,10 +59,12 @@ export default function FilesviewBase({
     getHome,
     getDirs,
     getCwdFiles,
+    loadError = false,
     editingFile,
     onCloseEditor,
     ...restProps
 }: IProps) {
+    const { t } = useTranslation();
     const copyData = useAppStore((state) => state.copyData);
     const setCopyData = useAppStore((state) => state.setCopyData);
     const searching = useMemo(() => isSearchUri(cwd), [cwd]);
@@ -122,6 +126,19 @@ export default function FilesviewBase({
                     data={files}
                     enableParentFile={!searching}
                     loading={loading}
+                    emptyContent={
+                        loadError ? (
+                            <button
+                                className="filesviewFilelistRetry"
+                                onClick={() => {
+                                    void getCwdFiles().catch(() => undefined);
+                                }}
+                                type="button"
+                            >
+                                {t("filesview_load_failed_retry")}
+                            </button>
+                        ) : undefined
+                    }
                     onCopy={setCopyData}
                     onPaste={onPaste}
                     {...restProps}

@@ -150,6 +150,7 @@
     "filesview_open_terminal": "Open in SSH",
     "filesview_show_all_files": "Show all files",
     "filesview_hide_hidden_files": "Hide hidden files",
+    "filesview_load_failed_retry": "Loading failed, click to retry",
     "terminal_disconnected": "SSH connection disconnected",
     "terminal_reconnect": "Reconnect",
     "terminal_copy_success": "Text copied. Paste with the middle or right mouse button.",

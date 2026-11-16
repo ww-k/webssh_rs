@@ -87,6 +87,7 @@ export default function FilesviewRemote({
     const {
         data: files = [],
         loading,
+        error,
         runAsync: getCwdFiles,
     } = useRequest(
         async () => {
@@ -164,6 +165,7 @@ export default function FilesviewRemote({
             history={pathHistory}
             files={files}
             loading={loading}
+            loadError={!!error}
             posix={true}
             setCwd={setCwdUri}
             getDirs={getDirs}

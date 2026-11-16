@@ -261,5 +261,6 @@
     "settings_data_import_target_conflict": "已存在的连接目标",
     "settings_data_import_target_skip": "跳过",
     "settings_data_import_target_overwrite": "覆盖",
-    "files_app_image_preview": "图片预览"
+    "files_app_image_preview": "图片预览",
+    "filesview_load_failed_retry": "\u52a0\u8f7d\u5931\u8d25\uff0c\u70b9\u51fb\u91cd\u8bd5"
 }
