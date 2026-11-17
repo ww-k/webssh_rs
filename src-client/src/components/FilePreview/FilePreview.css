@@ -62,11 +62,6 @@
     gap: 8px;
 }
 
-.filesviewFileEditorPagination span {
-    min-width: 32px;
-    text-align: center;
-}
-
 .filesviewFileEditorBody > div {
     display: flex;
     min-width: 0;
