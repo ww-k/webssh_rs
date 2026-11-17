@@ -177,6 +177,7 @@
     "target_jump_host_placeholder": "Please select one; create it first if needed",
     "target_method": "Authentication method",
     "target_new": "New target",
+    "target_local_terminal": "Local terminal",
     "target_password": "Password",
     "target_port": "Port",
     "target_private_key": "Private key",

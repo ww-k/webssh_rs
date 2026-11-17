@@ -33,8 +33,8 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use apis::{
-    favorite_directory, fs, preferences, sftp, ssh, ssh_connection, ssh_known_host, target,
-    transfer, user_data,
+    favorite_directory, fs, local_terminal, preferences, sftp, ssh, ssh_connection, ssh_known_host,
+    target, transfer, user_data,
 };
 use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
@@ -151,6 +151,7 @@ where
             ssh_connection::router_builder(connection_pool.clone()),
         )
         .nest("/api/ssh", ssh::router_builder(connection_pool.clone()))
+        .nest("/api/local", local_terminal::router_builder())
         .nest("/api/sftp", sftp::router_builder(app_state.clone()))
         .nest("/api/fs", fs::router_builder(app_base_state.clone()))
         .nest(

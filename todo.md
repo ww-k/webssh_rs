@@ -3,3 +3,5 @@
 - [] [feat] ssh terminal支持缓存历史会话信息，重连时保留历史会话
 - [] [feat] ssh terminal的断开重连，区分ssh通道断开和websocket链接断开。websocket链接断开可重连websocket，并连上断开前的通道。ssh通道断开则完重连。
 - [] [feat] MCP，支持agent直接操作界面
+- [] [feat] tailf模式，增加一个暂停实时刷新的开关，方便查看已有内容
+- [] [feat] 主页支持分割视图

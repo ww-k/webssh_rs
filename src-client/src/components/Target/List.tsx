@@ -577,6 +577,19 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     value={searchValue}
                 />
                 <Space className="targetListActions" size="small">
+                    <Tooltip title={t("target_local_terminal")}>
+                        <Button
+                            aria-label={t("target_local_terminal")}
+                            icon={<CodeOutlined />}
+                            onClick={() => {
+                                setTabPath(
+                                    tab.key,
+                                    "/terminal/local",
+                                    t("target_local_terminal"),
+                                );
+                            }}
+                        />
+                    </Tooltip>
                     <Tooltip title={t("target_new")}>
                         <Button
                             icon={<PlusCircleTwoTone />}

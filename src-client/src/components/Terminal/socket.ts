@@ -1,6 +1,10 @@
 import { io, type Socket } from "socket.io-client";
 
-import type { ServerReadyOption, TerminalSocketCallbacks } from "./types";
+import type {
+    ServerReadyOption,
+    TerminalConnection,
+    TerminalSocketCallbacks,
+} from "./types";
 
 function parseServerReadyOption(option: unknown): ServerReadyOption {
     if (!option || typeof option !== "object") return {};
@@ -17,12 +21,17 @@ function parseServerReadyOption(option: unknown): ServerReadyOption {
 }
 
 export function createTerminalSocket(
-    targetId: number,
+    connection: TerminalConnection,
     callbacks: TerminalSocketCallbacks,
 ): Socket {
+    const isLocal = connection.mode === "local";
     const socket = io(window.location.origin, {
-        path: "/api/ssh/terminal/socket.io",
-        query: { target_id: String(targetId) },
+        path: isLocal
+            ? "/api/local/terminal/socket.io"
+            : "/api/ssh/terminal/socket.io",
+        ...(isLocal
+            ? {}
+            : { query: { target_id: String(connection.targetId) } }),
         transports:
             "WebSocket" in window ? ["websocket"] : ["polling", "websocket"],
     });

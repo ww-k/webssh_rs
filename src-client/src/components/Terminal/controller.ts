@@ -14,7 +14,12 @@ import { createTerminalSocket } from "./socket";
 import { applyTerminalTheme } from "./theme";
 
 import type { Socket } from "socket.io-client";
-import type { ClipboardOptions, TerminalSize, TerminalTheme } from "./types";
+import type {
+    ClipboardOptions,
+    TerminalConnection,
+    TerminalSize,
+    TerminalTheme,
+} from "./types";
 
 function quoteShellPath(path: string): string {
     return `'${path.replace(/'/g, "'\\''")}'`;
@@ -32,11 +37,13 @@ export interface TerminalControllerEvents {
 
 export interface TerminalControllerOptions {
     preventDocumentDrop?: boolean;
+    mode?: "ssh" | "local";
 }
 
 export class TerminalController {
     private readonly terminalContainer: HTMLElement | null;
-    private readonly targetId: number;
+    private readonly targetId?: number;
+    private readonly mode: "ssh" | "local";
     private readonly events: TerminalControllerEvents;
     private readonly preventDocumentDrop: boolean;
     private terminal?: WTerm;
@@ -64,13 +71,14 @@ export class TerminalController {
 
     constructor(
         containerId: string,
-        targetId: number,
+        targetId: number | undefined,
         events: TerminalControllerEvents = {},
         initialTheme: TerminalTheme = defaultTheme,
         options: TerminalControllerOptions = {},
     ) {
         this.terminalContainer = document.getElementById(containerId);
         this.targetId = targetId;
+        this.mode = options.mode ?? "ssh";
         this.events = events;
         this.theme = initialTheme;
         this.preventDocumentDrop = options.preventDocumentDrop === true;
@@ -228,13 +236,16 @@ export class TerminalController {
     }
 
     private initSocket(): void {
-        const targetId = this.targetId;
-        this.terminalSocket = createTerminalSocket(targetId, {
+        const connection: TerminalConnection =
+            this.mode === "local"
+                ? { mode: "local" }
+                : { mode: "ssh", targetId: this.targetId as number };
+        this.terminalSocket = createTerminalSocket(connection, {
             onConnect: (socket, recovered) => {
                 this.terminalReady = false;
                 this.events.onStatus?.("connected");
                 if (!this.terminal) {
-                    this.createTerminal(socket, targetId);
+                    this.createTerminal(socket);
                 } else if (recovered) {
                     console.log(new Date(), socket.id, "socket recovered");
                 } else {
@@ -294,13 +305,13 @@ export class TerminalController {
         });
     }
 
-    private createTerminal(socket: Socket, targetId: number): void {
+    private createTerminal(socket: Socket): void {
         if (this.terminalCreationPromise) return;
         if (!this.terminalContainer) return;
 
         this.terminalContainer.innerHTML = "";
 
-        this.terminalCreationPromise = this.initializeTerminal(socket, targetId)
+        this.terminalCreationPromise = this.initializeTerminal(socket)
             .catch((error) => {
                 if (!this.destroyed) {
                     console.error("failed to create terminal", error);
@@ -311,10 +322,7 @@ export class TerminalController {
             });
     }
 
-    private async initializeTerminal(
-        socket: Socket,
-        targetId: number,
-    ): Promise<void> {
+    private async initializeTerminal(socket: Socket): Promise<void> {
         const container = this.terminalContainer;
         if (!container) return;
 
@@ -329,8 +337,14 @@ export class TerminalController {
             core,
             autoResize: true,
             webmcp: this.pendingWebMCP || {
-                name: `ssh-terminal-${targetId}`,
-                description: `Interactive SSH terminal for target ${targetId}`,
+                name:
+                    this.mode === "local"
+                        ? "local-terminal"
+                        : `ssh-terminal-${this.targetId}`,
+                description:
+                    this.mode === "local"
+                        ? "Interactive local terminal"
+                        : `Interactive SSH terminal for target ${this.targetId}`,
             },
             onWorkingDirectory: (uri) => {
                 const cwd = parseTerminalCwd(uri);

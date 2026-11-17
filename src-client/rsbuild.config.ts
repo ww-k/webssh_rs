@@ -58,6 +58,11 @@ export default defineConfig({
             },
         ],
         proxy: {
+            "/api/local/terminal": {
+                target: serverWebSocketOrigin,
+                ws: true,
+                changeOrigin: true,
+            },
             "/api/ssh": {
                 target: serverWebSocketOrigin,
                 ws: true,

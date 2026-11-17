@@ -57,7 +57,17 @@ function getTargetLabel(label: string, targetId?: number): string {
     return targetLabel || `target ${targetId ?? "unknown"}`;
 }
 
-function createWebMCPOptions(targetId: number | undefined, label: string) {
+function createWebMCPOptions(
+    targetId: number | undefined,
+    label: string,
+    isLocal: boolean,
+) {
+    if (isLocal) {
+        return {
+            name: "local-terminal",
+            description: "Interactive local terminal.",
+        };
+    }
     const targetLabel = getTargetLabel(label, targetId);
     const slug = targetLabel
         .toLowerCase()
@@ -134,9 +144,10 @@ export default function Terminal({
         const match = tab.path.match(/^\/terminal\/(\d+)/);
         return match ? Number.parseInt(match[1], 10) : undefined;
     }, [tab.path]);
+    const isLocalTerminal = tab.path === "/terminal/local";
     const webmcpOptions = useMemo(
-        () => createWebMCPOptions(targetId, tab.label),
-        [tab.label, targetId],
+        () => createWebMCPOptions(targetId, tab.label, isLocalTerminal),
+        [isLocalTerminal, tab.label, targetId],
     );
     const isWindowsTarget = terminalSystem?.toLowerCase() === "windows";
 
@@ -438,7 +449,7 @@ export default function Terminal({
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: Keep one controller for each terminal id.
     useEffect(() => {
-        if (targetId === undefined) return;
+        if (!isLocalTerminal && targetId === undefined) return;
         if (terminalControllerRef.current) {
             return () => {
                 if (terminalControllerRef.current) {
@@ -463,10 +474,11 @@ export default function Terminal({
                     terminalEventsRef.current?.onContextMenu?.(data),
             },
             terminalThemes[theme],
+            { mode: isLocalTerminal ? "local" : "ssh" },
         );
         terminalControllerRef.current = controller;
         controller.init();
-    }, [targetId, terminalId]);
+    }, [isLocalTerminal, targetId, terminalId]);
 
     useEffect(() => {
         handleTerminalLoad();
@@ -491,7 +503,7 @@ export default function Terminal({
     return (
         <div className="terminalView">
             <div className="terminalToolbar">
-                {!isWindowsTarget && (
+                {!isLocalTerminal && !isWindowsTarget && (
                     <div
                         ref={favoriteDirectoryMenuBoxRef}
                         className="terminalFavoriteDirectoryMenuBox"
@@ -580,34 +592,38 @@ export default function Terminal({
                         )}
                     </div>
                 )}
-                <Tooltip
-                    title={t(
-                        cwd === undefined
-                            ? "terminal_open_sftp_disabled"
-                            : "terminal_open_sftp",
-                    )}
-                >
-                    <span>
-                        <Button
-                            aria-label={t("terminal_open_sftp")}
-                            disabled={cwd === undefined}
-                            icon={<FolderOutlined />}
-                            onClick={openSftp}
-                            size="small"
-                            type="text"
-                        />
-                    </span>
-                </Tooltip>
-                <Tooltip title={t("files_menu_upload")}>
-                    <Button
-                        aria-label={t("files_menu_upload")}
-                        disabled={cwd === undefined}
-                        icon={<UploadOutlined />}
-                        onClick={() => void uploadToCwd()}
-                        size="small"
-                        type="text"
-                    />
-                </Tooltip>
+                {!isLocalTerminal && (
+                    <>
+                        <Tooltip
+                            title={t(
+                                cwd === undefined
+                                    ? "terminal_open_sftp_disabled"
+                                    : "terminal_open_sftp",
+                            )}
+                        >
+                            <span>
+                                <Button
+                                    aria-label={t("terminal_open_sftp")}
+                                    disabled={cwd === undefined}
+                                    icon={<FolderOutlined />}
+                                    onClick={openSftp}
+                                    size="small"
+                                    type="text"
+                                />
+                            </span>
+                        </Tooltip>
+                        <Tooltip title={t("files_menu_upload")}>
+                            <Button
+                                aria-label={t("files_menu_upload")}
+                                disabled={cwd === undefined}
+                                icon={<UploadOutlined />}
+                                onClick={() => void uploadToCwd()}
+                                size="small"
+                                type="text"
+                            />
+                        </Tooltip>
+                    </>
+                )}
                 <Tooltip title={t("terminal_menu_clear")}>
                     <Button
                         aria-label={t("terminal_menu_clear")}

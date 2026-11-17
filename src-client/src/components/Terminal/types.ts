@@ -36,3 +36,7 @@ export interface TerminalSocketCallbacks {
     onServerReady: (option: ServerReadyOption) => void;
     onOutput: (data: string) => void;
 }
+
+export type TerminalConnection =
+    | { mode: "ssh"; targetId: number }
+    | { mode: "local" };
