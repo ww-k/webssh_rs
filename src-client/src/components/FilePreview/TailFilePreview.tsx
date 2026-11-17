@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { FilterOutlined } from "@ant-design/icons";
+import { Input } from "antd";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { parseTailEvent } from "./fileContent";
@@ -19,6 +21,11 @@ export default function TailFilePreview({ file, lineWrapping }: Props) {
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string>();
+    const [filter, setFilter] = useState("");
+    const filteredContent = useMemo(
+        () => filterTailContent(content, filter),
+        [content, filter],
+    );
 
     useEffect(() => {
         let disposed = false;
@@ -60,15 +67,24 @@ export default function TailFilePreview({ file, lineWrapping }: Props) {
             <PreviewState loading={loading} error={error}>
                 <MonacoTextEditor
                     fileName={file.name}
-                    content={content}
+                    content={filteredContent}
                     lineWrapping={lineWrapping}
                     readOnly={true}
                     followTail={true}
                     showLineNumbers={false}
+                    highlightText={filter}
                 />
             </PreviewState>
             <footer className="filesviewFileEditorFooter">
-                <span />
+                <Input
+                    allowClear={true}
+                    aria-label={t("file_editor_tail_filter")}
+                    className="filesviewFileEditorFilter"
+                    onChange={(event) => setFilter(event.target.value)}
+                    placeholder={t("file_editor_tail_filter")}
+                    prefix={<FilterOutlined />}
+                    value={filter}
+                />
                 <span />
             </footer>
         </>
@@ -80,4 +96,13 @@ function trimTailContent(content: string) {
     const trimStart = content.length - MAX_TAIL_TEXT_BYTES;
     const lineStart = content.indexOf("\n", trimStart);
     return content.slice(lineStart < 0 ? trimStart : lineStart + 1);
+}
+
+function filterTailContent(content: string, filter: string) {
+    if (!filter) return content;
+    const hasTrailingNewline = content.endsWith("\n");
+    const lines = content
+        .split(/\r?\n/)
+        .filter((line) => line.includes(filter));
+    return `${lines.join("\n")}${hasTrailingNewline && lines.length ? "\n" : ""}`;
 }

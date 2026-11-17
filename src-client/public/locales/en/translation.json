@@ -242,6 +242,7 @@
     "file_editor_collapse": "Restore editor size",
     "file_editor_loading": "Loading...",
     "file_editor_tail_mode": "tailf mode",
+    "file_editor_tail_filter": "Filter text",
     "file_editor_previous_page": "Previous page",
     "file_editor_next_page": "Next page",
     "files_conflict_content": "The target contains {{count}} files with the same name. Overwrite or skip?",

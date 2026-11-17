@@ -207,6 +207,7 @@
     "file_editor_collapse": "缩小编辑器",
     "file_editor_loading": "加载中...",
     "file_editor_tail_mode": "末页实时模式",
+    "file_editor_tail_filter": "过滤文本",
     "file_editor_previous_page": "上一页",
     "file_editor_next_page": "下一页",
     "files_conflict_content": "目标包含 {{count}} 个同名文件，是否覆盖或跳过？",

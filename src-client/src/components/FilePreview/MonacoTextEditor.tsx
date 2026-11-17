@@ -14,6 +14,7 @@ type Props = {
     lineNumberOffset?: number;
     followTail?: boolean;
     showLineNumbers?: boolean;
+    highlightText?: string;
     onChange?: (content: string) => void;
 };
 
@@ -31,6 +32,7 @@ export default function MonacoTextEditor({
     lineNumberOffset = 0,
     followTail = false,
     showLineNumbers = true,
+    highlightText = "",
     onChange,
 }: Props) {
     const theme = useAppStore((state) => state.theme);
@@ -38,6 +40,7 @@ export default function MonacoTextEditor({
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor>();
     const onChangeRef = useRef(onChange);
     const externalUpdateRef = useRef(false);
+    const highlightDecorationsRef = useRef<string[]>([]);
 
     onChangeRef.current = onChange;
 
@@ -106,6 +109,54 @@ export default function MonacoTextEditor({
             wordWrap: lineWrapping ? "on" : "off",
         });
     }, [lineNumberOffset, lineWrapping, showLineNumbers]);
+
+    useEffect(() => {
+        const editor = editorRef.current;
+        const model = editor?.getModel();
+        if (!editor || !model || model.getValue() !== content) return;
+
+        const decorations: monaco.editor.IModelDeltaDecoration[] = [];
+        if (highlightText) {
+            for (
+                let lineNumber = 1;
+                lineNumber <= model.getLineCount();
+                lineNumber++
+            ) {
+                const lineContent = model.getLineContent(lineNumber);
+                let index = lineContent.indexOf(highlightText);
+                while (index >= 0) {
+                    decorations.push({
+                        range: new monaco.Range(
+                            lineNumber,
+                            index + 1,
+                            lineNumber,
+                            index + highlightText.length + 1,
+                        ),
+                        options: {
+                            inlineClassName: "filesviewFileEditorHighlight",
+                        },
+                    });
+                    index = lineContent.indexOf(
+                        highlightText,
+                        index + highlightText.length,
+                    );
+                }
+            }
+        }
+        highlightDecorationsRef.current = editor.deltaDecorations(
+            highlightDecorationsRef.current,
+            decorations,
+        );
+
+        return () => {
+            if (editorRef.current === editor) {
+                highlightDecorationsRef.current = editor.deltaDecorations(
+                    highlightDecorationsRef.current,
+                    [],
+                );
+            }
+        };
+    }, [content, highlightText]);
 
     useEffect(() => {
         monaco.editor.setTheme(theme === "dark" ? "vs-dark" : "vs");
