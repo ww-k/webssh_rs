@@ -23,7 +23,7 @@ export default function TailFilePreview({ file, lineWrapping }: Props) {
     useEffect(() => {
         let disposed = false;
         const eventSource = new EventSource(
-            `/api/sftp/tail?uri=${encodeURIComponent(file.uri)}`,
+            `/api/sftp/tailf?uri=${encodeURIComponent(file.uri)}`,
         );
         const replaceContent = (event: Event) => {
             if (disposed) return;

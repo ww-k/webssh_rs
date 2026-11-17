@@ -645,7 +645,7 @@ pub async fn read(
 
 #[utoipa::path(
     get,
-    path = "/api/sftp/tail",
+    path = "/api/sftp/tailf",
     tag = "sftp",
     summary = "实时读取文本文件尾部",
     params(SftpFileUriPayload),

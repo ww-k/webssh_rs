@@ -31,7 +31,7 @@ pub(crate) fn router_builder(app_state: Arc<AppState>) -> Router {
         .route("/upload", post(upload))
         .route("/download", get(download))
         .route("/read", get(read))
-        .route("/tail", get(tail))
+        .route("/tailf", get(tail))
         .fallback(|| async { "not supported" })
         .with_state(app_state)
 }
