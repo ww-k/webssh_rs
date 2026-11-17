@@ -198,7 +198,7 @@
     "transfer_unknown_reason": "未知原因",
     "batch_task_progress_title": "批处理任务进度",
     "batch_task_failed_count": "{{count}} 个任务失败",
-    "file_editor_load_failed": "加载文件失败",
+    "file_editor_load_failed": "加载失败",
     "file_editor_save_failed": "保存文件失败",
     "file_editor_save_success": "文件保存成功",
     "file_editor_aria_label": "编辑 {{name}}",
@@ -206,8 +206,7 @@
     "file_editor_expand": "放大编辑器",
     "file_editor_collapse": "缩小编辑器",
     "file_editor_loading": "加载中...",
-    "file_editor_tail_mode": "tailf 实时模式",
-    "file_editor_tail_failed": "tailf 连接失败",
+    "file_editor_tail_mode": "末页实时模式",
     "file_editor_previous_page": "上一页",
     "file_editor_next_page": "下一页",
     "files_conflict_content": "目标包含 {{count}} 个同名文件，是否覆盖或跳过？",
@@ -266,5 +265,5 @@
     "settings_data_import_target_skip": "跳过",
     "settings_data_import_target_overwrite": "覆盖",
     "files_app_image_preview": "图片预览",
-    "filesview_load_failed_retry": "\u52a0\u8f7d\u5931\u8d25\uff0c\u70b9\u51fb\u91cd\u8bd5"
+    "filesview_load_failed_retry": "加载失败，点击重试"
 }

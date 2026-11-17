@@ -38,7 +38,7 @@ export default function TailFilePreview({ file, lineWrapping }: Props) {
             setLoading(false);
         };
         const reportError = () => {
-            if (!disposed) setError(t("file_editor_tail_failed"));
+            if (!disposed) setError(t("file_editor_load_failed"));
         };
         eventSource.addEventListener("snapshot", replaceContent);
         eventSource.addEventListener("append", appendContent);
