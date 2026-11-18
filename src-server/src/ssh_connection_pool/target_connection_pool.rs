@@ -13,7 +13,7 @@ use super::{
     connection::{ChannelPermit, ConnectionState, SshConnection},
     connector::{SshConnectionSpec, SshConnector},
     error::{SshPoolError, SshPoolResult},
-    lease::SshChannelGuard,
+    lease::{SshChannelGuard, SshChannelStreamGuard},
 };
 
 pub(crate) struct TargetConnectionPool {
@@ -253,6 +253,85 @@ impl TargetConnectionPool {
         result_rx
             .await
             .map_err(|_| SshPoolError::ConnectionExpired { connection_id })?
+    }
+
+    pub(crate) async fn direct_tcpip(
+        self: &Arc<Self>,
+        host: &str,
+        port: u16,
+        originator_address: &str,
+    ) -> SshPoolResult<SshChannelStreamGuard> {
+        if self.max_connections == 0 {
+            return Err(SshPoolError::CapacityExceeded {
+                resource: "SSH connection",
+                limit: 0,
+            });
+        }
+        if self.max_channels_per_connection == 0 {
+            return Err(SshPoolError::CapacityExceeded {
+                resource: "SSH channel",
+                limit: 0,
+            });
+        }
+        let (connection, permit) = loop {
+            self.ensure_active()?;
+            if let Some(reservation) = self.try_existing(ChannelMode::Shared).await {
+                break reservation;
+            }
+
+            let connect_guard = self.connect_lock.lock().await;
+            self.ensure_active()?;
+            if let Some(reservation) = self.try_existing(ChannelMode::Shared).await {
+                break reservation;
+            }
+
+            let connection_count = {
+                let mut connections = self.connections.lock().await;
+                connections.retain(|connection| connection.state() != ConnectionState::Closed);
+                connections.len()
+            };
+            if connection_count >= self.max_connections {
+                drop(connect_guard);
+                self.notify.notified().await;
+                continue;
+            }
+
+            let connected = self.connector.connect(&self.spec).await?;
+            let connection = SshConnection::new(
+                connected,
+                self.max_channels_per_connection,
+                Arc::clone(&self.notify),
+                Arc::downgrade(self),
+            );
+            let permit =
+                connection
+                    .try_reserve()
+                    .ok_or_else(|| SshPoolError::ConnectionExpired {
+                        connection_id: connection.id().to_string(),
+                    })?;
+            self.connections.lock().await.push(Arc::clone(&connection));
+            break (connection, permit);
+        };
+
+        let connection_id = connection.id().to_string();
+        let channel = match connection
+            .open_direct_tcpip(host, port, originator_address)
+            .await
+        {
+            Ok(channel) => channel,
+            Err(err) => {
+                connection.expire();
+                return Err(err);
+            }
+        };
+        if let Err(err) = self.ensure_active() {
+            let _ = channel.close().await;
+            drop(permit);
+            return Err(err);
+        }
+        SshChannelGuard::new(channel, permit)
+            .into_stream()
+            .ok_or(SshPoolError::ConnectionExpired { connection_id })
     }
 
     fn ensure_active(&self) -> SshPoolResult<()> {

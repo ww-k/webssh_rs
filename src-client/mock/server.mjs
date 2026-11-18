@@ -115,6 +115,9 @@ async function route(request, response) {
     if (pathname.startsWith("/api/ssh_connection/")) {
         return handleSshConnection(request, response, pathname, searchParams);
     }
+    if (pathname.startsWith("/api/port_forward/")) {
+        return handlePortForward(request, response, pathname);
+    }
     if (pathname.startsWith("/api/favorite_directory/")) {
         return handleFavoriteDirectory(
             request,
@@ -258,6 +261,55 @@ async function handleSshConnection(request, response, pathname, searchParams) {
     return sendMethodNotAllowed(response);
 }
 
+async function handlePortForward(request, response, pathname) {
+    if (request.method === "GET" && pathname === "/api/port_forward/list") {
+        return sendJson(response, 200, state.portForwards);
+    }
+    if (request.method === "POST" && pathname === "/api/port_forward/create") {
+        const payload = await readJson(request);
+        const item = {
+            id: `mock-forward-${randomUUID()}`,
+            local_host: payload.local_host || "127.0.0.1",
+            local_port: Number(payload.local_port),
+            remote_host: payload.remote_host,
+            remote_port: Number(payload.remote_port),
+            target_id: Number(payload.target_id),
+            enabled: true,
+        };
+        state.portForwards.push(item);
+        return sendJson(response, 200, item);
+    }
+    if (request.method === "POST" && pathname === "/api/port_forward/update") {
+        const payload = await readJson(request);
+        const item = state.portForwards.find((entry) => entry.id === payload.id);
+        if (!item) return sendNotFound(response, "Port forwarding", payload.id);
+        Object.assign(item, {
+            target_id: Number(payload.target_id),
+            local_host: payload.local_host,
+            local_port: Number(payload.local_port),
+            remote_host: payload.remote_host,
+            remote_port: Number(payload.remote_port),
+        });
+        return sendJson(response, 200, item);
+    }
+    if (request.method === "POST" && pathname === "/api/port_forward/toggle") {
+        const payload = await readJson(request);
+        const item = state.portForwards.find((entry) => entry.id === payload.id);
+        if (!item) return sendNotFound(response, "Port forwarding", payload.id);
+        item.enabled = Boolean(payload.enabled);
+        return sendJson(response, 200, item);
+    }
+    if (request.method === "POST" && pathname === "/api/port_forward/remove") {
+        const payload = await readJson(request);
+        const index = state.portForwards.findIndex((item) => item.id === payload.id);
+        if (index === -1) return sendNotFound(response, "Port forwarding", payload.id);
+        state.portForwards.splice(index, 1);
+        response.writeHead(200);
+        return response.end();
+    }
+    return sendMethodNotAllowed(response);
+}
+
 async function handleFavoriteDirectory(
     request,
     response,
@@ -379,6 +431,7 @@ async function handleUserData(request, response, pathname) {
                     name,
                     path,
                 })),
+            port_forwards: state.portForwards.map(({ enabled, ...item }) => item),
             settings: payload.settings ?? {},
         };
         if (!payload.password) return sendJson(response, 200, document);
@@ -420,6 +473,9 @@ async function handleUserData(request, response, pathname) {
         const favorites = Array.isArray(document.favorite_directories)
             ? document.favorite_directories
             : [];
+        const portForwards = Array.isArray(document.port_forwards)
+            ? document.port_forwards
+            : [];
         for (const favorite of favorites) {
             ensureFavoriteDirectories(Number(favorite.target_id || 0));
             const list = state.favoriteDirectories.get(
@@ -436,10 +492,26 @@ async function handleUserData(request, response, pathname) {
                 });
             }
         }
+        if (payload.import_port_forwards !== false) {
+            for (const forward of portForwards) {
+                const existing = state.portForwards.find(
+                    (item) => item.id === forward.id,
+                );
+                const item = {
+                    ...forward,
+                    local_host: forward.local_host || "127.0.0.1",
+                    enabled: false,
+                };
+                if (existing) Object.assign(existing, item);
+                else state.portForwards.push(item);
+            }
+        }
         return sendJson(response, 200, {
             added_targets: addedTargets,
             skipped_targets: skippedTargets,
             imported_favorites: favorites.length,
+            imported_port_forwards:
+                payload.import_port_forwards === false ? 0 : portForwards.length,
             settings: document.settings ?? {},
         });
     }

@@ -9,6 +9,7 @@ import {
     FileTextOutlined,
     HomeOutlined,
     KeyOutlined,
+    NodeIndexOutlined,
     SettingOutlined,
     SwapOutlined,
 } from "@ant-design/icons";
@@ -19,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import useAppStore from "@/store";
 
 import Home from "./components/Home";
+import PortForwarding from "./components/PortForwarding";
 import ServerLogs from "./components/ServerLogs";
 import Settings from "./components/Settings";
 import SshConnections from "./components/SshConnections";
@@ -76,6 +78,11 @@ export default function App() {
                 key: "ssh_connections",
                 icon: <DisconnectOutlined />,
                 label: t("app_menu_ssh_connections"),
+            },
+            {
+                key: "port_forward",
+                icon: <NodeIndexOutlined />,
+                label: t("app_menu_port_forward"),
             },
             {
                 key: "ssh_known_hosts",
@@ -198,6 +205,7 @@ export default function App() {
                     <Home active={activeMenuKey === "home"} />
                     {activeMenuKey === "transfer" && <Transfer />}
                     {activeMenuKey === "ssh_connections" && <SshConnections />}
+                    {activeMenuKey === "port_forward" && <PortForwarding />}
                     {activeMenuKey === "server_logs" && <ServerLogs />}
                     {activeMenuKey === "ssh_known_hosts" && <SshKnownHosts />}
                     {activeMenuKey === "settings" && <Settings />}

@@ -220,6 +220,7 @@ export default function Settings() {
                     updated: result.updatedTargets,
                     skipped: result.skippedTargets,
                     favorites: result.importedFavorites,
+                    portForwards: result.importedPortForwards,
                 }),
             );
             return;
@@ -260,6 +261,7 @@ export default function Settings() {
                 updated: result.updatedTargets,
                 skipped: result.skippedTargets,
                 favorites: result.importedFavorites,
+                portForwards: result.importedPortForwards,
             }),
         );
         window.dispatchEvent(new Event("webssh:user-data-imported"));
@@ -289,6 +291,7 @@ export default function Settings() {
             settingsLabel: t("settings_data_import_category_settings"),
             targetsLabel: t("settings_data_import_category_targets"),
             favoritesLabel: t("settings_data_import_category_favorites"),
+            portForwardsLabel: t("settings_data_import_category_port_forwards"),
             conflictLabel: t("settings_data_import_target_conflict"),
             skipLabel: t("settings_data_import_target_skip"),
             overwriteLabel: t("settings_data_import_target_overwrite"),
@@ -335,6 +338,9 @@ export default function Settings() {
                 settingsLabel: t("settings_data_import_category_settings"),
                 targetsLabel: t("settings_data_import_category_targets"),
                 favoritesLabel: t("settings_data_import_category_favorites"),
+                portForwardsLabel: t(
+                    "settings_data_import_category_port_forwards",
+                ),
                 conflictLabel: t("settings_data_import_target_conflict"),
                 skipLabel: t("settings_data_import_target_skip"),
                 overwriteLabel: t("settings_data_import_target_overwrite"),

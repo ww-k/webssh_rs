@@ -138,6 +138,7 @@ export interface RenderImportOptions {
     import_settings: boolean;
     import_targets: boolean;
     import_favorites: boolean;
+    import_port_forwards: boolean;
     target_conflict: "skip" | "overwrite";
 }
 
@@ -146,6 +147,7 @@ export function renderImportOptionsPrompt(options: {
     settingsLabel: string;
     targetsLabel: string;
     favoritesLabel: string;
+    portForwardsLabel: string;
     conflictLabel: string;
     skipLabel: string;
     overwriteLabel: string;
@@ -157,6 +159,7 @@ export function renderImportOptionsPrompt(options: {
             import_settings: true,
             import_targets: true,
             import_favorites: true,
+            import_port_forwards: true,
             target_conflict: "overwrite",
         };
         let settled = false;
@@ -181,6 +184,17 @@ export function renderImportOptionsPrompt(options: {
                         }}
                     >
                         {options.settingsLabel}
+                    </Checkbox>
+                    <Checkbox
+                        defaultChecked
+                        onChange={(event) => {
+                            value = {
+                                ...value,
+                                import_port_forwards: event.target.checked,
+                            };
+                        }}
+                    >
+                        {options.portForwardsLabel}
                     </Checkbox>
                     <Checkbox
                         defaultChecked

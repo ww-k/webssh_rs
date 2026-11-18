@@ -10,6 +10,7 @@ mod m000007_target_directory;
 mod m000008_target_sort_order;
 mod m000009_preference_tabs;
 mod m000010_transfer_task_parent;
+mod m000011_port_forward;
 
 pub struct Migrator;
 
@@ -27,6 +28,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000008_target_sort_order::Migration),
             Box::new(m000009_preference_tabs::Migration),
             Box::new(m000010_transfer_task_parent::Migration),
+            Box::new(m000011_port_forward::Migration),
         ]
     }
 }
@@ -63,7 +65,7 @@ mod tests {
             let stmt2 = stmt.clone();
             let rows = TableName::find_by_statement(stmt).all(&db).await.unwrap();
 
-            assert_eq!(rows.len(), 7, "Expected 7 tables, got {}", rows.len());
+            assert_eq!(rows.len(), 8, "Expected 8 tables, got {}", rows.len());
             assert_eq!(
                 Vec::from_iter(rows.iter().map(|row| row.name.as_str())),
                 vec![
@@ -73,7 +75,8 @@ mod tests {
                     "transfer_task",
                     "favorite_directory",
                     "tabs",
-                    "app_state"
+                    "app_state",
+                    "port_forward"
                 ],
                 "Unexpected tables: {:?}",
                 rows

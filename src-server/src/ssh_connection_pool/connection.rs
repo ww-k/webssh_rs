@@ -119,6 +119,23 @@ impl SshConnection {
         Ok(self.handle.channel_open_session().await?)
     }
 
+    pub(crate) async fn open_direct_tcpip(
+        &self,
+        host: &str,
+        port: u16,
+        originator_address: &str,
+    ) -> SshPoolResult<Channel<russh::client::Msg>> {
+        if self.state() == ConnectionState::Closed || self.handle.is_closed() {
+            return Err(SshPoolError::ConnectionExpired {
+                connection_id: self.id.clone(),
+            });
+        }
+        Ok(self
+            .handle
+            .channel_open_direct_tcpip(host, port as u32, originator_address, 0)
+            .await?)
+    }
+
     pub(crate) fn expire(self: &Arc<Self>) {
         let _ = self.state.compare_exchange(
             ConnectionState::Active as u8,

@@ -23,6 +23,9 @@ pub const ERR_CODE_SSH_ERR: u32 = 1000;
 /// SSH 执行命令错误
 pub const ERR_CODE_SSH_EXEC: u32 = 1001;
 
+/// 端口转发错误
+pub const ERR_CODE_PORT_FORWARD: u32 = 7000;
+
 pub const ERR_CODE_SFTP_INVALID_URI: u32 = 2000;
 
 /// SFTP 上传请求不合法

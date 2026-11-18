@@ -33,8 +33,8 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use apis::{
-    favorite_directory, fs, local_terminal, preferences, sftp, ssh, ssh_connection, ssh_known_host,
-    target, transfer, user_data,
+    favorite_directory, fs, local_terminal, port_forward, preferences, sftp, ssh, ssh_connection,
+    ssh_known_host, target, transfer, user_data,
 };
 use migrations::{Migrator, MigratorTrait};
 use utoipa::OpenApi;
@@ -55,6 +55,7 @@ pub struct AppState {
     base_state: Arc<AppBaseState>,
     connection_pool: Arc<SshConnectionPool>,
     transfer_service: transfer::TransferService,
+    pub(crate) port_forward_manager: Arc<port_forward::PortForwardManager>,
 }
 
 impl Deref for AppState {
@@ -128,11 +129,17 @@ where
     let transfer_service =
         transfer::TransferService::new(app_base_state.clone(), connection_pool.clone());
     transfer_service.init_pending_tasks().await.unwrap();
+    let port_forward_manager = Arc::new(port_forward::PortForwardManager::new(
+        app_base_state.db.clone(),
+        connection_pool.clone(),
+    ));
+    port_forward_manager.load().await.unwrap();
 
     let app_state = Arc::new(AppState {
         base_state: app_base_state.clone(),
         connection_pool: connection_pool.clone(),
         transfer_service,
+        port_forward_manager: port_forward_manager.clone(),
     });
 
     let app = Router::new()
@@ -149,6 +156,10 @@ where
         .nest(
             "/api/ssh_connection",
             ssh_connection::router_builder(connection_pool.clone()),
+        )
+        .nest(
+            "/api/port_forward",
+            port_forward::router_builder(port_forward_manager),
         )
         .nest("/api/ssh", ssh::router_builder(connection_pool.clone()))
         .nest("/api/local", local_terminal::router_builder())

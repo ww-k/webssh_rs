@@ -32,6 +32,21 @@ pub struct UserDataFavoriteDirectory {
     pub path: String,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone, ToSchema)]
+pub struct UserDataPortForward {
+    pub id: String,
+    pub target_id: i32,
+    #[serde(default = "default_local_host")]
+    pub local_host: String,
+    pub local_port: u16,
+    pub remote_host: String,
+    pub remote_port: u16,
+}
+
+fn default_local_host() -> String {
+    "127.0.0.1".to_string()
+}
+
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UserDataExportPayload {
     pub password: Option<String>,
@@ -57,6 +72,8 @@ pub struct UserDataImportPayload {
     pub import_targets: bool,
     #[serde(default = "default_true")]
     pub import_favorites: bool,
+    #[serde(default = "default_true")]
+    pub import_port_forwards: bool,
     #[serde(default)]
     pub target_conflict: TargetConflict,
 }
@@ -71,6 +88,8 @@ pub struct UserDataImportUrlPayload {
     pub import_targets: bool,
     #[serde(default = "default_true")]
     pub import_favorites: bool,
+    #[serde(default = "default_true")]
+    pub import_port_forwards: bool,
     #[serde(default)]
     pub target_conflict: TargetConflict,
 }
@@ -99,6 +118,8 @@ pub struct UserDataDocument {
     pub targets: Vec<UserDataTarget>,
     pub favorite_directories: Vec<UserDataFavoriteDirectory>,
     #[serde(default)]
+    pub port_forwards: Vec<UserDataPortForward>,
+    #[serde(default)]
     pub settings: Value,
 }
 
@@ -108,5 +129,6 @@ pub struct UserDataImportResult {
     pub updated_targets: usize,
     pub skipped_targets: usize,
     pub imported_favorites: usize,
+    pub imported_port_forwards: usize,
     pub settings: Value,
 }

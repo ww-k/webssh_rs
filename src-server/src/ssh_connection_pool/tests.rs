@@ -17,6 +17,7 @@ use sea_orm_migration::MigratorTrait;
 use crate::{
     AppBaseState, AppState,
     apis::{
+        port_forward::PortForwardManager,
         sftp::{download, dto::SftpFileUriPayload},
         target::{TargetUpdatePayload, remove_for_test, update_for_test},
         transfer::TransferService,
@@ -460,6 +461,10 @@ fn download_app_state(context: &TestContext) -> (Arc<SshConnectionPool>, Arc<App
         base_state,
         connection_pool: Arc::clone(&pool),
         transfer_service,
+        port_forward_manager: Arc::new(PortForwardManager::new(
+            context.db.clone(),
+            Arc::clone(&pool),
+        )),
     });
     (pool, state)
 }

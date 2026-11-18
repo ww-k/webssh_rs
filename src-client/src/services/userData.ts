@@ -26,6 +26,7 @@ export interface UserDataImportResult {
     updatedTargets: number;
     skippedTargets: number;
     importedFavorites: number;
+    importedPortForwards: number;
     settings?: UserDataSettings;
 }
 function readSettings(value: unknown): UserDataSettings {
@@ -180,6 +181,7 @@ export async function importUserData(
         updatedTargets: result.updated_targets ?? 0,
         skippedTargets: result.skipped_targets,
         importedFavorites: result.imported_favorites,
+        importedPortForwards: result.imported_port_forwards ?? 0,
         settings: result.settings ? readSettings(result.settings) : undefined,
     };
 }
@@ -199,6 +201,7 @@ export async function importUserDataFromUrl(
         updatedTargets: result.updated_targets ?? 0,
         skippedTargets: result.skipped_targets,
         importedFavorites: result.imported_favorites,
+        importedPortForwards: result.imported_port_forwards ?? 0,
         settings: result.settings ? readSettings(result.settings) : undefined,
     };
 }
@@ -207,6 +210,7 @@ export interface UserDataImportOptions {
     import_settings: boolean;
     import_targets: boolean;
     import_favorites: boolean;
+    import_port_forwards: boolean;
     target_conflict: "skip" | "overwrite";
 }
 

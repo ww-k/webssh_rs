@@ -9,7 +9,7 @@ use crate::{
 };
 
 use super::{
-    ChannelMode, SshChannelGuard, SshConnectionPool,
+    ChannelMode, SshChannelGuard, SshChannelStreamGuard, SshConnectionPool,
     connector::{SshAuth, SshConnectionSpec},
     error::{SshPoolError, SshPoolResult},
     target_connection_pool::TargetConnectionPool,
@@ -83,6 +83,18 @@ impl TargetSshContext {
     pub(crate) async fn channel(self, mode: ChannelMode) -> Result<SshChannelGuard> {
         let connection_pool = self.connection_pool?;
         Ok(connection_pool.acquire(mode).await?)
+    }
+
+    pub(crate) async fn direct_tcpip(
+        self,
+        host: &str,
+        port: u16,
+        originator_address: &str,
+    ) -> Result<SshChannelStreamGuard> {
+        let connection_pool = self.connection_pool?;
+        Ok(connection_pool
+            .direct_tcpip(host, port, originator_address)
+            .await?)
     }
 
     async fn sftp(self, mode: ChannelMode) -> Result<SftpClientGuard> {

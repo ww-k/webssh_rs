@@ -1,4 +1,5 @@
 pub mod favorite_directory;
+pub mod port_forward;
 pub mod preference;
 pub mod ssh_known_host;
 pub mod tab;

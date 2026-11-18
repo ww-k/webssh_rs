@@ -380,6 +380,7 @@ export const createMockState = () => ({
     transferBatches: new Map(),
     knownHosts: createKnownHosts(),
     sshConnections: createSshConnections(),
+    portForwards: [],
     favoriteDirectories: new Map(),
     preferences: null,
     sftpEntries: createSftpEntries(),

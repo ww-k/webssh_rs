@@ -23,7 +23,7 @@ use crate::{
         user_data::dto::{
             EncryptedUserDataExport, TargetConflict, USER_DATA_VERSION, UserDataDocument,
             UserDataExportPayload, UserDataFavoriteDirectory, UserDataImportPayload,
-            UserDataImportResult, UserDataImportUrlPayload, UserDataTarget,
+            UserDataImportResult, UserDataImportUrlPayload, UserDataPortForward, UserDataTarget,
         },
     },
     consts::services_err_code::{
@@ -31,7 +31,7 @@ use crate::{
         ERR_CODE_USER_DATA_PASSWORD_REQUIRED, ERR_CODE_USER_DATA_URL_FETCH_FAILED,
         ERR_CODE_USER_DATA_URL_FORMAT, ERR_CODE_USER_DATA_URL_INVALID,
     },
-    entities::{favorite_directory, target},
+    entities::{favorite_directory, port_forward, target},
     map_db_err,
 };
 
@@ -46,6 +46,7 @@ pub async fn export(
             .all(db)
             .await
     )?;
+    let port_forwards = map_db_err!(port_forward::Entity::find().all(db).await)?;
 
     let document = UserDataDocument {
         version: USER_DATA_VERSION,
@@ -57,6 +58,17 @@ pub async fn export(
                 target_id: directory.target_id,
                 name: directory.name,
                 path: directory.path,
+            })
+            .collect(),
+        port_forwards: port_forwards
+            .into_iter()
+            .map(|forward| UserDataPortForward {
+                id: forward.id,
+                target_id: forward.target_id,
+                local_host: forward.local_host,
+                local_port: forward.local_port,
+                remote_host: forward.remote_host,
+                remote_port: forward.remote_port,
             })
             .collect(),
         settings: payload.settings,
@@ -119,6 +131,7 @@ struct ImportOptions {
     import_settings: bool,
     import_targets: bool,
     import_favorites: bool,
+    import_port_forwards: bool,
     target_conflict: TargetConflict,
 }
 
@@ -128,6 +141,7 @@ impl From<&UserDataImportPayload> for ImportOptions {
             import_settings: payload.import_settings,
             import_targets: payload.import_targets,
             import_favorites: payload.import_favorites,
+            import_port_forwards: payload.import_port_forwards,
             target_conflict: payload.target_conflict,
         }
     }
@@ -139,6 +153,7 @@ impl From<&UserDataImportUrlPayload> for ImportOptions {
             import_settings: payload.import_settings,
             import_targets: payload.import_targets,
             import_favorites: payload.import_favorites,
+            import_port_forwards: payload.import_port_forwards,
             target_conflict: payload.target_conflict,
         }
     }
@@ -156,6 +171,11 @@ async fn import_document(
         targets: document.targets,
         favorite_directories: if options.import_favorites {
             document.favorite_directories
+        } else {
+            Vec::new()
+        },
+        port_forwards: if options.import_port_forwards {
+            document.port_forwards
         } else {
             Vec::new()
         },
@@ -338,11 +358,56 @@ async fn import_in_transaction<C: ConnectionTrait>(
         }
     }
 
+    let mut imported_port_forwards = 0;
+    for forward in payload.port_forwards {
+        let Some(target_id) = target_ids.get(&forward.target_id).copied() else {
+            continue;
+        };
+        if forward.local_port == 0
+            || forward.remote_port == 0
+            || forward.local_host.trim().is_empty()
+            || forward.remote_host.trim().is_empty()
+        {
+            continue;
+        }
+        let model = port_forward::Model {
+            id: forward.id,
+            target_id,
+            local_host: forward.local_host,
+            local_port: forward.local_port,
+            remote_host: forward.remote_host,
+            remote_port: forward.remote_port,
+            enabled: false,
+        };
+        if let Some(existing) = map_db_err!(
+            port_forward::Entity::find_by_id(model.id.clone())
+                .one(db)
+                .await
+        )? {
+            let mut active = port_forward::ActiveModel::from(existing);
+            active.target_id = Set(model.target_id);
+            active.local_host = Set(model.local_host);
+            active.local_port = Set(model.local_port);
+            active.remote_host = Set(model.remote_host);
+            active.remote_port = Set(model.remote_port);
+            active.enabled = Set(false);
+            map_db_err!(active.update(db).await)?;
+        } else {
+            map_db_err!(
+                port_forward::Entity::insert(port_forward::ActiveModel::from(model))
+                    .exec(db)
+                    .await
+            )?;
+        }
+        imported_port_forwards += 1;
+    }
+
     Ok(UserDataImportResult {
         added_targets,
         updated_targets,
         skipped_targets,
         imported_favorites,
+        imported_port_forwards,
         settings: serde_json::Value::Null,
     })
 }
@@ -351,6 +416,7 @@ struct UserDataImportPayloadData {
     version: u32,
     targets: Vec<UserDataTarget>,
     favorite_directories: Vec<UserDataFavoriteDirectory>,
+    port_forwards: Vec<UserDataPortForward>,
     target_conflict: TargetConflict,
     import_targets: bool,
 }

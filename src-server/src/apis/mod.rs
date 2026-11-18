@@ -1,6 +1,7 @@
 pub mod favorite_directory;
 pub mod fs;
 pub mod local_terminal;
+pub mod port_forward;
 pub mod preferences;
 pub mod sftp;
 pub mod ssh;

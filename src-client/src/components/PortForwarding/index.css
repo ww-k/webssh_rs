@@ -1,0 +1,23 @@
+.WebSSH-PortForwarding-Header {
+    justify-content: space-between;
+}
+
+.WebSSH-PortForwarding-LocalPort {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.WebSSH-PortForwarding-LocalPort a {
+    color: var(--ant-color-link);
+}
+
+.WebSSH-PortForwarding-HostField {
+    flex: 1;
+    min-width: 0;
+}
+
+.WebSSH-PortForwarding-PortField {
+    flex: 0 0 120px;
+    width: 120px;
+}

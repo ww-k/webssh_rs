@@ -49,7 +49,12 @@ pub async fn user_data_import(
     State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<UserDataImportPayload>,
 ) -> Result<Json<UserDataImportResult>, ApiErr> {
-    Ok(Json(service::import(&state.db, payload).await?))
+    let import_port_forwards = payload.import_port_forwards;
+    let result = service::import(&state.db, payload).await?;
+    if import_port_forwards {
+        state.port_forward_manager.reload().await?;
+    }
+    Ok(Json(result))
 }
 
 #[utoipa::path(
@@ -67,5 +72,10 @@ pub async fn user_data_import_url(
     State(state): State<Arc<AppState>>,
     ValidJson(payload): ValidJson<UserDataImportUrlPayload>,
 ) -> Result<Json<UserDataImportResult>, ApiErr> {
-    Ok(Json(service::import_from_url(&state.db, payload).await?))
+    let import_port_forwards = payload.import_port_forwards;
+    let result = service::import_from_url(&state.db, payload).await?;
+    if import_port_forwards {
+        state.port_forward_manager.reload().await?;
+    }
+    Ok(Json(result))
 }

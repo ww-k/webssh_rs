@@ -22,6 +22,7 @@ export async function postUserDataImport(data: {
     import_settings?: boolean;
     import_targets?: boolean;
     import_favorites?: boolean;
+    import_port_forwards?: boolean;
     target_conflict?: "skip" | "overwrite";
 }) {
     const response = await axios.post<{
@@ -29,6 +30,7 @@ export async function postUserDataImport(data: {
         updated_targets: number;
         skipped_targets: number;
         imported_favorites: number;
+        imported_port_forwards: number;
         settings: unknown;
     }>("/api/user_data/import", data);
     return response.data;
@@ -40,6 +42,7 @@ export async function postUserDataImportUrl(data: {
     import_settings?: boolean;
     import_targets?: boolean;
     import_favorites?: boolean;
+    import_port_forwards?: boolean;
     target_conflict?: "skip" | "overwrite";
 }) {
     const response = await axios.post<{
@@ -47,6 +50,7 @@ export async function postUserDataImportUrl(data: {
         updated_targets: number;
         skipped_targets: number;
         imported_favorites: number;
+        imported_port_forwards: number;
         settings: unknown;
     }>("/api/user_data/import/url", data);
     return response.data;
