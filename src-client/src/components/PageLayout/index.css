@@ -1,4 +1,4 @@
-.WebSSH-MenuPage {
+.WebSSH-PageLayout {
     position: absolute;
     inset: 0;
     display: flex;
@@ -9,7 +9,7 @@
     background: var(--ant-color-bg-container);
 }
 
-.WebSSH-MenuPageToolbar {
+.WebSSH-PageLayoutHeader {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -17,7 +17,19 @@
     margin-bottom: 12px;
 }
 
-.WebSSH-MenuPageContent {
+.WebSSH-PageLayoutHeader-filter,
+.WebSSH-PageLayoutHeader-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.WebSSH-PageLayoutHeader-toolbar {
+    margin-inline-start: auto;
+}
+
+.WebSSH-PageLayoutContent {
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -25,13 +37,13 @@
     border-radius: 4px;
 }
 
-.WebSSH-MenuPageContent:focus {
+.WebSSH-PageLayoutContent:focus {
     outline: none;
     box-shadow: 0 0 0 2px var(--ant-control-outline);
 }
 
 @media (max-width: 600px) {
-    .WebSSH-MenuPage {
+    .WebSSH-PageLayout {
         padding: 16px;
     }
 }

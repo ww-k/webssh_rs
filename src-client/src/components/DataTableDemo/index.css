@@ -1,20 +1,10 @@
-.DataTableDemoToolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 40px;
-    padding: 0 2px;
+.DataTableDemo .WebSSH-PageLayoutHeader-filter {
+    align-items: baseline;
     color: var(--ant-color-text-secondary);
     font-size: 12px;
 }
 
-.DataTableDemoToolbar > div {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-}
-
-.DataTableDemoToolbar strong {
+.DataTableDemo .WebSSH-PageLayoutHeader-filter strong {
     color: var(--ant-color-text);
     font-size: 14px;
     font-weight: 600;

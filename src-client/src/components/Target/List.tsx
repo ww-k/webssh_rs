@@ -24,6 +24,7 @@ import DataTable, {
     type DataTableColumn,
     type DataTableDropEvent,
 } from "@/components/DataTable";
+import PageLayout from "@/components/PageLayout";
 import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 import useAppStore from "@/store";
 
@@ -151,7 +152,13 @@ const TargetTreeExpandIcon = (
     );
 };
 
-export default function TargetList({ tab }: { tab: ITab }) {
+export default function TargetList({
+    active = true,
+    tab,
+}: {
+    active?: boolean;
+    tab: ITab;
+}) {
     const { t } = useTranslation();
     const setTabPath = useAppStore((state) => state.setTabPath);
     const targetDoubleClickAction = useAppStore(
@@ -553,66 +560,76 @@ export default function TargetList({ tab }: { tab: ITab }) {
 
     return (
         <>
-            <div className="WebSSH-MenuPageToolbar targetListToolbar">
-                <Select
-                    allowClear
-                    className="targetListDirectoryFilter"
-                    aria-label={t("target_directory_filter")}
-                    options={directoryOptions}
-                    placeholder={t("target_directory_filter")}
-                    showSearch
-                    value={directoryFilter}
-                    onChange={(value) => setDirectoryFilter(value)}
-                    getPopupContainer={(trigger) =>
-                        trigger.parentElement ?? document.body
-                    }
-                />
-                <Input
-                    allowClear
-                    aria-label={t("transfer_filter_keyword")}
-                    className="WebSSH-TransferKeyword targetListSearch"
-                    onChange={(event) => setSearchValue(event.target.value)}
-                    placeholder={t("transfer_filter_keyword")}
-                    prefix={<SearchOutlined />}
-                    value={searchValue}
-                />
-                <Space className="targetListActions" size="small">
-                    <Tooltip title={t("target_local_terminal")}>
-                        <Button
-                            aria-label={t("target_local_terminal")}
-                            icon={<CodeOutlined />}
-                            onClick={() => {
-                                setTabPath(
-                                    tab.key,
-                                    "/terminal/local",
-                                    t("target_local_terminal"),
-                                );
-                            }}
+            <PageLayout
+                className="WebSSH-TargetList"
+                style={{ display: active ? undefined : "none" }}
+                header={
+                    <>
+                        <Select
+                            allowClear
+                            className="targetListDirectoryFilter"
+                            aria-label={t("target_directory_filter")}
+                            options={directoryOptions}
+                            placeholder={t("target_directory_filter")}
+                            showSearch
+                            value={directoryFilter}
+                            onChange={(value) => setDirectoryFilter(value)}
+                            getPopupContainer={(trigger) =>
+                                trigger.parentElement ?? document.body
+                            }
                         />
-                    </Tooltip>
-                    <Tooltip title={t("target_new")}>
-                        <Button
-                            icon={<PlusCircleTwoTone />}
-                            onClick={() => {
-                                setEditorData(undefined);
-                                setEditorOpen(true);
-                            }}
+                        <Input
+                            allowClear
+                            aria-label={t("transfer_filter_keyword")}
+                            className="WebSSH-TransferKeyword targetListSearch"
+                            onChange={(event) =>
+                                setSearchValue(event.target.value)
+                            }
+                            placeholder={t("transfer_filter_keyword")}
+                            prefix={<SearchOutlined />}
+                            value={searchValue}
                         />
-                    </Tooltip>
-                    <Tooltip title={t("app_btn_refresh")}>
-                        <Button
-                            aria-label={t("app_btn_refresh")}
-                            icon={<ReloadOutlined />}
-                            onClick={refresh}
-                            title={t("app_btn_refresh")}
-                        />
-                    </Tooltip>
-                </Space>
-            </div>
-            <div
-                ref={tableContainerRef}
-                className="WebSSH-MenuPageContent targetListTableContainer"
-                {...tablePageNavigationProps}
+                    </>
+                }
+                toolbar={
+                    <Space className="targetListActions" size="small">
+                        <Tooltip title={t("target_local_terminal")}>
+                            <Button
+                                aria-label={t("target_local_terminal")}
+                                icon={<CodeOutlined />}
+                                onClick={() => {
+                                    setTabPath(
+                                        tab.key,
+                                        "/terminal/local",
+                                        t("target_local_terminal"),
+                                    );
+                                }}
+                            />
+                        </Tooltip>
+                        <Tooltip title={t("target_new")}>
+                            <Button
+                                icon={<PlusCircleTwoTone />}
+                                onClick={() => {
+                                    setEditorData(undefined);
+                                    setEditorOpen(true);
+                                }}
+                            />
+                        </Tooltip>
+                        <Tooltip title={t("app_btn_refresh")}>
+                            <Button
+                                aria-label={t("app_btn_refresh")}
+                                icon={<ReloadOutlined />}
+                                onClick={refresh}
+                                title={t("app_btn_refresh")}
+                            />
+                        </Tooltip>
+                    </Space>
+                }
+                contentRef={tableContainerRef}
+                contentProps={{
+                    className: "targetListTableContainer",
+                    ...tablePageNavigationProps,
+                }}
             >
                 <DataTable
                     className="targetListTable"
@@ -642,7 +659,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     multiple={false}
                     virtual={tableBodyHeight > 0}
                 />
-            </div>
+            </PageLayout>
             <TargetEditor
                 open={editorOpen}
                 data={editorData}

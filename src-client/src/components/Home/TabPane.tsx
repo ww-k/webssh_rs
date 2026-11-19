@@ -1,7 +1,7 @@
 import { memo } from "react";
 
 import Filesview from "../Filesview";
-import TargetSelector from "../Target/Selector";
+import TargetList from "../Target/List";
 import Terminal from "../Terminal";
 
 import type { ITab } from "@/store";
@@ -21,7 +21,7 @@ const TabPane = memo(function TabPane({ active, tab }: TabPaneProps) {
             children = <Filesview tab={tab} />;
             break;
         default:
-            children = <TargetSelector active={active} tab={tab} />;
+            children = <TargetList active={active} tab={tab} />;
             break;
     }
 

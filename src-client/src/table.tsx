@@ -1,9 +1,8 @@
-import { ConfigProvider, theme } from "antd";
+import { App as AntdApp, ConfigProvider, theme } from "antd";
 import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./App.css";
-import "./styles/menu-page.css";
 
 import DataTableDemo from "./components/DataTableDemo";
 import useAppStore from "./store";
@@ -34,7 +33,9 @@ function TableDemoApp() {
                     appTheme === "dark" ? darkAlgorithm : defaultAlgorithm,
             }}
         >
-            <DataTableDemo />
+            <AntdApp>
+                <DataTableDemo />
+            </AntdApp>
         </ConfigProvider>
     );
 }
@@ -42,8 +43,11 @@ function TableDemoApp() {
 const rootEl = document.getElementById("root");
 if (rootEl) {
     const root = createRoot(rootEl);
-    void useAppStore.getState().loadPreferences().then(
-        () => root.render(<TableDemoApp />),
-        () => root.render(<TableDemoApp />),
-    );
+    void useAppStore
+        .getState()
+        .loadPreferences()
+        .then(
+            () => root.render(<TableDemoApp />),
+            () => root.render(<TableDemoApp />),
+        );
 }

@@ -27,6 +27,8 @@ import {
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import PageLayout from "@/components/PageLayout";
+
 import "./index.css";
 
 import { postFsShowInFolder } from "@/api";
@@ -888,37 +890,42 @@ export default function Transfer() {
         { value: "DOWNLOAD", label: t("transfer_type_download") },
     ];
     return (
-        <div className="WebSSH-MenuPage WebSSH-Transfer">
-            <div className="WebSSH-MenuPageToolbar WebSSH-TransferToolbar">
-                <label className="WebSSH-TransferFilter">
-                    <Segmented
-                        aria-label={t("transfer_filter_type")}
-                        value={type}
-                        options={typeOptions}
-                        onChange={(value) =>
-                            setFilters((current) => ({
-                                ...current,
-                                type: value as TransferTypeFilter,
-                            }))
-                        }
-                    />
-                </label>
-                <label className="WebSSH-TransferFilter">
-                    <Input
-                        allowClear
-                        aria-label={t("transfer_filter_keyword")}
-                        className="WebSSH-TransferKeyword"
-                        placeholder={t("transfer_filter_keyword")}
-                        prefix={<SearchOutlined />}
-                        value={keyword}
-                        onChange={(event) =>
-                            setFilters((current) => ({
-                                ...current,
-                                keyword: event.target.value,
-                            }))
-                        }
-                    />
-                </label>
+        <PageLayout
+            className="WebSSH-Transfer"
+            header={
+                <>
+                    <label className="WebSSH-TransferFilter">
+                        <Segmented
+                            aria-label={t("transfer_filter_type")}
+                            value={type}
+                            options={typeOptions}
+                            onChange={(value) =>
+                                setFilters((current) => ({
+                                    ...current,
+                                    type: value as TransferTypeFilter,
+                                }))
+                            }
+                        />
+                    </label>
+                    <label className="WebSSH-TransferFilter">
+                        <Input
+                            allowClear
+                            aria-label={t("transfer_filter_keyword")}
+                            className="WebSSH-TransferKeyword"
+                            placeholder={t("transfer_filter_keyword")}
+                            prefix={<SearchOutlined />}
+                            value={keyword}
+                            onChange={(event) =>
+                                setFilters((current) => ({
+                                    ...current,
+                                    keyword: event.target.value,
+                                }))
+                            }
+                        />
+                    </label>
+                </>
+            }
+            toolbar={
                 <Tooltip title={t("transfer_action_delete_all_history")}>
                     <Button
                         aria-label={t("transfer_action_delete_all_history")}
@@ -929,18 +936,18 @@ export default function Transfer() {
                         onClick={handleRemoveAll}
                     />
                 </Tooltip>
-            </div>
-            <div
-                ref={tableContainerRef}
-                className="WebSSH-MenuPageContent WebSSH-TransferContent"
-                {...tablePageNavigationProps}
-            >
-                <TransferTable
-                    type={type}
-                    keyword={keyword}
-                    tableBodyHeight={tableBodyHeight}
-                />
-            </div>
-        </div>
+            }
+            contentRef={tableContainerRef}
+            contentProps={{
+                className: "WebSSH-TransferContent",
+                ...tablePageNavigationProps,
+            }}
+        >
+            <TransferTable
+                type={type}
+                keyword={keyword}
+                tableBodyHeight={tableBodyHeight}
+            />
+        </PageLayout>
     );
 }

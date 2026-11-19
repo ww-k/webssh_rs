@@ -1,7 +1,3 @@
-.WebSSH-PortForwarding-Header {
-    justify-content: space-between;
-}
-
 .WebSSH-PortForwarding-LocalPort {
     display: inline-flex;
     align-items: center;

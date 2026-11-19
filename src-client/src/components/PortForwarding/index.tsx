@@ -33,6 +33,7 @@ import {
     postPortForwardUpdate,
 } from "@/api";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
+import PageLayout from "@/components/PageLayout";
 import getTargetName from "@/components/Target/getTargetName";
 
 import type { IPortForward, ITarget } from "@/api";
@@ -307,25 +308,29 @@ export default function PortForwarding() {
     );
 
     return (
-        <main className="WebSSH-MenuPage WebSSH-PortForwarding">
-            <div className="WebSSH-MenuPageToolbar WebSSH-PortForwarding-Header">
-                <Button
-                    icon={<PlusOutlined />}
-                    onClick={openCreate}
-                    type="primary"
-                >
-                    {t("port_forward_create")}
-                </Button>
-                <Tooltip title={t("app_btn_refresh")}>
+        <>
+            <PageLayout
+                className="WebSSH-PortForwarding"
+                header={
                     <Button
-                        aria-label={t("app_btn_refresh")}
-                        icon={<ReloadOutlined />}
-                        loading={loading}
-                        onClick={() => void load()}
-                    />
-                </Tooltip>
-            </div>
-            <div className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll">
+                        icon={<PlusOutlined />}
+                        onClick={openCreate}
+                        type="primary"
+                    >
+                        {t("port_forward_create")}
+                    </Button>
+                }
+                toolbar={
+                    <Tooltip title={t("app_btn_refresh")}>
+                        <Button
+                            aria-label={t("app_btn_refresh")}
+                            icon={<ReloadOutlined />}
+                            loading={loading}
+                            onClick={() => void load()}
+                        />
+                    </Tooltip>
+                }
+            >
                 <DataTable
                     className="WebSSH-PortForwarding-Table"
                     columns={columns}
@@ -337,7 +342,7 @@ export default function PortForwarding() {
                     selectable={false}
                     virtual
                 />
-            </div>
+            </PageLayout>
             <Modal
                 title={t(editing ? "port_forward_edit" : "port_forward_create")}
                 open={modalOpen}
@@ -452,6 +457,6 @@ export default function PortForwarding() {
                     </Space.Compact>
                 </Form>
             </Modal>
-        </main>
+        </>
     );
 }

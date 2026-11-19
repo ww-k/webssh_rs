@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { getSshKnownHostList, postSshKnownHostRemove } from "@/api";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
+import PageLayout from "@/components/PageLayout";
 
 import type { ISshKnownHost } from "@/api";
 
@@ -132,8 +133,9 @@ export default function SshKnownHosts() {
     );
 
     return (
-        <main className="WebSSH-MenuPage WebSSH-SshKnownHosts">
-            <div className="WebSSH-MenuPageToolbar WebSSH-SshKnownHosts-Header">
+        <PageLayout
+            className="WebSSH-SshKnownHosts"
+            toolbar={
                 <Tooltip title={t("app_btn_refresh")}>
                     <Button
                         aria-label={t("app_btn_refresh")}
@@ -142,24 +144,23 @@ export default function SshKnownHosts() {
                         onClick={() => void loadKnownHosts(true)}
                     />
                 </Tooltip>
-            </div>
-            <div className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll">
-                <DataTable
-                    className="WebSSH-SshKnownHosts-Table"
-                    columns={columns}
-                    data={knownHosts}
-                    emptyContent={
-                        <span>
-                            <KeyOutlined /> {t("ssh_known_hosts_empty")}
-                        </span>
-                    }
-                    getRowId={(knownHost) => String(knownHost.id)}
-                    loading={loading}
-                    rowHeight={33}
-                    selectable={false}
-                    virtual
-                />
-            </div>
-        </main>
+            }
+        >
+            <DataTable
+                className="WebSSH-SshKnownHosts-Table"
+                columns={columns}
+                data={knownHosts}
+                emptyContent={
+                    <span>
+                        <KeyOutlined /> {t("ssh_known_hosts_empty")}
+                    </span>
+                }
+                getRowId={(knownHost) => String(knownHost.id)}
+                loading={loading}
+                rowHeight={33}
+                selectable={false}
+                virtual
+            />
+        </PageLayout>
     );
 }

@@ -24,6 +24,7 @@ import {
     postSshConnectionExpire,
 } from "@/api";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
+import PageLayout from "@/components/PageLayout";
 import getTargetName from "@/components/Target/getTargetName";
 
 import type { ISshConnection, ITarget } from "@/api";
@@ -196,8 +197,9 @@ export default function SshConnections() {
     );
 
     return (
-        <main className="WebSSH-MenuPage WebSSH-SshConnections">
-            <div className="WebSSH-MenuPageToolbar WebSSH-SshConnections-Header">
+        <PageLayout
+            className="WebSSH-SshConnections"
+            toolbar={
                 <Tooltip title={t("app_btn_refresh")}>
                     <Button
                         aria-label={t("app_btn_refresh")}
@@ -206,20 +208,19 @@ export default function SshConnections() {
                         onClick={() => void loadConnections()}
                     />
                 </Tooltip>
-            </div>
-            <div className="WebSSH-MenuPageContent WebSSH-MenuPageContent--scroll">
-                <DataTable
-                    className="WebSSH-SshConnections-Table"
-                    columns={columns}
-                    data={connections}
-                    emptyContent={t("ssh_connections_empty")}
-                    getRowId={(connection) => connection.id}
-                    loading={loading}
-                    rowHeight={33}
-                    selectable={false}
-                    virtual
-                />
-            </div>
-        </main>
+            }
+        >
+            <DataTable
+                className="WebSSH-SshConnections-Table"
+                columns={columns}
+                data={connections}
+                emptyContent={t("ssh_connections_empty")}
+                getRowId={(connection) => connection.id}
+                loading={loading}
+                rowHeight={33}
+                selectable={false}
+                virtual
+            />
+        </PageLayout>
     );
 }

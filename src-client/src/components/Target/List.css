@@ -1,5 +1,5 @@
-.targetListToolbar {
-    flex: 0 0 auto;
+.WebSSH-TargetList {
+    min-width: 0;
 }
 
 .targetListSearch {

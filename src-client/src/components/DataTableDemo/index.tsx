@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import DataTable, { type DataTableDropEvent } from "@/components/DataTable";
+import PageLayout from "@/components/PageLayout";
 
 import "./index.css";
 
@@ -105,26 +106,27 @@ export default function DataTableDemo() {
     );
 
     return (
-        <main className="WebSSH-MenuPage DataTableDemo">
-            <header className="DataTableDemoToolbar">
-                <div>
+        <PageLayout
+            className="DataTableDemo"
+            header={
+                <>
                     <strong>Custom Table</strong>
                     <span>{demoData.length.toLocaleString()} rows</span>
-                </div>
-                <span>{selected.length.toLocaleString()} selected</span>
-            </header>
-            <section className="WebSSH-MenuPageContent DataTableDemoContent">
-                <DataTable
-                    data={demoData}
-                    columns={columns}
-                    getRowId={getRowId}
-                    onSelectionChange={setSelected}
-                    onRowDoubleClick={handleRowDoubleClick}
-                    onContextMenu={handleContextMenu}
-                    onDrop={handleDrop}
-                    emptyContent="No records"
-                />
-            </section>
-        </main>
+                </>
+            }
+            toolbar={<span>{selected.length.toLocaleString()} selected</span>}
+            contentProps={{ className: "DataTableDemoContent" }}
+        >
+            <DataTable
+                data={demoData}
+                columns={columns}
+                getRowId={getRowId}
+                onSelectionChange={setSelected}
+                onRowDoubleClick={handleRowDoubleClick}
+                onContextMenu={handleContextMenu}
+                onDrop={handleDrop}
+                emptyContent="No records"
+            />
+        </PageLayout>
     );
 }

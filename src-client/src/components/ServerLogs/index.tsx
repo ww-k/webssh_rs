@@ -10,6 +10,8 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import PageLayout from "@/components/PageLayout";
+
 import "./index.css";
 
 const LOG_LEVELS = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"] as const;
@@ -202,8 +204,9 @@ export default function ServerLogs() {
     });
 
     return (
-        <main className="WebSSH-MenuPage WebSSH-ServerLogs">
-            <div className="WebSSH-MenuPageToolbar WebSSH-ServerLogs-Header">
+        <PageLayout
+            className="WebSSH-ServerLogs"
+            header={
                 <Space className="WebSSH-ServerLogs-Filters">
                     <Select<LogLevel | "ALL">
                         aria-label={t("server_logs_level_filter")}
@@ -230,32 +233,32 @@ export default function ServerLogs() {
                         value={keyword}
                     />
                 </Space>
-            </div>
-            <div className="WebSSH-MenuPageContent WebSSH-ServerLogs-Content">
-                <pre
-                    className="WebSSH-ServerLogs-Output"
-                    onScroll={(event) => {
-                        const { scrollTop, scrollHeight, clientHeight } =
-                            event.currentTarget;
-                        shouldStickToBottom.current =
-                            scrollHeight - scrollTop - clientHeight < 24;
-                    }}
-                    ref={outputRef}
-                >
-                    {visibleLogs.length ? (
-                        renderedLogs
-                    ) : logs.length ? (
-                        <span className="WebSSH-ServerLogs-Empty">
-                            <Empty description={t("server_logs_no_match")} />
-                        </span>
-                    ) : (
-                        <span className="WebSSH-ServerLogs-Empty">
-                            <FileTextOutlined />
-                            <Empty description={t("server_logs_empty")} />
-                        </span>
-                    )}
-                </pre>
-            </div>
-        </main>
+            }
+            contentProps={{ className: "WebSSH-ServerLogs-Content" }}
+        >
+            <pre
+                className="WebSSH-ServerLogs-Output"
+                onScroll={(event) => {
+                    const { scrollTop, scrollHeight, clientHeight } =
+                        event.currentTarget;
+                    shouldStickToBottom.current =
+                        scrollHeight - scrollTop - clientHeight < 24;
+                }}
+                ref={outputRef}
+            >
+                {visibleLogs.length ? (
+                    renderedLogs
+                ) : logs.length ? (
+                    <span className="WebSSH-ServerLogs-Empty">
+                        <Empty description={t("server_logs_no_match")} />
+                    </span>
+                ) : (
+                    <span className="WebSSH-ServerLogs-Empty">
+                        <FileTextOutlined />
+                        <Empty description={t("server_logs_empty")} />
+                    </span>
+                )}
+            </pre>
+        </PageLayout>
     );
 }

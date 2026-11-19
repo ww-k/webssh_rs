@@ -1,7 +1,3 @@
-.WebSSH-ServerLogs-Header {
-    justify-content: flex-start;
-}
-
 .WebSSH-ServerLogs-Filter {
     width: min(280px, 42vw);
 }
