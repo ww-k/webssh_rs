@@ -2,9 +2,7 @@ import {
     DeleteOutlined,
     EditOutlined,
     LinkOutlined,
-    PauseOutlined,
-    PlayCircleOutlined,
-    PlusOutlined,
+    PlusCircleTwoTone,
     ReloadOutlined,
 } from "@ant-design/icons";
 import {
@@ -17,6 +15,7 @@ import {
     Popconfirm,
     Select,
     Space,
+    Switch,
     Tooltip,
 } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -202,13 +201,13 @@ export default function PortForwarding() {
     const columns: DataTableColumn<IPortForward>[] = useMemo(
         () => [
             {
-                id: "local_port",
-                header: t("port_forward_column_local_port"),
-                accessor: (item) => item.local_port,
-                width: 150,
+                id: "local_target",
+                header: t("port_forward_column_local_target"),
+                accessor: (item) => `${item.local_host}:${item.local_port}`,
+                width: 180,
                 cell: (_, item) => (
-                    <span className="WebSSH-PortForwarding-LocalPort">
-                        <span>{item.local_port}</span>
+                    <span className="WebSSH-PortForwarding-LocalTarget">
+                        <span>{`${item.local_host}:${item.local_port}`}</span>
                         {item.enabled && (
                             <Tooltip title={t("port_forward_open_local")}>
                                 <a
@@ -241,10 +240,29 @@ export default function PortForwarding() {
                 },
             },
             {
+                id: "enabled",
+                header: t("port_forward_column_enabled"),
+                accessor: (item) => item.enabled,
+                width: 90,
+                align: "center",
+                cell: (_, item) => (
+                    <Switch
+                        aria-label={t(
+                            item.enabled
+                                ? "port_forward_disable"
+                                : "port_forward_enable",
+                        )}
+                        checked={item.enabled}
+                        loading={togglingId === item.id}
+                        onChange={() => void toggle(item)}
+                    />
+                ),
+            },
+            {
                 id: "actions",
                 header: t("app_common_action"),
                 accessor: () => "",
-                width: 110,
+                width: 80,
                 sortable: false,
                 cell: (_, item) => (
                     <Space size="small">
@@ -253,32 +271,6 @@ export default function PortForwarding() {
                                 aria-label={t("app_btn_edit")}
                                 icon={<EditOutlined />}
                                 onClick={() => openEdit(item)}
-                                size="small"
-                                type="text"
-                            />
-                        </Tooltip>
-                        <Tooltip
-                            title={t(
-                                item.enabled
-                                    ? "port_forward_disable"
-                                    : "port_forward_enable",
-                            )}
-                        >
-                            <Button
-                                aria-label={t(
-                                    item.enabled
-                                        ? "port_forward_disable"
-                                        : "port_forward_enable",
-                                )}
-                                icon={
-                                    item.enabled ? (
-                                        <PauseOutlined />
-                                    ) : (
-                                        <PlayCircleOutlined />
-                                    )
-                                }
-                                loading={togglingId === item.id}
-                                onClick={() => void toggle(item)}
                                 size="small"
                                 type="text"
                             />
@@ -311,24 +303,23 @@ export default function PortForwarding() {
         <>
             <PageLayout
                 className="WebSSH-PortForwarding"
-                header={
-                    <Button
-                        icon={<PlusOutlined />}
-                        onClick={openCreate}
-                        type="primary"
-                    >
-                        {t("port_forward_create")}
-                    </Button>
-                }
                 toolbar={
-                    <Tooltip title={t("app_btn_refresh")}>
-                        <Button
-                            aria-label={t("app_btn_refresh")}
-                            icon={<ReloadOutlined />}
-                            loading={loading}
-                            onClick={() => void load()}
-                        />
-                    </Tooltip>
+                    <Space size="small">
+                        <Tooltip title={t("port_forward_create")}>
+                            <Button
+                                icon={<PlusCircleTwoTone />}
+                                onClick={openCreate}
+                            />
+                        </Tooltip>
+                        <Tooltip title={t("app_btn_refresh")}>
+                            <Button
+                                aria-label={t("app_btn_refresh")}
+                                icon={<ReloadOutlined />}
+                                loading={loading}
+                                onClick={() => void load()}
+                            />
+                        </Tooltip>
+                    </Space>
                 }
             >
                 <DataTable

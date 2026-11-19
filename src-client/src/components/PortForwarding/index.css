@@ -1,10 +1,10 @@
-.WebSSH-PortForwarding-LocalPort {
+.WebSSH-PortForwarding-LocalTarget {
     display: inline-flex;
     align-items: center;
     gap: 6px;
 }
 
-.WebSSH-PortForwarding-LocalPort a {
+.WebSSH-PortForwarding-LocalTarget a {
     color: var(--ant-color-link);
 }
 
