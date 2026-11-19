@@ -156,23 +156,25 @@ export default function DataTableHeader<TData extends RowData>({
                                             ];
                                         }}
                                         onMove={({ moveX }) => {
-                                            resizeOrigin.current[
-                                                header.column.id
-                                            ] ??=
-                                                columnWidths[
-                                                    header.column.id
-                                                ] ??
-                                                column?.width ??
-                                                160;
-                                            setColumnWidths((previous) => ({
-                                                ...previous,
-                                                [header.column.id]: Math.max(
-                                                    column?.minWidth ?? 48,
-                                                    resizeOrigin.current[
-                                                        header.column.id
-                                                    ] + moveX,
-                                                ),
-                                            }));
+                                            setColumnWidths((previous) => {
+                                                const columnId =
+                                                    header.column.id;
+                                                resizeOrigin.current[
+                                                    columnId
+                                                ] ??=
+                                                    previous[columnId] ??
+                                                    column?.width ??
+                                                    160;
+                                                return {
+                                                    ...previous,
+                                                    [columnId]: Math.max(
+                                                        column?.minWidth ?? 48,
+                                                        resizeOrigin.current[
+                                                            columnId
+                                                        ] + moveX,
+                                                    ),
+                                                };
+                                            });
                                         }}
                                     />
                                 </th>
