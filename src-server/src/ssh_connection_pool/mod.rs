@@ -23,6 +23,9 @@ use connector::{SshConnectionSpec, SshConnector};
 use known_hosts::KnownHosts;
 use target_connection_pool::TargetConnectionPool;
 
+#[cfg(test)]
+const DEFAULT_MAX_FORWARDING_CHANNELS_PER_TARGET: usize = 100;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ChannelMode {
     #[default]
@@ -48,14 +51,32 @@ pub(crate) struct SshConnectionPool {
     connector: Arc<SshConnector>,
     max_connections_per_target: usize,
     max_channels_per_connection: usize,
+    max_forwarding_channels_per_target: usize,
 }
 
 impl SshConnectionPool {
+    #[cfg(test)]
     pub(crate) fn new(
         db: DatabaseConnection,
         check_server_key: CheckServerKey,
         max_connections_per_target: usize,
         max_channels_per_connection: usize,
+    ) -> Self {
+        Self::with_forwarding_limit(
+            db,
+            check_server_key,
+            max_connections_per_target,
+            max_channels_per_connection,
+            DEFAULT_MAX_FORWARDING_CHANNELS_PER_TARGET,
+        )
+    }
+
+    pub(crate) fn with_forwarding_limit(
+        db: DatabaseConnection,
+        check_server_key: CheckServerKey,
+        max_connections_per_target: usize,
+        max_channels_per_connection: usize,
+        max_forwarding_channels_per_target: usize,
     ) -> Self {
         let known_hosts = KnownHosts::new(db.clone(), check_server_key);
         Self {
@@ -66,6 +87,7 @@ impl SshConnectionPool {
             connector: Arc::new(SshConnector::new(known_hosts)),
             max_connections_per_target,
             max_channels_per_connection,
+            max_forwarding_channels_per_target,
         }
     }
 
@@ -88,6 +110,7 @@ impl SshConnectionPool {
                         jump_host_pool.clone(),
                         self.max_connections_per_target,
                         self.max_channels_per_connection,
+                        self.max_forwarding_channels_per_target,
                     ));
                     target_connection_pools.insert(target_id, Arc::clone(&pool));
                     (pool, expired)
@@ -99,6 +122,7 @@ impl SshConnectionPool {
                     jump_host_pool,
                     self.max_connections_per_target,
                     self.max_channels_per_connection,
+                    self.max_forwarding_channels_per_target,
                 ));
                 target_connection_pools.insert(target_id, Arc::clone(&pool));
                 (pool, None)

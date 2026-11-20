@@ -9,11 +9,12 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::sync::OwnedSemaphorePermit;
 use tracing::debug;
 
-use super::connection::ChannelPermit;
+use super::connection::{ChannelPermit, ForwardingChannelPermit};
 
 pub struct SshChannelGuard {
     channel: Option<Channel<russh::client::Msg>>,
     lease: Option<ChannelPermit>,
+    forwarding_lease: Option<ForwardingChannelPermit>,
 }
 
 impl SshChannelGuard {
@@ -21,6 +22,18 @@ impl SshChannelGuard {
         Self {
             channel: Some(channel),
             lease: Some(lease),
+            forwarding_lease: None,
+        }
+    }
+
+    pub(crate) fn new_forwarding(
+        channel: Channel<russh::client::Msg>,
+        forwarding_lease: ForwardingChannelPermit,
+    ) -> Self {
+        Self {
+            channel: Some(channel),
+            lease: None,
+            forwarding_lease: Some(forwarding_lease),
         }
     }
 
@@ -41,12 +54,19 @@ impl SshChannelGuard {
         SshChannelTransferGuard,
     )> {
         let channel = self.channel.take()?;
-        let lease = self.lease.take()?;
+        let lease = self.lease.take();
+        let forwarding_lease = self.forwarding_lease.take();
+        if lease.is_none() && forwarding_lease.is_none() {
+            return None;
+        }
         let (reader, writer) = channel.split();
         Some((
             reader,
             writer,
-            SshChannelTransferGuard { lease: Some(lease) },
+            SshChannelTransferGuard {
+                lease,
+                _forwarding_lease: forwarding_lease,
+            },
         ))
     }
 
@@ -63,9 +83,11 @@ impl SshChannelGuard {
     pub fn into_stream(mut self) -> Option<SshChannelStreamGuard> {
         let channel = self.channel.take()?;
         let lease = self.lease.take()?;
+        let forwarding_lease = self.forwarding_lease.take();
         Some(SshChannelStreamGuard {
             stream: channel.into_stream(),
-            _lease: lease,
+            _lease: Some(lease),
+            _forwarding_lease: forwarding_lease,
             _direct_tcpip_lease: None,
         })
     }
@@ -75,10 +97,15 @@ impl SshChannelGuard {
         direct_tcpip_lease: OwnedSemaphorePermit,
     ) -> Option<SshChannelStreamGuard> {
         let channel = self.channel.take()?;
-        let lease = self.lease.take()?;
+        let lease = self.lease.take();
+        let forwarding_lease = self.forwarding_lease.take();
+        if lease.is_none() && forwarding_lease.is_none() {
+            return None;
+        }
         Some(SshChannelStreamGuard {
             stream: channel.into_stream(),
             _lease: lease,
+            _forwarding_lease: forwarding_lease,
             _direct_tcpip_lease: Some(direct_tcpip_lease),
         })
     }
@@ -104,10 +131,12 @@ impl Drop for SshChannelGuard {
             return;
         };
         let lease = self.lease.take();
+        let forwarding_lease = self.forwarding_lease.take();
         if let Ok(runtime) = tokio::runtime::Handle::try_current() {
             runtime.spawn(async move {
                 let _ = channel.close().await;
                 drop(lease);
+                drop(forwarding_lease);
             });
         }
     }
@@ -115,6 +144,7 @@ impl Drop for SshChannelGuard {
 
 pub struct SshChannelTransferGuard {
     lease: Option<ChannelPermit>,
+    _forwarding_lease: Option<ForwardingChannelPermit>,
 }
 
 impl Drop for SshChannelTransferGuard {
@@ -125,7 +155,8 @@ impl Drop for SshChannelTransferGuard {
 
 pub struct SshChannelStreamGuard {
     stream: ChannelStream<russh::client::Msg>,
-    _lease: ChannelPermit,
+    _lease: Option<ChannelPermit>,
+    _forwarding_lease: Option<ForwardingChannelPermit>,
     _direct_tcpip_lease: Option<OwnedSemaphorePermit>,
 }
 

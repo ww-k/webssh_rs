@@ -1,6 +1,6 @@
 use std::sync::{
     Arc,
-    atomic::{AtomicU8, Ordering},
+    atomic::{AtomicU8, AtomicUsize, Ordering},
 };
 
 use russh::{Channel, Disconnect};
@@ -38,6 +38,7 @@ pub(crate) struct SshConnection {
     _upstream_handles: Vec<russh::client::Handle<SshClientHandler>>,
     permits: Arc<Semaphore>,
     max_channels: usize,
+    forwarding_channels: AtomicUsize,
     state: AtomicU8,
     notify: Arc<Notify>,
     owner: std::sync::Weak<TargetConnectionPool>,
@@ -56,6 +57,7 @@ impl SshConnection {
             _upstream_handles: connected.upstream_handles,
             permits: Arc::new(Semaphore::new(max_channels)),
             max_channels,
+            forwarding_channels: AtomicUsize::new(0),
             state: AtomicU8::new(ConnectionState::Active as u8),
             notify,
             owner,
@@ -89,10 +91,12 @@ impl SshConnection {
     pub(crate) fn active_channels(&self) -> usize {
         self.max_channels
             .saturating_sub(self.permits.available_permits())
+            .saturating_add(self.forwarding_channels.load(Ordering::Acquire))
     }
 
     pub(crate) fn is_idle(&self) -> bool {
         self.permits.available_permits() == self.max_channels
+            && self.forwarding_channels.load(Ordering::Acquire) == 0
     }
 
     pub(crate) fn try_reserve(self: &Arc<Self>) -> Option<ChannelPermit> {
@@ -106,6 +110,20 @@ impl SshConnection {
         }
         Some(ChannelPermit {
             permit: Some(permit),
+            connection: Arc::clone(self),
+        })
+    }
+
+    pub(crate) fn reserve_forwarding(self: &Arc<Self>) -> Option<ForwardingChannelPermit> {
+        if self.state() != ConnectionState::Active {
+            return None;
+        }
+        self.forwarding_channels.fetch_add(1, Ordering::AcqRel);
+        if self.state() != ConnectionState::Active {
+            self.forwarding_channels.fetch_sub(1, Ordering::AcqRel);
+            return None;
+        }
+        Some(ForwardingChannelPermit {
             connection: Arc::clone(self),
         })
     }
@@ -192,6 +210,12 @@ impl SshConnection {
         self.close_if_expired_and_idle();
     }
 
+    fn on_forwarding_permit_released(self: &Arc<Self>) {
+        self.forwarding_channels.fetch_sub(1, Ordering::AcqRel);
+        self.notify.notify_one();
+        self.close_if_expired_and_idle();
+    }
+
     async fn remove_from_owner(&self) {
         if let Some(owner) = self.owner.upgrade() {
             owner.remove_closed(&self.id).await;
@@ -204,9 +228,19 @@ pub(crate) struct ChannelPermit {
     connection: Arc<SshConnection>,
 }
 
+pub(crate) struct ForwardingChannelPermit {
+    connection: Arc<SshConnection>,
+}
+
 impl Drop for ChannelPermit {
     fn drop(&mut self) {
         drop(self.permit.take());
         self.connection.on_permit_released();
+    }
+}
+
+impl Drop for ForwardingChannelPermit {
+    fn drop(&mut self) {
+        self.connection.on_forwarding_permit_released();
     }
 }

@@ -10,13 +10,11 @@ use crate::sftp_client::{FastSftpClient, SftpClientGuard};
 
 use super::{
     ChannelMode, ConnectionSnapshot,
-    connection::{ChannelPermit, ConnectionState, SshConnection},
+    connection::{ChannelPermit, ConnectionState, ForwardingChannelPermit, SshConnection},
     connector::{ConnectedSsh, SshConnectionSpec, SshConnector},
     error::{SshPoolError, SshPoolResult},
     lease::{SshChannelGuard, SshChannelStreamGuard},
 };
-
-const MAX_DIRECT_TCPIP_CHANNELS_PER_TARGET: usize = 5;
 
 pub(crate) struct TargetConnectionPool {
     spec: SshConnectionSpec,
@@ -27,7 +25,8 @@ pub(crate) struct TargetConnectionPool {
     notify: Arc<Notify>,
     max_connections: usize,
     max_channels_per_connection: usize,
-    direct_tcpip_permits: Arc<Semaphore>,
+    max_forwarding_channels_per_target: usize,
+    forwarding_permits: Arc<Semaphore>,
     expired: AtomicBool,
     sftp_client: Mutex<Option<FastSftpClient>>,
     sftp_init_lock: Mutex<()>,
@@ -41,6 +40,7 @@ impl TargetConnectionPool {
         jump_host_pool: Option<Arc<TargetConnectionPool>>,
         max_connections: usize,
         max_channels_per_connection: usize,
+        max_forwarding_channels_per_target: usize,
     ) -> Self {
         Self {
             spec,
@@ -51,7 +51,8 @@ impl TargetConnectionPool {
             notify: Arc::new(Notify::new()),
             max_connections,
             max_channels_per_connection,
-            direct_tcpip_permits: Arc::new(Semaphore::new(MAX_DIRECT_TCPIP_CHANNELS_PER_TARGET)),
+            max_forwarding_channels_per_target,
+            forwarding_permits: Arc::new(Semaphore::new(max_forwarding_channels_per_target)),
             expired: AtomicBool::new(false),
             sftp_client: Mutex::new(None),
             sftp_init_lock: Mutex::new(()),
@@ -93,7 +94,6 @@ impl TargetConnectionPool {
                 limit: 0,
             });
         }
-
         loop {
             self.ensure_active()?;
             if let Some(reservation) = self.try_existing(mode).await {
@@ -162,13 +162,6 @@ impl TargetConnectionPool {
                 limit: 0,
             });
         }
-        if self.max_channels_per_connection == 0 {
-            return Err(SshPoolError::CapacityExceeded {
-                resource: "SSH channel",
-                limit: 0,
-            });
-        }
-
         loop {
             self.ensure_active()?;
             if self.has_active_connection().await {
@@ -348,36 +341,42 @@ impl TargetConnectionPool {
         port: u16,
         originator_address: &str,
     ) -> SshPoolResult<SshChannelStreamGuard> {
-        let direct_tcpip_lease: OwnedSemaphorePermit = self
-            .direct_tcpip_permits
-            .clone()
-            .acquire_owned()
-            .await
-            .map_err(|_| SshPoolError::CapacityExceeded {
-                resource: "direct-tcpip channel per target",
-                limit: MAX_DIRECT_TCPIP_CHANNELS_PER_TARGET,
-            })?;
         if self.max_connections == 0 {
             return Err(SshPoolError::CapacityExceeded {
                 resource: "SSH connection",
                 limit: 0,
             });
         }
-        if self.max_channels_per_connection == 0 {
+        if self.max_forwarding_channels_per_target == 0 {
             return Err(SshPoolError::CapacityExceeded {
-                resource: "SSH channel",
+                resource: "forwarding channel per target",
                 limit: 0,
             });
         }
-        let (connection, permit) = loop {
+        let forwarding_permit: OwnedSemaphorePermit = loop {
             self.ensure_active()?;
-            if let Some(reservation) = self.try_existing(ChannelMode::Shared).await {
+            let notified = self.notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            tokio::select! {
+                permit = self.forwarding_permits.clone().acquire_owned() => {
+                    break permit.map_err(|_| SshPoolError::CapacityExceeded {
+                        resource: "forwarding channel per target",
+                        limit: self.max_forwarding_channels_per_target,
+                    })?;
+                }
+                _ = &mut notified => {}
+            }
+        };
+        let (connection, forwarding_lease) = loop {
+            self.ensure_active()?;
+            if let Some(reservation) = self.try_existing_forwarding().await {
                 break reservation;
             }
 
             let connect_guard = self.connect_lock.lock().await;
             self.ensure_active()?;
-            if let Some(reservation) = self.try_existing(ChannelMode::Shared).await {
+            if let Some(reservation) = self.try_existing_forwarding().await {
                 break reservation;
             }
 
@@ -399,14 +398,14 @@ impl TargetConnectionPool {
                 Arc::clone(&self.notify),
                 Arc::downgrade(self),
             );
-            let permit =
+            let forwarding_lease =
                 connection
-                    .try_reserve()
+                    .reserve_forwarding()
                     .ok_or_else(|| SshPoolError::ConnectionExpired {
                         connection_id: connection.id().to_string(),
                     })?;
             self.connections.lock().await.push(Arc::clone(&connection));
-            break (connection, permit);
+            break (connection, forwarding_lease);
         };
 
         let connection_id = connection.id().to_string();
@@ -422,12 +421,24 @@ impl TargetConnectionPool {
         };
         if let Err(err) = self.ensure_active() {
             let _ = channel.close().await;
-            drop(permit);
+            drop(forwarding_lease);
             return Err(err);
         }
-        SshChannelGuard::new(channel, permit)
-            .into_stream_with_direct_tcpip_lease(direct_tcpip_lease)
+        SshChannelGuard::new_forwarding(channel, forwarding_lease)
+            .into_stream_with_direct_tcpip_lease(forwarding_permit)
             .ok_or(SshPoolError::ConnectionExpired { connection_id })
+    }
+
+    async fn try_existing_forwarding(
+        &self,
+    ) -> Option<(Arc<SshConnection>, ForwardingChannelPermit)> {
+        let mut connections = self.connections.lock().await;
+        connections.retain(|connection| connection.state() != ConnectionState::Closed);
+        connections.iter().find_map(|connection| {
+            connection
+                .reserve_forwarding()
+                .map(|permit| (Arc::clone(connection), permit))
+        })
     }
 
     fn ensure_active(&self) -> SshPoolResult<()> {

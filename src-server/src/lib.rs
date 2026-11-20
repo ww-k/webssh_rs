@@ -120,11 +120,12 @@ where
     Migrator::up(&db, None).await.unwrap();
 
     let app_base_state = Arc::new(AppBaseState { db, config });
-    let connection_pool = Arc::new(SshConnectionPool::new(
+    let connection_pool = Arc::new(SshConnectionPool::with_forwarding_limit(
         app_base_state.db.clone(),
         app_base_state.config.check_server_key,
         app_base_state.config.max_connections_per_target as usize,
         app_base_state.config.max_channels_per_connection as usize,
+        app_base_state.config.max_forwarding_channels_per_target,
     ));
     let transfer_service =
         transfer::TransferService::new(app_base_state.clone(), connection_pool.clone());

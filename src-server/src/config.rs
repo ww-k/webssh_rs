@@ -24,6 +24,7 @@ impl CheckServerKey {
 pub struct Config {
     pub max_connections_per_target: u8,
     pub max_channels_per_connection: u8,
+    pub max_forwarding_channels_per_target: usize,
     pub transfer_task_concurrency: usize,
     pub transfer_chunk_size: usize,
     pub check_server_key: CheckServerKey,
@@ -34,6 +35,7 @@ impl Default for Config {
         Config {
             max_connections_per_target: 10,
             max_channels_per_connection: 10,
+            max_forwarding_channels_per_target: 100,
             transfer_task_concurrency: 3,
             transfer_chunk_size: 10 * 1024 * 1024,
             check_server_key: CheckServerKey::AcceptNew,
@@ -55,6 +57,10 @@ impl Config {
         if let Ok(value) = std::env::var("WEBSSH_RS_TRANSFER_TASK_CONCURRENCY") {
             config.transfer_task_concurrency =
                 Config::parse_transfer_task_concurrency(value.as_str())?;
+        }
+        if let Ok(value) = std::env::var("WEBSSH_RS_MAX_FORWARDING_CHANNELS_PER_TARGET") {
+            config.max_forwarding_channels_per_target =
+                Config::parse_max_forwarding_channels_per_target(value.as_str())?;
         }
         if let Ok(value) = std::env::var("WEBSSH_RS_TRANSFER_CHUNK_SIZE") {
             config.transfer_chunk_size = Config::parse_transfer_chunk_size(value.as_str())?;
@@ -85,6 +91,20 @@ impl Config {
             ));
         }
         Ok(chunk_size)
+    }
+
+    fn parse_max_forwarding_channels_per_target(value: &str) -> Result<usize> {
+        let channels = value.parse::<usize>().map_err(|err| {
+            anyhow::anyhow!(
+                "invalid WEBSSH_RS_MAX_FORWARDING_CHANNELS_PER_TARGET value: {value}: {err}"
+            )
+        })?;
+        if channels == 0 {
+            return Err(anyhow::anyhow!(
+                "invalid WEBSSH_RS_MAX_FORWARDING_CHANNELS_PER_TARGET value: {value}; expected positive integer"
+            ));
+        }
+        Ok(channels)
     }
 }
 
@@ -126,5 +146,15 @@ mod tests {
         );
         assert!(Config::parse_transfer_chunk_size("0").is_err());
         assert!(Config::parse_transfer_chunk_size("abc").is_err());
+    }
+
+    #[test]
+    fn parse_max_forwarding_channels_per_target() {
+        assert_eq!(
+            Config::parse_max_forwarding_channels_per_target("100").unwrap(),
+            100
+        );
+        assert!(Config::parse_max_forwarding_channels_per_target("0").is_err());
+        assert!(Config::parse_max_forwarding_channels_per_target("abc").is_err());
     }
 }

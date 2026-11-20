@@ -132,6 +132,7 @@ cargo fmt --check         # 检查 Rust 格式
 | `WEBSSH_RS_CHECK_SERVER_KEY` | `accept-new` | SSH 主机密钥策略，可选 `accept-new`、`strict`、`disabled` |
 | `WEBSSH_RS_TRANSFER_TASK_CONCURRENCY` | `3` | 并行传输任务数量，必须是正整数 |
 | `WEBSSH_RS_TRANSFER_CHUNK_SIZE` | `10485760` | 传输分块大小，单位为字节，必须是正整数 |
+| `WEBSSH_RS_MAX_FORWARDING_CHANNELS_PER_TARGET` | `100` | 每个 SSH 目标允许的并行 TCP 转发 channel 数量，必须是正整数 |
 
 例如：
 
