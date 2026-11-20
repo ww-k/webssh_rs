@@ -152,11 +152,13 @@ impl PortForwardManager {
             return Err(err);
         }
         info!(
-            forward_id = %info.id,
-            local = %format!("{}:{}", info.local_host, info.local_port),
-            remote = %format!("{}:{}", info.remote_host, info.remote_port),
-            target_id = info.target_id,
-            "port forwarding enabled"
+            "forward_id={} forwarding enabled local={}:{} remote={}:{} target_id={}",
+            info.id,
+            info.local_host,
+            info.local_port,
+            info.remote_host,
+            info.remote_port,
+            info.target_id
         );
         self.tasks.lock().await.insert(
             id,
@@ -189,11 +191,13 @@ impl PortForwardManager {
                 message: err.to_string(),
             })?;
         info!(
-            forward_id = %info.id,
-            local = %format!("{}:{}", info.local_host, info.local_port),
-            remote = %format!("{}:{}", info.remote_host, info.remote_port),
-            target_id = info.target_id,
-            "port forwarding listener started"
+            "forward_id={} listener started local={}:{} remote={}:{} target_id={}",
+            info.id,
+            info.local_host,
+            info.local_port,
+            info.remote_host,
+            info.remote_port,
+            info.target_id
         );
         let connection_pool = Arc::clone(&self.connection_pool);
         let target_id = info.target_id;
@@ -207,19 +211,34 @@ impl PortForwardManager {
                 let (mut local, peer) = match listener.accept().await {
                     Ok(value) => value,
                     Err(err) => {
-                        debug!(%err, local_port, "port forwarding listener stopped");
+                        debug!(
+                            "forward_id={} listener stopped local_port={} error={}",
+                            forward_id, local_port, err
+                        );
                         break;
                     }
                 };
-                info!(forward_id = %forward_id, ?peer, "port forwarding connection accepted");
+                info!(
+                    "forward_id={} connection accepted peer={}",
+                    forward_id, peer
+                );
                 let pool = Arc::clone(&connection_pool);
+                let forward_id = forward_id.clone();
                 let remote_host = remote_host.clone();
                 let local_host = local_host.clone();
                 tokio::spawn(async move {
                     let context = match pool.context(target_id).await {
                         Ok(context) => context,
                         Err(err) => {
-                            warn!(%err, target_id, "unable to create SSH context for port forwarding");
+                            warn!(
+                                "forward_id={} unable to create SSH context target_id={} error={}",
+                                forward_id, target_id, err
+                            );
+                            drop(local);
+                            info!(
+                                "forward_id={} connection disconnected peer={}",
+                                forward_id, peer
+                            );
                             return;
                         }
                     };
@@ -229,18 +248,39 @@ impl PortForwardManager {
                     {
                         Ok(remote) => remote,
                         Err(err) => {
-                            warn!(%err, target_id, %remote_host, remote_port, "unable to open forwarded SSH channel");
+                            warn!(
+                                "forward_id={} unable to open forwarding channel remote={}:{} target_id={} error={}",
+                                forward_id, remote_host, remote_port, target_id, err
+                            );
+                            drop(local);
+                            info!(
+                                "forward_id={} connection disconnected peer={}",
+                                forward_id, peer
+                            );
                             return;
                         }
                     };
                     info!(
-                        target_id,
-                        remote = %format!("{}:{}", remote_host, remote_port),
-                        "port forwarding SSH channel opened"
+                        "forward_id={} forwarding channel opened peer={} remote={}:{} target_id={}",
+                        forward_id, peer, remote_host, remote_port, target_id
                     );
-                    if let Err(err) = copy_bidirectional(&mut local, &mut remote).await {
-                        debug!(%err, ?peer, target_id, "port forwarding connection closed");
+                    let copy_result = copy_bidirectional(&mut local, &mut remote).await;
+                    drop(remote);
+                    match copy_result {
+                        Ok((uploaded, downloaded)) => info!(
+                            "forward_id={} forwarding channel disconnected and released peer={} target_id={} uploaded={} downloaded={}",
+                            forward_id, peer, target_id, uploaded, downloaded
+                        ),
+                        Err(err) => info!(
+                            "forward_id={} forwarding channel disconnected and released peer={} target_id={} error={}",
+                            forward_id, peer, target_id, err
+                        ),
                     }
+                    drop(local);
+                    info!(
+                        "forward_id={} connection disconnected peer={}",
+                        forward_id, peer
+                    );
                 });
             }
         }))
@@ -277,7 +317,7 @@ impl PortForwardManager {
                     .exec(&self.db)
                     .await
             )?;
-            info!(forward_id = %id, "port forwarding disabled");
+            info!("forward_id={} forwarding disabled", id);
             return Ok(item.info.clone());
         }
 
@@ -302,7 +342,7 @@ impl PortForwardManager {
                 .exec(&self.db)
                 .await
         )?;
-        info!(forward_id = %id, "port forwarding enabled");
+        info!("forward_id={} forwarding enabled", id);
         Ok(item.info.clone())
     }
 
@@ -389,7 +429,7 @@ impl PortForwardManager {
             enabled: updated.enabled,
         });
         map_db_err!(model.update(&self.db).await)?;
-        info!(forward_id = %updated.id, "port forwarding configuration updated");
+        info!("forward_id={} forwarding configuration updated", updated.id);
         Ok(updated)
     }
 
@@ -403,7 +443,7 @@ impl PortForwardManager {
             if let Some(task) = item.task {
                 task.abort();
             }
-            info!(forward_id = %id, "port forwarding removed");
+            info!("forward_id={} forwarding removed", id);
             Ok(true)
         } else {
             Ok(false)
