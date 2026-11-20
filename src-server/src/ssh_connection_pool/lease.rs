@@ -6,6 +6,7 @@ use std::{
 
 use russh::{Channel, ChannelMsg, ChannelReadHalf, ChannelStream, ChannelWriteHalf};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::sync::OwnedSemaphorePermit;
 use tracing::debug;
 
 use super::connection::ChannelPermit;
@@ -65,6 +66,20 @@ impl SshChannelGuard {
         Some(SshChannelStreamGuard {
             stream: channel.into_stream(),
             _lease: lease,
+            _direct_tcpip_lease: None,
+        })
+    }
+
+    pub(crate) fn into_stream_with_direct_tcpip_lease(
+        mut self,
+        direct_tcpip_lease: OwnedSemaphorePermit,
+    ) -> Option<SshChannelStreamGuard> {
+        let channel = self.channel.take()?;
+        let lease = self.lease.take()?;
+        Some(SshChannelStreamGuard {
+            stream: channel.into_stream(),
+            _lease: lease,
+            _direct_tcpip_lease: Some(direct_tcpip_lease),
         })
     }
 }
@@ -111,6 +126,7 @@ impl Drop for SshChannelTransferGuard {
 pub struct SshChannelStreamGuard {
     stream: ChannelStream<russh::client::Msg>,
     _lease: ChannelPermit,
+    _direct_tcpip_lease: Option<OwnedSemaphorePermit>,
 }
 
 impl AsyncRead for SshChannelStreamGuard {

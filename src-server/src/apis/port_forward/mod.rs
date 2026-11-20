@@ -175,6 +175,19 @@ impl PortForwardManager {
                 code: ERR_CODE_PORT_FORWARD,
                 message: format!("failed to bind local port {}: {err}", info.local_port),
             })?;
+        self.connection_pool
+            .context(info.target_id)
+            .await
+            .map_err(|err| ApiErr {
+                code: ERR_CODE_SSH_ERR,
+                message: err.to_string(),
+            })?
+            .connect()
+            .await
+            .map_err(|err| ApiErr {
+                code: ERR_CODE_SSH_ERR,
+                message: err.to_string(),
+            })?;
         info!(
             forward_id = %info.id,
             local = %format!("{}:{}", info.local_host, info.local_port),

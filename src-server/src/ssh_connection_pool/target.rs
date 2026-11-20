@@ -97,6 +97,11 @@ impl TargetSshContext {
             .await?)
     }
 
+    pub(crate) async fn connect(self) -> Result<()> {
+        let connection_pool = self.connection_pool?;
+        Ok(connection_pool.ensure_connection().await?)
+    }
+
     async fn sftp(self, mode: ChannelMode) -> Result<SftpClientGuard> {
         let connection_pool = self.connection_pool?;
         connection_pool.sftp(mode).await

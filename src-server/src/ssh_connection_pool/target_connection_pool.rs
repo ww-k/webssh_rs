@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::{Mutex, Notify, OwnedSemaphorePermit, Semaphore};
 use tracing::debug;
 
 use crate::sftp_client::{FastSftpClient, SftpClientGuard};
@@ -16,6 +16,8 @@ use super::{
     lease::{SshChannelGuard, SshChannelStreamGuard},
 };
 
+const MAX_DIRECT_TCPIP_CHANNELS_PER_TARGET: usize = 5;
+
 pub(crate) struct TargetConnectionPool {
     spec: SshConnectionSpec,
     connector: Arc<SshConnector>,
@@ -24,6 +26,7 @@ pub(crate) struct TargetConnectionPool {
     notify: Arc<Notify>,
     max_connections: usize,
     max_channels_per_connection: usize,
+    direct_tcpip_permits: Arc<Semaphore>,
     expired: AtomicBool,
     sftp_client: Mutex<Option<FastSftpClient>>,
     sftp_init_lock: Mutex<()>,
@@ -45,6 +48,7 @@ impl TargetConnectionPool {
             notify: Arc::new(Notify::new()),
             max_connections,
             max_channels_per_connection,
+            direct_tcpip_permits: Arc::new(Semaphore::new(MAX_DIRECT_TCPIP_CHANNELS_PER_TARGET)),
             expired: AtomicBool::new(false),
             sftp_client: Mutex::new(None),
             sftp_init_lock: Mutex::new(()),
@@ -138,6 +142,68 @@ impl TargetConnectionPool {
         }
     }
 
+    pub(crate) async fn ensure_connection(self: &Arc<Self>) -> SshPoolResult<()> {
+        if self.max_connections == 0 {
+            return Err(SshPoolError::CapacityExceeded {
+                resource: "SSH connection",
+                limit: 0,
+            });
+        }
+        if self.max_channels_per_connection == 0 {
+            return Err(SshPoolError::CapacityExceeded {
+                resource: "SSH channel",
+                limit: 0,
+            });
+        }
+
+        loop {
+            self.ensure_active()?;
+            if self.has_active_connection().await {
+                return Ok(());
+            }
+
+            let connect_guard = self.connect_lock.lock().await;
+            self.ensure_active()?;
+            let notified = self.notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+
+            if self.has_active_connection().await {
+                return Ok(());
+            }
+
+            let connection_count = {
+                let mut connections = self.connections.lock().await;
+                connections.retain(|connection| connection.state() != ConnectionState::Closed);
+                connections.len()
+            };
+            if connection_count >= self.max_connections {
+                drop(connect_guard);
+                notified.await;
+                continue;
+            }
+
+            let connected = self.connector.connect(&self.spec).await?;
+            let connection = SshConnection::new(
+                connected,
+                self.max_channels_per_connection,
+                Arc::clone(&self.notify),
+                Arc::downgrade(self),
+            );
+            if let Err(err) = self.ensure_active() {
+                connection.expire();
+                return Err(err);
+            }
+            self.connections.lock().await.push(Arc::clone(&connection));
+            debug!(
+                target_id = self.spec.target_id(),
+                connection_id = connection.id(),
+                "preconnected SSH connection"
+            );
+            return Ok(());
+        }
+    }
+
     pub(crate) async fn sftp(
         self: &Arc<Self>,
         mode: ChannelMode,
@@ -191,6 +257,14 @@ impl TargetConnectionPool {
         if let Some(client) = self.sftp_client.lock().await.take() {
             client.shutdown().await;
         }
+    }
+
+    async fn has_active_connection(&self) -> bool {
+        let mut connections = self.connections.lock().await;
+        connections.retain(|connection| connection.state() != ConnectionState::Closed);
+        connections
+            .iter()
+            .any(|connection| connection.state() == ConnectionState::Active)
     }
 
     async fn try_existing(&self, mode: ChannelMode) -> Option<(Arc<SshConnection>, ChannelPermit)> {
@@ -261,6 +335,15 @@ impl TargetConnectionPool {
         port: u16,
         originator_address: &str,
     ) -> SshPoolResult<SshChannelStreamGuard> {
+        let direct_tcpip_lease: OwnedSemaphorePermit = self
+            .direct_tcpip_permits
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| SshPoolError::CapacityExceeded {
+                resource: "direct-tcpip channel per target",
+                limit: MAX_DIRECT_TCPIP_CHANNELS_PER_TARGET,
+            })?;
         if self.max_connections == 0 {
             return Err(SshPoolError::CapacityExceeded {
                 resource: "SSH connection",
@@ -330,7 +413,7 @@ impl TargetConnectionPool {
             return Err(err);
         }
         SshChannelGuard::new(channel, permit)
-            .into_stream()
+            .into_stream_with_direct_tcpip_lease(direct_tcpip_lease)
             .ok_or(SshPoolError::ConnectionExpired { connection_id })
     }
 
