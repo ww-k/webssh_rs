@@ -70,17 +70,22 @@ impl SshConnectionPool {
     }
 
     async fn connection_pool_for(&self, spec: SshConnectionSpec) -> Arc<TargetConnectionPool> {
+        let jump_host_pool = match spec.jump_host() {
+            Some(jump_host) => Some(Box::pin(self.connection_pool_for(jump_host)).await),
+            None => None,
+        };
         let target_id = spec.target_id();
         let (target_connection_pool, expired_connection_pool) = {
             let mut target_connection_pools = self.target_connection_pools.lock().await;
             if let Some(existing) = target_connection_pools.get(&target_id) {
-                if existing.matches(&spec) {
+                if existing.matches(&spec, jump_host_pool.as_ref()) {
                     (Arc::clone(existing), None)
                 } else {
                     let expired = target_connection_pools.remove(&target_id);
                     let pool = Arc::new(TargetConnectionPool::new(
                         spec,
                         Arc::clone(&self.connector),
+                        jump_host_pool.clone(),
                         self.max_connections_per_target,
                         self.max_channels_per_connection,
                     ));
@@ -91,6 +96,7 @@ impl SshConnectionPool {
                 let pool = Arc::new(TargetConnectionPool::new(
                     spec,
                     Arc::clone(&self.connector),
+                    jump_host_pool,
                     self.max_connections_per_target,
                     self.max_channels_per_connection,
                 ));

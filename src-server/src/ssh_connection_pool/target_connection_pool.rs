@@ -11,7 +11,7 @@ use crate::sftp_client::{FastSftpClient, SftpClientGuard};
 use super::{
     ChannelMode, ConnectionSnapshot,
     connection::{ChannelPermit, ConnectionState, SshConnection},
-    connector::{SshConnectionSpec, SshConnector},
+    connector::{ConnectedSsh, SshConnectionSpec, SshConnector},
     error::{SshPoolError, SshPoolResult},
     lease::{SshChannelGuard, SshChannelStreamGuard},
 };
@@ -21,6 +21,7 @@ const MAX_DIRECT_TCPIP_CHANNELS_PER_TARGET: usize = 5;
 pub(crate) struct TargetConnectionPool {
     spec: SshConnectionSpec,
     connector: Arc<SshConnector>,
+    jump_host_pool: Option<Arc<TargetConnectionPool>>,
     connections: Mutex<Vec<Arc<SshConnection>>>,
     connect_lock: Mutex<()>,
     notify: Arc<Notify>,
@@ -37,12 +38,14 @@ impl TargetConnectionPool {
     pub(crate) fn new(
         spec: SshConnectionSpec,
         connector: Arc<SshConnector>,
+        jump_host_pool: Option<Arc<TargetConnectionPool>>,
         max_connections: usize,
         max_channels_per_connection: usize,
     ) -> Self {
         Self {
             spec,
             connector,
+            jump_host_pool,
             connections: Mutex::new(Vec::new()),
             connect_lock: Mutex::new(()),
             notify: Arc::new(Notify::new()),
@@ -56,8 +59,18 @@ impl TargetConnectionPool {
         }
     }
 
-    pub(crate) fn matches(&self, spec: &SshConnectionSpec) -> bool {
-        self.spec == *spec && !self.expired.load(Ordering::Acquire)
+    pub(crate) fn matches(
+        &self,
+        spec: &SshConnectionSpec,
+        jump_host_pool: Option<&Arc<TargetConnectionPool>>,
+    ) -> bool {
+        self.spec == *spec
+            && !self.expired.load(Ordering::Acquire)
+            && match (&self.jump_host_pool, jump_host_pool) {
+                (Some(existing), Some(current)) => Arc::ptr_eq(existing, current),
+                (None, None) => true,
+                _ => false,
+            }
     }
 
     pub(crate) fn target_id(&self) -> i32 {
@@ -109,7 +122,7 @@ impl TargetConnectionPool {
                 continue;
             }
 
-            let connected = self.connector.connect(&self.spec).await?;
+            let connected = self.connect().await?;
             let connection = SshConnection::new(
                 connected,
                 self.max_channels_per_connection,
@@ -183,7 +196,7 @@ impl TargetConnectionPool {
                 continue;
             }
 
-            let connected = self.connector.connect(&self.spec).await?;
+            let connected = self.connect().await?;
             let connection = SshConnection::new(
                 connected,
                 self.max_channels_per_connection,
@@ -379,7 +392,7 @@ impl TargetConnectionPool {
                 continue;
             }
 
-            let connected = self.connector.connect(&self.spec).await?;
+            let connected = self.connect().await?;
             let connection = SshConnection::new(
                 connected,
                 self.max_channels_per_connection,
@@ -424,6 +437,20 @@ impl TargetConnectionPool {
             });
         }
         Ok(())
+    }
+
+    async fn connect(&self) -> SshPoolResult<ConnectedSsh> {
+        if let Some(jump_host_pool) = &self.jump_host_pool {
+            let stream = Box::pin(jump_host_pool.direct_tcpip(
+                self.spec.host(),
+                self.spec.port(),
+                "127.0.0.1",
+            ))
+            .await?;
+            self.connector.connect_over_stream(&self.spec, stream).await
+        } else {
+            self.connector.connect(&self.spec).await
+        }
     }
 
     pub(crate) async fn expire(&self) {

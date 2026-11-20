@@ -30,7 +30,7 @@ use super::{
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
-trait SshStream: AsyncRead + AsyncWrite + Unpin + Send {}
+pub(crate) trait SshStream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> SshStream for T {}
 
 #[derive(Clone)]
@@ -243,6 +243,18 @@ impl SshConnectionSpec {
     pub(crate) fn target_id(&self) -> i32 {
         self.target_id
     }
+
+    pub(crate) fn host(&self) -> &str {
+        &self.host
+    }
+
+    pub(crate) fn port(&self) -> u16 {
+        self.port
+    }
+
+    pub(crate) fn jump_host(&self) -> Option<SshConnectionSpec> {
+        self.jump_host.as_deref().cloned()
+    }
 }
 
 impl fmt::Debug for SshConnectionSpec {
@@ -298,42 +310,35 @@ impl SshConnector {
         result
     }
 
+    pub(crate) async fn connect_over_stream<S>(
+        &self,
+        spec: &SshConnectionSpec,
+        socket: S,
+    ) -> SshPoolResult<ConnectedSsh>
+    where
+        S: SshStream + 'static,
+    {
+        let deadline = ConnectDeadline::new(self.connect_timeout);
+        let result = self
+            .connect_stream(spec, deadline.clone(), Box::new(socket), Vec::new())
+            .await;
+        if let Err(SshPoolError::ConnectTimeout { timeout }) = &result {
+            debug!(
+                target_id = spec.target_id(),
+                host = %spec.host,
+                port = spec.port,
+                ?timeout,
+                "SSH connection timed out"
+            );
+        }
+        result
+    }
+
     async fn connect_inner(
         &self,
         spec: &SshConnectionSpec,
         deadline: ConnectDeadline,
     ) -> SshPoolResult<ConnectedSsh> {
-        let config = russh::client::Config {
-            window_size: 16 * 1024 * 1024,
-            maximum_packet_size: 64 * 1024,
-            nodelay: true,
-            preferred: Preferred {
-                cipher: std::borrow::Cow::Borrowed(&[
-                    cipher::AES_128_GCM,
-                    cipher::AES_256_GCM,
-                    cipher::AES_128_CTR,
-                    cipher::AES_256_CTR,
-                    cipher::CHACHA20_POLY1305,
-                ]),
-                compression: std::borrow::Cow::Borrowed(&[compression::NONE]),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        let pinned_server_public_keys = deadline
-            .run(self.known_hosts.load(&spec.host, spec.port))
-            .await?;
-        let (disconnect_tx, disconnect_rx) = oneshot::channel();
-        let handler = SshClientHandler {
-            host: spec.host.clone(),
-            port: spec.port,
-            known_hosts: self.known_hosts.clone(),
-            pinned_server_public_keys,
-            disconnect_tx: Some(disconnect_tx),
-            connect_deadline: deadline.clone(),
-        };
-
         let (socket, upstream_handles): (Box<dyn SshStream>, Vec<_>) =
             if let Some(jump_host) = &spec.jump_host {
                 let bastion = Box::pin(self.connect_inner(jump_host, deadline.clone())).await?;
@@ -374,6 +379,48 @@ impl SshConnector {
                     Vec::new(),
                 )
             };
+        self.connect_stream(spec, deadline, socket, upstream_handles)
+            .await
+    }
+
+    async fn connect_stream(
+        &self,
+        spec: &SshConnectionSpec,
+        deadline: ConnectDeadline,
+        socket: Box<dyn SshStream>,
+        upstream_handles: Vec<russh::client::Handle<SshClientHandler>>,
+    ) -> SshPoolResult<ConnectedSsh> {
+        let config = russh::client::Config {
+            window_size: 16 * 1024 * 1024,
+            maximum_packet_size: 64 * 1024,
+            nodelay: true,
+            preferred: Preferred {
+                cipher: std::borrow::Cow::Borrowed(&[
+                    cipher::AES_128_GCM,
+                    cipher::AES_256_GCM,
+                    cipher::AES_128_CTR,
+                    cipher::AES_256_CTR,
+                    cipher::CHACHA20_POLY1305,
+                ]),
+                compression: std::borrow::Cow::Borrowed(&[compression::NONE]),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let pinned_server_public_keys = deadline
+            .run(self.known_hosts.load(&spec.host, spec.port))
+            .await?;
+        let (disconnect_tx, disconnect_rx) = oneshot::channel();
+        let handler = SshClientHandler {
+            host: spec.host.clone(),
+            port: spec.port,
+            known_hosts: self.known_hosts.clone(),
+            pinned_server_public_keys,
+            disconnect_tx: Some(disconnect_tx),
+            connect_deadline: deadline.clone(),
+        };
+
         // TCP_NODELAY is applied by direct callers where the concrete socket is available;
         // forwarded channels do not expose that socket option.
         let stream = DeadlineStream::new(socket, deadline.clone());
