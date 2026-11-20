@@ -118,7 +118,7 @@ export default function SshConnections() {
                 id: "active_channels",
                 header: t("ssh_connections_column_channels"),
                 accessor: (connection) => connection.active_channels ?? 0,
-                width: 80,
+                width: 120,
                 align: "right",
             },
             {
