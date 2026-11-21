@@ -5,10 +5,9 @@
     "type": "module",
     "scripts": {
         "build": "rsbuild build",
-        "check": "biome check --write",
         "dev": "rsbuild dev",
         "test": "rstest",
-        "format": "biome format --write",
+        "format:changed": "node scripts/format-changed.mjs",
         "clean": "biome clean",
         "preview": "rsbuild preview"
     },
