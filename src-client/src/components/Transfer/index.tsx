@@ -798,11 +798,9 @@ const getBatchActionItems = (
 export const TransferTable = ({
     type,
     keyword,
-    tableBodyHeight,
 }: {
     type: TransferTypeFilter;
     keyword: string;
-    tableBodyHeight: number;
 }) => {
     const { t } = useTranslation();
     const [tree, setTree] = useState<ITransferTreeNode[]>(() =>
@@ -834,7 +832,7 @@ export const TransferTable = ({
             multiple={false}
             selectable={false}
             loading={false}
-            virtual={tableBodyHeight > 0}
+            virtual
         />
     );
 };
@@ -843,7 +841,6 @@ export default function Transfer() {
     const { t } = useTranslation();
     const { tableContainerRef, tablePageNavigationProps } =
         useTablePageNavigation();
-    const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const [filters, setFilters] = useState<TransferFilterState>(
         getStoredTransferFilters,
@@ -862,19 +859,6 @@ export default function Transfer() {
             unsubscribeTree();
         };
     }, []);
-    useEffect(() => {
-        const element = tableContainerRef.current;
-        if (!element) return;
-
-        const updateTableHeight = () => {
-            setTableBodyHeight(Math.max(element.clientHeight - 38, 160));
-        };
-        updateTableHeight();
-
-        const observer = new ResizeObserver(updateTableHeight);
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [tableContainerRef]);
     const handleRemoveAll = () =>
         Modal.confirm({
             title: t("transfer_confirm_delete_all_title"),
@@ -943,11 +927,7 @@ export default function Transfer() {
                 ...tablePageNavigationProps,
             }}
         >
-            <TransferTable
-                type={type}
-                keyword={keyword}
-                tableBodyHeight={tableBodyHeight}
-            />
+            <TransferTable type={type} keyword={keyword} />
         </PageLayout>
     );
 }

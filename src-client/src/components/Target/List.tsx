@@ -179,7 +179,6 @@ export default function TargetList({
     );
     const { tableContainerRef, tablePageNavigationProps } =
         useTablePageNavigation();
-    const [tableBodyHeight, setTableBodyHeight] = useState(0);
 
     const filteredDataSource = useMemo(() => {
         const search = searchValue.trim().toLocaleLowerCase();
@@ -544,20 +543,6 @@ export default function TargetList({
             window.removeEventListener("webssh:user-data-imported", handler);
     }, [refresh]);
 
-    useEffect(() => {
-        const element = tableContainerRef.current;
-        if (!element) return;
-
-        const updateTableHeight = () => {
-            setTableBodyHeight(Math.max(element.clientHeight - 38, 160));
-        };
-        updateTableHeight();
-
-        const observer = new ResizeObserver(updateTableHeight);
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [tableContainerRef]);
-
     return (
         <>
             <PageLayout
@@ -657,7 +642,7 @@ export default function TargetList({
                     onDrop={handleDrop}
                     rowHeight={TARGET_ROW_HEIGHT}
                     multiple={false}
-                    virtual={tableBodyHeight > 0}
+                    virtual
                 />
             </PageLayout>
             <TargetEditor
