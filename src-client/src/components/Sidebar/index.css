@@ -1,0 +1,159 @@
+.WebSSH-Root-Sider {
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 0 200px;
+    flex-direction: column;
+    width: 200px;
+    min-width: 200px;
+    max-width: 200px;
+    height: 100%;
+    overflow: hidden;
+    color: var(--ant-color-text);
+    background: var(--ant-color-bg-container);
+    transition: all 0.2s;
+}
+
+.WebSSH-Root-Sider.is-collapsed {
+    flex-basis: 45px;
+    width: 45px;
+    min-width: 45px;
+    max-width: 45px;
+}
+
+.WebSSH-Root-Menu {
+    display: flex;
+    flex-direction: column;
+    border-inline-end: none;
+    flex: 1;
+    min-height: 0;
+    padding: 4px 0;
+}
+
+.WebSSH-Root-SettingsMenu {
+    flex: none;
+}
+
+.WebSSH-Root-MenuItem {
+    position: relative;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8px;
+    gap: 10px;
+    border: 0;
+    color: var(--ant-color-text);
+    font: inherit;
+    text-align: left;
+    background: transparent;
+    cursor: pointer;
+    transition:
+        color 0.2s,
+        background-color 0.2s;
+}
+
+.WebSSH-Root-MenuItem:hover {
+    color: var(--ant-color-text);
+    background: var(--ant-color-fill-tertiary);
+}
+
+.WebSSH-Root-MenuItem:focus-visible,
+.WebSSH-Root-SiderToggle:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+}
+
+.WebSSH-Root-MenuItem.is-selected {
+    color: var(--ant-color-primary);
+    font-weight: 600;
+    background: var(--ant-color-primary-bg);
+}
+
+.WebSSH-Root-MenuIcon {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.WebSSH-Root-MenuLabel {
+    min-width: 0;
+    overflow: hidden;
+    flex: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.WebSSH-Root-TransferMenuCount {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    background: var(--ant-color-error);
+    border-radius: 9px;
+    box-shadow: 0 0 0 1px var(--ant-color-bg-container);
+    pointer-events: none;
+}
+
+.WebSSH-Root-TransferMenuCount.is-collapsed {
+    position: absolute;
+    top: -7px;
+    right: -9px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 4px;
+    line-height: 14px;
+    border-radius: 7px;
+}
+
+.WebSSH-Root-Sider.is-collapsed .WebSSH-Root-MenuItem {
+    justify-content: flex-start;
+}
+
+.WebSSH-Root-Sider.is-collapsed .WebSSH-Root-MenuLabel {
+    display: none;
+}
+
+.WebSSH-Root-SiderFooter {
+    display: flex;
+    flex: none;
+    justify-content: flex-start;
+    border-top: 1px solid var(--ant-color-border-secondary);
+    padding-left: 7px;
+}
+
+.WebSSH-Root-SiderToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    color: var(--ant-color-text-secondary);
+    font-size: 16px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.WebSSH-Root-SiderToggle svg {
+    width: 16px;
+    height: 16px;
+}
+
+.WebSSH-Root-SiderToggle:hover {
+    color: var(--ant-color-text);
+    background: var(--ant-color-fill-tertiary);
+}

@@ -1,11 +1,6 @@
-import {
-    CloseOutlined,
-    MenuFoldOutlined,
-    MenuUnfoldOutlined,
-    PlusOutlined,
-    SearchOutlined,
-} from "@ant-design/icons";
+import { CloseOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
 import { Input } from "antd";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -158,9 +153,9 @@ const Sidebar = memo(function Sidebar({
                     }
                 >
                     {tabListCollapsed ? (
-                        <MenuUnfoldOutlined aria-hidden="true" />
+                        <PanelLeftOpen aria-hidden="true" />
                     ) : (
-                        <MenuFoldOutlined aria-hidden="true" />
+                        <PanelLeftClose aria-hidden="true" />
                     )}
                 </button>
             </div>

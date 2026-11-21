@@ -1,17 +1,8 @@
-import { Badge, ConfigProvider, Layout, Menu, theme } from "antd";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ConfigProvider, Layout, theme } from "antd";
+import { useCallback, useEffect } from "react";
 
 import "./App.css";
 
-import {
-    DisconnectOutlined,
-    FileTextOutlined,
-    HomeOutlined,
-    KeyOutlined,
-    NodeIndexOutlined,
-    SettingOutlined,
-    SwapOutlined,
-} from "@ant-design/icons";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import { useTranslation } from "react-i18next";
@@ -22,17 +13,15 @@ import Home from "./components/Home";
 import PortForwarding from "./components/PortForwarding";
 import ServerLogs from "./components/ServerLogs";
 import Settings from "./components/Settings";
+import Sidebar from "./components/Sidebar";
 import SshConnections from "./components/SshConnections";
 import SshKnownHosts from "./components/SshKnownHosts";
 import Transfer from "./components/Transfer";
-import transferService from "./services/transfer";
-
-import type { MenuProps } from "antd";
 
 const { darkAlgorithm, defaultAlgorithm } = theme;
-const { Content, Sider } = Layout;
+const { Content } = Layout;
 export default function App() {
-    const { t, i18n } = useTranslation();
+    const { i18n } = useTranslation();
     const theme = useAppStore((state) => state.theme);
     const setTheme = useAppStore((state) => state.setTheme);
     const sidebarCollapsed = useAppStore((state) => state.sidebarCollapsed);
@@ -41,75 +30,6 @@ export default function App() {
     );
     const activeMenuKey = useAppStore((state) => state.activeMenuKey);
     const setMenuKey = useAppStore((state) => state.setMenuKey);
-    const [newTransferCount, setNewTransferCount] = useState(0);
-    const menusItems = useMemo<Required<MenuProps>["items"]>(() => {
-        return [
-            {
-                key: "home",
-                icon: <HomeOutlined />,
-                label: t("app_menu_home"),
-            },
-            {
-                key: "transfer",
-                icon: sidebarCollapsed ? (
-                    <span className="WebSSH-Root-TransferMenuIcon">
-                        <SwapOutlined
-                            className="ant-menu-item-icon"
-                            style={{ transform: "rotate(90deg)" }}
-                        />
-                        {newTransferCount > 0 && (
-                            <span className="WebSSH-Root-TransferMenuCount">
-                                {newTransferCount > 99
-                                    ? "99+"
-                                    : newTransferCount}
-                            </span>
-                        )}
-                    </span>
-                ) : (
-                    <SwapOutlined style={{ transform: "rotate(90deg)" }} />
-                ),
-                label: t("app_menu_transfer"),
-                extra: !sidebarCollapsed ? (
-                    <Badge count={newTransferCount}></Badge>
-                ) : undefined,
-            },
-            {
-                key: "ssh_connections",
-                icon: <DisconnectOutlined />,
-                label: t("app_menu_ssh_connections"),
-            },
-            {
-                key: "port_forward",
-                icon: <NodeIndexOutlined />,
-                label: t("app_menu_port_forward"),
-            },
-            {
-                key: "ssh_known_hosts",
-                icon: <KeyOutlined />,
-                label: t("app_menu_ssh_known_hosts"),
-            },
-            {
-                key: "server_logs",
-                icon: <FileTextOutlined />,
-                label: t("app_menu_server_logs"),
-            },
-        ];
-    }, [newTransferCount, sidebarCollapsed, t]);
-
-    const settingsMenuItems = useMemo<Required<MenuProps>["items"]>(
-        () => [
-            {
-                key: "settings",
-                icon: <SettingOutlined />,
-                label: t("app_menu_settings"),
-            },
-        ],
-        [t],
-    );
-
-    useEffect(() => {
-        return transferService.subscribeUnfinishedCount(setNewTransferCount);
-    }, []);
 
     useEffect(() => {
         console.log("App init");
@@ -171,35 +91,16 @@ export default function App() {
                 algorithm: theme === "dark" ? darkAlgorithm : defaultAlgorithm,
             }}
         >
-            <Layout style={{ height: "100vh" }}>
-                <Sider
-                    className="WebSSH-Root-Sider"
-                    theme={theme}
-                    collapsible={true}
+            <Layout
+                className="WebSSH-Root-Layout"
+                style={{ height: "100vh", flexDirection: "row" }}
+            >
+                <Sidebar
+                    activeMenuKey={activeMenuKey}
                     collapsed={sidebarCollapsed}
-                    collapsedWidth={60}
                     onCollapse={setSidebarCollapsed}
-                >
-                    <Menu
-                        className="WebSSH-Root-Menu"
-                        theme={theme}
-                        mode="inline"
-                        defaultSelectedKeys={["home"]}
-                        selectedKeys={[activeMenuKey]}
-                        items={menusItems}
-                        onClick={handleMenuClick}
-                    />
-                    <Menu
-                        className="WebSSH-Root-SettingsMenu"
-                        theme={theme}
-                        mode="inline"
-                        selectedKeys={
-                            activeMenuKey === "settings" ? ["settings"] : []
-                        }
-                        items={settingsMenuItems}
-                        onClick={handleMenuClick}
-                    />
-                </Sider>
+                    onMenuClick={handleMenuClick}
+                />
                 <Content className="WebSSH-Root-Content">
                     <Home active={activeMenuKey === "home"} />
                     {activeMenuKey === "transfer" && <Transfer />}

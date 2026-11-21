@@ -64,10 +64,9 @@
 
 .WebSSH-Home-SidebarFooter {
     display: flex;
-    flex: 0 0 48px;
     align-items: center;
-    justify-content: flex-end;
-    padding: 0 8px;
+    justify-content: flex-start;
+    padding-left: 7px;
     border-top: 1px solid var(--ant-color-border-secondary);
 }
 
@@ -88,14 +87,19 @@
 }
 
 .WebSSH-Home-SidebarToggle {
-    flex: 0 0 30px;
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     color: var(--ant-color-text-secondary);
     background: transparent;
     border: 0;
     border-radius: 6px;
+    font-size: 16px;
+}
+
+.WebSSH-Home-SidebarToggle svg {
+    width: 16px;
+    height: 16px;
 }
 
 .WebSSH-Home-SidebarToggle:hover {
@@ -380,11 +384,6 @@
 .WebSSH-Home-Sidebar.is-collapsed .WebSSH-Home-AddButton {
     flex-basis: 23px;
     width: 23px;
-}
-
-.WebSSH-Home-Sidebar.is-collapsed .WebSSH-Home-SidebarFooter {
-    justify-content: center;
-    padding: 0;
 }
 
 .WebSSH-Home-Sidebar.is-collapsed .WebSSH-Home-SidebarSearch,
