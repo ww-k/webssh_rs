@@ -109,7 +109,7 @@ const Sidebar = memo(function Sidebar({
                             }
                         >
                             <span className="WebSSH-Home-TabIcon">
-                                {getTabIcon(tab.path)}
+                                {getTabIcon(tab.path ?? "/")}
                             </span>
                             <span className="WebSSH-Home-TabInfo">
                                 <span className="WebSSH-Home-TabName">

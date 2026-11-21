@@ -19,16 +19,17 @@ export default function Filesview({
     [key: string]: unknown;
 }) {
     const { t } = useTranslation();
+    const path = tab.path ?? "/";
     const openTerminalAt = useAppStore((state) => state.openTerminalAt);
     const [showAllFiles, setShowAllFiles] = useState(false);
     const { baseUrl, targetId } = useMemo(() => {
         // 从路径中解析 target ID: /filesview/123 -> targetId: 123
-        const match = tab.path.match(/\/filesview\/(\d+)/);
+        const match = path.match(/\/filesview\/(\d+)/);
         const targetId = match ? parseInt(match[1], 10) : null;
         const baseUrl = `sftp:${targetId}:`;
 
         return { baseUrl, targetId };
-    }, [tab.path]);
+    }, [path]);
     const cwd = useMemo(() => {
         const value = tab.state?.cwd;
         if (typeof value !== "string" || !isSftpFileUri(value)) {

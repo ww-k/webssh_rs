@@ -89,6 +89,7 @@ export default function Terminal({
     tab: ITab;
 }) {
     const { t } = useTranslation();
+    const path = tab.path ?? "/";
     const openSftpAt = useAppStore((state) => state.openSftpAt);
     const theme = useAppStore((state) => state.theme);
     const terminalThemes = useAppStore((state) => state.terminalThemes);
@@ -141,10 +142,10 @@ export default function Terminal({
     const favoriteDirectoryRequestIdRef = useRef(0);
     const favoriteDirectoryMenuBoxRef = useRef<HTMLDivElement>(null);
     const targetId = useMemo(() => {
-        const match = tab.path.match(/^\/terminal\/(\d+)/);
+        const match = path.match(/^\/terminal\/(\d+)/);
         return match ? Number.parseInt(match[1], 10) : undefined;
-    }, [tab.path]);
-    const isLocalTerminal = tab.path === "/terminal/local";
+    }, [path]);
+    const isLocalTerminal = path === "/terminal/local";
     const webmcpOptions = useMemo(
         () => createWebMCPOptions(targetId, tab.label, isLocalTerminal),
         [isLocalTerminal, tab.label, targetId],

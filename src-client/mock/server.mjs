@@ -154,9 +154,13 @@ async function handleTarget(request, response, pathname, searchParams) {
         const keyword = searchParams.get("keyword")?.trim().toLocaleLowerCase();
         const targets = keyword
             ? state.targets.filter((target) =>
-                  [target.directory, target.name, target.user, target.host].some(
-                      (value) =>
-                          value?.toLocaleLowerCase().includes(keyword),
+                  [
+                      target.directory,
+                      target.name,
+                      target.user,
+                      target.host,
+                  ].some((value) =>
+                      value?.toLocaleLowerCase().includes(keyword),
                   ),
               )
             : state.targets;
@@ -281,7 +285,9 @@ async function handlePortForward(request, response, pathname) {
     }
     if (request.method === "POST" && pathname === "/api/port_forward/update") {
         const payload = await readJson(request);
-        const item = state.portForwards.find((entry) => entry.id === payload.id);
+        const item = state.portForwards.find(
+            (entry) => entry.id === payload.id,
+        );
         if (!item) return sendNotFound(response, "Port forwarding", payload.id);
         Object.assign(item, {
             target_id: Number(payload.target_id),
@@ -294,15 +300,20 @@ async function handlePortForward(request, response, pathname) {
     }
     if (request.method === "POST" && pathname === "/api/port_forward/toggle") {
         const payload = await readJson(request);
-        const item = state.portForwards.find((entry) => entry.id === payload.id);
+        const item = state.portForwards.find(
+            (entry) => entry.id === payload.id,
+        );
         if (!item) return sendNotFound(response, "Port forwarding", payload.id);
         item.enabled = Boolean(payload.enabled);
         return sendJson(response, 200, item);
     }
     if (request.method === "POST" && pathname === "/api/port_forward/remove") {
         const payload = await readJson(request);
-        const index = state.portForwards.findIndex((item) => item.id === payload.id);
-        if (index === -1) return sendNotFound(response, "Port forwarding", payload.id);
+        const index = state.portForwards.findIndex(
+            (item) => item.id === payload.id,
+        );
+        if (index === -1)
+            return sendNotFound(response, "Port forwarding", payload.id);
         state.portForwards.splice(index, 1);
         response.writeHead(200);
         return response.end();
@@ -431,7 +442,9 @@ async function handleUserData(request, response, pathname) {
                     name,
                     path,
                 })),
-            port_forwards: state.portForwards.map(({ enabled, ...item }) => item),
+            port_forwards: state.portForwards.map(
+                ({ enabled, ...item }) => item,
+            ),
             settings: payload.settings ?? {},
         };
         if (!payload.password) return sendJson(response, 200, document);
@@ -511,7 +524,9 @@ async function handleUserData(request, response, pathname) {
             skipped_targets: skippedTargets,
             imported_favorites: favorites.length,
             imported_port_forwards:
-                payload.import_port_forwards === false ? 0 : portForwards.length,
+                payload.import_port_forwards === false
+                    ? 0
+                    : portForwards.length,
             settings: document.settings ?? {},
         });
     }
@@ -610,15 +625,19 @@ async function handleTransfer(request, response, pathname, searchParams) {
         const directory = state.transferTasks.find(
             (task) => task.id === directoryId && task.kind === "DIRECTORY",
         );
-        if (!directory) return sendNotFound(response, "Transfer directory", directoryId);
+        if (!directory)
+            return sendNotFound(response, "Transfer directory", directoryId);
         if (request.method === "DELETE" && !action) {
             state.transferTasks = state.transferTasks.filter(
-                (task) => task.id !== directoryId && task.parent_id !== directoryId,
+                (task) =>
+                    task.id !== directoryId && task.parent_id !== directoryId,
             );
             return endResponse(response);
         }
         if (request.method === "POST" && action) {
-            const status = { pause: "PAUSE", resume: "RUN", cancel: "CANCEL" }[action];
+            const status = { pause: "PAUSE", resume: "RUN", cancel: "CANCEL" }[
+                action
+            ];
             state.transferTasks = state.transferTasks.map((task) =>
                 task.id === directoryId || task.parent_id === directoryId
                     ? { ...task, status, updated_at: Date.now() }
@@ -699,9 +718,14 @@ function buildMockTransferTree(batchId) {
             target_id: batchTasks[0].target_id,
             conflict_policy: batchTasks[0].conflict_policy || "OVERWRITE",
             item_count: batchTasks.length,
-            completed_count: batchTasks.filter((task) => task.status === "SUCCESS").length,
-            failed_count: batchTasks.filter((task) => task.status === "FAIL").length,
-            directory_count: batchTasks.filter((task) => task.kind === "DIRECTORY").length,
+            completed_count: batchTasks.filter(
+                (task) => task.status === "SUCCESS",
+            ).length,
+            failed_count: batchTasks.filter((task) => task.status === "FAIL")
+                .length,
+            directory_count: batchTasks.filter(
+                (task) => task.kind === "DIRECTORY",
+            ).length,
             directory_failed_count: batchTasks.filter(
                 (task) => task.kind === "DIRECTORY" && task.status === "FAIL",
             ).length,

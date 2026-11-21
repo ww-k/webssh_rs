@@ -105,16 +105,31 @@ fn default_target_double_click_action() -> String {
 #[derive(Debug, Deserialize, Serialize, Clone, ToSchema)]
 pub struct PreferenceTab {
     pub key: String,
+    pub label: String,
+    #[serde(rename = "activeChildKey")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_child_key: Option<String>,
+    pub direction: String,
+    pub ratio: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub child1: Option<Box<PreferenceTab>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub child2: Option<Box<PreferenceTab>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StoredTab {
+    pub key: String,
     pub label: Option<String>,
     pub path: Option<String>,
-    #[schema(value_type = Object)]
     pub state: Option<Value>,
-    #[serde(default)]
     pub parent_key: Option<String>,
-    #[serde(default)]
     pub split_direction: Option<String>,
-    #[serde(default)]
     pub split_ratio: Option<f64>,
-    #[serde(default)]
-    pub position: Option<i32>,
+    pub position: i32,
+    pub active_child_key: Option<String>,
 }

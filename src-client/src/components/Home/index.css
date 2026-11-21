@@ -139,7 +139,7 @@
     grid-template-columns: 34px minmax(0, 1fr);
     align-items: center;
     width: 100%;
-    min-height:46px;
+    min-height: 46px;
     padding: 8px;
     margin: 0 0 4px;
     color: var(--ant-color-text);
@@ -259,6 +259,34 @@
     border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
+.WebSSH-Home-ContentHeading {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 10px;
+}
+
+.WebSSH-Home-SplitButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    margin-left: auto;
+    padding: 0;
+    color: var(--ant-color-text-secondary);
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.WebSSH-Home-SplitButton:hover {
+    color: var(--ant-color-primary);
+    background: var(--ant-color-fill-secondary);
+}
+
 .WebSSH-Home-ContentIcon {
     font-size: 17px;
 }
@@ -300,8 +328,68 @@
 }
 
 .WebSSH-Home-Pane.is-active {
+    z-index: 2;
     visibility: visible;
     pointer-events: auto;
+}
+
+.WebSSH-Home-Split {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.WebSSH-Home-Split-horizontal {
+    flex-direction: row;
+}
+
+.WebSSH-Home-Split-vertical {
+    flex-direction: column;
+}
+
+.WebSSH-Home-SplitPart {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.WebSSH-Home-SplitLeaf,
+.WebSSH-Home-SplitLeaf > .WebSSH-Home-Pane,
+.WebSSH-Home-SplitPart > .WebSSH-Home-Split {
+    width: 100%;
+    height: 100%;
+}
+
+.WebSSH-Home-SplitResize {
+    position: absolute;
+    z-index: 2;
+}
+
+.WebSSH-Home-Split-horizontal
+    > .WebSSH-Home-SplitPart
+    > .WebSSH-Home-SplitResize {
+    top: 0;
+    right: -2px;
+    bottom: 0;
+    width: 4px;
+}
+
+.WebSSH-Home-Split-vertical
+    > .WebSSH-Home-SplitPart
+    > .WebSSH-Home-SplitResize {
+    right: 0;
+    bottom: -2px;
+    left: 0;
+    height: 4px;
+}
+
+.WebSSH-Home-ChildPane {
+    width: 100%;
+    height: 100%;
 }
 
 .WebSSH-Home-Empty {

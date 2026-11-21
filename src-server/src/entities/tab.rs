@@ -12,6 +12,7 @@ pub struct Model {
     pub label: Option<String>,
     pub path: Option<String>,
     pub state: Option<String>,
+    pub active_child_key: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

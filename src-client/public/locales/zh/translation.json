@@ -17,6 +17,7 @@
     "app_tab_expand": "展开标签列表",
     "app_tab_resize_sidebar": "调整标签列表宽度",
     "app_tab_new": "新标签页",
+    "app_split_view": "拆分视图",
     "app_tab_rename": "重命名",
     "app_tab_rename_prompt": "请输入标签名称",
     "app_title": "WebSSH",

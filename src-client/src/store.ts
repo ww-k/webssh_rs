@@ -6,7 +6,6 @@ import i18n from "@/i18n";
 
 import { terminalThemeDefaults } from "./components/Terminal/constants";
 
-import type { TabPaneProps } from "antd";
 import type { IFileListCopyEvent } from "./components/Filelist/types";
 import type {
     TerminalRightClickAction,
@@ -21,38 +20,17 @@ export type ResolvedTheme = "light" | "dark";
 export type Language = "zh" | "en";
 export type TargetDoubleClickAction = "ssh" | "sftp";
 
-export interface ITab<T = ITabState>
-    extends Omit<TabPaneProps, "tab" | "children" | "closeIcon" | "icon"> {
+export interface ITab {
     key: string;
     label: string;
-    path: string;
-    state?: T;
-    parentKey?: string | null;
-    splitDirection?: "horizontal" | "vertical" | null;
-    splitRatio?: number | null;
-    position?: number;
-}
-
-type TabLayoutNode = {
-    key: string;
-    label?: string | null;
-    path?: string | null;
+    direction: "horizontal" | "vertical";
+    ratio: number;
+    path?: string;
     state?: ITabState;
-    parentKey?: string | null;
-    splitDirection?: "horizontal" | "vertical" | null;
-    splitRatio?: number | null;
-    position?: number;
-};
-
-type PreferenceTabResponse = Omit<
-    TabLayoutNode,
-    "parentKey" | "splitDirection" | "splitRatio"
-> & {
-    parent_key?: string | null;
-    split_direction?: "horizontal" | "vertical" | null;
-    split_ratio?: number | null;
-    position?: number;
-};
+    activeChildKey?: string;
+    child1?: ITab;
+    child2?: ITab;
+}
 
 type AppStore = {
     theme: ResolvedTheme;
@@ -91,15 +69,17 @@ type AppStore = {
 
     activeTabKey: string;
     tabs: ITab[];
-    tabNodes: TabLayoutNode[];
     setActiveTabKey: (key: string) => void;
+    setActiveChildKey: (key: string) => void;
     addTab: () => string;
+    splitView: (direction?: "horizontal" | "vertical") => void;
     removeTab: (key: string) => void;
     removeTabs: (keys: string[]) => void;
     renameTab: (key: string, label: string) => void;
     duplicateTab: (key: string) => void;
     setTabPath: (key: string, path: string, label?: string) => void;
     setTabState: (key: string, state: ITabState) => void;
+    setSplitRatio: (key: string, ratio: number) => void;
     openSftpAt: (targetId: number, cwd: string, terminalTabKey: string) => void;
     openTerminalAt: (
         targetId: number,
@@ -113,18 +93,16 @@ type AppStore = {
 };
 
 function getInitialTabs() {
-    const firstTabKey = nanoid();
-    const tabs = [
+    const firstTab = createView();
+    const tabs: ITab[] = [
         {
-            key: firstTabKey,
-            label: i18n.t("app_tab_new"),
-            path: "/",
+            ...firstTab,
+            activeChildKey: firstTab.key,
         },
     ];
     const fallback = {
-        activeTabKey: firstTabKey,
+        activeTabKey: firstTab.key,
         tabs,
-        tabNodes: tabs,
     };
 
     return fallback;
@@ -285,6 +263,155 @@ function serializeTerminalThemes(
     };
 }
 
+function createView(label = i18n.t("app_tab_new"), path = "/"): ITab {
+    return {
+        key: nanoid(),
+        direction: "horizontal",
+        ratio: 100,
+        label,
+        path,
+    };
+}
+
+function getChildren(node: ITab): ITab[] {
+    return [node.child1, node.child2].filter((child): child is ITab =>
+        Boolean(child),
+    );
+}
+
+function setChildren(node: ITab, children: ITab[]): ITab {
+    const next = { ...node };
+    if (children[0]) next.child1 = children[0];
+    else delete next.child1;
+    if (children[1]) next.child2 = children[1];
+    else delete next.child2;
+    return next;
+}
+
+function findNode(node: ITab, key: string): ITab | undefined {
+    if (node.key === key) return node;
+    for (const child of getChildren(node)) {
+        const found = findNode(child, key);
+        if (found) return found;
+    }
+    return undefined;
+}
+
+function mapNode(node: ITab, key: string, mapper: (node: ITab) => ITab): ITab {
+    const children = getChildren(node);
+    const mapped = children.length
+        ? setChildren(
+              node,
+              children.map((child) => mapNode(child, key, mapper)),
+          )
+        : node;
+    return mapped.key === key ? mapper(mapped) : mapped;
+}
+
+function findRootTab(tabs: ITab[], childKey: string) {
+    return tabs.find((tab) => Boolean(findNode(tab, childKey)));
+}
+
+function findNodeByPath(
+    node: ITab,
+    path: string,
+    cwd: string,
+): ITab | undefined {
+    if (
+        getChildren(node).length === 0 &&
+        node.path === path &&
+        (node.state as { cwd?: unknown } | undefined)?.cwd === cwd
+    ) {
+        return node;
+    }
+    return getChildren(node).find((child) => findNodeByPath(child, path, cwd));
+}
+
+function firstLeaf(node: ITab): ITab {
+    const children = getChildren(node);
+    return children.length === 0 ? node : firstLeaf(children[0]);
+}
+
+function getRootChildKey(root: ITab) {
+    return (
+        findNode(root, root.activeChildKey ?? root.key)?.key ??
+        firstLeaf(root).key
+    );
+}
+
+function updateRoot(tabs: ITab[], key: string, update: (root: ITab) => ITab) {
+    return tabs.map((root) => (root.key === key ? update(root) : root));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object";
+}
+
+function normalizeTabNode(value: unknown): ITab | undefined {
+    if (!isRecord(value) || typeof value.key !== "string") return undefined;
+    const child1 = normalizeTabNode(value.child1);
+    const child2 = normalizeTabNode(value.child2);
+    const children = [child1, child2].filter((child): child is ITab =>
+        Boolean(child),
+    );
+    const isLeaf = children.length === 0;
+    const label =
+        typeof value.label === "string" ? value.label : i18n.t("app_tab_new");
+    const path = typeof value.path === "string" ? value.path : undefined;
+    const state = isRecord(value.state)
+        ? (value.state as ITabState)
+        : undefined;
+    const direction =
+        value.direction === "vertical" ? "vertical" : "horizontal";
+    const ratio =
+        typeof value.ratio === "number" && Number.isFinite(value.ratio)
+            ? value.ratio
+            : isLeaf
+              ? 100
+              : 50;
+    return {
+        key: value.key,
+        label,
+        direction,
+        ratio: isLeaf
+            ? 100
+            : Math.max(15, Math.min(85, ratio <= 1 ? ratio * 100 : ratio)),
+        ...(path !== undefined ? { path } : {}),
+        ...(state ? { state } : {}),
+        ...(children[0] ? { child1: children[0] } : {}),
+        ...(children[1] ? { child2: children[1] } : {}),
+    };
+}
+
+function normalizeSavedTab(value: unknown): ITab | undefined {
+    if (!isRecord(value)) return undefined;
+    const root = normalizeTabNode(value);
+    if (!root) return undefined;
+    const requestedActive = value.activeChildKey;
+    root.activeChildKey =
+        typeof requestedActive === "string" && findNode(root, requestedActive)
+            ? requestedActive
+            : firstLeaf(root).key;
+    return root;
+}
+
+function serializeTab(node: ITab): Record<string, unknown> {
+    const serialized: Record<string, unknown> = {
+        key: node.key,
+        label: node.label,
+        direction: node.direction,
+        ratio: getChildren(node).length
+            ? Math.max(15, Math.min(85, node.ratio))
+            : 100,
+        ...(node.path !== undefined ? { path: node.path } : {}),
+        ...(node.state !== undefined ? { state: node.state } : {}),
+        ...(node.activeChildKey ? { activeChildKey: node.activeChildKey } : {}),
+    };
+    if (node.child1) serialized.child1 = serializeTab(node.child1);
+    if (node.child2) serialized.child2 = serializeTab(node.child2);
+    return serialized;
+}
+
 const useAppStore = create<AppStore>((set) => {
     const initialTabs = getInitialTabs();
     const initialThemeMode = getInitialThemeMode();
@@ -363,74 +490,98 @@ const useAppStore = create<AppStore>((set) => {
 
         ...initialTabs,
         setActiveTabKey: (key: string) =>
-            set((state) =>
-                state.activeTabKey === key ? state : { activeTabKey: key },
-            ),
+            set((state) => {
+                return state.tabs.some((tab) => tab.key === key)
+                    ? { activeTabKey: key }
+                    : state;
+            }),
+        setActiveChildKey: (key: string) =>
+            set((state) => {
+                const root = findRootTab(state.tabs, key);
+                if (!root) return state;
+                const tabs = updateRoot(state.tabs, root.key, (tab) => ({
+                    ...tab,
+                    activeChildKey: key,
+                }));
+                return { activeTabKey: root.key, tabs };
+            }),
         addTab: () => {
             let newTabKey = "";
             set((state) => {
-                const newTab = {
-                    key: nanoid(),
-                    label: "New Tab",
-                    path: "/",
+                const newTab: ITab = {
+                    ...createView(),
                 };
+                newTab.activeChildKey = newTab.key;
                 newTabKey = newTab.key;
-                const newTabs = [...state.tabs];
-                newTabs.push(newTab);
-                return { activeTabKey: newTab.key, tabs: newTabs };
+                const newTabs = [...state.tabs, newTab];
+                return {
+                    activeTabKey: newTab.key,
+                    tabs: newTabs,
+                };
             });
             return newTabKey;
         },
+        splitView: (direction = "horizontal") =>
+            set((state) => {
+                const root = state.tabs.find(
+                    (tab) => tab.key === state.activeTabKey,
+                );
+                if (!root) return state;
+                const childKey = getRootChildKey(root);
+                const current = findNode(root, childKey);
+                if (!current || getChildren(current).length > 0) return state;
+                const newView = createView();
+                const currentLeaf = { ...current, key: nanoid() };
+                delete currentLeaf.activeChildKey;
+                const split: ITab = {
+                    ...current,
+                    direction,
+                    ratio: 50,
+                    child1: currentLeaf,
+                    child2: newView,
+                };
+                delete split.path;
+                delete split.state;
+                delete split.activeChildKey;
+                const layout = mapNode(root, current.key, () => split);
+                const updatedTabs = updateRoot(state.tabs, root.key, (tab) => ({
+                    ...tab,
+                    ...layout,
+                    activeChildKey: newView.key,
+                }));
+                return {
+                    activeTabKey: root.key,
+                    tabs: updatedTabs,
+                };
+            }),
         removeTab: (key: string) =>
             set((state) => {
-                const items = state.tabs;
-                let newActiveKey = state.activeTabKey;
-                let lastIndex = -1;
-                items.forEach((item, i) => {
-                    if (item.key === key) {
-                        lastIndex = i - 1;
-                    }
-                });
-                const newTabs = items.filter((item) => item.key !== key);
-                if (newTabs.length && newActiveKey === key) {
-                    if (lastIndex >= 0) {
-                        newActiveKey = newTabs[lastIndex].key;
-                    } else {
-                        newActiveKey = newTabs[0].key;
-                    }
-                }
-                return { activeTabKey: newActiveKey, tabs: newTabs };
+                const index = state.tabs.findIndex((tab) => tab.key === key);
+                if (index < 0) return state;
+                const newTabs = state.tabs.filter((tab) => tab.key !== key);
+                const nextActive =
+                    state.activeTabKey === key
+                        ? (newTabs[Math.max(0, index - 1)]?.key ??
+                          newTabs[0]?.key ??
+                          "")
+                        : state.activeTabKey;
+                return {
+                    activeTabKey: nextActive,
+                    tabs: newTabs,
+                };
             }),
         removeTabs: (keys: string[]) =>
             set((state) => {
                 const keysToRemove = new Set(keys);
                 if (keysToRemove.size === 0) return state;
-
-                const removedIndexes = state.tabs
-                    .map((tab, index) =>
-                        keysToRemove.has(tab.key) ? index : -1,
-                    )
-                    .filter((index) => index >= 0);
                 const newTabs = state.tabs.filter(
                     (tab) => !keysToRemove.has(tab.key),
                 );
-
-                if (
-                    newTabs.length === 0 ||
-                    !keysToRemove.has(state.activeTabKey)
-                ) {
-                    return { tabs: newTabs };
-                }
-
-                const firstRemovedIndex = removedIndexes[0];
-                const previousTab = state.tabs
-                    .slice(0, firstRemovedIndex)
-                    .reverse()
-                    .find((tab) => !keysToRemove.has(tab.key));
-
                 return {
                     tabs: newTabs,
-                    activeTabKey: previousTab?.key ?? newTabs[0].key,
+                    activeTabKey: keysToRemove.has(state.activeTabKey)
+                        ? (newTabs[0]?.key ?? "")
+                        : state.activeTabKey,
                 };
             }),
         renameTab: (key: string, label: string) =>
@@ -443,71 +594,125 @@ const useAppStore = create<AppStore>((set) => {
             set((state) => {
                 const tab = state.tabs.find((item) => item.key === key);
                 if (!tab) return state;
-
-                const newTab = {
-                    ...tab,
+                const cloneLayout = (node: ITab): ITab => ({
+                    ...node,
                     key: nanoid(),
-                    state: tab.state ? { ...tab.state } : undefined,
-                };
+                    ...(node.child1
+                        ? { child1: cloneLayout(node.child1) }
+                        : {}),
+                    ...(node.child2
+                        ? { child2: cloneLayout(node.child2) }
+                        : {}),
+                    ...(node.state ? { state: { ...node.state } } : {}),
+                });
+                const duplicate = cloneLayout(tab);
+                duplicate.activeChildKey = firstLeaf(duplicate).key;
                 const tabIndex = state.tabs.findIndex(
                     (item) => item.key === key,
                 );
                 const tabs = [...state.tabs];
-                tabs.splice(tabIndex + 1, 0, newTab);
-                return { activeTabKey: newTab.key, tabs };
+                tabs.splice(tabIndex + 1, 0, duplicate);
+                return {
+                    activeTabKey: duplicate.key,
+                    tabs,
+                };
             }),
         setTabPath: (key: string, path: string, label?: string) =>
             set((state) => {
-                const newTabs = state.tabs.map((tab) => {
-                    if (tab.key === key) {
-                        return { ...tab, path, label: label || tab.label };
-                    }
-                    return tab;
-                });
-                return { tabs: newTabs };
+                const root = findRootTab(state.tabs, key);
+                if (!root) return state;
+                const tabs = updateRoot(state.tabs, root.key, (tab) => ({
+                    ...mapNode(tab, key, (node) => ({
+                        ...node,
+                        path,
+                        ...(label ? { label } : {}),
+                    })),
+                    activeChildKey: key,
+                }));
+                return {
+                    tabs,
+                    activeTabKey: root.key,
+                };
             }),
         setTabState: (key: string, tabState: ITabState) =>
-            set((state) => ({
-                tabs: state.tabs.map((tab) =>
-                    tab.key === key
-                        ? { ...tab, state: { ...tab.state, ...tabState } }
-                        : tab,
-                ),
-            })),
+            set((state) => {
+                const root = findRootTab(state.tabs, key);
+                if (!root) return state;
+                const tabs = updateRoot(state.tabs, root.key, (tab) => ({
+                    ...tab,
+                    ...mapNode(tab, key, (node) => ({
+                        ...node,
+                        state: { ...node.state, ...tabState },
+                    })),
+                }));
+                return { tabs };
+            }),
+        setSplitRatio: (key: string, ratio: number) =>
+            set((state) => {
+                const root = findRootTab(state.tabs, key);
+                if (!root) return state;
+                const tabs = updateRoot(state.tabs, root.key, (tab) => ({
+                    ...tab,
+                    ...mapNode(tab, key, (node) => ({
+                        ...node,
+                        ratio: Math.max(15, Math.min(85, ratio * 100)),
+                    })),
+                }));
+                return { tabs };
+            }),
         openSftpAt: (targetId: number, cwd: string, terminalTabKey: string) =>
             set((state) => {
                 const normalizedCwd =
                     cwd.length > 1 ? cwd.replace(/\/+$/, "") : cwd;
                 const fileUri = `sftp:${targetId}:${normalizedCwd}`;
-                const existingTab = state.tabs.find((tab) => {
-                    if (tab.path !== `/filesview/${targetId}`) return false;
-                    const tabState = tab.state as { cwd?: unknown } | undefined;
-                    return tabState?.cwd === fileUri;
-                });
+                const existing = state.tabs
+                    .map((root) => ({
+                        root,
+                        node: findNodeByPath(
+                            root,
+                            `/filesview/${targetId}`,
+                            fileUri,
+                        ),
+                    }))
+                    .find((item) => item.node);
 
-                if (existingTab) {
-                    return { activeTabKey: existingTab.key };
+                if (existing) {
+                    const existingNode = existing.node;
+                    if (!existingNode) return state;
+                    const tabs = updateRoot(
+                        state.tabs,
+                        existing.root.key,
+                        (root) => ({
+                            ...root,
+                            activeChildKey: existingNode.key,
+                        }),
+                    );
+                    return {
+                        activeTabKey: existing.root.key,
+                        tabs,
+                    };
                 }
 
-                const terminalTab = state.tabs.find(
-                    (tab) => tab.key === terminalTabKey,
-                );
-                const label = terminalTab?.label
-                    ? terminalTab.label.replace(/^ssh\s/i, "sftp ")
+                const terminal = findRootTab(state.tabs, terminalTabKey);
+                const terminalNode = terminal
+                    ? findNode(terminal, terminalTabKey)
+                    : undefined;
+                const label = terminalNode?.label
+                    ? terminalNode.label.replace(/^ssh\s/i, "sftp ")
                     : `sftp ${targetId}`;
-                const newTab = {
-                    key: nanoid(),
-                    label,
-                    path: `/filesview/${targetId}`,
-                    state: {
-                        cwd: fileUri,
-                        linkedTerminalKey: terminalTabKey,
-                    },
+                const view = createView(label, `/filesview/${targetId}`);
+                view.state = {
+                    cwd: fileUri,
+                    linkedTerminalKey: terminalTabKey,
                 };
-
+                const newTab: ITab = {
+                    ...view,
+                    activeChildKey: view.key,
+                };
+                const tabs = [...state.tabs, newTab];
                 return {
                     activeTabKey: newTab.key,
-                    tabs: [...state.tabs, newTab],
+                    tabs,
                 };
             }),
         openTerminalAt: (
@@ -516,27 +721,32 @@ const useAppStore = create<AppStore>((set) => {
             filesviewTabKey: string,
         ) =>
             set((state) => {
-                const filesviewTab = state.tabs.find(
-                    (tab) => tab.key === filesviewTabKey,
+                const filesviewTab = findRootTab(state.tabs, filesviewTabKey);
+                const filesviewNode = filesviewTab
+                    ? findNode(filesviewTab, filesviewTabKey)
+                    : undefined;
+                if (!filesviewNode) return state;
+                const view = createView(
+                    `${filesviewNode.label}`,
+                    `/terminal/${targetId}`,
                 );
-                if (!filesviewTab) return state;
-                const newTab = {
-                    key: nanoid(),
-                    label: `${filesviewTab.label}`,
-                    path: `/terminal/${targetId}`,
-                    state: cwd ? { initialCwd: cwd } : undefined,
+                if (cwd) view.state = { initialCwd: cwd };
+                const newTab: ITab = {
+                    ...view,
+                    activeChildKey: view.key,
                 };
 
+                const tabs = [...state.tabs, newTab];
                 return {
                     activeTabKey: newTab.key,
-                    tabs: [...state.tabs, newTab],
+                    tabs,
                 };
             }),
         loadPreferences: async () => {
             try {
                 const response = await axios.get<{
                     active_tab_key: string;
-                    tabs: PreferenceTabResponse[];
+                    tabs: unknown[];
                     settings?: {
                         theme_mode?: string;
                         sidebar_collapsed?: boolean;
@@ -628,35 +838,10 @@ const useAppStore = create<AppStore>((set) => {
                     await i18n.changeLanguage(language);
                 }
                 if (saved?.tabs?.length) {
-                    const tabNodes = saved.tabs.map((tab) => ({
-                        key: tab.key,
-                        label: tab.label,
-                        path: tab.path,
-                        ...(tab.state ? { state: tab.state } : {}),
-                        parentKey: tab.parent_key,
-                        splitDirection: tab.split_direction,
-                        splitRatio: tab.split_ratio,
-                        position: tab.position,
-                    }));
-                    const tabs = tabNodes
-                        .filter(
-                            (tab) =>
-                                typeof tab.key === "string" &&
-                                typeof tab.label === "string" &&
-                                typeof tab.path === "string" &&
-                                tab.path.startsWith("/"),
-                        )
-                        .map((tab) => ({
-                            key: tab.key,
-                            label: tab.label as string,
-                            path: tab.path as string,
-                            ...(tab.state ? { state: tab.state } : {}),
-                            parentKey: tab.parentKey,
-                            splitDirection: tab.splitDirection,
-                            splitRatio: tab.splitRatio,
-                            position: tab.position,
-                        }));
-                    set({ tabNodes });
+                    const tabs = saved.tabs.flatMap((tab) => {
+                        const normalized = normalizeSavedTab(tab);
+                        return normalized ? [normalized] : [];
+                    });
                     if (tabs.length) {
                         set({
                             tabs,
@@ -683,7 +868,6 @@ const useAppStore = create<AppStore>((set) => {
 useAppStore.subscribe((state, previousState) => {
     if (
         state.tabs === previousState.tabs &&
-        state.tabNodes === previousState.tabNodes &&
         state.activeTabKey === previousState.activeTabKey &&
         state.themeMode === previousState.themeMode &&
         state.sidebarCollapsed === previousState.sidebarCollapsed &&
@@ -708,48 +892,10 @@ useAppStore.subscribe((state, previousState) => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
         const current = useAppStore.getState();
-        const currentTabs = new Map(current.tabs.map((tab) => [tab.key, tab]));
-        const savedKeys = new Set<string>();
-        const tabNodes = current.tabNodes
-            .filter((node) => node.splitDirection || currentTabs.has(node.key))
-            .map((node) => {
-                const tab = currentTabs.get(node.key);
-                savedKeys.add(node.key);
-                return tab ? { ...node, ...tab } : node;
-            });
-        for (const tab of current.tabs) {
-            if (!savedKeys.has(tab.key)) tabNodes.push(tab);
-        }
         void axios
             .put("/api/app_state", {
                 active_tab_key: current.activeTabKey,
-                tabs: tabNodes.map(
-                    ({
-                        key,
-                        label,
-                        path,
-                        state: tabState,
-                        parentKey,
-                        splitDirection,
-                        splitRatio,
-                        position,
-                    }) => ({
-                        key,
-                        label,
-                        path,
-                        ...(parentKey !== undefined
-                            ? { parent_key: parentKey }
-                            : {}),
-                        ...(splitDirection !== undefined
-                            ? { split_direction: splitDirection }
-                            : {}),
-                        ...(splitRatio !== undefined
-                            ? { split_ratio: splitRatio }
-                            : {}),
-                        ...(position !== undefined ? { position } : {}),
-                        ...(tabState ? { state: tabState } : {}),
-                    }),
-                ),
+                tabs: current.tabs.map(serializeTab),
                 settings: {
                     theme_mode: current.themeMode,
                     sidebar_collapsed: current.sidebarCollapsed,

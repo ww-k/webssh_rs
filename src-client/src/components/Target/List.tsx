@@ -153,10 +153,8 @@ const TargetTreeExpandIcon = (
 };
 
 export default function TargetList({
-    active = true,
     tab,
 }: {
-    active?: boolean;
     tab: ITab;
 }) {
     const { t } = useTranslation();
@@ -547,7 +545,6 @@ export default function TargetList({
         <>
             <PageLayout
                 className="WebSSH-TargetList"
-                style={{ display: active ? undefined : "none" }}
                 header={
                     <>
                         <Select

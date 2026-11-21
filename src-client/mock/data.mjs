@@ -43,24 +43,21 @@ const createTargets = () => {
     ];
     return [
         ...seed,
-        ...Array.from(
-            { length: MOCK_ROW_COUNT - seed.length },
-            (_, offset) => {
-                const id = seed.length + offset + 1;
-                return {
-                    id,
-                    name: `Mock target ${id}`,
-                    directory: id % 3 === 0 ? "Servers" : "",
-                    host: `server-${String(id).padStart(5, "0")}.example.test`,
-                    port: id % 4 === 0 ? 2222 : 22,
-                    method: id % 2 === 0 ? 2 : 1,
-                    user: `user${id}`,
-                    key: id % 2 === 0 ? "mock-private-key" : "",
-                    password: `password-${id}`,
-                    system: id % 3 === 0 ? "windows" : "",
-                };
-            },
-        ),
+        ...Array.from({ length: MOCK_ROW_COUNT - seed.length }, (_, offset) => {
+            const id = seed.length + offset + 1;
+            return {
+                id,
+                name: `Mock target ${id}`,
+                directory: id % 3 === 0 ? "Servers" : "",
+                host: `server-${String(id).padStart(5, "0")}.example.test`,
+                port: id % 4 === 0 ? 2222 : 22,
+                method: id % 2 === 0 ? 2 : 1,
+                user: `user${id}`,
+                key: id % 2 === 0 ? "mock-private-key" : "",
+                password: `password-${id}`,
+                system: id % 3 === 0 ? "windows" : "",
+            };
+        }),
     ];
 };
 
@@ -235,27 +232,27 @@ const createTransferTasks = () => {
                 "DIRECTORY",
                 undefined,
             ),
-            createTask(
-                `mock-${status.toLowerCase()}-file`,
-                "FILE",
-                undefined,
-            ),
+            createTask(`mock-${status.toLowerCase()}-file`, "FILE", undefined),
         ];
     });
     return [
         ...representativeTasks,
         ...seed,
         ...Array.from(
-            { length: MOCK_ROW_COUNT - seed.length - representativeTasks.length },
+            {
+                length:
+                    MOCK_ROW_COUNT - seed.length - representativeTasks.length,
+            },
             (_, offset) => {
                 const index = offset + seed.length + 1;
                 const status = "SUCCESS";
                 const total = gibibytes(1 + (index % 40) / 10);
-                const loaded = status === "SUCCESS"
-                    ? total
-                    : status === "WAIT"
-                      ? 0
-                      : Math.round(total * ((index % 80) / 100));
+                const loaded =
+                    status === "SUCCESS"
+                        ? total
+                        : status === "WAIT"
+                          ? 0
+                          : Math.round(total * ((index % 80) / 100));
                 const targetId = (index % MOCK_ROW_COUNT) + 1;
                 const type = index % 2 === 0 ? "DOWNLOAD" : "UPLOAD";
                 const createdAt = now - index * 1_000;
@@ -270,11 +267,16 @@ const createTransferTasks = () => {
                     name: `mock-file-${index}.bin`,
                     loaded,
                     total,
-                    percent: total === 0 ? 0 : Number(((loaded / total) * 100).toFixed(2)),
+                    percent:
+                        total === 0
+                            ? 0
+                            : Number(((loaded / total) * 100).toFixed(2)),
                     speed: status === "RUN" ? mebibytes(10 + (index % 50)) : 0,
-                    estimated_time: status === "RUN" ? 60 + (index % 600) : undefined,
+                    estimated_time:
+                        status === "RUN" ? 60 + (index % 600) : undefined,
                     ranges: loaded > 0 ? [[0, loaded]] : [],
-                    fail_reason: status === "FAIL" ? "Mock transfer failed" : undefined,
+                    fail_reason:
+                        status === "FAIL" ? "Mock transfer failed" : undefined,
                     created_at: createdAt,
                     updated_at: status === "WAIT" ? createdAt : now,
                     ended_at: ["SUCCESS", "FAIL", "CANCEL"].includes(status)
@@ -374,6 +376,35 @@ const createFsEntries = () =>
         ["/tmp", []],
     ]);
 
+const createMockPreferences = () => ({
+    active_tab_key: "mock-tab",
+    tabs: [
+        {
+            key: "mock-tab",
+            label: "New Tab",
+            activeChildKey: "mock-tab-1",
+            direction: "horizontal",
+            ratio: 50,
+            child1: {
+                key: "mock-tab-1",
+                label: "New Tab",
+                direction: "horizontal",
+                ratio: 100,
+                path: "/",
+                state: null,
+            },
+            child2: {
+                key: "mock-tab-2",
+                label: "New Tab",
+                direction: "horizontal",
+                ratio: 100,
+                path: "/",
+                state: null,
+            },
+        },
+    ],
+});
+
 export const createMockState = () => ({
     targets: createTargets(),
     transferTasks: createTransferTasks(),
@@ -382,7 +413,7 @@ export const createMockState = () => ({
     sshConnections: createSshConnections(),
     portForwards: [],
     favoriteDirectories: new Map(),
-    preferences: null,
+    preferences: createMockPreferences(),
     sftpEntries: createSftpEntries(),
     fsEntries: createFsEntries(),
 });

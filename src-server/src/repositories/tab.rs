@@ -23,17 +23,17 @@ pub async fn replace(db: &DatabaseConnection, models: Vec<tab::ActiveModel>) -> 
 }
 
 pub fn from_preference_with_layout(
-    model: crate::apis::preferences::dto::PreferenceTab,
-    position: i32,
+    model: crate::apis::preferences::dto::StoredTab,
 ) -> tab::ActiveModel {
     tab::ActiveModel {
         key: Set(model.key),
         parent_key: Set(model.parent_key),
         split_direction: Set(model.split_direction),
         split_ratio: Set(model.split_ratio),
-        position: Set(model.position.unwrap_or(position)),
+        position: Set(model.position),
         label: Set(model.label),
         path: Set(model.path),
         state: Set(model.state.map(|value| value.to_string())),
+        active_child_key: Set(model.active_child_key),
     }
 }
