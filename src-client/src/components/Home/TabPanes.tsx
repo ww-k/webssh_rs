@@ -21,6 +21,7 @@ const TabPanes = memo(function TabPanes({
                 .filter((tab) => mountedTabKeys.has(tab.key))
                 .map((tab) => (
                     <TabPane
+                        className={`WebSSH-Home-Pane${tab.key === activeTabKey ? " is-active" : ""}`}
                         key={tab.key}
                         active={tab.key === activeTabKey}
                         tab={tab}

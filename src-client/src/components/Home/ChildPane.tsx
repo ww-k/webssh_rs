@@ -9,9 +9,18 @@ import type { ITab } from "@/store";
 interface ChildPaneProps {
     active: boolean;
     tab: ITab;
+    className?: string;
+    style?: React.CSSProperties;
+    onMouseDown?: React.MouseEventHandler<HTMLDivElement>;
 }
 
-const ChildPane = memo(function ChildPane({ active, tab }: ChildPaneProps) {
+const ChildPane = memo(function ChildPane({
+    active,
+    tab,
+    className,
+    style,
+    onMouseDown,
+}: ChildPaneProps) {
     const path = tab.path ?? "/";
     let children: JSX.Element;
     switch (true) {
@@ -28,8 +37,10 @@ const ChildPane = memo(function ChildPane({ active, tab }: ChildPaneProps) {
 
     return (
         <div
-            className={`WebSSH-Home-ChildPane${active ? " is-active" : ""}`}
+            className={`WebSSH-Home-ChildPane${active ? " is-active" : ""}${className ? ` ${className}` : ""}`}
+            style={style}
             aria-hidden={!active}
+            onMouseDown={onMouseDown}
         >
             {children}
         </div>
