@@ -3,7 +3,7 @@ import {
     DisconnectOutlined,
     ReloadOutlined,
 } from "@ant-design/icons";
-import { message, Popconfirm, Space, Tag, Tooltip, Typography } from "antd";
+import { message, Popconfirm, Space, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -19,6 +19,7 @@ import Button from "@/components/Button";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
 import getTargetName from "@/components/Target/getTargetName";
+import Tooltip from "@/components/Tooltip";
 
 import type { ISshConnection, ITarget } from "@/api";
 

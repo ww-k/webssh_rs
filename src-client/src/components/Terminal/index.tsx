@@ -14,7 +14,6 @@ import {
     SnippetsOutlined,
     UploadOutlined,
 } from "@ant-design/icons";
-import { Tooltip } from "antd";
 import {
     useCallback,
     useEffect,
@@ -33,6 +32,7 @@ import {
     postFavoriteDirectoryInitialize,
 } from "@/api";
 import Button from "@/components/Button";
+import Tooltip from "@/components/Tooltip";
 import { getFilePath } from "@/helpers/file_uri";
 import { normalizeTerminalCwd } from "@/helpers/terminal_cwd";
 import transferService from "@/services/transfer";

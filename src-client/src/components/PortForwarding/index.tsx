@@ -13,7 +13,6 @@ import {
     Popconfirm,
     Space,
     Switch,
-    Tooltip,
 } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -34,6 +33,7 @@ import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 import Select from "@/components/Select";
 import getTargetName from "@/components/Target/getTargetName";
+import Tooltip from "@/components/Tooltip";
 
 import type { IPortForward, ITarget } from "@/api";
 

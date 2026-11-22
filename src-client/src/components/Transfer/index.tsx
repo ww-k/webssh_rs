@@ -13,7 +13,7 @@ import {
     SearchOutlined,
     StopOutlined,
 } from "@ant-design/icons";
-import { Modal, message, Segmented, Space, Tooltip, Typography } from "antd";
+import { Modal, message, Segmented, Space, Typography } from "antd";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -21,6 +21,7 @@ import Button from "@/components/Button";
 import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 import Progress from "@/components/Progress";
+import Tooltip from "@/components/Tooltip";
 
 import "./index.css";
 

@@ -1,5 +1,5 @@
 import { DeleteOutlined, KeyOutlined, ReloadOutlined } from "@ant-design/icons";
-import { message, Popconfirm, Tooltip, Typography } from "antd";
+import { message, Popconfirm, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +7,7 @@ import { getSshKnownHostList, postSshKnownHostRemove } from "@/api";
 import Button from "@/components/Button";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
+import Tooltip from "@/components/Tooltip";
 
 import type { ISshKnownHost } from "@/api";
 

@@ -8,6 +8,12 @@ body,
     overflow: hidden;
 }
 
+@layer ui-sdk {
+    :where([data-slot][hidden]:not([hidden="until-found"])) {
+        display: none !important;
+    }
+}
+
 /* Keep application scrollbars consistent with the DataTable surface. */
 * {
     scrollbar-color: var(--ant-color-fill) var(--ant-color-bg-container);

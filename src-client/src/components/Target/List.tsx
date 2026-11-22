@@ -10,7 +10,7 @@ import {
     SearchOutlined,
     WindowsOutlined,
 } from "@ant-design/icons";
-import { Modal, message, Space, Tooltip } from "antd";
+import { Modal, message, Space } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -28,6 +28,7 @@ import DataTable, {
 import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 import Select from "@/components/Select";
+import Tooltip from "@/components/Tooltip";
 import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 import useAppStore from "@/store";
 
