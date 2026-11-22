@@ -10,7 +10,7 @@ import {
     SearchOutlined,
     WindowsOutlined,
 } from "@ant-design/icons";
-import { Input, Modal, message, Space, Tooltip } from "antd";
+import { Modal, message, Space, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +25,7 @@ import DataTable, {
     type DataTableColumn,
     type DataTableDropEvent,
 } from "@/components/DataTable";
+import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 import Select from "@/components/Select";
 import useTablePageNavigation from "@/hooks/useTablePageNavigation";

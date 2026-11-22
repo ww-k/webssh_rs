@@ -1,5 +1,5 @@
 import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
-import { Empty, Input, message, Space } from "antd";
+import { Empty, message, Space } from "antd";
 import {
     type ReactNode,
     useCallback,
@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 import Select from "@/components/Select";
 

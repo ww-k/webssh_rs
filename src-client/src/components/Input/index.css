@@ -1,0 +1,156 @@
+[data-slot="input"].webssh-input,
+.webssh-input-group {
+    box-sizing: border-box;
+    min-width: 0;
+    color: var(--ant-color-text, #141414);
+    font: inherit;
+    font-size: var(--ant-font-size, 14px);
+}
+
+[data-slot="input"].webssh-input {
+    display: block;
+    width: 100%;
+    height: 32px;
+    padding: 4px 11px;
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: var(--ant-border-radius, 6px);
+    outline: none;
+    background: var(--ant-color-bg-container, #fff);
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
+}
+
+[data-slot="input"].webssh-input::placeholder,
+.webssh-password-input-control::placeholder,
+.webssh-textarea::placeholder {
+    color: var(--ant-color-text-placeholder, rgb(0 0 0 / 25%));
+    opacity: 1;
+}
+
+[data-slot="input"].webssh-input-small {
+    height: 24px;
+    padding: 0 7px;
+    font-size: 12px;
+}
+
+[data-slot="input"].webssh-input-large {
+    height: 40px;
+    padding: 6px 11px;
+    font-size: 16px;
+}
+
+[data-slot="input"].webssh-input:hover,
+.webssh-input-group:has(input:hover) {
+    border-color: var(--ant-color-primary-hover, #4096ff);
+}
+
+[data-slot="input"].webssh-input:focus,
+[data-slot="input"].webssh-input:focus-visible,
+.webssh-input-group:has(input:focus-visible),
+.webssh-password-input:has(input:focus-visible) {
+    border-color: var(--ant-color-primary, #1677ff);
+    box-shadow: 0 0 0 2px var(--ant-color-primary-bg, rgb(5 145 255 / 10%));
+}
+
+[data-slot="input"].webssh-input:disabled,
+[data-slot="password-input-control"]:disabled {
+    color: var(--ant-color-text-disabled, rgb(0 0 0 / 25%));
+    cursor: not-allowed;
+    background: var(--ant-color-bg-container-disabled, rgb(0 0 0 / 4%));
+}
+
+.webssh-input-group {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 32px;
+    padding: 0 8px 0 11px;
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: var(--ant-border-radius, 6px);
+    background: var(--ant-color-bg-container, #fff);
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
+}
+
+.webssh-input-group.webssh-input-small {
+    height: 24px;
+    padding-left: 7px;
+}
+
+.webssh-input-group.webssh-input-large {
+    height: 40px;
+}
+
+.webssh-input-group > [data-slot="input"].webssh-input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    height: 100%;
+    padding: 4px 6px;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+}
+
+.webssh-input-prefix,
+.webssh-input-suffix {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    color: var(--ant-color-text-secondary, rgb(0 0 0 / 45%));
+}
+
+.webssh-input-clear,
+.webssh-password-input-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    color: var(--ant-color-text-quaternary, rgb(0 0 0 / 25%));
+    cursor: pointer;
+    background: transparent;
+}
+
+.webssh-input-clear:hover,
+.webssh-password-input-toggle:hover {
+    color: var(--ant-color-text, #141414);
+}
+
+.webssh-password-input {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    padding: 0 8px 0 11px;
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: var(--ant-border-radius, 6px);
+    background: var(--ant-color-bg-container, #fff);
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
+}
+
+.webssh-password-input-control {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 4px 6px;
+    border: 0;
+    outline: none;
+    color: inherit;
+    font: inherit;
+    background: transparent;
+}
+
+.webssh-textarea {
+    height: auto;
+    min-height: 64px;
+}

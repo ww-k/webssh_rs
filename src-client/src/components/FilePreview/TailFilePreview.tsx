@@ -1,7 +1,8 @@
 import { FilterOutlined } from "@ant-design/icons";
-import { Input } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import Input from "@/components/Input";
 
 import { parseTailEvent } from "./fileContent";
 import MonacoTextEditor from "./MonacoTextEditor";

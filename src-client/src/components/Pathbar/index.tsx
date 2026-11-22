@@ -14,11 +14,12 @@ import {
     StarFilled,
     StarOutlined,
 } from "@ant-design/icons";
-import { Input, message, Popconfirm, Spin } from "antd";
+import { message, Popconfirm, Spin } from "antd";
 import classNames from "clsx";
 import throttle from "lodash/throttle";
 import { Component, createRef } from "react";
 
+import Input from "@/components/Input";
 import path, { posix as pathPosix } from "@/helpers/path";
 import i18n from "@/i18n";
 

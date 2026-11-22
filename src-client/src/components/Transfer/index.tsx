@@ -14,7 +14,6 @@ import {
     StopOutlined,
 } from "@ant-design/icons";
 import {
-    Input,
     Modal,
     message,
     Progress,
@@ -27,6 +26,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import Button from "@/components/Button";
+import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 
 import "./index.css";

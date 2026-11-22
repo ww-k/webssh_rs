@@ -1,8 +1,9 @@
 import { CloseOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
-import { Input } from "antd";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import Input from "@/components/Input";
 
 import ResizeLine from "../ResizeLine";
 import getTabIcon from "./tabIcon";

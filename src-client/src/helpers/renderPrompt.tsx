@@ -1,7 +1,7 @@
-import { Checkbox, Input, Modal, Radio, Space } from "antd";
+import { Checkbox, Modal, Radio, Space } from "antd";
 import { createRef } from "react";
 
-import type { InputRef } from "antd";
+import Input from "@/components/Input";
 
 export interface RenderPromptOptions {
     title: string;
@@ -18,7 +18,7 @@ export default function renderPrompt(
         let value = options.defaultValue ?? "";
         let settled = false;
         let destroyModal = () => {};
-        const inputRef = createRef<InputRef>();
+        const inputRef = createRef<HTMLInputElement>();
 
         const finish = (result?: string) => {
             if (settled) return;
@@ -86,7 +86,7 @@ export function renderUrlPasswordPrompt(
         let password = "";
         let settled = false;
         let destroyModal = () => {};
-        const inputRef = createRef<InputRef>();
+        const inputRef = createRef<HTMLInputElement>();
 
         const finish = (result?: { url: string; password: string }) => {
             if (settled) return;

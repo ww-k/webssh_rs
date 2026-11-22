@@ -7,7 +7,6 @@ import {
 } from "@ant-design/icons";
 import {
     Form,
-    Input,
     InputNumber,
     Modal,
     message,
@@ -31,6 +30,7 @@ import {
 } from "@/api";
 import Button from "@/components/Button";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
+import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 import Select from "@/components/Select";
 import getTargetName from "@/components/Target/getTargetName";
