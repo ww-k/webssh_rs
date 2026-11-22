@@ -73,6 +73,7 @@ type AppStore = {
     setActiveChildKey: (key: string) => void;
     addTab: () => string;
     splitView: (direction?: "horizontal" | "vertical") => void;
+    closeSplitView: () => void;
     removeTab: (key: string) => void;
     removeTabs: (keys: string[]) => void;
     renameTab: (key: string, label: string) => void;
@@ -306,6 +307,25 @@ function mapNode(node: ITab, key: string, mapper: (node: ITab) => ITab): ITab {
           )
         : node;
     return mapped.key === key ? mapper(mapped) : mapped;
+}
+
+function removeNode(node: ITab, key: string): ITab | undefined {
+    if (node.key === key) return undefined;
+
+    const child1 = node.child1 ? removeNode(node.child1, key) : undefined;
+    const child2 = node.child2 ? removeNode(node.child2, key) : undefined;
+    if (child1 === node.child1 && child2 === node.child2) return node;
+
+    const children = [child1, child2].filter((child): child is ITab =>
+        Boolean(child),
+    );
+    if (children.length === 0) return undefined;
+    if (children.length === 1) return children[0];
+    return {
+        ...node,
+        child1: children[0],
+        child2: children[1],
+    };
 }
 
 function findRootTab(tabs: ITab[], childKey: string) {
@@ -552,6 +572,30 @@ const useAppStore = create<AppStore>((set) => {
                 return {
                     activeTabKey: root.key,
                     tabs: updatedTabs,
+                };
+            }),
+        closeSplitView: () =>
+            set((state) => {
+                const root = state.tabs.find(
+                    (tab) => tab.key === state.activeTabKey,
+                );
+                if (!root || !getChildren(root).length) return state;
+
+                const childKey = getRootChildKey(root);
+                const nextRoot = removeNode(root, childKey);
+                if (!nextRoot) return state;
+
+                const tabs = state.tabs.map((tab) =>
+                    tab.key === root.key
+                        ? {
+                              ...nextRoot,
+                              activeChildKey: firstLeaf(nextRoot).key,
+                          }
+                        : tab,
+                );
+                return {
+                    activeTabKey: nextRoot.key,
+                    tabs,
                 };
             }),
         removeTab: (key: string) =>

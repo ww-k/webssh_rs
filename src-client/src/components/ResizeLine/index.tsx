@@ -25,6 +25,10 @@ export default function ResizeLine({
     });
 
     const initInfoRef = useRef<{ x: number; y: number }>();
+    const onMoveRef = useRef(onMove);
+    const onMovedRef = useRef(onMoved);
+    onMoveRef.current = onMove;
+    onMovedRef.current = onMoved;
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         initInfoRef.current = {
@@ -33,7 +37,6 @@ export default function ResizeLine({
         };
     }, []);
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies: no need add onMove and onMoved to dependencies
     useEffect(() => {
         function handleMouseMove(e: MouseEvent) {
             if (!initInfoRef.current) {
@@ -44,7 +47,7 @@ export default function ResizeLine({
             const moveX = clientX - initInfoRef.current.x;
             const moveY = clientY - initInfoRef.current.y;
 
-            onMove?.({
+            onMoveRef.current?.({
                 moveX,
                 moveY,
             });
@@ -52,7 +55,7 @@ export default function ResizeLine({
         function handleMouseUp() {
             if (initInfoRef.current) {
                 initInfoRef.current = undefined;
-                onMoved?.();
+                onMovedRef.current?.();
             }
         }
         window.addEventListener("mousemove", handleMouseMove);

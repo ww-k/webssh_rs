@@ -16,6 +16,7 @@ function Home({ active }: { active: boolean }) {
     const setActiveTabKey = useAppStore((state) => state.setActiveTabKey);
     const addTab = useAppStore((state) => state.addTab);
     const splitView = useAppStore((state) => state.splitView);
+    const closeSplitView = useAppStore((state) => state.closeSplitView);
     const removeTab = useAppStore((state) => state.removeTab);
     const removeTabs = useAppStore((state) => state.removeTabs);
     const renameTab = useAppStore((state) => state.renameTab);
@@ -42,9 +43,12 @@ function Home({ active }: { active: boolean }) {
     const onAddTab = useCallback(() => {
         addTab();
     }, [addTab]);
-    const onSplitView = useCallback(() => {
-        splitView("horizontal");
-    }, [splitView]);
+    const onSplitView = useCallback(
+        (direction: "horizontal" | "vertical") => {
+            splitView(direction);
+        },
+        [splitView],
+    );
 
     return (
         <div
@@ -68,6 +72,7 @@ function Home({ active }: { active: boolean }) {
                 activeTabKey={activeTabKey}
                 onAddTab={onAddTab}
                 onSplitView={onSplitView}
+                onCloseSplitView={closeSplitView}
                 mountedTabKeys={mountedTabKeys}
                 tabs={tabs}
             />

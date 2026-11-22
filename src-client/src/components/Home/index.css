@@ -272,7 +272,7 @@
     justify-content: center;
     width: 30px;
     height: 30px;
-    margin-left: auto;
+    margin-left: 0;
     padding: 0;
     color: var(--ant-color-text-secondary);
     background: transparent;
@@ -280,6 +280,13 @@
     border-radius: 6px;
     cursor: pointer;
     font-size: 16px;
+}
+
+.WebSSH-Home-SplitActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
 }
 
 .WebSSH-Home-SplitButton:hover {
@@ -364,26 +371,19 @@
     inset: auto;
 }
 
-.WebSSH-Home-SplitResize {
-    position: absolute;
+.WebSSH-Home-Split > .WebSSH-Home-SplitResize {
+    position: relative;
     z-index: 2;
+    flex: 0 0 4px;
 }
 
-.WebSSH-Home-Split-horizontal
-    > .WebSSH-Home-SplitPart
-    + .WebSSH-Home-SplitResize {
-    top: 0;
-    right: -2px;
-    bottom: 0;
+.WebSSH-Home-Split-horizontal > .WebSSH-Home-SplitResize {
     width: 4px;
+    height: 100%;
 }
 
-.WebSSH-Home-Split-vertical
-    > .WebSSH-Home-SplitPart
-    + .WebSSH-Home-SplitResize {
-    right: 0;
-    bottom: -2px;
-    left: 0;
+.WebSSH-Home-Split-vertical > .WebSSH-Home-SplitResize {
+    width: 100%;
     height: 4px;
 }
 

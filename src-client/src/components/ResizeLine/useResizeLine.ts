@@ -16,10 +16,10 @@ export default function useResizeLine(
     const [position, setPosition] = useState(initPosition);
     const seperatorPositionRef = useRef<{
         _seperatorPosition?: number;
-        _containerWidth?: number;
+        _containerSize?: number;
     }>({
         _seperatorPosition: undefined,
-        _containerWidth: undefined,
+        _containerSize: undefined,
     });
 
     function resizeHandle(e: IMouseMoveInfo) {
@@ -27,10 +27,11 @@ export default function useResizeLine(
         const container = getContainer();
         if (info._seperatorPosition === undefined && container) {
             info._seperatorPosition = position;
-            info._containerWidth = container.getBoundingClientRect().width;
+            const rect = container.getBoundingClientRect();
+            info._containerSize = direction === "h" ? rect.height : rect.width;
         }
 
-        if (!info._seperatorPosition || !info._containerWidth) return;
+        if (!info._seperatorPosition || !info._containerSize) return;
 
         const move = direction === "h" ? e.moveY : e.moveX;
         setPosition(
@@ -39,7 +40,7 @@ export default function useResizeLine(
                 Math.min(
                     100,
                     info._seperatorPosition +
-                        (move * 100) / info._containerWidth,
+                        (move * 100) / info._containerSize,
                 ),
             ),
         );

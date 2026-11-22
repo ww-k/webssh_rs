@@ -1,5 +1,7 @@
 import {
-    AppstoreOutlined,
+    CloseOutlined,
+    ColumnHeightOutlined,
+    ColumnWidthOutlined,
     DesktopOutlined,
     PlusOutlined,
 } from "@ant-design/icons";
@@ -15,7 +17,8 @@ import type { ITab } from "@/store";
 interface ContentProps {
     activeTabKey: string;
     onAddTab: () => void;
-    onSplitView: () => void;
+    onSplitView: (direction: "horizontal" | "vertical") => void;
+    onCloseSplitView: () => void;
     mountedTabKeys: ReadonlySet<string>;
     tabs: ITab[];
 }
@@ -24,6 +27,7 @@ const Content = memo(function Content({
     activeTabKey,
     onAddTab,
     onSplitView,
+    onCloseSplitView,
     mountedTabKeys,
     tabs,
 }: ContentProps) {
@@ -52,15 +56,37 @@ const Content = memo(function Content({
                         </span>
                     )}
                 </div>
-                <button
-                    type="button"
-                    className="WebSSH-Home-SplitButton"
-                    aria-label={t("app_split_view")}
-                    title={t("app_split_view")}
-                    onClick={onSplitView}
-                >
-                    <AppstoreOutlined aria-hidden="true" />
-                </button>
+                <div className="WebSSH-Home-SplitActions">
+                    <button
+                        type="button"
+                        className="WebSSH-Home-SplitButton"
+                        aria-label={t("app_split_horizontal")}
+                        title={t("app_split_horizontal")}
+                        onClick={() => onSplitView("horizontal")}
+                    >
+                        <ColumnWidthOutlined aria-hidden="true" />
+                    </button>
+                    <button
+                        type="button"
+                        className="WebSSH-Home-SplitButton"
+                        aria-label={t("app_split_vertical")}
+                        title={t("app_split_vertical")}
+                        onClick={() => onSplitView("vertical")}
+                    >
+                        <ColumnHeightOutlined aria-hidden="true" />
+                    </button>
+                    {activeTab?.child1 || activeTab?.child2 ? (
+                        <button
+                            type="button"
+                            className="WebSSH-Home-SplitButton"
+                            aria-label={t("app_split_close")}
+                            title={t("app_split_close")}
+                            onClick={onCloseSplitView}
+                        >
+                            <CloseOutlined aria-hidden="true" />
+                        </button>
+                    ) : null}
+                </div>
             </header>
             <div className="WebSSH-Home-Panes">
                 <TabPanes
