@@ -1,19 +1,12 @@
 import { InfoCircleOutlined } from "@ant-design/icons";
-import {
-    AutoComplete,
-    Button,
-    Form,
-    Input,
-    InputNumber,
-    Modal,
-    Tooltip,
-} from "antd";
+import { AutoComplete, Form, Input, InputNumber, Modal, Tooltip } from "antd";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./Editor.css";
 
 import { getTargetList, postTargetAdd, postTargetUpdate } from "@/api";
+import Button from "@/components/Button";
 import Select from "@/components/Select";
 import { validateCertContent } from "@/helpers/validateCertContent";
 

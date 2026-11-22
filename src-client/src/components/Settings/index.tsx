@@ -13,7 +13,6 @@ import {
     UploadOutlined,
 } from "@ant-design/icons";
 import {
-    Button,
     ColorPicker,
     InputNumber,
     message,
@@ -27,6 +26,7 @@ import { useTranslation } from "react-i18next";
 
 import "./index.css";
 
+import Button from "@/components/Button";
 import Select from "@/components/Select";
 import fileSave from "@/helpers/fileSave";
 import renderPrompt, {

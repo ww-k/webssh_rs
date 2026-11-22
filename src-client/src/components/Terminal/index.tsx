@@ -14,7 +14,7 @@ import {
     SnippetsOutlined,
     UploadOutlined,
 } from "@ant-design/icons";
-import { Button, Tooltip } from "antd";
+import { Tooltip } from "antd";
 import {
     useCallback,
     useEffect,
@@ -32,6 +32,7 @@ import {
     getFavoriteDirectoryList,
     postFavoriteDirectoryInitialize,
 } from "@/api";
+import Button from "@/components/Button";
 import { getFilePath } from "@/helpers/file_uri";
 import { normalizeTerminalCwd } from "@/helpers/terminal_cwd";
 import transferService from "@/services/transfer";
@@ -602,16 +603,14 @@ export default function Terminal({
                                     : "terminal_open_sftp",
                             )}
                         >
-                            <span>
-                                <Button
-                                    aria-label={t("terminal_open_sftp")}
-                                    disabled={cwd === undefined}
-                                    icon={<FolderOutlined />}
-                                    onClick={openSftp}
-                                    size="small"
-                                    type="text"
-                                />
-                            </span>
+                            <Button
+                                aria-label={t("terminal_open_sftp")}
+                                disabled={cwd === undefined}
+                                icon={<FolderOutlined />}
+                                onClick={openSftp}
+                                size="small"
+                                type="text"
+                            />
                         </Tooltip>
                         <Tooltip title={t("files_menu_upload")}>
                             <Button

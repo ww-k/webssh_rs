@@ -4,10 +4,10 @@ import {
     EnterOutlined,
     FileSyncOutlined,
 } from "@ant-design/icons";
-import { Button } from "antd";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import Button from "@/components/Button";
 import useAppStore from "@/store";
 
 import {
@@ -52,6 +52,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                     <Button
                         type={tailMode ? "default" : "text"}
                         icon={<FileSyncOutlined />}
+                        size="middle"
                         aria-label={t("file_editor_tail_mode")}
                         aria-pressed={tailMode}
                         title={t("file_editor_tail_mode")}
@@ -60,6 +61,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                     <Button
                         type={lineWrapping ? "default" : "text"}
                         icon={<EnterOutlined />}
+                        size="middle"
                         aria-label={t("file_editor_line_wrap")}
                         aria-pressed={lineWrapping}
                         title={t("file_editor_line_wrap")}
@@ -68,6 +70,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                     <Button
                         type={expanded ? "default" : "text"}
                         icon={<ColumnWidthOutlined />}
+                        size="middle"
                         aria-label={t(
                             expanded
                                 ? "file_editor_collapse"
@@ -83,6 +86,7 @@ export default function FileEditorPanel({ file, onClose }: Props) {
                     <Button
                         type="text"
                         icon={<CloseOutlined />}
+                        size="middle"
                         aria-label={t("app_btn_cancel")}
                         title={t("app_btn_cancel")}
                         onClick={onClose}

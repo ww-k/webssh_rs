@@ -6,7 +6,6 @@ import {
     ReloadOutlined,
 } from "@ant-design/icons";
 import {
-    Button,
     Form,
     Input,
     InputNumber,
@@ -30,6 +29,7 @@ import {
     postPortForwardToggle,
     postPortForwardUpdate,
 } from "@/api";
+import Button from "@/components/Button";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
 import Select from "@/components/Select";
@@ -271,7 +271,7 @@ export default function PortForwarding() {
                                 aria-label={t("app_btn_edit")}
                                 icon={<EditOutlined />}
                                 onClick={() => openEdit(item)}
-                                size="small"
+                                size="middle"
                                 type="text"
                             />
                         </Tooltip>
@@ -287,7 +287,7 @@ export default function PortForwarding() {
                                     danger
                                     icon={<DeleteOutlined />}
                                     loading={removingId === item.id}
-                                    size="small"
+                                    size="middle"
                                     type="text"
                                 />
                             </Tooltip>

@@ -1,7 +1,8 @@
-import { Button, Modal, Space } from "antd";
+import { Modal, Space } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import Button from "@/components/Button";
 import useAppStore from "@/store";
 
 import FilesviewLocal from "../Filesview/Local";

@@ -1,8 +1,10 @@
 import { WarningOutlined } from "@ant-design/icons";
-import { Button, Modal, Progress } from "antd";
+import { Modal, Progress } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import simpleQueueRun from "simple-queue-run";
+
+import Button from "@/components/Button";
 
 import "./index.css";
 

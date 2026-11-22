@@ -1,9 +1,10 @@
 import { DeleteOutlined, KeyOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Button, message, Popconfirm, Tooltip, Typography } from "antd";
+import { message, Popconfirm, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getSshKnownHostList, postSshKnownHostRemove } from "@/api";
+import Button from "@/components/Button";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
 
@@ -121,7 +122,7 @@ export default function SshKnownHosts() {
                                 danger
                                 icon={<DeleteOutlined />}
                                 loading={removingId === knownHost.id}
-                                size="small"
+                                size="middle"
                                 type="text"
                             />
                         </Tooltip>

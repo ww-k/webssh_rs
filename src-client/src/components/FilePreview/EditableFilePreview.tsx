@@ -1,8 +1,9 @@
-import { Button, message } from "antd";
+import { message } from "antd";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { postSftpUpload } from "@/api";
+import Button from "@/components/Button";
 
 import { loadFileContent } from "./fileContent";
 import MonacoTextEditor from "./MonacoTextEditor";

@@ -1,9 +1,9 @@
 import { LeftOutlined, RightOutlined } from "@ant-design/icons";
-import { Button } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getSftpTextPage } from "@/api";
+import Button from "@/components/Button";
 
 import MonacoTextEditor from "./MonacoTextEditor";
 import PreviewState from "./previewState";

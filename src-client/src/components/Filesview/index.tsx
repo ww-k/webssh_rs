@@ -1,10 +1,11 @@
 import { CodeOutlined, EyeOutlined } from "@ant-design/icons";
-import { Button, Tooltip } from "antd";
+import { Tooltip } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
 
+import Button from "@/components/Button";
 import { getFilePath, isSftpFileUri } from "@/helpers/file_uri";
 import useAppStore from "@/store";
 

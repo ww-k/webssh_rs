@@ -3,15 +3,7 @@ import {
     DisconnectOutlined,
     ReloadOutlined,
 } from "@ant-design/icons";
-import {
-    Button,
-    message,
-    Popconfirm,
-    Space,
-    Tag,
-    Tooltip,
-    Typography,
-} from "antd";
+import { message, Popconfirm, Space, Tag, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -23,6 +15,7 @@ import {
     postSshConnectionClose,
     postSshConnectionExpire,
 } from "@/api";
+import Button from "@/components/Button";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
 import getTargetName from "@/components/Target/getTargetName";
@@ -162,7 +155,7 @@ export default function SshConnections() {
                                 onClick={() =>
                                     void runAction(connection, "expire")
                                 }
-                                size="small"
+                                size="middle"
                                 type="text"
                             />
                         </Tooltip>
@@ -184,7 +177,7 @@ export default function SshConnections() {
                                     loading={
                                         actionKey === `close:${connection.id}`
                                     }
-                                    size="small"
+                                    size="middle"
                                     type="text"
                                 />
                             </Tooltip>

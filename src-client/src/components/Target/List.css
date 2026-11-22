@@ -48,3 +48,37 @@
     .targetTreeExpandIconDirectory {
     color: var(--ant-color-white);
 }
+
+.targetListTable:focus .WebSSH-DataTableTrActive .webssh-button-text,
+.targetListTable:focus-within .WebSSH-DataTableTrActive .webssh-button-text {
+    color: var(--ant-color-white);
+}
+
+.targetListTable:focus
+    .WebSSH-DataTableTrActive
+    .webssh-button-text:hover:not(:disabled),
+.targetListTable:focus-within
+    .WebSSH-DataTableTrActive
+    .webssh-button-text:hover:not(:disabled) {
+    color: var(--ant-color-white);
+    background-color: rgb(255 255 255 / 16%);
+}
+
+.targetListTable:focus
+    .WebSSH-DataTableTrActive
+    .webssh-button-text.webssh-button-danger,
+.targetListTable:focus-within
+    .WebSSH-DataTableTrActive
+    .webssh-button-text.webssh-button-danger {
+    color: var(--ant-color-error);
+}
+
+.targetListTable:focus
+    .WebSSH-DataTableTrActive
+    .webssh-button-text.webssh-button-danger:hover:not(:disabled),
+.targetListTable:focus-within
+    .WebSSH-DataTableTrActive
+    .webssh-button-text.webssh-button-danger:hover:not(:disabled) {
+    color: var(--ant-color-error-hover);
+    background-color: rgb(255 255 255 / 16%);
+}

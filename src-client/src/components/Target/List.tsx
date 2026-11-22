@@ -10,7 +10,7 @@ import {
     SearchOutlined,
     WindowsOutlined,
 } from "@ant-design/icons";
-import { Button, Input, Modal, message, Space, Tooltip } from "antd";
+import { Input, Modal, message, Space, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -20,6 +20,7 @@ import {
     postTargetReorder,
     postTargetUpdate,
 } from "@/api";
+import Button from "@/components/Button";
 import DataTable, {
     type DataTableColumn,
     type DataTableDropEvent,
@@ -477,6 +478,7 @@ export default function TargetList({
                                 <Button
                                     aria-label="SSH"
                                     icon={<CodeOutlined />}
+                                    size="middle"
                                     type="text"
                                     onClick={() => {
                                         openTarget(record, "ssh");
@@ -487,6 +489,7 @@ export default function TargetList({
                                 <Button
                                     aria-label="SFTP"
                                     icon={<FolderOutlined />}
+                                    size="middle"
                                     type="text"
                                     onClick={() => {
                                         openTarget(record, "sftp");
@@ -497,6 +500,7 @@ export default function TargetList({
                                 <Button
                                     aria-label={t("app_btn_edit")}
                                     icon={<EditOutlined />}
+                                    size="middle"
                                     type="text"
                                     onClick={() => {
                                         setEditorData(record);
@@ -510,6 +514,7 @@ export default function TargetList({
                                     aria-label={t("app_btn_delete")}
                                     danger
                                     icon={<DeleteOutlined />}
+                                    size="middle"
                                     type="text"
                                     onClick={() => {
                                         Modal.confirm({

@@ -14,7 +14,6 @@ import {
     StopOutlined,
 } from "@ant-design/icons";
 import {
-    Button,
     Input,
     Modal,
     message,
@@ -27,6 +26,7 @@ import {
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import Button from "@/components/Button";
 import PageLayout from "@/components/PageLayout";
 
 import "./index.css";
@@ -397,6 +397,7 @@ const ActionButtons = ({ actions }: { actions: TransferAction[] }) => (
                     danger={action.danger}
                     disabled={action.disabled}
                     icon={action.icon}
+                    size="middle"
                     type="text"
                     onClick={action.onClick}
                 />
