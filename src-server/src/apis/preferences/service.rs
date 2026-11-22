@@ -40,7 +40,9 @@ pub async fn get(db: &DatabaseConnection) -> Result<Option<Preferences>, ApiErr>
                 .or_else(|| first_leaf_key_from_layout(&layout))
                 .unwrap_or_else(|| model.key.clone());
             layout.active_child_key = Some(active_child_key);
-            layout.label = first_label(&layout).unwrap_or_else(|| "New Tab".to_string());
+            if layout.label.is_empty() {
+                layout.label = first_label(&layout).unwrap_or_else(|| "New Tab".to_string());
+            }
             Some(layout)
         })
         .collect();
@@ -173,15 +175,21 @@ fn layout_node(
         .and_then(|child| layout_node(child, models, visited))
         .map(Box::new);
     let is_split = model.split_direction.is_some() || child1.is_some() || child2.is_some();
-    let label = if is_split {
-        child1
-            .as_deref()
-            .and_then(first_label)
-            .or_else(|| child2.as_deref().and_then(first_label))
-            .unwrap_or_default()
-    } else {
-        model.label.clone().unwrap_or_default()
-    };
+    let label = model
+        .label
+        .clone()
+        .filter(|label| !label.is_empty())
+        .or_else(|| {
+            if is_split {
+                child1
+                    .as_deref()
+                    .and_then(first_label)
+                    .or_else(|| child2.as_deref().and_then(first_label))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
     Some(PreferenceTab {
         key: model.key.clone(),
         label,
@@ -246,11 +254,7 @@ fn flatten_layout(
     let is_leaf = node.child1.is_none() && node.child2.is_none();
     output.push(StoredTab {
         key: node.key.clone(),
-        label: if is_leaf {
-            Some(node.label.clone())
-        } else {
-            None
-        },
+        label: Some(node.label.clone()),
         path: if is_leaf { node.path.clone() } else { None },
         state: if is_leaf { node.state.clone() } else { None },
         parent_key: parent_key.clone(),
