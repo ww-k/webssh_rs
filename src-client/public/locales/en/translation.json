@@ -221,6 +221,8 @@
     "target_name_placeholder": "Defaults to user@host[:port]",
     "target_directory": "Directory",
     "target_directory_filter": "Filter by directory",
+    "target_directory_clear": "Clear directory filter",
+    "target_directory_empty": "No directories found",
     "target_directory_placeholder": "Optional, for example: Production",
     "target_move_failed": "Failed to move target",
     "target_move_success": "Target moved",

@@ -10,7 +10,7 @@ import {
     SearchOutlined,
     WindowsOutlined,
 } from "@ant-design/icons";
-import { Button, Input, Modal, message, Select, Space, Tooltip } from "antd";
+import { Button, Input, Modal, message, Space, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +25,7 @@ import DataTable, {
     type DataTableDropEvent,
 } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
+import Select from "@/components/Select";
 import useTablePageNavigation from "@/hooks/useTablePageNavigation";
 import useAppStore from "@/store";
 
@@ -548,16 +549,17 @@ export default function TargetList({
                 header={
                     <>
                         <Select
-                            allowClear
-                            className="targetListDirectoryFilter"
                             aria-label={t("target_directory_filter")}
+                            allowClear
+                            className="targetDirectorySelect"
+                            clearLabel={t("target_directory_clear")}
+                            emptyText={t("target_directory_empty")}
                             options={directoryOptions}
                             placeholder={t("target_directory_filter")}
                             showSearch
                             value={directoryFilter}
-                            onChange={(value) => setDirectoryFilter(value)}
-                            getPopupContainer={(trigger) =>
-                                trigger.parentElement ?? document.body
+                            onChange={(value) =>
+                                setDirectoryFilter(value ?? undefined)
                             }
                         />
                         <Input

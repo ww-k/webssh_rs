@@ -1,0 +1,151 @@
+.WebSSH-Select {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-width: 0;
+}
+
+.WebSSH-SelectTrigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-width: 0;
+    min-height: 32px;
+    padding: 4px 10px;
+    color: var(--ant-color-text);
+    font: inherit;
+    background: var(--ant-color-bg-container);
+    border: 1px solid var(--ant-color-border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.WebSSH-SelectTrigger:hover,
+.WebSSH-SelectTrigger[data-open] {
+    border-color: var(--ant-color-primary);
+}
+
+.WebSSH-SelectTrigger:focus-visible {
+    outline: 2px solid var(--ant-control-outline);
+    outline-offset: 1px;
+}
+
+.WebSSH-SelectTrigger[data-placeholder] {
+    color: var(--ant-color-text-placeholder);
+}
+
+.WebSSH-SelectTrigger[data-disabled] {
+    color: var(--ant-color-text-disabled);
+    background: var(--ant-color-fill-tertiary);
+    cursor: not-allowed;
+}
+
+.WebSSH-SelectTrigger [data-slot="select-value"] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.WebSSH-SelectClear {
+    position: absolute;
+    top: 50%;
+    right: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    color: var(--ant-color-text-tertiary);
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transform: translateY(-50%);
+}
+
+.WebSSH-SelectClear:hover {
+    color: var(--ant-color-text);
+    background: var(--ant-color-fill-secondary);
+}
+
+.WebSSH-SelectContent {
+    z-index: 1050;
+    min-width: var(--anchor-width);
+    padding: 4px;
+    color: var(--ant-color-text);
+    background: var(--ant-color-bg-elevated);
+    border: 1px solid var(--ant-color-border-secondary);
+    border-radius: 6px;
+    box-shadow: var(--ant-box-shadow-secondary);
+}
+
+.WebSSH-SelectInput {
+    box-sizing: border-box;
+    width: 100%;
+    height: 30px;
+    padding: 4px 8px;
+    color: var(--ant-color-text);
+    font: inherit;
+    background: var(--ant-color-bg-container);
+    border: 1px solid var(--ant-color-border);
+    border-radius: 4px;
+    outline: 0;
+}
+
+.WebSSH-SelectInput:focus {
+    border-color: var(--ant-color-primary);
+}
+
+.WebSSH-SelectList {
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.WebSSH-SelectContent.is-searchable .WebSSH-SelectList {
+    margin-top: 4px;
+}
+
+.WebSSH-SelectItem {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 5px 28px 5px 8px;
+    color: var(--ant-color-text);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.WebSSH-SelectItem[data-highlighted] {
+    background: var(--ant-color-fill-secondary);
+}
+
+.WebSSH-SelectItem[data-selected] {
+    color: var(--ant-color-primary);
+    font-weight: 500;
+}
+
+.WebSSH-SelectItem[data-disabled] {
+    color: var(--ant-color-text-disabled);
+    cursor: not-allowed;
+}
+
+.WebSSH-SelectIndicator {
+    position: absolute;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.WebSSH-SelectEmpty {
+    padding: 8px;
+    color: var(--ant-color-text-tertiary);
+    font-size: 12px;
+}
+
+.WebSSH-SelectEmpty:not([data-empty]) {
+    display: none;
+}

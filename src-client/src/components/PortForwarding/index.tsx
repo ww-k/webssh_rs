@@ -13,7 +13,6 @@ import {
     Modal,
     message,
     Popconfirm,
-    Select,
     Space,
     Switch,
     Tooltip,
@@ -33,6 +32,7 @@ import {
 } from "@/api";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
+import Select from "@/components/Select";
 import getTargetName from "@/components/Target/getTargetName";
 
 import type { IPortForward, ITarget } from "@/api";
@@ -360,6 +360,7 @@ export default function PortForwarding() {
                         ]}
                     >
                         <Select
+                            aria-label={t("port_forward_jump_host")}
                             showSearch={{
                                 optionFilterProp: "label",
                             }}

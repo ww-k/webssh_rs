@@ -179,6 +179,8 @@
     "target_name_placeholder": "默认为 user@host[:port]",
     "target_directory": "目录",
     "target_directory_filter": "按目录筛选",
+    "target_directory_clear": "清除目录筛选",
+    "target_directory_empty": "暂无目录",
     "target_directory_placeholder": "可选，例如：生产环境",
     "target_move_failed": "目标移动失败",
     "target_move_success": "目标已移动",

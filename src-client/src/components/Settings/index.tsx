@@ -18,7 +18,6 @@ import {
     InputNumber,
     message,
     Segmented,
-    Select,
     Space,
     Switch,
     Typography,
@@ -28,6 +27,7 @@ import { useTranslation } from "react-i18next";
 
 import "./index.css";
 
+import Select from "@/components/Select";
 import fileSave from "@/helpers/fileSave";
 import renderPrompt, {
     renderImportOptionsPrompt,
@@ -422,6 +422,7 @@ export default function Settings() {
                         </Text>
                     </div>
                     <Select
+                        aria-label={t("settings_language")}
                         value={language}
                         style={{ width: 160 }}
                         options={[
@@ -431,9 +432,11 @@ export default function Settings() {
                             },
                             { value: "en", label: "English" },
                         ]}
-                        onChange={(value: string) =>
-                            setLanguage(value as "zh" | "en")
-                        }
+                        onChange={(value) => {
+                            if (value === "zh" || value === "en") {
+                                setLanguage(value);
+                            }
+                        }}
                     />
                 </div>
 

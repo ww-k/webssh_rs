@@ -6,7 +6,6 @@ import {
     Input,
     InputNumber,
     Modal,
-    Select,
     Tooltip,
 } from "antd";
 import { useEffect, useState } from "react";
@@ -15,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import "./Editor.css";
 
 import { getTargetList, postTargetAdd, postTargetUpdate } from "@/api";
+import Select from "@/components/Select";
 import { validateCertContent } from "@/helpers/validateCertContent";
 
 import InputTextFromFile from "../InputTextFromFile";
@@ -116,6 +116,7 @@ export default function TargetEditor({
                     rules={[{ required: true }]}
                 >
                     <Select
+                        aria-label={t("target_method")}
                         options={[
                             {
                                 label: "Password",
@@ -203,6 +204,7 @@ export default function TargetEditor({
                 </Form.Item>
                 <Form.Item name="jump_host_id" label={t("target_jump_host")}>
                     <Select
+                        aria-label={t("target_jump_host")}
                         allowClear
                         placeholder={t("target_jump_host_placeholder")}
                         options={targets
@@ -215,6 +217,7 @@ export default function TargetEditor({
                 </Form.Item>
                 <Form.Item name="system" label={t("target_system")}>
                     <Select
+                        aria-label={t("target_system")}
                         placeholder="Linux"
                         options={[
                             {

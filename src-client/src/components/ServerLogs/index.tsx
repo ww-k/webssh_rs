@@ -1,5 +1,5 @@
 import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
-import { Empty, Input, message, Select, Space } from "antd";
+import { Empty, Input, message, Space } from "antd";
 import {
     type ReactNode,
     useCallback,
@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import PageLayout from "@/components/PageLayout";
+import Select from "@/components/Select";
 
 import "./index.css";
 
@@ -211,7 +212,9 @@ export default function ServerLogs() {
                     <Select<LogLevel | "ALL">
                         aria-label={t("server_logs_level_filter")}
                         className="WebSSH-ServerLogs-LevelFilter"
-                        onChange={setLevel}
+                        onChange={(value) => {
+                            if (value !== null) setLevel(value);
+                        }}
                         options={[
                             {
                                 label: t("server_logs_level_all"),
