@@ -5,6 +5,7 @@ import {
     DownloadOutlined,
     DownOutlined,
     FileTextOutlined,
+    FolderOpenOutlined,
     FolderOutlined,
     HomeOutlined,
     LaptopOutlined,
@@ -446,7 +447,11 @@ export default class Pathbar extends Component<IProps, IState> {
                                                     item.uri === activedPath,
                                             })}
                                         >
-                                            <FolderOutlined />
+                                            {item.uri === activedPath ? (
+                                                <FolderOpenOutlined />
+                                            ) : (
+                                                <FolderOutlined />
+                                            )}
                                             <span>{item.name}</span>
                                         </div>
                                     </li>
