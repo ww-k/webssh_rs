@@ -13,21 +13,14 @@ import {
     SearchOutlined,
     StopOutlined,
 } from "@ant-design/icons";
-import {
-    Modal,
-    message,
-    Progress,
-    Segmented,
-    Space,
-    Tooltip,
-    Typography,
-} from "antd";
+import { Modal, message, Segmented, Space, Tooltip, Typography } from "antd";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import Button from "@/components/Button";
 import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
+import Progress from "@/components/Progress";
 
 import "./index.css";
 
@@ -271,10 +264,13 @@ const TransferProgressCell = memo(
                 </div>
                 {record.status !== "SUCCESS" && (
                     <Progress
-                        percent={progressPercent}
-                        size={["100%", 4]}
+                        value={progressPercent}
+                        size="small"
                         status={progressStatus}
-                        showInfo={false}
+                        aria-label={record.name}
+                        getValueLabel={(_, details) =>
+                            `${record.name}: ${details.percent ?? 0}%`
+                        }
                     />
                 )}
             </div>

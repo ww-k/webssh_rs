@@ -1,5 +1,11 @@
 .batchTaskProgressModalProgressWrapper {
     display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.batchTaskProgressModalProgressWrapper > .webssh-progress {
+    flex: 1;
 }
 
 .batchTaskProgressModalProgressText {

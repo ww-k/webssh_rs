@@ -93,7 +93,7 @@
     min-height: 34px;
 }
 
-.WebSSH-TransferProgress > .ant-progress {
+.WebSSH-TransferProgress > .webssh-progress {
     position: absolute;
     right: 0;
     bottom: 0;
@@ -150,16 +150,6 @@
 
 .WebSSH-TransferProgressMetaItem--status-fail {
     color: var(--ant-color-error);
-}
-
-.WebSSH-Transfer .ant-progress {
-    margin: 0;
-    line-height: 1;
-}
-
-.WebSSH-Transfer .ant-progress-inner,
-.WebSSH-Transfer .ant-progress-bg {
-    border-radius: 2px;
 }
 
 .WebSSH-TransferActions {

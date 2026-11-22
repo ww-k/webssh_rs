@@ -1,10 +1,11 @@
 import { WarningOutlined } from "@ant-design/icons";
-import { Modal, Progress } from "antd";
+import { Modal } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import simpleQueueRun from "simple-queue-run";
 
 import Button from "@/components/Button";
+import Progress from "@/components/Progress";
 
 import "./index.css";
 
@@ -113,9 +114,12 @@ export default function BatchTaskProgressModal<T>({
         >
             <div className="batchTaskProgressModalProgressWrapper">
                 <Progress
-                    percent={percent}
-                    success={{ percent: successPercent }}
-                    format={() => ""}
+                    value={percent}
+                    successPercent={successPercent}
+                    aria-label={t("batch_task_progress_title")}
+                    getValueLabel={(_, details) =>
+                        `${doneNum} / ${data.length} (${details.percent ?? 0}%)`
+                    }
                 />
                 <span className="batchTaskProgressModalProgressText">
                     {doneNum} / {data.length}
