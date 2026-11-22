@@ -14,12 +14,13 @@ import {
     StarFilled,
     StarOutlined,
 } from "@ant-design/icons";
-import { message, Popconfirm, Spin } from "antd";
+import { message, Popconfirm } from "antd";
 import classNames from "clsx";
 import throttle from "lodash/throttle";
 import { Component, createRef } from "react";
 
 import Input from "@/components/Input";
+import Loading from "@/components/Loading";
 import path, { posix as pathPosix } from "@/helpers/path";
 import i18n from "@/i18n";
 
@@ -429,7 +430,7 @@ export default class Pathbar extends Component<IProps, IState> {
                                         {dirListLoadingMsg ? (
                                             <span>{dirListLoadingMsg}</span>
                                         ) : (
-                                            <Spin />
+                                            <Loading />
                                         )}
                                     </div>
                                 </li>

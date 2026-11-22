@@ -1,5 +1,6 @@
-import { Spin } from "antd";
 import { useTranslation } from "react-i18next";
+
+import Loading from "@/components/Loading";
 
 import type { ReactNode } from "react";
 
@@ -15,7 +16,7 @@ export default function PreviewState({ loading, error, children }: Props) {
         <div className="filesviewFileEditorBody">
             {loading ? (
                 <div className="filesviewFileEditorState">
-                    <Spin tip={t("file_editor_loading")} />
+                    <Loading tip={t("file_editor_loading")} />
                 </div>
             ) : error ? (
                 <div className="filesviewFileEditorState">{error}</div>

@@ -1,5 +1,4 @@
 import { useMemoizedFn, useRequest } from "ahooks";
-import { Spin } from "antd";
 import { useEffect, useState } from "react";
 
 import "./index.css";
@@ -9,6 +8,7 @@ import {
     getFsUserDirHome,
     postFavoriteDirectoryInitialize,
 } from "@/api";
+import Loading from "@/components/Loading";
 import getFsLsMapFiles, { normalizeLocalPath } from "@/helpers/getFsLsMapFiles";
 import { isMSWindows } from "@/helpers/platform";
 
@@ -110,7 +110,7 @@ export default function FilesviewLocal({
     if (!favoriteDirectoriesInitialized) {
         return (
             <div className="filesviewInitializing">
-                <Spin />
+                <Loading />
             </div>
         );
     }

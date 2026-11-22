@@ -1,8 +1,8 @@
 import { useMemoizedFn } from "ahooks";
-import { Spin } from "antd";
 import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import Loading from "@/components/Loading";
 import Pathbar from "@/components/Pathbar";
 import { isSearchUri } from "@/components/Pathbar/search";
 
@@ -152,7 +152,7 @@ export default function FilesviewBase({
             </div>
             {loading && (
                 <div className="filesviewBaseLoadLayer">
-                    <Spin spinning={loading} />
+                    <Loading />
                 </div>
             )}
         </div>

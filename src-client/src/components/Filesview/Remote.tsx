@@ -1,11 +1,11 @@
 import { useMemoizedFn, useRequest } from "ahooks";
-import { Spin } from "antd";
 import { useEffect, useRef, useState } from "react";
 
 import "./index.css";
 
 import { postFavoriteDirectoryInitialize } from "@/api";
 import { getSftpUserDirHome } from "@/api/sftp";
+import Loading from "@/components/Loading";
 import { isSftpFileUri } from "@/helpers/file_uri";
 import getSftpLsMapFiles from "@/helpers/getSftpLsMapFiles";
 import transferService from "@/services/transfer";
@@ -154,7 +154,7 @@ export default function FilesviewRemote({
     if (!favoriteDirectoriesInitialized) {
         return (
             <div className="filesviewInitializing">
-                <Spin />
+                <Loading />
             </div>
         );
     }

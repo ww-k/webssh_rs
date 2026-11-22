@@ -1,6 +1,7 @@
-import { Modal, Spin } from "antd";
+import { Modal } from "antd";
 import { useEffect, useRef, useState } from "react";
 
+import Loading from "@/components/Loading";
 import readFileAsText from "@/helpers/readFileAsText";
 
 import InputFile from "../InputFile";
@@ -106,7 +107,7 @@ export default function InputTextFromFile({
             >
                 {previewLoading ? (
                     <div className="inputTextFromFile__preview-loading">
-                        <Spin />
+                        <Loading />
                     </div>
                 ) : (
                     <pre className="inputTextFromFile__preview-content">
