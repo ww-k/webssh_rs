@@ -233,7 +233,7 @@ impl SshTerminalSession {
         channel: SshChannelGuard,
         target_system: Option<&str>,
     ) -> Result<SshChannelGuard> {
-        const PROMPT_COMMAND_APPEND: &str = r#"if [ -n "$BASH_VERSION" ]; then __webssh_prompt_command() { printf '\033]7;file://webssh%s\007' "$PWD"; }; case ";${PROMPT_COMMAND-};" in *";__webssh_prompt_command;"*) ;; *) PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }__webssh_prompt_command" ;; esac; fi; stty echo
+        const PROMPT_COMMAND_APPEND: &str = r#"if [ -n "$BASH_VERSION" ]; then __webssh_prompt_command() { printf '\033]7;file://webssh%s\007' "$PWD"; }; case ";${PROMPT_COMMAND-};" in *";__webssh_prompt_command;"*) ;; *) PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }__webssh_prompt_command" ;; esac; history -d "$((HISTCMD - 1))" 2>/dev/null; fi; stty echo
 "#;
         const NO_TERMINAL_MODES: &[(Pty, u32)] = &[];
         const NO_ECHO_TERMINAL_MODES: &[(Pty, u32)] = &[(Pty::ECHO, 0)];
