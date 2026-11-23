@@ -27,14 +27,14 @@ importers:
         specifier: 0.1.0-beta.13
         version: 0.1.0-beta.13(@types/react@19.2.10)(@ui-sdk/core@0.1.0-beta.13)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@wterm/dom':
-        specifier: ^0.5.9
-        version: 0.5.9
+        specifier: ^0.6.0
+        version: 0.6.0
       '@wterm/ghostty':
-        specifier: ^0.5.9
-        version: 0.5.9
+        specifier: ^0.6.0
+        version: 0.6.0
       '@wterm/react':
-        specifier: ^0.5.9
-        version: 0.5.9(@wterm/dom@0.5.9)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+        specifier: ^0.6.0
+        version: 0.6.0(@wterm/dom@0.6.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       ahooks:
         specifier: ^3.9.0
         version: 3.9.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -811,19 +811,19 @@ packages:
       '@types/react':
         optional: true
 
-  '@wterm/core@0.5.9':
-    resolution: {integrity: sha512-+S5VA/CGmbU60PnN8PrE8i0hWBbzUzdrbjRYsnaioMum7alubzgRQ7IJ+SWCeymX6lKA6SfzfdkdYsNffTLA1Q==}
+  '@wterm/core@0.6.0':
+    resolution: {integrity: sha512-5sKuBbMAILn1PyC5AJvTfVo+80nEAoPY+YyN0SYg3KkCV/DyUqdDzFIZQYuJN1ijTWZ/XQLh7hsmZRQtb59IYw==}
 
-  '@wterm/dom@0.5.9':
-    resolution: {integrity: sha512-0Ghz0FVbtr6g4Frk8F3I92H9UjCsIbhjQ1X8U+tly9oF172qDq685mrRPBeI8XZ5OIXK2bLr+/XAEYPUmxzwBA==}
+  '@wterm/dom@0.6.0':
+    resolution: {integrity: sha512-c638pHIx3nN0fXP8B/nERAEjBc3GsSbJmW1TN+/WaDLOU97Y/IYw35bargP6e8y8Paq0sF1AnWB9HgKIZR4QBw==}
 
-  '@wterm/ghostty@0.5.9':
-    resolution: {integrity: sha512-LzzPxJp6F53BiKWoWXm+D8kL4PLZDeNT922edOpNYm174YiuqjrMDLGEjad6dlLy6SLST9t9fzXk0/srMx6BPg==}
+  '@wterm/ghostty@0.6.0':
+    resolution: {integrity: sha512-BmRMvea3/qYJY5C+CsjrGtd0dOYy3gyT26Bajiy/xOqyv6WILTKxPSEniLWz/mPBPoMWZpmzOS0QIQK15zHhUA==}
 
-  '@wterm/react@0.5.9':
-    resolution: {integrity: sha512-LFai/uCjFZ+Csni6UpNFS/AiaKyS8FNe5d75ARzyWnAX8FTsmBpuZetaN2uiGJcJgJhmmRulYnF8HOPW/AOAUw==}
+  '@wterm/react@0.6.0':
+    resolution: {integrity: sha512-MtOGdulyMpbJEUPlc/Y6sIcJ2+3Gt6zncEmbW3rsg9kbfG0yFdW8xBk7u0SSY2J3U7sa6SxkFUlSpu8F4DcOSg==}
     peerDependencies:
-      '@wterm/dom': 0.5.9
+      '@wterm/dom': 0.6.0
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
@@ -1878,19 +1878,19 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.10
 
-  '@wterm/core@0.5.9': {}
+  '@wterm/core@0.6.0': {}
 
-  '@wterm/dom@0.5.9':
+  '@wterm/dom@0.6.0':
     dependencies:
-      '@wterm/core': 0.5.9
+      '@wterm/core': 0.6.0
 
-  '@wterm/ghostty@0.5.9':
+  '@wterm/ghostty@0.6.0':
     dependencies:
-      '@wterm/core': 0.5.9
+      '@wterm/core': 0.6.0
 
-  '@wterm/react@0.5.9(@wterm/dom@0.5.9)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
+  '@wterm/react@0.6.0(@wterm/dom@0.6.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
     dependencies:
-      '@wterm/dom': 0.5.9
+      '@wterm/dom': 0.6.0
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
 
