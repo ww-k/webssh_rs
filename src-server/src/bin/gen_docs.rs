@@ -7,7 +7,7 @@ const REDOC_HTML: &str = r#"<!DOCTYPE html>
 <html>
 
 <head>
-    <title>WebSSH RS API Documentation</title>
+    <title>Shrug API Documentation</title>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>

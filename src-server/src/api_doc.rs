@@ -125,8 +125,8 @@ use utoipa::OpenApi;
         (name = "transfer", description = "文件传输任务 API")
     ),
     info(
-        title = "WebSSH RS API",
-        description = "WebSSH RS 后端 API 文档",
+        title = "Shrug API",
+        description = "Shrug 后端 API 文档",
         version = "0.1.0",
         contact(
             name = "API Support",

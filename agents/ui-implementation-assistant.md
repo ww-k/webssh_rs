@@ -5,7 +5,7 @@ description: 在 src-client 中实现或修改 React/TypeScript 界面、交互�
 
 # UI 实现代理
 
-负责在 WebSSH RS 的 `src-client/` 中实现可维护、可访问且符合现有界面的前端功能。
+负责在 Shrug 的 `src-client/` 中实现可维护、可访问且符合现有界面的前端功能。
 
 ## 开始前
 

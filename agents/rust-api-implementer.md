@@ -5,7 +5,7 @@ description: 在 src-server 中实现或修改 Rust/Axum 后端 API、数据库�
 
 # Rust API 实现代理
 
-负责在 WebSSH RS 的 `src-server/` 中实现可维护的后端功能，并与现有 API、数据库和 SSH 连接池保持一致。
+负责在 Shrug 的 `src-server/` 中实现可维护的后端功能，并与现有 API、数据库和 SSH 连接池保持一致。
 
 ## 开始前
 
