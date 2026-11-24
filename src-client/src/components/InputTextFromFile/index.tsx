@@ -1,6 +1,6 @@
-import { Modal } from "antd";
 import { useEffect, useRef, useState } from "react";
 
+import { AppDialog } from "@/components/Dialog";
 import Loading from "@/components/Loading";
 import readFileAsText from "@/helpers/readFileAsText";
 
@@ -98,10 +98,9 @@ export default function InputTextFromFile({
                 }}
                 {...restProps}
             />
-            <Modal
+            <AppDialog
                 open={Boolean(preview)}
                 title={preview?.file.name}
-                footer={null}
                 width={720}
                 onCancel={() => setPreview(undefined)}
             >
@@ -114,7 +113,7 @@ export default function InputTextFromFile({
                         {preview?.text}
                     </pre>
                 )}
-            </Modal>
+            </AppDialog>
         </>
     );
 }

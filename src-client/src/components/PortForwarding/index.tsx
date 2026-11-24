@@ -5,15 +5,7 @@ import {
     PlusCircleTwoTone,
     ReloadOutlined,
 } from "@ant-design/icons";
-import {
-    Form,
-    InputNumber,
-    Modal,
-    message,
-    Popconfirm,
-    Space,
-    Switch,
-} from "antd";
+import { Form, InputNumber, message, Popconfirm, Space, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -29,6 +21,7 @@ import {
 } from "@/api";
 import Button from "@/components/Button";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
+import { AppDialog } from "@/components/Dialog";
 import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 import Select from "@/components/Select";
@@ -334,15 +327,24 @@ export default function PortForwarding() {
                     virtual
                 />
             </PageLayout>
-            <Modal
+            <AppDialog
                 title={t(editing ? "port_forward_edit" : "port_forward_create")}
                 open={modalOpen}
-                confirmLoading={saving}
-                okText={t("app_btn_save")}
-                cancelText={t("app_btn_cancel")}
                 onCancel={() => setModalOpen(false)}
-                onOk={() => void form.submit()}
-                destroyOnHidden
+                footer={
+                    <>
+                        <Button onClick={() => setModalOpen(false)}>
+                            {t("app_btn_cancel")}
+                        </Button>
+                        <Button
+                            loading={saving}
+                            type="primary"
+                            onClick={() => void form.submit()}
+                        >
+                            {t("app_btn_save")}
+                        </Button>
+                    </>
+                }
             >
                 <Form
                     form={form}
@@ -448,7 +450,7 @@ export default function PortForwarding() {
                         </Form.Item>
                     </Space.Compact>
                 </Form>
-            </Modal>
+            </AppDialog>
         </>
     );
 }

@@ -1,3 +1,4 @@
+import { OverlayHost } from "@ui-sdk/react/overlays";
 import { ConfigProvider, Layout, theme } from "antd";
 import { useCallback, useEffect } from "react";
 
@@ -111,6 +112,7 @@ export default function App() {
                     {activeMenuKey === "settings" && <Settings />}
                 </Content>
             </Layout>
+            <OverlayHost />
         </ConfigProvider>
     );
 }

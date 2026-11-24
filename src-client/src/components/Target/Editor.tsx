@@ -1,5 +1,5 @@
 import { InfoCircleOutlined } from "@ant-design/icons";
-import { AutoComplete, Form, InputNumber, Modal } from "antd";
+import { AutoComplete, Form, InputNumber } from "antd";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +7,7 @@ import "./Editor.css";
 
 import { getTargetList, postTargetAdd, postTargetUpdate } from "@/api";
 import Button from "@/components/Button";
+import { AppDialog } from "@/components/Dialog";
 import Input from "@/components/Input";
 import Select from "@/components/Select";
 import Tooltip from "@/components/Tooltip";
@@ -75,11 +76,10 @@ export default function TargetEditor({
     };
 
     return (
-        <Modal
+        <AppDialog
             title={data ? t("target_edit") : t("target_new")}
             width={724}
-            open={open}
-            footer={null}
+            open={Boolean(open)}
             onCancel={onCancel}
         >
             <Form
@@ -232,6 +232,6 @@ export default function TargetEditor({
                     </Button>
                 </Form.Item>
             </Form>
-        </Modal>
+        </AppDialog>
     );
 }

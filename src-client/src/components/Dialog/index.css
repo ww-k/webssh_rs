@@ -1,0 +1,194 @@
+[data-slot="dialog-backdrop"],
+[data-slot="alert-dialog-backdrop"] {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgb(0 0 0 / 45%);
+}
+
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: min(520px, calc(100vw - 32px));
+    height: fit-content;
+    max-height: calc(100vh - 32px);
+    padding: 24px;
+    overflow: hidden;
+    color: var(--ant-color-text, #1f1f1f);
+    background: var(--ant-color-bg-elevated, #fff);
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: var(--ant-border-radius-lg, 8px);
+    box-shadow:
+        0 6px 16px 0 rgb(0 0 0 / 8%),
+        0 3px 6px -4px rgb(0 0 0 / 12%),
+        0 9px 28px 8px rgb(0 0 0 / 5%);
+}
+
+[data-slot="dialog-content"][data-starting-style],
+[data-slot="dialog-content"][data-ending-style],
+[data-slot="alert-dialog-content"][data-starting-style],
+[data-slot="alert-dialog-content"][data-ending-style] {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+}
+
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
+    transition:
+        opacity 160ms ease,
+        transform 160ms ease;
+}
+
+[data-slot="dialog-content"]::backdrop,
+[data-slot="alert-dialog-content"]::backdrop {
+    background: rgb(0 0 0 / 45%);
+}
+
+[data-slot="alert-dialog-content"] > [data-slot="alert-dialog-title"] {
+    margin: 0;
+    color: var(--ant-color-text-heading, #1f1f1f);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+[data-slot="alert-dialog-content"] > [data-slot="alert-dialog-description"] {
+    margin: 12px 0 0;
+    color: var(--ant-color-text-secondary);
+    line-height: 1.5714;
+}
+
+[data-slot="alert-dialog-content"] > div:last-child {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 24px;
+}
+
+[data-slot="alert-dialog-close"] {
+    box-sizing: border-box;
+    min-width: 72px;
+    height: 32px;
+    padding: 4px 15px;
+    color: var(--ant-color-text, #1f1f1f);
+    font: inherit;
+    cursor: pointer;
+    background: var(--ant-color-bg-container, #fff);
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: var(--ant-border-radius, 6px);
+}
+
+[data-slot="alert-dialog-close"]:last-child {
+    color: var(--ant-color-text-light-solid, #fff);
+    background: var(--ant-color-primary, #1677ff);
+    border-color: var(--ant-color-primary, #1677ff);
+}
+
+.webssh-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 28px;
+}
+
+.webssh-dialog-header [data-slot="dialog-title"] {
+    flex: 1;
+    margin: 0;
+    color: var(--ant-color-text-heading);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.webssh-dialog-close {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    color: var(--ant-color-text-tertiary);
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-radius: var(--ant-border-radius-sm, 4px);
+}
+
+.webssh-dialog-close:hover,
+.webssh-dialog-close:focus-visible {
+    color: var(--ant-color-text, #1f1f1f);
+    background: var(--ant-color-fill-tertiary);
+}
+
+.webssh-dialog-body {
+    min-height: 0;
+    margin-top: 20px;
+    overflow: auto;
+}
+
+.webssh-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 24px;
+}
+
+.webssh-dialog-action {
+    box-sizing: border-box;
+    min-width: 72px;
+    height: 32px;
+    padding: 4px 15px;
+    color: var(--ant-color-text);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.5714;
+    cursor: pointer;
+    background: var(--ant-color-bg-container, #fff);
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: var(--ant-border-radius, 6px);
+}
+
+.webssh-dialog-action:hover,
+.webssh-dialog-action:focus-visible {
+    color: var(--ant-color-primary);
+    border-color: var(--ant-color-primary);
+}
+
+.webssh-dialog-action[data-variant="solid"] {
+    color: var(--ant-color-text-light-solid, #fff);
+    background: var(--ant-color-primary, #1677ff);
+    border-color: var(--ant-color-primary, #1677ff);
+}
+
+.webssh-dialog-action[data-danger="true"] {
+    color: var(--ant-color-error);
+    border-color: var(--ant-color-error);
+}
+
+.webssh-dialog-action[data-danger="true"][data-variant="solid"] {
+    color: var(--ant-color-text-light-solid, #fff);
+    background: var(--ant-color-error);
+    border-color: var(--ant-color-error);
+}
+
+.webssh-dialog-action:disabled {
+    color: var(--ant-color-text-disabled);
+    cursor: not-allowed;
+    background: var(--ant-color-bg-container-disabled);
+    border-color: var(--ant-color-border);
+}
+
+@media (max-width: 576px) {
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"] {
+        width: calc(100vw - 16px);
+        max-height: calc(100vh - 16px);
+        padding: 16px;
+    }
+}

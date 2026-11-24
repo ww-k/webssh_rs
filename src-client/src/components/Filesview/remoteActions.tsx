@@ -1,4 +1,4 @@
-import { Modal } from "antd";
+import { confirm } from "@ui-sdk/react/alert-dialog";
 
 import {
     postSftpCp,
@@ -33,34 +33,23 @@ export async function handleDelete(
             await postSftpRm(file.uri);
         }
     }
-    return new Promise<void>((resolve, reject) => {
-        const modal = Modal.confirm({
-            content: i18n.t("files_action_delete_content"),
-            okText: i18n.t("app_btn_delete"),
-            cancelText: i18n.t("app_btn_cancel"),
-            okType: "danger",
-            onOk: async () => {
-                try {
-                    if (files.length === 1) {
-                        await deleteFile(files[0]);
-                    } else {
-                        modal.destroy();
-                        await renderBatchTaskProgressModal<IViewFileStat>({
-                            data: files,
-                            action: (file) => deleteFile(file),
-                            failsRender: () =>
-                                i18n.t("files_action_batch_failed"),
-                        });
-                    }
-                    await getCwdFiles();
-                    resolve();
-                } catch (err) {
-                    reject(err);
-                }
-            },
-            onCancel: () => resolve(),
-        });
+    const confirmed = await confirm({
+        title: i18n.t("files_action_delete_content"),
+        confirmLabel: i18n.t("app_btn_delete"),
+        cancelLabel: i18n.t("app_btn_cancel"),
     });
+    if (!confirmed) return;
+
+    if (files.length === 1) {
+        await deleteFile(files[0]);
+    } else {
+        await renderBatchTaskProgressModal<IViewFileStat>({
+            data: files,
+            action: (file) => deleteFile(file),
+            failsRender: () => i18n.t("files_action_batch_failed"),
+        });
+    }
+    await getCwdFiles();
 }
 
 export async function handleRename(

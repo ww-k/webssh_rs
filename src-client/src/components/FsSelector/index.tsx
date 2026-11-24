@@ -1,8 +1,9 @@
-import { Modal, Space } from "antd";
+import { Space } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import Button from "@/components/Button";
+import { AppDialog } from "@/components/Dialog";
 import useAppStore from "@/store";
 
 import FilesviewLocal from "../Filesview/Local";
@@ -69,11 +70,10 @@ export default function FsSelector({
     }
 
     return (
-        <Modal
+        <AppDialog
             open={open}
             title={title}
             width={800}
-            centered
             onCancel={onCancel}
             footer={
                 <Space>
@@ -110,6 +110,6 @@ export default function FsSelector({
                     setSelectedFiles(selected);
                 }}
             />
-        </Modal>
+        </AppDialog>
     );
 }

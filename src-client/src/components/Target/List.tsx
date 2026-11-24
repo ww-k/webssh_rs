@@ -10,7 +10,8 @@ import {
     SearchOutlined,
     WindowsOutlined,
 } from "@ant-design/icons";
-import { Modal, message, Space } from "antd";
+import { confirm } from "@ui-sdk/react/alert-dialog";
+import { message, Space } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -156,11 +157,7 @@ const TargetTreeExpandIcon = (
     );
 };
 
-export default function TargetList({
-    tab,
-}: {
-    tab: ITab;
-}) {
+export default function TargetList({ tab }: { tab: ITab }) {
     const { t } = useTranslation();
     const setTabPath = useAppStore((state) => state.setTabPath);
     const targetDoubleClickAction = useAppStore(
@@ -519,14 +516,12 @@ export default function TargetList({
                                     size="middle"
                                     type="text"
                                     onClick={() => {
-                                        Modal.confirm({
-                                            content: "Confirm to delete?",
-                                            async onOk() {
-                                                await postTargetRemove(
-                                                    record.id,
-                                                );
-                                                await refresh();
-                                            },
+                                        void confirm({
+                                            title: "Confirm to delete?",
+                                        }).then(async (confirmed) => {
+                                            if (!confirmed) return;
+                                            await postTargetRemove(record.id);
+                                            await refresh();
                                         });
                                     }}
                                 />

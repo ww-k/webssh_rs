@@ -1,22 +1,21 @@
 import { WarningOutlined } from "@ant-design/icons";
-import { Modal } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import simpleQueueRun from "simple-queue-run";
 
 import Button from "@/components/Button";
+import { AppDialog } from "@/components/Dialog";
 import Progress from "@/components/Progress";
 
 import "./index.css";
-
-import type { ModalProps } from "antd/lib/modal";
 
 type FailResult<T> = {
     dataItem: T;
     error: unknown;
 };
 
-export type BatchTaskProgressModalProps<T> = ModalProps & {
+export type BatchTaskProgressModalProps<T> = {
+    open?: boolean;
     data: T[];
     action: (item: T) => Promise<unknown>;
     failsRender?: (failsResult: FailResult<T>[]) => React.ReactNode;
@@ -37,7 +36,7 @@ export default function BatchTaskProgressModal<T>({
     const [doneNum, setDoneNum] = useState(0);
     const [failsResult, setFailsResult] = useState<FailResult<T>[]>([]);
     const [showErrMsg, setShowErrMsg] = useState(false);
-    const abortControllerRef = useRef<AbortController>();
+    const abortControllerRef = useRef<AbortController | undefined>(undefined);
 
     function handleCancel() {
         if (abortControllerRef.current) {
@@ -92,14 +91,11 @@ export default function BatchTaskProgressModal<T>({
     }, []);
 
     return (
-        <Modal
+        <AppDialog
             title={t("batch_task_progress_title")}
-            {...modalProps}
-            transitionName=""
-            maskTransitionName=""
-            closable={false}
-            maskClosable={false}
-            keyboard={false}
+            open={Boolean(modalProps.open)}
+            dismissible={false}
+            showClose={false}
             footer={
                 loading ? (
                     <Button type="primary" danger onClick={handleCancel}>
@@ -140,6 +136,6 @@ export default function BatchTaskProgressModal<T>({
             <div style={{ display: showErrMsg ? "block" : "none" }}>
                 {failsRender?.(failsResult)}
             </div>
-        </Modal>
+        </AppDialog>
     );
 }

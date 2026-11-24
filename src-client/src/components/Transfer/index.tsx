@@ -13,7 +13,8 @@ import {
     SearchOutlined,
     StopOutlined,
 } from "@ant-design/icons";
-import { Modal, message, Segmented, Space, Typography } from "antd";
+import { confirm } from "@ui-sdk/react/alert-dialog";
+import { message, Segmented, Space, Typography } from "antd";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -320,26 +321,30 @@ const getActionItems = (
         directory
             ? transferService.resumeDirectory(record)
             : transferService.resume(record);
-    const handleCancel = () =>
-        Modal.confirm({
+    const handleCancel = () => {
+        void confirm({
             title: t("transfer_confirm_cancel_title"),
-            content: t("transfer_confirm_cancel_content", {
+            description: t("transfer_confirm_cancel_content", {
                 name: record.name,
             }),
-            okText: t("app_btn_ok"),
-            cancelText: t("app_btn_cancel"),
-            onOk: cancel,
+            confirmLabel: t("app_btn_ok"),
+            cancelLabel: t("app_btn_cancel"),
+        }).then(async (confirmed) => {
+            if (confirmed) await cancel();
         });
-    const handleDelete = () =>
-        Modal.confirm({
+    };
+    const handleDelete = () => {
+        void confirm({
             title: t("transfer_confirm_delete_title"),
-            content: t("transfer_confirm_delete_content", {
+            description: t("transfer_confirm_delete_content", {
                 name: record.name,
             }),
-            okText: t("app_btn_ok"),
-            cancelText: t("app_btn_cancel"),
-            onOk: remove,
+            confirmLabel: t("app_btn_ok"),
+            cancelLabel: t("app_btn_cancel"),
+        }).then(async (confirmed) => {
+            if (confirmed) await remove();
         });
+    };
 
     return [
         {
@@ -857,15 +862,16 @@ export default function Transfer() {
             unsubscribeTree();
         };
     }, []);
-    const handleRemoveAll = () =>
-        Modal.confirm({
+    const handleRemoveAll = () => {
+        void confirm({
             title: t("transfer_confirm_delete_all_title"),
-            content: t("transfer_confirm_delete_all_content"),
-            okText: t("app_btn_ok"),
-            cancelText: t("app_btn_cancel"),
-            okButtonProps: { danger: true },
-            onOk: () => transferService.removeAll(),
+            description: t("transfer_confirm_delete_all_content"),
+            confirmLabel: t("app_btn_ok"),
+            cancelLabel: t("app_btn_cancel"),
+        }).then(async (confirmed) => {
+            if (confirmed) await transferService.removeAll();
         });
+    };
     const typeOptions: { value: TransferTypeFilter; label: string }[] = [
         { value: "ALL", label: t("transfer_filter_all") },
         { value: "UPLOAD", label: t("transfer_type_upload") },

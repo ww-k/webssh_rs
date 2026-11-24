@@ -8,7 +8,7 @@
     height: 32px;
     padding: 4px 15px;
     overflow: hidden;
-    color: var(--ant-color-text);
+    color: var(--ant-color-text, #1f1f1f);
     font: inherit;
     font-size: 14px;
     line-height: 1.5714285714;
@@ -16,8 +16,8 @@
     text-align: center;
     text-overflow: ellipsis;
     cursor: pointer;
-    background: var(--ant-color-bg-container);
-    border: 1px solid var(--ant-color-border);
+    background: var(--ant-color-bg-container, #fff);
+    border: 1px solid var(--ant-color-border, #d9d9d9);
     border-radius: var(--ant-border-radius, 6px);
     outline: 0;
     transition: all 0.2s;
@@ -25,35 +25,35 @@
 
 [data-slot="button"].webssh-button:hover:not(:disabled),
 [data-slot="button"].webssh-button:focus-visible:not(:disabled) {
-    color: var(--ant-color-primary);
-    border-color: var(--ant-color-primary-hover);
+    color: var(--ant-color-primary, #1677ff);
+    border-color: var(--ant-color-primary-hover, #4096ff);
 }
 
 [data-slot="button"].webssh-button:focus-visible {
-    box-shadow: 0 0 0 2px var(--ant-control-outline);
+    box-shadow: 0 0 0 2px var(--ant-control-outline, rgb(5 145 255 / 10%));
 }
 
 [data-slot="button"].webssh-button:active:not(:disabled) {
-    color: var(--ant-color-primary-active);
-    border-color: var(--ant-color-primary-active);
+    color: var(--ant-color-primary-active, #0958d9);
+    border-color: var(--ant-color-primary-active, #0958d9);
 }
 
 [data-slot="button"].webssh-button-primary {
     color: var(--ant-color-text-light-solid, #fff);
-    background: var(--ant-color-primary);
+    background: var(--ant-color-primary, #1677ff);
     border-color: transparent;
 }
 
 [data-slot="button"].webssh-button-primary:hover:not(:disabled),
 [data-slot="button"].webssh-button-primary:focus-visible:not(:disabled) {
     color: var(--ant-color-text-light-solid, #fff);
-    background: var(--ant-color-primary-hover);
+    background: var(--ant-color-primary-hover, #4096ff);
     border-color: transparent;
 }
 
 [data-slot="button"].webssh-button-primary:active:not(:disabled) {
     color: var(--ant-color-text-light-solid, #fff);
-    background: var(--ant-color-primary-active);
+    background: var(--ant-color-primary-active, #0958d9);
     border-color: transparent;
 }
 

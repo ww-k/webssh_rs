@@ -1,7 +1,29 @@
-import { Checkbox, Modal, Radio, Space } from "antd";
-import { createRef } from "react";
+import { Checkbox, Radio, Space } from "antd";
+import { useEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
 
+import Button from "@/components/Button";
+import { AppDialog } from "@/components/Dialog";
 import Input from "@/components/Input";
+
+import type { ReactNode } from "react";
+
+function mountDialog<T>(render: (finish: (value: T) => void) => ReactNode) {
+    return new Promise<T>((resolve) => {
+        const div = document.createElement("div");
+        document.body.appendChild(div);
+        const root = createRoot(div);
+        let settled = false;
+        const finish = (value: T) => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+            root.unmount();
+            div.remove();
+        };
+        root.render(render(finish));
+    });
+}
 
 export interface RenderPromptOptions {
     title: string;
@@ -14,60 +36,55 @@ export interface RenderPromptOptions {
 export default function renderPrompt(
     options: RenderPromptOptions,
 ): Promise<string | undefined> {
-    return new Promise((resolve) => {
-        let value = options.defaultValue ?? "";
-        let settled = false;
-        let destroyModal = () => {};
-        const inputRef = createRef<HTMLInputElement>();
+    return mountDialog((finish) => (
+        <PromptDialog options={options} onFinish={finish} />
+    ));
+}
 
-        const finish = (result?: string) => {
-            if (settled) return;
-            settled = true;
-            resolve(result);
-        };
-
-        const handleEnter = () => {
-            finish(value);
-            destroyModal();
-        };
-
-        const input = options.password ? (
-            <Input.Password
-                ref={inputRef}
-                autoFocus={true}
-                onChange={(event) => {
-                    value = event.target.value;
-                }}
-                onPressEnter={handleEnter}
-            />
-        ) : (
-            <Input
-                ref={inputRef}
-                autoFocus={true}
-                defaultValue={value}
-                onChange={(event) => {
-                    value = event.target.value;
-                }}
-                onPressEnter={handleEnter}
-            />
-        );
-
-        const modal = Modal.confirm({
-            title: options.title,
-            autoFocusButton: null,
-            afterOpenChange: (open) => {
-                if (open) {
-                    inputRef.current?.focus();
-                }
-            },
-            content: input,
-            okText: options.okText,
-            cancelText: options.cancelText,
-            onOk: () => finish(value),
-            onCancel: () => finish(),
-        });
-        destroyModal = modal.destroy;
-    });
+function PromptDialog({
+    options,
+    onFinish,
+}: {
+    options: RenderPromptOptions;
+    onFinish: (value?: string) => void;
+}) {
+    const [value, setValue] = useState(options.defaultValue ?? "");
+    const inputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        inputRef.current?.focus();
+    }, []);
+    const inputProps = {
+        ref: inputRef,
+        autoFocus: true,
+        value,
+        onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+            setValue(event.target.value),
+        onPressEnter: () => onFinish(value),
+    };
+    return (
+        <AppDialog
+            open={true}
+            title={options.title}
+            initialFocus={() => inputRef.current}
+            onCancel={() => onFinish()}
+            footer={
+                <>
+                    <Button onClick={() => onFinish()}>
+                        {options.cancelText ?? "Cancel"}
+                    </Button>
+                    <Button type="primary" onClick={() => onFinish(value)}>
+                        {options.okText ?? "OK"}
+                    </Button>
+                </>
+            }
+        >
+            {options.password ? (
+                <Input.Password {...inputProps} />
+            ) : (
+                <Input {...inputProps} />
+            )}
+        </AppDialog>
+    );
 }
 
 export interface RenderUrlPasswordPromptOptions {
@@ -81,57 +98,60 @@ export interface RenderUrlPasswordPromptOptions {
 export function renderUrlPasswordPrompt(
     options: RenderUrlPasswordPromptOptions,
 ): Promise<{ url: string; password: string } | undefined> {
-    return new Promise((resolve) => {
-        let url = "";
-        let password = "";
-        let settled = false;
-        let destroyModal = () => {};
-        const inputRef = createRef<HTMLInputElement>();
+    return mountDialog((finish) => (
+        <UrlPasswordPromptDialog options={options} onFinish={finish} />
+    ));
+}
 
-        const finish = (result?: { url: string; password: string }) => {
-            if (settled) return;
-            settled = true;
-            resolve(result);
-        };
-
-        const handleEnter = () => {
-            finish({ url, password });
-            destroyModal();
-        };
-
-        const modal = Modal.confirm({
-            title: options.title,
-            autoFocusButton: null,
-            afterOpenChange: (open) => {
-                if (open) inputRef.current?.focus();
-            },
-            content: (
-                <Space direction="vertical" style={{ width: "100%" }}>
-                    <Input
-                        ref={inputRef}
-                        autoFocus={true}
-                        placeholder={options.urlPlaceholder}
-                        onChange={(event) => {
-                            url = event.target.value;
-                        }}
-                        onPressEnter={handleEnter}
-                    />
-                    <Input.Password
-                        placeholder={options.passwordPlaceholder}
-                        onChange={(event) => {
-                            password = event.target.value;
-                        }}
-                        onPressEnter={handleEnter}
-                    />
-                </Space>
-            ),
-            okText: options.okText,
-            cancelText: options.cancelText,
-            onOk: () => finish({ url, password }),
-            onCancel: () => finish(),
-        });
-        destroyModal = modal.destroy;
-    });
+function UrlPasswordPromptDialog({
+    options,
+    onFinish,
+}: {
+    options: RenderUrlPasswordPromptOptions;
+    onFinish: (value?: { url: string; password: string }) => void;
+}) {
+    const [url, setUrl] = useState("");
+    const [password, setPassword] = useState("");
+    const urlRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        urlRef.current?.focus();
+    }, []);
+    const finish = () => onFinish({ url, password });
+    return (
+        <AppDialog
+            open={true}
+            title={options.title}
+            initialFocus={() => urlRef.current}
+            onCancel={() => onFinish()}
+            footer={
+                <>
+                    <Button onClick={() => onFinish()}>
+                        {options.cancelText ?? "Cancel"}
+                    </Button>
+                    <Button type="primary" onClick={finish}>
+                        {options.okText ?? "OK"}
+                    </Button>
+                </>
+            }
+        >
+            <Space direction="vertical" style={{ width: "100%" }}>
+                <Input
+                    ref={urlRef}
+                    autoFocus={true}
+                    placeholder={options.urlPlaceholder}
+                    value={url}
+                    onChange={(event) => setUrl(event.target.value)}
+                    onPressEnter={finish}
+                />
+                <Input.Password
+                    placeholder={options.passwordPlaceholder}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    onPressEnter={finish}
+                />
+            </Space>
+        </AppDialog>
+    );
 }
 
 export interface RenderImportOptions {
@@ -154,94 +174,115 @@ export function renderImportOptionsPrompt(options: {
     okText?: string;
     cancelText?: string;
 }): Promise<RenderImportOptions | undefined> {
-    return new Promise((resolve) => {
-        let value: RenderImportOptions = {
-            import_settings: true,
-            import_targets: true,
-            import_favorites: true,
-            import_port_forwards: true,
-            target_conflict: "overwrite",
-        };
-        let settled = false;
-        let destroyModal = () => {};
-        const finish = (result?: RenderImportOptions) => {
-            if (settled) return;
-            settled = true;
-            resolve(result);
-            destroyModal();
-        };
-        const modal = Modal.confirm({
-            title: options.title,
-            content: (
-                <Space direction="vertical">
-                    <Checkbox
-                        defaultChecked
-                        onChange={(event) => {
-                            value = {
-                                ...value,
-                                import_settings: event.target.checked,
-                            };
-                        }}
-                    >
-                        {options.settingsLabel}
-                    </Checkbox>
-                    <Checkbox
-                        defaultChecked
-                        onChange={(event) => {
-                            value = {
-                                ...value,
-                                import_port_forwards: event.target.checked,
-                            };
-                        }}
-                    >
-                        {options.portForwardsLabel}
-                    </Checkbox>
-                    <Checkbox
-                        defaultChecked
-                        onChange={(event) => {
-                            value = {
-                                ...value,
-                                import_targets: event.target.checked,
-                            };
-                        }}
-                    >
-                        {options.targetsLabel}
-                    </Checkbox>
-                    <Checkbox
-                        defaultChecked
-                        onChange={(event) => {
-                            value = {
-                                ...value,
-                                import_favorites: event.target.checked,
-                            };
-                        }}
-                    >
-                        {options.favoritesLabel}
-                    </Checkbox>
-                    <span>{options.conflictLabel}</span>
-                    <Radio.Group
-                        defaultValue="overwrite"
-                        onChange={(event) => {
-                            value = {
-                                ...value,
-                                target_conflict: event.target.value,
-                            };
-                        }}
-                    >
-                        <Space direction="vertical">
-                            <Radio value="skip">{options.skipLabel}</Radio>
-                            <Radio value="overwrite">
-                                {options.overwriteLabel}
-                            </Radio>
-                        </Space>
-                    </Radio.Group>
-                </Space>
-            ),
-            okText: options.okText,
-            cancelText: options.cancelText,
-            onOk: () => finish(value),
-            onCancel: () => finish(),
-        });
-        destroyModal = modal.destroy;
+    return mountDialog((finish) => (
+        <ImportOptionsDialog options={options} onFinish={finish} />
+    ));
+}
+
+function ImportOptionsDialog({
+    options,
+    onFinish,
+}: {
+    options: {
+        title: string;
+        settingsLabel: string;
+        targetsLabel: string;
+        favoritesLabel: string;
+        portForwardsLabel: string;
+        conflictLabel: string;
+        skipLabel: string;
+        overwriteLabel: string;
+        okText?: string;
+        cancelText?: string;
+    };
+    onFinish: (value?: RenderImportOptions) => void;
+}) {
+    const [value, setValue] = useState<RenderImportOptions>({
+        import_settings: true,
+        import_targets: true,
+        import_favorites: true,
+        import_port_forwards: true,
+        target_conflict: "overwrite",
     });
+    return (
+        <AppDialog
+            open={true}
+            title={options.title}
+            onCancel={() => onFinish()}
+            footer={
+                <>
+                    <Button onClick={() => onFinish()}>
+                        {options.cancelText ?? "Cancel"}
+                    </Button>
+                    <Button type="primary" onClick={() => onFinish(value)}>
+                        {options.okText ?? "OK"}
+                    </Button>
+                </>
+            }
+        >
+            <Space direction="vertical">
+                <Checkbox
+                    checked={value.import_settings}
+                    onChange={(event) =>
+                        setValue((current) => ({
+                            ...current,
+                            import_settings: event.target.checked,
+                        }))
+                    }
+                >
+                    {options.settingsLabel}
+                </Checkbox>
+                <Checkbox
+                    checked={value.import_port_forwards}
+                    onChange={(event) =>
+                        setValue((current) => ({
+                            ...current,
+                            import_port_forwards: event.target.checked,
+                        }))
+                    }
+                >
+                    {options.portForwardsLabel}
+                </Checkbox>
+                <Checkbox
+                    checked={value.import_targets}
+                    onChange={(event) =>
+                        setValue((current) => ({
+                            ...current,
+                            import_targets: event.target.checked,
+                        }))
+                    }
+                >
+                    {options.targetsLabel}
+                </Checkbox>
+                <Checkbox
+                    checked={value.import_favorites}
+                    onChange={(event) =>
+                        setValue((current) => ({
+                            ...current,
+                            import_favorites: event.target.checked,
+                        }))
+                    }
+                >
+                    {options.favoritesLabel}
+                </Checkbox>
+                <span>{options.conflictLabel}</span>
+                <Radio.Group
+                    value={value.target_conflict}
+                    onChange={(event) =>
+                        setValue((current) => ({
+                            ...current,
+                            target_conflict: event.target.value,
+                        }))
+                    }
+                >
+                    <Space direction="vertical">
+                        <Radio value="skip">{options.skipLabel}</Radio>
+                        <Radio value="overwrite">
+                            {options.overwriteLabel}
+                        </Radio>
+                    </Space>
+                </Radio.Group>
+            </Space>
+        </AppDialog>
+    );
 }
