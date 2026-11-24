@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 function mountDialog<T>(render: (finish: (value: T) => void) => ReactNode) {
     return new Promise<T>((resolve) => {
         const div = document.createElement("div");
-        document.body.appendChild(div);
+        (document.getElementById("root") ?? document.body).appendChild(div);
         const root = createRoot(div);
         let settled = false;
         const finish = (value: T) => {

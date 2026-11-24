@@ -12,7 +12,7 @@ export default function renderFsSelector(option: {
 }) {
     return new Promise<string[]>((resolve, reject) => {
         const div = document.createElement("div");
-        document.body.appendChild(div);
+        (document.getElementById("root") ?? document.body).appendChild(div);
         const root = createRoot(div);
 
         function destroy() {

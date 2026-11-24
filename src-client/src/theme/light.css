@@ -1,0 +1,52 @@
+#root[data-color-scheme="light"] {
+    color-scheme: light;
+
+    --ant-border-radius: 6px;
+    --ant-border-radius-lg: 8px;
+    --ant-border-radius-sm: 4px;
+    --ant-box-shadow-secondary:
+        0 6px 16px 0 rgb(0 0 0 / 8%), 0 3px 6px -4px rgb(0 0 0 / 12%),
+        0 9px 28px 8px rgb(0 0 0 / 5%);
+    --ant-color-bg-container: #fff;
+    --ant-color-bg-container-disabled: rgb(0 0 0 / 4%);
+    --ant-color-bg-elevated: #fff;
+    --ant-color-bg-layout: #f5f5f5;
+    --ant-color-bg-mask: rgb(0 0 0 / 45%);
+    --ant-color-bg-spotlight: rgb(0 0 0 / 85%);
+    --ant-color-border: #d9d9d9;
+    --ant-color-border-secondary: #f0f0f0;
+    --ant-color-error: #ff4d4f;
+    --ant-color-error-bg: #fff2f0;
+    --ant-color-error-hover: #ff7875;
+    --ant-color-fill: rgb(0 0 0 / 15%);
+    --ant-color-fill-quaternary: rgb(0 0 0 / 2%);
+    --ant-color-fill-secondary: rgb(0 0 0 / 6%);
+    --ant-color-fill-tertiary: rgb(0 0 0 / 4%);
+    --ant-color-link: #1677ff;
+    --ant-color-primary: #1677ff;
+    --ant-color-primary-active: #0958d9;
+    --ant-color-primary-bg: #e6f4ff;
+    --ant-color-primary-bg-hover: #bae0ff;
+    --ant-color-primary-border: #91caff;
+    --ant-color-primary-hover: #4096ff;
+    --ant-color-success: #52c41a;
+    --ant-color-text: rgb(0 0 0 / 88%);
+    --ant-color-text-disabled: rgb(0 0 0 / 25%);
+    --ant-color-text-heading: rgb(0 0 0 / 88%);
+    --ant-color-text-light-solid: #fff;
+    --ant-color-text-placeholder: rgb(0 0 0 / 25%);
+    --ant-color-text-quaternary: rgb(0 0 0 / 25%);
+    --ant-color-text-secondary: rgb(0 0 0 / 65%);
+    --ant-color-text-tertiary: rgb(0 0 0 / 45%);
+    --ant-color-warning: #faad14;
+    --ant-color-white: #fff;
+    --ant-control-item-bg-active: #e6f4ff;
+    --ant-control-item-bg-active-hover: #bae0ff;
+    --ant-control-outline: rgb(5 145 255 / 10%);
+    --ant-font-family-code:
+        'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    --ant-font-size: 14px;
+    --ant-line-height: 1.5714285714285714;
+    --ant-line-type: solid;
+    --ant-line-width: 1px;
+}

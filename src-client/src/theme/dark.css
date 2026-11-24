@@ -1,0 +1,52 @@
+#root[data-color-scheme="dark"] {
+    color-scheme: dark;
+
+    --ant-border-radius: 6px;
+    --ant-border-radius-lg: 8px;
+    --ant-border-radius-sm: 4px;
+    --ant-box-shadow-secondary:
+        0 6px 16px 0 rgb(0 0 0 / 45%), 0 3px 6px -4px rgb(0 0 0 / 65%),
+        0 9px 28px 8px rgb(0 0 0 / 20%);
+    --ant-color-bg-container: #141414;
+    --ant-color-bg-container-disabled: rgb(255 255 255 / 8%);
+    --ant-color-bg-elevated: #1f1f1f;
+    --ant-color-bg-layout: #000;
+    --ant-color-bg-mask: rgb(0 0 0 / 45%);
+    --ant-color-bg-spotlight: #424242;
+    --ant-color-border: #424242;
+    --ant-color-border-secondary: #303030;
+    --ant-color-error: #dc4446;
+    --ant-color-error-bg: #2c1618;
+    --ant-color-error-hover: #e86e6b;
+    --ant-color-fill: rgb(255 255 255 / 18%);
+    --ant-color-fill-quaternary: rgb(255 255 255 / 4%);
+    --ant-color-fill-secondary: rgb(255 255 255 / 12%);
+    --ant-color-fill-tertiary: rgb(255 255 255 / 8%);
+    --ant-color-link: #1668dc;
+    --ant-color-primary: #1668dc;
+    --ant-color-primary-active: #1554ad;
+    --ant-color-primary-bg: #111a2c;
+    --ant-color-primary-bg-hover: #112545;
+    --ant-color-primary-border: #15325b;
+    --ant-color-primary-hover: #3c89e8;
+    --ant-color-success: #49aa19;
+    --ant-color-text: rgb(255 255 255 / 85%);
+    --ant-color-text-disabled: rgb(255 255 255 / 25%);
+    --ant-color-text-heading: rgb(255 255 255 / 85%);
+    --ant-color-text-light-solid: #fff;
+    --ant-color-text-placeholder: rgb(255 255 255 / 25%);
+    --ant-color-text-quaternary: rgb(255 255 255 / 25%);
+    --ant-color-text-secondary: rgb(255 255 255 / 65%);
+    --ant-color-text-tertiary: rgb(255 255 255 / 45%);
+    --ant-color-warning: #d89614;
+    --ant-color-white: #fff;
+    --ant-control-item-bg-active: #111a2c;
+    --ant-control-item-bg-active-hover: #112545;
+    --ant-control-outline: rgb(17 26 44 / 20%);
+    --ant-font-family-code:
+        'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    --ant-font-size: 14px;
+    --ant-line-height: 1.5714285714285714;
+    --ant-line-type: solid;
+    --ant-line-width: 1px;
+}

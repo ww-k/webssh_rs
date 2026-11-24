@@ -27,7 +27,7 @@ export default function renderBatchTaskProgressModal<T>(
 ) {
     return new Promise((resolve, reject) => {
         const div = document.createElement("div");
-        document.body.appendChild(div);
+        (document.getElementById("root") ?? document.body).appendChild(div);
         const root = createRoot(div);
 
         function onOk() {

@@ -37,6 +37,10 @@ export function AppDialog({
     showClose = true,
     onCancel,
 }: AppDialogProps) {
+    const container =
+        typeof document === "undefined"
+            ? undefined
+            : (document.getElementById("root") ?? undefined);
     const contentClassName = ["webssh-dialog-content", className]
         .filter(Boolean)
         .join(" ");
@@ -50,6 +54,7 @@ export function AppDialog({
     return (
         <Dialog
             open={open}
+            container={container}
             dismissible={dismissible}
             closeOnOutsidePress={dismissible}
             onOpenChange={(next) => {
@@ -59,6 +64,7 @@ export function AppDialog({
             <DialogBackdrop className="webssh-dialog-backdrop" />
             <DialogContent
                 className={contentClassName}
+                container={container}
                 initialFocus={initialFocus}
                 style={style}
             >

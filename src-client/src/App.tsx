@@ -1,6 +1,6 @@
 import { OverlayHost } from "@ui-sdk/react/overlays";
 import { ConfigProvider, Layout, theme } from "antd";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useLayoutEffect } from "react";
 
 import "./App.css";
 
@@ -9,6 +9,7 @@ import zhCN from "antd/locale/zh_CN";
 import { useTranslation } from "react-i18next";
 
 import useAppStore from "@/store";
+import { applyThemeToRoot } from "@/theme";
 
 import Home from "./components/Home";
 import PortForwarding from "./components/PortForwarding";
@@ -19,11 +20,10 @@ import SshConnections from "./components/SshConnections";
 import SshKnownHosts from "./components/SshKnownHosts";
 import Transfer from "./components/Transfer";
 
-const { darkAlgorithm, defaultAlgorithm } = theme;
 const { Content } = Layout;
 export default function App() {
     const { i18n } = useTranslation();
-    const theme = useAppStore((state) => state.theme);
+    const appTheme = useAppStore((state) => state.theme);
     const setTheme = useAppStore((state) => state.setTheme);
     const sidebarCollapsed = useAppStore((state) => state.sidebarCollapsed);
     const setSidebarCollapsed = useAppStore(
@@ -31,6 +31,10 @@ export default function App() {
     );
     const activeMenuKey = useAppStore((state) => state.activeMenuKey);
     const setMenuKey = useAppStore((state) => state.setMenuKey);
+
+    useLayoutEffect(() => {
+        applyThemeToRoot(appTheme);
+    }, [appTheme]);
 
     useEffect(() => {
         console.log("App init");
@@ -89,7 +93,10 @@ export default function App() {
             theme={{
                 cssVar: {},
                 hashed: false,
-                algorithm: theme === "dark" ? darkAlgorithm : defaultAlgorithm,
+                algorithm:
+                    appTheme === "dark"
+                        ? theme.darkAlgorithm
+                        : theme.defaultAlgorithm,
             }}
         >
             <Layout

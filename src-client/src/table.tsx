@@ -1,17 +1,20 @@
 import { App as AntdApp, ConfigProvider, theme } from "antd";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./App.css";
 
 import DataTableDemo from "./components/DataTableDemo";
 import useAppStore from "./store";
-
-const { darkAlgorithm, defaultAlgorithm } = theme;
+import { applyThemeToRoot } from "./theme";
 
 function TableDemoApp() {
     const appTheme = useAppStore((state) => state.theme);
     const setTheme = useAppStore((state) => state.setTheme);
+
+    useLayoutEffect(() => {
+        applyThemeToRoot(appTheme);
+    }, [appTheme]);
 
     useEffect(() => {
         const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -30,7 +33,9 @@ function TableDemoApp() {
                 cssVar: {},
                 hashed: false,
                 algorithm:
-                    appTheme === "dark" ? darkAlgorithm : defaultAlgorithm,
+                    appTheme === "dark"
+                        ? theme.darkAlgorithm
+                        : theme.defaultAlgorithm,
             }}
         >
             <AntdApp>
