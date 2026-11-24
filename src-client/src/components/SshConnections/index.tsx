@@ -3,7 +3,8 @@ import {
     DisconnectOutlined,
     ReloadOutlined,
 } from "@ant-design/icons";
-import { message, Popconfirm, Space, Tag, Typography } from "antd";
+import { toast } from "@ui-sdk/react/toast";
+import { Popconfirm, Space, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -42,7 +43,7 @@ export default function SshConnections() {
             setConnections(connectionList);
             setTargets(targetList);
         } catch {
-            message.error(t("ssh_connections_load_failed"));
+            toast.error(t("ssh_connections_load_failed"));
         } finally {
             setLoading(false);
         }
@@ -63,14 +64,14 @@ export default function SshConnections() {
                 };
                 if (action === "expire") {
                     await postSshConnectionExpire(params);
-                    message.success(t("ssh_connections_expire_success"));
+                    toast.success(t("ssh_connections_expire_success"));
                 } else {
                     await postSshConnectionClose(params);
-                    message.success(t("ssh_connections_close_success"));
+                    toast.success(t("ssh_connections_close_success"));
                 }
                 await loadConnections();
             } catch {
-                message.error(
+                toast.error(
                     action === "expire"
                         ? t("ssh_connections_expire_failed")
                         : t("ssh_connections_close_failed"),

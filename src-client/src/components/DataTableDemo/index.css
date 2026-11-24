@@ -10,6 +10,28 @@
     font-weight: 600;
 }
 
+.DataTableDemoToolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    max-width: 100%;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.DataTableDemoToolbar > span {
+    margin-right: 8px;
+    color: var(--ant-color-text-secondary);
+}
+
+@media (max-width: 600px) {
+    .DataTableDemoToolbar > span {
+        flex-basis: 100%;
+        margin-right: 0;
+        text-align: right;
+    }
+}
+
 .DataTableDemoContent {
     display: flex;
     flex-direction: column;

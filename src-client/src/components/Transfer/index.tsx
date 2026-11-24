@@ -14,7 +14,8 @@ import {
     StopOutlined,
 } from "@ant-design/icons";
 import { confirm } from "@ui-sdk/react/alert-dialog";
-import { message, Segmented, Space, Typography } from "antd";
+import { toast } from "@ui-sdk/react/toast";
+import { Segmented, Space, Typography } from "antd";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -302,7 +303,7 @@ const getActionItems = (
         if (!record.local_path) return;
         postFsShowInFolder(record.local_path).catch((err) => {
             console.warn("Show transfer in folder failed", err);
-            message.error(t("transfer_show_in_folder_failed"));
+            toast.error(t("transfer_show_in_folder_failed"));
         });
     };
     const cancel = () =>

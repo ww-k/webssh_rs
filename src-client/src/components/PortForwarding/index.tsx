@@ -5,7 +5,8 @@ import {
     PlusCircleTwoTone,
     ReloadOutlined,
 } from "@ant-design/icons";
-import { Form, InputNumber, message, Popconfirm, Space, Switch } from "antd";
+import { toast } from "@ui-sdk/react/toast";
+import { Form, InputNumber, Popconfirm, Space, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -66,7 +67,7 @@ export default function PortForwarding() {
             setForwards(forwardList);
             setTargets(targetList);
         } catch {
-            message.error(t("port_forward_load_failed"));
+            toast.error(t("port_forward_load_failed"));
         } finally {
             setLoading(false);
         }
@@ -116,7 +117,7 @@ export default function PortForwarding() {
                         ),
                     );
                 }
-                message.success(
+                toast.success(
                     t(
                         editing
                             ? "port_forward_update_success"
@@ -126,7 +127,7 @@ export default function PortForwarding() {
                 setModalOpen(false);
                 if (!editing) await load();
             } catch {
-                message.error(
+                toast.error(
                     t(
                         editing
                             ? "port_forward_update_failed"
@@ -146,9 +147,9 @@ export default function PortForwarding() {
             try {
                 await postPortForwardRemove(id);
                 setForwards((items) => items.filter((item) => item.id !== id));
-                message.success(t("port_forward_remove_success"));
+                toast.success(t("port_forward_remove_success"));
             } catch {
-                message.error(t("port_forward_remove_failed"));
+                toast.error(t("port_forward_remove_failed"));
             } finally {
                 setRemovingId(undefined);
             }
@@ -169,7 +170,7 @@ export default function PortForwarding() {
                         current.id === updated.id ? updated : current,
                     ),
                 );
-                message.success(
+                toast.success(
                     t(
                         updated.enabled
                             ? "port_forward_enable_success"
@@ -177,7 +178,7 @@ export default function PortForwarding() {
                     ),
                 );
             } catch {
-                message.error(
+                toast.error(
                     t(
                         item.enabled
                             ? "port_forward_disable_failed"

@@ -1,5 +1,7 @@
+import { toast } from "@ui-sdk/react/toast";
 import { useCallback, useMemo, useState } from "react";
 
+import Button from "@/components/Button";
 import DataTable, { type DataTableDropEvent } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
 
@@ -114,7 +116,23 @@ export default function DataTableDemo() {
                     <span>{demoData.length.toLocaleString()} rows</span>
                 </>
             }
-            toolbar={<span>{selected.length.toLocaleString()} selected</span>}
+            toolbar={
+                <div className="DataTableDemoToolbar">
+                    <span>{selected.length.toLocaleString()} selected</span>
+                    <Button
+                        type="primary"
+                        onClick={() => toast.success("Changes saved")}
+                    >
+                        Show success toast
+                    </Button>
+                    <Button
+                        danger
+                        onClick={() => toast.error("Something went wrong")}
+                    >
+                        Show error toast
+                    </Button>
+                </div>
+            }
             contentProps={{ className: "DataTableDemoContent" }}
         >
             <DataTable

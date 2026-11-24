@@ -1,4 +1,4 @@
-import { message } from "antd";
+import { toast } from "@ui-sdk/react/toast";
 import axios from "axios";
 
 function getErrorMessage(error: unknown): string {
@@ -44,11 +44,11 @@ axios.interceptors.response.use(undefined, (error) => {
                 } catch {
                     // Keep Axios' original error when the response is not JSON.
                 }
-                message.error(getErrorMessage(error));
+                toast.error(getErrorMessage(error));
                 return Promise.reject(error);
             });
         }
-        message.error(getErrorMessage(error));
+        toast.error(getErrorMessage(error));
     }
     return Promise.reject(error);
 });

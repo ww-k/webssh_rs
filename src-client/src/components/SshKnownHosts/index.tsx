@@ -1,5 +1,6 @@
 import { DeleteOutlined, KeyOutlined, ReloadOutlined } from "@ant-design/icons";
-import { message, Popconfirm, Typography } from "antd";
+import { toast } from "@ui-sdk/react/toast";
+import { Popconfirm, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,7 +28,7 @@ export default function SshKnownHosts() {
             try {
                 setKnownHosts(await getSshKnownHostList());
             } catch {
-                if (showError) message.error(t("ssh_known_hosts_load_failed"));
+                if (showError) toast.error(t("ssh_known_hosts_load_failed"));
             } finally {
                 setLoading(false);
             }
@@ -44,10 +45,10 @@ export default function SshKnownHosts() {
             setRemovingId(knownHost.id);
             try {
                 await postSshKnownHostRemove(knownHost.id);
-                message.success(t("ssh_known_hosts_remove_success"));
+                toast.success(t("ssh_known_hosts_remove_success"));
                 await loadKnownHosts();
             } catch {
-                message.error(t("ssh_known_hosts_remove_failed"));
+                toast.error(t("ssh_known_hosts_remove_failed"));
             } finally {
                 setRemovingId(undefined);
             }

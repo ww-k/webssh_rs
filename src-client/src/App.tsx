@@ -1,4 +1,3 @@
-import { OverlayHost } from "@ui-sdk/react/overlays";
 import { ConfigProvider, Layout, theme } from "antd";
 import { useCallback, useEffect, useLayoutEffect } from "react";
 
@@ -11,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import useAppStore from "@/store";
 import { applyThemeToRoot } from "@/theme";
 
+import AppOverlayHost from "./components/AppOverlayHost";
 import Home from "./components/Home";
 import PortForwarding from "./components/PortForwarding";
 import ServerLogs from "./components/ServerLogs";
@@ -119,7 +119,7 @@ export default function App() {
                     {activeMenuKey === "settings" && <Settings />}
                 </Content>
             </Layout>
-            <OverlayHost />
+            <AppOverlayHost />
         </ConfigProvider>
     );
 }

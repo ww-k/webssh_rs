@@ -1,5 +1,6 @@
 import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
-import { Empty, message, Space } from "antd";
+import { toast } from "@ui-sdk/react/toast";
+import { Empty, Space } from "antd";
 import {
     type ReactNode,
     useCallback,
@@ -171,7 +172,7 @@ export default function ServerLogs() {
                 !errorReported
             ) {
                 errorReported = true;
-                message.error(t("server_logs_load_failed"));
+                toast.error(t("server_logs_load_failed"));
             }
         };
 

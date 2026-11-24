@@ -11,7 +11,8 @@ import {
     WindowsOutlined,
 } from "@ant-design/icons";
 import { confirm } from "@ui-sdk/react/alert-dialog";
-import { message, Space } from "antd";
+import { toast } from "@ui-sdk/react/toast";
+import { Space } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -301,7 +302,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                         "[drag-debug] TargetList reorder directories failed",
                         error,
                     );
-                    message.error(t("target_move_failed"));
+                    toast.error(t("target_move_failed"));
                     await refresh();
                 }
                 return;
@@ -413,7 +414,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     "[drag-debug] TargetList move targets failed",
                     error,
                 );
-                message.error(t("target_move_failed"));
+                toast.error(t("target_move_failed"));
                 await refresh();
             }
         },

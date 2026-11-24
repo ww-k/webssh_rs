@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 
 import "./App.css";
 
+import AppOverlayHost from "./components/AppOverlayHost";
 import DataTableDemo from "./components/DataTableDemo";
 import useAppStore from "./store";
 import { applyThemeToRoot } from "./theme";
@@ -41,6 +42,7 @@ function TableDemoApp() {
             <AntdApp>
                 <DataTableDemo />
             </AntdApp>
+            <AppOverlayHost />
         </ConfigProvider>
     );
 }

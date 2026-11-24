@@ -12,10 +12,10 @@ import {
     SunOutlined,
     UploadOutlined,
 } from "@ant-design/icons";
+import { toast } from "@ui-sdk/react/toast";
 import {
     ColorPicker,
     InputNumber,
-    message,
     Segmented,
     Space,
     Switch,
@@ -116,15 +116,15 @@ export default function Settings() {
             serverPort < 1 ||
             serverPort > 65535
         ) {
-            message.error(t("settings_server_port_invalid"));
+            toast.error(t("settings_server_port_invalid"));
             return;
         }
         setServerPortSaving(true);
         try {
             await setServerPort(serverPort);
-            message.success(t("settings_server_port_saved"));
+            toast.success(t("settings_server_port_saved"));
         } catch {
-            message.error(t("settings_server_port_save_failed"));
+            toast.error(t("settings_server_port_save_failed"));
         } finally {
             setServerPortSaving(false);
         }
@@ -203,9 +203,9 @@ export default function Settings() {
                     fileName: `webssh-user-data-${new Date().toISOString().slice(0, 10)}.json`,
                 },
             );
-            message.success(t("settings_data_export_success"));
+            toast.success(t("settings_data_export_success"));
         } catch {
-            message.error(t("settings_data_export_failed"));
+            toast.error(t("settings_data_export_failed"));
         }
     };
 
@@ -214,7 +214,7 @@ export default function Settings() {
     ) => {
         if (!result.settings) {
             window.dispatchEvent(new Event("webssh:user-data-imported"));
-            message.success(
+            toast.success(
                 t("settings_data_import_success", {
                     added: result.addedTargets,
                     updated: result.updatedTargets,
@@ -255,7 +255,7 @@ export default function Settings() {
             }
         }
         setLanguage(result.settings.language as "zh" | "en");
-        message.success(
+        toast.success(
             t("settings_data_import_success", {
                 added: result.addedTargets,
                 updated: result.updatedTargets,
@@ -307,7 +307,7 @@ export default function Settings() {
         try {
             await importData(JSON.parse(await file.text()) as unknown);
         } catch (error) {
-            message.error(
+            toast.error(
                 t(
                     `settings_data_import_error_${getUserDataImportErrorType(
                         error,
@@ -355,7 +355,7 @@ export default function Settings() {
             );
             applyImportedData(result);
         } catch (error) {
-            message.error(
+            toast.error(
                 t(
                     `settings_data_import_url_error_${getUserDataImportErrorType(
                         error,

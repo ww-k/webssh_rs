@@ -1,4 +1,4 @@
-import { message } from "antd";
+import { toast } from "@ui-sdk/react/toast";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -50,7 +50,7 @@ export default function EditableFilePreview({ file, lineWrapping }: Props) {
                 file.uri,
                 new Blob([content], { type: "text/plain;charset=utf-8" }),
             );
-            message.success(t("file_editor_save_success"));
+            toast.success(t("file_editor_save_success"));
         } catch {
             setError(t("file_editor_save_failed"));
         } finally {

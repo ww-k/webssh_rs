@@ -14,7 +14,8 @@ import {
     StarFilled,
     StarOutlined,
 } from "@ant-design/icons";
-import { message, Popconfirm } from "antd";
+import { toast } from "@ui-sdk/react/toast";
+import { Popconfirm } from "antd";
 import classNames from "clsx";
 import throttle from "lodash/throttle";
 import { Component, createRef } from "react";
@@ -1221,7 +1222,7 @@ export default class Pathbar extends Component<IProps, IState> {
                     location.targetId,
                 )
             ) {
-                message.error(
+                toast.error(
                     i18n.t("pathbar_favorite_directory_update_failed"),
                 );
             }
@@ -1307,7 +1308,7 @@ export default class Pathbar extends Component<IProps, IState> {
                     location.targetId,
                 )
             ) {
-                message.error(
+                toast.error(
                     i18n.t("pathbar_favorite_directory_update_failed"),
                 );
             }
