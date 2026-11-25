@@ -15,7 +15,7 @@ import {
 } from "@ant-design/icons";
 import { confirm } from "@ui-sdk/react/alert-dialog";
 import { toast } from "@ui-sdk/react/toast";
-import { Segmented, Space, Typography } from "antd";
+import { Space, Typography } from "antd";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -23,6 +23,7 @@ import Button from "@/components/Button";
 import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 import Progress from "@/components/Progress";
+import Segmented from "@/components/Segmented";
 import Tooltip from "@/components/Tooltip";
 
 import "./index.css";

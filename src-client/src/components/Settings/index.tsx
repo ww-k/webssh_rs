@@ -13,20 +13,14 @@ import {
     UploadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import {
-    ColorPicker,
-    InputNumber,
-    Segmented,
-    Space,
-    Switch,
-    Typography,
-} from "antd";
+import { ColorPicker, InputNumber, Space, Switch, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./index.css";
 
 import Button from "@/components/Button";
+import Segmented from "@/components/Segmented";
 import Select from "@/components/Select";
 import fileSave from "@/helpers/fileSave";
 import renderPrompt, {
@@ -393,6 +387,7 @@ export default function Settings() {
                         <Text type="secondary">{t("settings_theme_help")}</Text>
                     </div>
                     <Segmented
+                        aria-label={t("settings_theme")}
                         value={themeMode}
                         onChange={(value) => setTheme(value as ThemeMode)}
                         options={[
@@ -539,6 +534,7 @@ export default function Settings() {
                         </Text>
                     </div>
                     <Segmented
+                        aria-label={t("settings_terminal_right_click_action")}
                         value={terminalRightClickAction}
                         options={[
                             {
@@ -612,6 +608,7 @@ export default function Settings() {
                         </Text>
                     </div>
                     <Segmented
+                        aria-label={t("settings_target_double_click")}
                         value={targetDoubleClickAction}
                         options={[
                             {

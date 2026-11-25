@@ -8,6 +8,7 @@ import Input from "@/components/Input";
 import Loading from "@/components/Loading";
 import Popconfirm from "@/components/Popconfirm";
 import Progress from "@/components/Progress";
+import Segmented from "@/components/Segmented";
 import Select from "@/components/Select";
 import Tooltip from "@/components/Tooltip";
 
@@ -35,6 +36,7 @@ export default function UiComponentShowcase({
     const [password, setPassword] = useState("ssh-secret");
     const [environment, setEnvironment] = useState<string | null>("staging");
     const [progress, setProgress] = useState(68);
+    const [density, setDensity] = useState("comfortable");
     const [loading, setLoading] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [profileDeleted, setProfileDeleted] = useState(false);
@@ -81,7 +83,7 @@ export default function UiComponentShowcase({
                     >
                         {theme === "dark" ? "Light theme" : "Dark theme"}
                     </Button>
-                    <span>7 components</span>
+                    <span>8 components</span>
                     <span className="UiComponentShowcaseMetaDot" />
                     <span>Interactive examples</span>
                 </div>
@@ -445,6 +447,52 @@ export default function UiComponentShowcase({
                             <strong>
                                 {profileDeleted ? "Deleted" : "Saved"}
                             </strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="UiComponentCard">
+                    <div className="UiComponentCardHeading">
+                        <div>
+                            <p className="UiComponentCardKicker">
+                                08 / Controls
+                            </p>
+                            <h2>Segmented</h2>
+                        </div>
+                        <span className="UiComponentCardSource">
+                            components/Segmented
+                        </span>
+                    </div>
+                    <p className="UiComponentCardDescription">
+                        Compact single-choice controls with icons, keyboard
+                        navigation, and a moving selection indicator.
+                    </p>
+                    <div className="UiComponentExampleStack">
+                        <Segmented
+                            aria-label="Workspace density"
+                            options={[
+                                {
+                                    value: "comfortable",
+                                    label: "Comfortable",
+                                    icon: <Sun aria-hidden="true" size={14} />,
+                                },
+                                {
+                                    value: "compact",
+                                    label: "Compact",
+                                    icon: <Moon aria-hidden="true" size={14} />,
+                                },
+                                {
+                                    value: "automatic",
+                                    label: "Automatic",
+                                    disabled: true,
+                                },
+                            ]}
+                            value={density}
+                            onChange={setDensity}
+                        />
+                        <div className="UiComponentValuePreview">
+                            <span>Selected density</span>
+                            <strong>{density}</strong>
                         </div>
                     </div>
                 </section>
