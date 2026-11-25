@@ -59,6 +59,7 @@ impl PortForwardManager {
                 PortForwardTask {
                     info: PortForwardInfo {
                         id: row.id,
+                        name: row.name,
                         local_host: row.local_host,
                         local_port: row.local_port,
                         remote_host: row.remote_host,
@@ -104,6 +105,13 @@ impl PortForwardManager {
                 message: "local_port and remote_port must be between 1 and 65535".into(),
             });
         }
+        let name = payload.name.trim().to_string();
+        if name.is_empty() {
+            return Err(ApiErr {
+                code: ERR_CODE_PORT_FORWARD,
+                message: "name must not be empty".into(),
+            });
+        }
         let remote_host = payload.remote_host.trim().to_string();
         if remote_host.is_empty() {
             return Err(ApiErr {
@@ -130,6 +138,7 @@ impl PortForwardManager {
         let id = nanoid::nanoid!();
         let info = PortForwardInfo {
             id: id.clone(),
+            name,
             local_host,
             local_port: payload.local_port,
             remote_host: remote_host.clone(),
@@ -140,6 +149,7 @@ impl PortForwardManager {
         let task = self.start_listener(&info).await?;
         let model = port_forward::ActiveModel {
             id: Set(info.id.clone()),
+            name: Set(info.name.clone()),
             target_id: Set(info.target_id),
             local_host: Set(info.local_host.clone()),
             local_port: Set(info.local_port),
@@ -356,6 +366,13 @@ impl PortForwardManager {
                 message: "local_port and remote_port must be between 1 and 65535".into(),
             });
         }
+        let name = payload.name.trim().to_string();
+        if name.is_empty() {
+            return Err(ApiErr {
+                code: ERR_CODE_PORT_FORWARD,
+                message: "name must not be empty".into(),
+            });
+        }
         let local_host = payload.local_host.trim().to_string();
         let remote_host = payload.remote_host.trim().to_string();
         if local_host.is_empty() || remote_host.is_empty() {
@@ -387,6 +404,7 @@ impl PortForwardManager {
         };
         let mut updated = PortForwardInfo {
             id: payload.id.clone(),
+            name,
             local_host,
             local_port: payload.local_port,
             remote_host,
@@ -421,6 +439,7 @@ impl PortForwardManager {
         item.task = new_task;
         let model = port_forward::ActiveModel::from(port_forward::Model {
             id: updated.id.clone(),
+            name: updated.name.clone(),
             target_id: updated.target_id,
             local_host: updated.local_host.clone(),
             local_port: updated.local_port,

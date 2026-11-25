@@ -35,6 +35,8 @@ pub struct UserDataFavoriteDirectory {
 #[derive(Debug, Deserialize, Serialize, Clone, ToSchema)]
 pub struct UserDataPortForward {
     pub id: String,
+    #[serde(default)]
+    pub name: String,
     pub target_id: i32,
     #[serde(default = "default_local_host")]
     pub local_host: String,

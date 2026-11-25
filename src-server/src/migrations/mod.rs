@@ -12,6 +12,7 @@ mod m000009_preference_tabs;
 mod m000010_transfer_task_parent;
 mod m000011_port_forward;
 mod m000012_tab_active_child;
+mod m000013_port_forward_name;
 
 pub struct Migrator;
 
@@ -31,6 +32,7 @@ impl MigratorTrait for Migrator {
             Box::new(m000010_transfer_task_parent::Migration),
             Box::new(m000011_port_forward::Migration),
             Box::new(m000012_tab_active_child::Migration),
+            Box::new(m000013_port_forward_name::Migration),
         ]
     }
 }

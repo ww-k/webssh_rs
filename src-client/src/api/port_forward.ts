@@ -2,6 +2,7 @@ import axios from "axios";
 
 export interface IPortForward {
     id: string;
+    name: string;
     local_host: string;
     local_port: number;
     remote_host: string;
@@ -11,6 +12,7 @@ export interface IPortForward {
 }
 
 export interface IPortForwardPayload {
+    name: string;
     target_id: number;
     local_host: string;
     local_port: number;

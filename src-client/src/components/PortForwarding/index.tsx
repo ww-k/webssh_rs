@@ -32,6 +32,7 @@ import Tooltip from "@/components/Tooltip";
 import type { IPortForward, ITarget } from "@/api";
 
 type PortForwardFormValues = {
+    name: string;
     target_id: number;
     local_host: string;
     local_port: number;
@@ -92,6 +93,7 @@ export default function PortForwarding() {
         (item: IPortForward) => {
             setEditing(item);
             form.setFieldsValue({
+                name: item.name,
                 target_id: item.target_id,
                 local_host: item.local_host,
                 local_port: item.local_port,
@@ -194,6 +196,11 @@ export default function PortForwarding() {
 
     const columns: DataTableColumn<IPortForward>[] = useMemo(
         () => [
+            {
+                id: "name",
+                header: t("port_forward_column_name"),
+                accessor: (item) => item.name,
+            },
             {
                 id: "local_target",
                 header: t("port_forward_column_local_target"),
@@ -352,6 +359,21 @@ export default function PortForwarding() {
                     layout="vertical"
                     onFinish={(values) => void create(values)}
                 >
+                    <Form.Item
+                        label={t("port_forward_name")}
+                        name="name"
+                        rules={[
+                            {
+                                required: true,
+                                whitespace: true,
+                                message: t("port_forward_name_required"),
+                            },
+                        ]}
+                    >
+                        <Input
+                            placeholder={t("port_forward_name_placeholder")}
+                        />
+                    </Form.Item>
                     <Form.Item
                         label={t("port_forward_jump_host")}
                         name="target_id"

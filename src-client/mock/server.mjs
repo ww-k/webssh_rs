@@ -273,6 +273,7 @@ async function handlePortForward(request, response, pathname) {
         const payload = await readJson(request);
         const item = {
             id: `mock-forward-${randomUUID()}`,
+            name: payload.name || "",
             local_host: payload.local_host || "127.0.0.1",
             local_port: Number(payload.local_port),
             remote_host: payload.remote_host,
@@ -290,6 +291,7 @@ async function handlePortForward(request, response, pathname) {
         );
         if (!item) return sendNotFound(response, "Port forwarding", payload.id);
         Object.assign(item, {
+            name: payload.name || "",
             target_id: Number(payload.target_id),
             local_host: payload.local_host,
             local_port: Number(payload.local_port),
@@ -512,6 +514,7 @@ async function handleUserData(request, response, pathname) {
                 );
                 const item = {
                     ...forward,
+                    name: forward.name || "",
                     local_host: forward.local_host || "127.0.0.1",
                     enabled: false,
                 };

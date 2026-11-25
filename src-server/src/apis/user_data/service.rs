@@ -64,6 +64,7 @@ pub async fn export(
             .into_iter()
             .map(|forward| UserDataPortForward {
                 id: forward.id,
+                name: forward.name,
                 target_id: forward.target_id,
                 local_host: forward.local_host,
                 local_port: forward.local_port,
@@ -372,6 +373,7 @@ async fn import_in_transaction<C: ConnectionTrait>(
         }
         let model = port_forward::Model {
             id: forward.id,
+            name: forward.name,
             target_id,
             local_host: forward.local_host,
             local_port: forward.local_port,
@@ -385,6 +387,7 @@ async fn import_in_transaction<C: ConnectionTrait>(
                 .await
         )? {
             let mut active = port_forward::ActiveModel::from(existing);
+            active.name = Set(model.name);
             active.target_id = Set(model.target_id);
             active.local_host = Set(model.local_host);
             active.local_port = Set(model.local_port);
