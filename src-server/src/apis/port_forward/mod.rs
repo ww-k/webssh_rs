@@ -437,16 +437,16 @@ impl PortForwardManager {
         updated.enabled = old.enabled;
         item.info = updated.clone();
         item.task = new_task;
-        let model = port_forward::ActiveModel::from(port_forward::Model {
-            id: updated.id.clone(),
-            name: updated.name.clone(),
-            target_id: updated.target_id,
-            local_host: updated.local_host.clone(),
-            local_port: updated.local_port,
-            remote_host: updated.remote_host.clone(),
-            remote_port: updated.remote_port,
-            enabled: updated.enabled,
-        });
+        let model = port_forward::ActiveModel {
+            id: Set(updated.id.clone()),
+            name: Set(updated.name.clone()),
+            target_id: Set(updated.target_id),
+            local_host: Set(updated.local_host.clone()),
+            local_port: Set(updated.local_port),
+            remote_host: Set(updated.remote_host.clone()),
+            remote_port: Set(updated.remote_port),
+            enabled: Set(updated.enabled),
+        };
         map_db_err!(model.update(&self.db).await)?;
         info!("forward_id={} forwarding configuration updated", updated.id);
         Ok(updated)

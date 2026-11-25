@@ -41,9 +41,14 @@ impl MigratorTrait for Migrator {
 mod tests {
     use std::fmt::Debug;
 
-    use crate::entities::target;
-    use crate::{Migrator, MigratorTrait};
-    use sea_orm::{ActiveModelTrait, Database, FromQueryResult, Statement};
+    use crate::Migrator;
+    use crate::{
+        entities::{port_forward, target},
+        migrations::MigratorTrait,
+    };
+    use sea_orm::{
+        ActiveModelTrait, ActiveValue::Set, Database, EntityTrait, FromQueryResult, Statement,
+    };
 
     use super::*; // 导入外部项
 
@@ -86,6 +91,18 @@ mod tests {
                 rows
             );
 
+            let columns = db
+                .query_all(Statement::from_string(
+                    db.get_database_backend(),
+                    "PRAGMA table_info(port_forward)".to_owned(),
+                ))
+                .await
+                .unwrap();
+            assert!(columns.iter().any(|row| {
+                row.try_get::<String>("", "name")
+                    .is_ok_and(|name| name == "name")
+            }));
+
             let active_model = target::ActiveModel::from(target::Model {
                 id: 1,
                 sort_order: 0,
@@ -108,6 +125,35 @@ mod tests {
                 "Expected system: windows, got: {:?}",
                 target1
             );
+
+            port_forward::ActiveModel {
+                id: Set("forward-1".to_string()),
+                name: Set("Web service".to_string()),
+                target_id: Set(target1.id),
+                local_host: Set("127.0.0.1".to_string()),
+                local_port: Set(19090),
+                remote_host: Set("127.0.0.1".to_string()),
+                remote_port: Set(9090),
+                enabled: Set(false),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+            let forward = port_forward::Entity::find_by_id("forward-1")
+                .one(&db)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(forward.name, "Web service");
+            let mut forward_update = port_forward::ActiveModel::from(forward);
+            forward_update.name = Set("Updated service".to_string());
+            forward_update.update(&db).await.unwrap();
+            let forward = port_forward::Entity::find_by_id("forward-1")
+                .one(&db)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(forward.name, "Updated service");
 
             Migrator::down(&db, None).await.unwrap();
             let rows = TableName::find_by_statement(stmt2).all(&db).await.unwrap();
