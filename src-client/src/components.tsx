@@ -5,11 +5,11 @@ import { createRoot } from "react-dom/client";
 import "./App.css";
 
 import AppOverlayHost from "./components/AppOverlayHost";
-import DataTableDemo from "./components/DataTableDemo";
+import UiComponentShowcase from "./components/UiComponentShowcase";
 import useAppStore from "./store";
 import { applyThemeToRoot } from "./theme";
 
-function TableDemoApp() {
+function ComponentShowcaseApp() {
     const appTheme = useAppStore((state) => state.theme);
     const setTheme = useAppStore((state) => state.setTheme);
 
@@ -18,6 +18,7 @@ function TableDemoApp() {
     }, [appTheme]);
 
     useEffect(() => {
+        document.title = "UI Components";
         const media = window.matchMedia("(prefers-color-scheme: dark)");
         const handleThemeChange = () => {
             if (useAppStore.getState().themeMode === "system") {
@@ -40,7 +41,7 @@ function TableDemoApp() {
             }}
         >
             <AntdApp>
-                <DataTableDemo />
+                <UiComponentShowcase />
             </AntdApp>
             <AppOverlayHost />
         </ConfigProvider>
@@ -54,7 +55,7 @@ if (rootEl) {
         .getState()
         .loadPreferences()
         .then(
-            () => root.render(<TableDemoApp />),
-            () => root.render(<TableDemoApp />),
+            () => root.render(<ComponentShowcaseApp />),
+            () => root.render(<ComponentShowcaseApp />),
         );
 }

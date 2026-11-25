@@ -38,7 +38,7 @@ export default defineConfig({
         entry: {
             index: "./src/index.tsx",
             terminal: "./src/terminal.js",
-            table: "./src/table.tsx",
+            components: "./src/components.tsx",
         },
     },
     html: {
