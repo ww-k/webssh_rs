@@ -1,5 +1,5 @@
 import { toast } from "@ui-sdk/react/toast";
-import { Check, Info, Plus, Search, Sparkles } from "lucide-react";
+import { Check, Info, Moon, Plus, Search, Sparkles, Sun } from "lucide-react";
 import { useState } from "react";
 
 import Button from "@/components/Button";
@@ -10,6 +10,8 @@ import Progress from "@/components/Progress";
 import Select from "@/components/Select";
 import Tooltip from "@/components/Tooltip";
 
+import type { ResolvedTheme } from "@/store";
+
 import "./index.css";
 
 const selectOptions = [
@@ -19,7 +21,15 @@ const selectOptions = [
     { label: "Unavailable", value: "unavailable", disabled: true },
 ];
 
-export default function UiComponentShowcase() {
+type UiComponentShowcaseProps = {
+    theme: ResolvedTheme;
+    onThemeChange: (theme: ResolvedTheme) => void;
+};
+
+export default function UiComponentShowcase({
+    theme,
+    onThemeChange,
+}: UiComponentShowcaseProps) {
     const [inputValue, setInputValue] = useState("workspace");
     const [password, setPassword] = useState("ssh-secret");
     const [environment, setEnvironment] = useState<string | null>("staging");
@@ -52,6 +62,23 @@ export default function UiComponentShowcase() {
                     </p>
                 </div>
                 <div className="UiComponentShowcaseMeta">
+                    <Button
+                        aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+                        aria-pressed={theme === "dark"}
+                        icon={
+                            theme === "dark" ? (
+                                <Sun aria-hidden="true" size={15} />
+                            ) : (
+                                <Moon aria-hidden="true" size={15} />
+                            )
+                        }
+                        size="small"
+                        onClick={() =>
+                            onThemeChange(theme === "dark" ? "light" : "dark")
+                        }
+                    >
+                        {theme === "dark" ? "Light theme" : "Dark theme"}
+                    </Button>
                     <span>7 components</span>
                     <span className="UiComponentShowcaseMetaDot" />
                     <span>Interactive examples</span>

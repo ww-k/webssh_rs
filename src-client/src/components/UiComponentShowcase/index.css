@@ -60,6 +60,10 @@
     font-size: 12px;
 }
 
+.UiComponentShowcaseMeta .webssh-button {
+    flex: 0 0 auto;
+}
+
 .UiComponentShowcaseMetaDot {
     width: 4px;
     height: 4px;
