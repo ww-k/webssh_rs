@@ -3,6 +3,7 @@
     display: block;
     width: 100%;
     min-width: 0;
+    font-size: var(--ant-font-size, 12px);
 }
 
 .WebSSH-SelectTrigger {
@@ -88,7 +89,7 @@
     height: 30px;
     padding: 4px 8px;
     color: var(--ant-color-text);
-    font: inherit;
+    font-size: var(--ant-font-size, 12px);
     background: var(--ant-color-bg-container);
     border: 1px solid var(--ant-color-border);
     border-radius: 4px;
