@@ -4,7 +4,7 @@ import {
     ReloadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { Popconfirm, Space, Tag, Typography } from "antd";
+import { Space, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -19,6 +19,7 @@ import {
 import Button from "@/components/Button";
 import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
+import Popconfirm from "@/components/Popconfirm";
 import getTargetName from "@/components/Target/getTargetName";
 import Tooltip from "@/components/Tooltip";
 

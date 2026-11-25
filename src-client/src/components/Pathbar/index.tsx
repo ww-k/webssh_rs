@@ -15,13 +15,13 @@ import {
     StarOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { Popconfirm } from "antd";
 import classNames from "clsx";
 import throttle from "lodash/throttle";
 import { Component, createRef } from "react";
 
 import Input from "@/components/Input";
 import Loading from "@/components/Loading";
+import Popconfirm from "@/components/Popconfirm";
 import path, { posix as pathPosix } from "@/helpers/path";
 import i18n from "@/i18n";
 

@@ -6,7 +6,7 @@ import {
     ReloadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { Form, InputNumber, Popconfirm, Space, Switch } from "antd";
+import { Form, InputNumber, Space, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +25,7 @@ import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import { AppDialog } from "@/components/Dialog";
 import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
+import Popconfirm from "@/components/Popconfirm";
 import Select from "@/components/Select";
 import getTargetName from "@/components/Target/getTargetName";
 import Tooltip from "@/components/Tooltip";

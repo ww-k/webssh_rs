@@ -6,6 +6,7 @@ import Button from "@/components/Button";
 import { AppDialog, DialogAction } from "@/components/Dialog";
 import Input from "@/components/Input";
 import Loading from "@/components/Loading";
+import Popconfirm from "@/components/Popconfirm";
 import Progress from "@/components/Progress";
 import Select from "@/components/Select";
 import Tooltip from "@/components/Tooltip";
@@ -36,6 +37,7 @@ export default function UiComponentShowcase({
     const [progress, setProgress] = useState(68);
     const [loading, setLoading] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [profileDeleted, setProfileDeleted] = useState(false);
 
     const showToast = (type: "success" | "info" | "warning" | "error") => {
         const messages = {
@@ -394,6 +396,57 @@ export default function UiComponentShowcase({
                             uses the selected environment and saved passphrase.
                         </p>
                     </AppDialog>
+                </section>
+
+                <section className="UiComponentCard">
+                    <div className="UiComponentCardHeading">
+                        <div>
+                            <p className="UiComponentCardKicker">
+                                07 / Overlays
+                            </p>
+                            <h2>Popconfirm</h2>
+                        </div>
+                        <span className="UiComponentCardSource">
+                            components/Popconfirm
+                        </span>
+                    </div>
+                    <p className="UiComponentCardDescription">
+                        Keep destructive actions lightweight with an anchored
+                        confirmation and an explicit cancel path.
+                    </p>
+                    <div className="UiComponentExampleStack">
+                        <div className="UiComponentExampleRow">
+                            <Popconfirm
+                                title="Delete this connection profile?"
+                                description="This removes the saved profile from the workspace."
+                                okText="Delete"
+                                cancelText="Keep it"
+                                okButtonProps={{ danger: true }}
+                                onConfirm={() => {
+                                    setProfileDeleted(true);
+                                    toast.success("Connection profile deleted");
+                                }}
+                            >
+                                <Button danger disabled={profileDeleted}>
+                                    Delete profile
+                                </Button>
+                            </Popconfirm>
+                            {profileDeleted ? (
+                                <Button
+                                    type="link"
+                                    onClick={() => setProfileDeleted(false)}
+                                >
+                                    Restore profile
+                                </Button>
+                            ) : null}
+                        </div>
+                        <div className="UiComponentValuePreview">
+                            <span>Profile state</span>
+                            <strong>
+                                {profileDeleted ? "Deleted" : "Saved"}
+                            </strong>
+                        </div>
+                    </div>
                 </section>
             </div>
         </main>

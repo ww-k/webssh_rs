@@ -1,0 +1,119 @@
+[data-slot="popover-content"].webssh-popconfirm {
+    z-index: 1070;
+    min-width: 200px;
+    max-width: 300px;
+    padding: 12px;
+    color: var(--ant-color-text, #1f1f1f);
+    font-size: var(--ant-font-size, 14px);
+    line-height: var(--ant-line-height, 1.5714285714);
+    background: var(--ant-color-bg-elevated, #fff);
+    border: 1px solid var(--ant-color-border, #d9d9d9);
+    border-radius: var(--ant-border-radius-lg, 8px);
+    box-shadow:
+        0 6px 16px 0 rgb(0 0 0 / 8%),
+        0 3px 6px -4px rgb(0 0 0 / 12%),
+        0 9px 28px 8px rgb(0 0 0 / 5%);
+    transform-origin: var(--transform-origin);
+    transition:
+        opacity 150ms ease-out,
+        scale 150ms ease-out;
+}
+
+[data-slot="popover-content"].webssh-popconfirm:is(
+    [data-starting-style],
+    [data-ending-style]
+) {
+    opacity: 0;
+    scale: 0.9;
+}
+
+[data-slot="popover-content"].webssh-popconfirm[data-instant] {
+    transition: none;
+}
+
+.webssh-popconfirm-body {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.webssh-popconfirm-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    margin-top: 1px;
+    color: var(--ant-color-warning, #faad14);
+}
+
+.webssh-popconfirm-text {
+    min-width: 0;
+    flex: 1;
+}
+
+.webssh-popconfirm-text > [data-slot="popover-title"] {
+    margin: 0;
+    font: inherit;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.webssh-popconfirm-text > [data-slot="popover-description"] {
+    margin: 4px 0 0;
+    color: var(--ant-color-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.webssh-popconfirm-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+[data-slot="popover-arrow"].webssh-popconfirm-arrow {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--ant-color-bg-elevated, #fff);
+    transform: rotate(45deg);
+}
+
+[data-slot="popover-arrow"].webssh-popconfirm-arrow[data-side="top"] {
+    bottom: -4px;
+    left: calc(var(--arrow-offset, 50%) - 4px);
+    border-right: 1px solid var(--ant-color-border, #d9d9d9);
+    border-bottom: 1px solid var(--ant-color-border, #d9d9d9);
+}
+
+[data-slot="popover-arrow"].webssh-popconfirm-arrow[data-side="right"] {
+    left: -4px;
+    top: calc(var(--arrow-offset, 50%) - 4px);
+    border-bottom: 1px solid var(--ant-color-border, #d9d9d9);
+    border-left: 1px solid var(--ant-color-border, #d9d9d9);
+}
+
+[data-slot="popover-arrow"].webssh-popconfirm-arrow[data-side="bottom"] {
+    top: -4px;
+    left: calc(var(--arrow-offset, 50%) - 4px);
+    border-top: 1px solid var(--ant-color-border, #d9d9d9);
+    border-left: 1px solid var(--ant-color-border, #d9d9d9);
+}
+
+[data-slot="popover-arrow"].webssh-popconfirm-arrow[data-side="left"] {
+    right: -4px;
+    top: calc(var(--arrow-offset, 50%) - 4px);
+    border-top: 1px solid var(--ant-color-border, #d9d9d9);
+    border-right: 1px solid var(--ant-color-border, #d9d9d9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-slot="popover-content"].webssh-popconfirm {
+        transition: opacity 150ms ease-out;
+    }
+
+    [data-slot="popover-content"].webssh-popconfirm:is(
+        [data-starting-style],
+        [data-ending-style]
+    ) {
+        scale: 1;
+    }
+}
