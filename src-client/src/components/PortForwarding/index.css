@@ -4,6 +4,12 @@
     gap: 6px;
 }
 
+.WebSSH-PortForwarding-Compact {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+}
+
 .WebSSH-PortForwarding-LocalTarget a {
     color: var(--ant-color-link);
 }

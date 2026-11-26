@@ -15,7 +15,7 @@ import {
 } from "@ant-design/icons";
 import { confirm } from "@ui-sdk/react/alert-dialog";
 import { toast } from "@ui-sdk/react/toast";
-import { Space, Typography } from "antd";
+import { Typography } from "antd";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -392,7 +392,7 @@ const getActionItems = (
 };
 
 const ActionButtons = ({ actions }: { actions: TransferAction[] }) => (
-    <Space className="WebSSH-TransferActions" size="small">
+    <div className="WebSSH-Stack WebSSH-TransferActions">
         {actions.map((action) => (
             <Tooltip key={action.key} title={action.label}>
                 <Button
@@ -407,7 +407,7 @@ const ActionButtons = ({ actions }: { actions: TransferAction[] }) => (
                 />
             </Tooltip>
         ))}
-    </Space>
+    </div>
 );
 
 /*

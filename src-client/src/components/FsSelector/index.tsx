@@ -1,4 +1,3 @@
-import { Space } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -76,12 +75,12 @@ export default function FsSelector({
             width={800}
             onCancel={onCancel}
             footer={
-                <Space>
+                <div className="WebSSH-Stack">
                     <Button onClick={onCancel}>{t("app_btn_cancel")}</Button>
                     <Button type="primary" disabled={!canOk} onClick={handleOk}>
                         {t("app_btn_ok")}
                     </Button>
-                </Space>
+                </div>
             }
         >
             <FilesviewLocal

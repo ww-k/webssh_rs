@@ -6,7 +6,7 @@ import {
     ReloadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { Form, InputNumber, Space, Switch } from "antd";
+import { Form, InputNumber, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -267,7 +267,7 @@ export default function PortForwarding() {
                 width: 80,
                 sortable: false,
                 cell: (_, item) => (
-                    <Space size="small">
+                    <div className="WebSSH-Stack">
                         <Tooltip title={t("app_btn_edit")}>
                             <Button
                                 aria-label={t("app_btn_edit")}
@@ -294,7 +294,7 @@ export default function PortForwarding() {
                                 />
                             </Tooltip>
                         </Popconfirm>
-                    </Space>
+                    </div>
                 ),
             },
         ],
@@ -306,7 +306,7 @@ export default function PortForwarding() {
             <PageLayout
                 className="WebSSH-PortForwarding"
                 toolbar={
-                    <Space size="small">
+                    <div className="WebSSH-Stack">
                         <Tooltip title={t("port_forward_create")}>
                             <Button
                                 icon={<PlusCircleTwoTone />}
@@ -321,7 +321,7 @@ export default function PortForwarding() {
                                 onClick={() => void load()}
                             />
                         </Tooltip>
-                    </Space>
+                    </div>
                 }
             >
                 <DataTable
@@ -399,7 +399,7 @@ export default function PortForwarding() {
                             }))}
                         />
                     </Form.Item>
-                    <Space.Compact block>
+                    <div className="WebSSH-PortForwarding-Compact">
                         <Form.Item
                             className="WebSSH-PortForwarding-HostField"
                             label={t("port_forward_remote_host")}
@@ -437,8 +437,8 @@ export default function PortForwarding() {
                                 style={{ width: "100%" }}
                             />
                         </Form.Item>
-                    </Space.Compact>
-                    <Space.Compact block>
+                    </div>
+                    <div className="WebSSH-PortForwarding-Compact">
                         <Form.Item
                             className="WebSSH-PortForwarding-HostField"
                             label={t("port_forward_local_host")}
@@ -472,7 +472,7 @@ export default function PortForwarding() {
                                 style={{ width: "100%" }}
                             />
                         </Form.Item>
-                    </Space.Compact>
+                    </div>
                 </Form>
             </AppDialog>
         </>

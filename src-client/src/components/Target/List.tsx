@@ -12,7 +12,6 @@ import {
 } from "@ant-design/icons";
 import { confirm } from "@ui-sdk/react/alert-dialog";
 import { toast } from "@ui-sdk/react/toast";
-import { Space } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -473,7 +472,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                 sortable: false,
                 cell: (_value, record) =>
                     record.isDirectory ? null : (
-                        <Space size="small">
+                        <div className="WebSSH-Stack">
                             <Tooltip title="SSH">
                                 <Button
                                     aria-label="SSH"
@@ -527,7 +526,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                                     }}
                                 />
                             </Tooltip>
-                        </Space>
+                        </div>
                     ),
             },
         ],
@@ -579,7 +578,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                     </>
                 }
                 toolbar={
-                    <Space className="targetListActions" size="small">
+                    <div className="WebSSH-Stack targetListActions">
                         <Tooltip title={t("target_local_terminal")}>
                             <Button
                                 aria-label={t("target_local_terminal")}
@@ -610,7 +609,7 @@ export default function TargetList({ tab }: { tab: ITab }) {
                                 title={t("app_btn_refresh")}
                             />
                         </Tooltip>
-                    </Space>
+                    </div>
                 }
                 contentRef={tableContainerRef}
                 contentProps={{

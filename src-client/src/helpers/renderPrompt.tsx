@@ -1,4 +1,4 @@
-import { Checkbox, Radio, Space } from "antd";
+import { Checkbox, Radio } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -134,7 +134,7 @@ function UrlPasswordPromptDialog({
                 </>
             }
         >
-            <Space direction="vertical" style={{ width: "100%" }}>
+            <div className="WebSSH-Stack WebSSH-Stack--vertical WebSSH-Stack--full">
                 <Input
                     ref={urlRef}
                     autoFocus={true}
@@ -149,7 +149,7 @@ function UrlPasswordPromptDialog({
                     onChange={(event) => setPassword(event.target.value)}
                     onPressEnter={finish}
                 />
-            </Space>
+            </div>
         </AppDialog>
     );
 }
@@ -220,7 +220,7 @@ function ImportOptionsDialog({
                 </>
             }
         >
-            <Space direction="vertical">
+            <div className="WebSSH-Stack WebSSH-Stack--vertical">
                 <Checkbox
                     checked={value.import_settings}
                     onChange={(event) =>
@@ -275,14 +275,14 @@ function ImportOptionsDialog({
                         }))
                     }
                 >
-                    <Space direction="vertical">
+                    <div className="WebSSH-Stack WebSSH-Stack--vertical">
                         <Radio value="skip">{options.skipLabel}</Radio>
                         <Radio value="overwrite">
                             {options.overwriteLabel}
                         </Radio>
-                    </Space>
+                    </div>
                 </Radio.Group>
-            </Space>
+            </div>
         </AppDialog>
     );
 }

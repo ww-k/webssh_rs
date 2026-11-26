@@ -13,7 +13,7 @@ import {
     UploadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { ColorPicker, InputNumber, Space, Switch, Typography } from "antd";
+import { ColorPicker, InputNumber, Switch, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -472,7 +472,7 @@ export default function Settings() {
                                 {t("settings_server_port_help")}
                             </Text>
                         </div>
-                        <Space>
+                        <div className="WebSSH-Stack">
                             <InputNumber
                                 min={1}
                                 max={65535}
@@ -491,7 +491,7 @@ export default function Settings() {
                             >
                                 {t("settings_server_port_save")}
                             </Button>
-                        </Space>
+                        </div>
                     </div>
                 </section>
             )}
@@ -676,7 +676,7 @@ export default function Settings() {
                             {t("settings_data_transfer_help")}
                         </Text>
                     </div>
-                    <Space wrap>
+                    <div className="WebSSH-Stack WebSSH-Stack--wrap">
                         <Button
                             icon={<DownloadOutlined />}
                             onClick={() => void handleExport()}
@@ -705,7 +705,7 @@ export default function Settings() {
                                 if (file) void handleImport(file);
                             }}
                         />
-                    </Space>
+                    </div>
                 </div>
             </section>
         </main>

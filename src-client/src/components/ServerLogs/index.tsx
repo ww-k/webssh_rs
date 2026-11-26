@@ -1,6 +1,6 @@
 import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { Empty, Space } from "antd";
+import { Empty } from "antd";
 import {
     type ReactNode,
     useCallback,
@@ -210,7 +210,7 @@ export default function ServerLogs() {
         <PageLayout
             className="WebSSH-ServerLogs"
             header={
-                <Space className="WebSSH-ServerLogs-Filters">
+                <div className="WebSSH-Stack WebSSH-ServerLogs-Filters">
                     <Select<LogLevel | "ALL">
                         aria-label={t("server_logs_level_filter")}
                         className="WebSSH-ServerLogs-LevelFilter"
@@ -237,7 +237,7 @@ export default function ServerLogs() {
                         prefix={<SearchOutlined />}
                         value={keyword}
                     />
-                </Space>
+                </div>
             }
             contentProps={{ className: "WebSSH-ServerLogs-Content" }}
         >

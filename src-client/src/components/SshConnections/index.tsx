@@ -4,7 +4,7 @@ import {
     ReloadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { Space, Tag, Typography } from "antd";
+import { Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -144,7 +144,7 @@ export default function SshConnections() {
                 width: 100,
                 sortable: false,
                 cell: (_, connection) => (
-                    <Space size="small">
+                    <div className="WebSSH-Stack">
                         <Tooltip title={t("ssh_connections_expire")}>
                             <Button
                                 aria-label={t("ssh_connections_expire")}
@@ -185,7 +185,7 @@ export default function SshConnections() {
                                 />
                             </Tooltip>
                         </Popconfirm>
-                    </Space>
+                    </div>
                 ),
             },
         ],

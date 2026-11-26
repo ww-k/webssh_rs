@@ -11,6 +11,25 @@ body,
     overflow: hidden;
 }
 
+.WebSSH-Stack {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.WebSSH-Stack--vertical {
+    align-items: stretch;
+    flex-direction: column;
+}
+
+.WebSSH-Stack--wrap {
+    flex-wrap: wrap;
+}
+
+.WebSSH-Stack--full {
+    width: 100%;
+}
+
 @layer ui-sdk {
     :where([data-slot][hidden]:not([hidden="until-found"])) {
         display: none !important;
