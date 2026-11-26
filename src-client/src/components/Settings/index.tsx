@@ -13,7 +13,7 @@ import {
     UploadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { ColorPicker, InputNumber, Switch, Typography } from "antd";
+import { ColorPicker, InputNumber, Switch } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -48,8 +48,6 @@ import useAppStore, {
 import { terminalThemeDefaults } from "../Terminal/constants";
 
 import type { TerminalThemeColorKey } from "../Terminal/types";
-
-const { Paragraph, Text, Title } = Typography;
 
 const terminalThemeColorFields: Array<{
     key: TerminalThemeColorKey;
@@ -127,13 +125,13 @@ export default function Settings() {
     const renderTerminalTheme = (mode: ResolvedTheme) => (
         <div className="WebSSH-Settings-TerminalTheme">
             <div className="WebSSH-Settings-TerminalThemeHeader">
-                <Text strong>
+                <span className="webssh-typography webssh-typography-text webssh-typography-strong">
                     {t(
                         mode === "dark"
                             ? "settings_terminal_theme_dark"
                             : "settings_terminal_theme_light",
                     )}
-                </Text>
+                </span>
                 <Button
                     icon={<ReloadOutlined />}
                     onClick={() => resetTerminalTheme(mode)}
@@ -144,7 +142,9 @@ export default function Settings() {
             </div>
             {terminalThemeColorFields.map(({ key, label }) => (
                 <div className="WebSSH-Settings-TerminalColor" key={key}>
-                    <Text type="secondary">{t(label)}</Text>
+                    <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
+                        {t(label)}
+                    </span>
                     <ColorPicker
                         style={{ width: 130 }}
                         value={terminalThemes[mode][key]}
@@ -362,10 +362,12 @@ export default function Settings() {
     return (
         <main className="WebSSH-Settings">
             <div className="WebSSH-Settings-Header">
-                <Title level={2}>{t("settings_title")}</Title>
-                <Paragraph type="secondary">
+                <h2 className="webssh-typography webssh-typography-title">
+                    {t("settings_title")}
+                </h2>
+                <p className="webssh-typography webssh-typography-paragraph webssh-typography-secondary">
                     {t("settings_description")}
-                </Paragraph>
+                </p>
             </div>
 
             <section className="WebSSH-Settings-Section">
@@ -374,17 +376,23 @@ export default function Settings() {
                         <SunOutlined />
                     </div>
                     <div>
-                        <Title level={4}>{t("settings_appearance")}</Title>
-                        <Text type="secondary">
+                        <h4 className="webssh-typography webssh-typography-title">
+                            {t("settings_appearance")}
+                        </h4>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_appearance_description")}
-                        </Text>
+                        </span>
                     </div>
                 </div>
 
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>{t("settings_theme")}</Text>
-                        <Text type="secondary">{t("settings_theme_help")}</Text>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
+                            {t("settings_theme")}
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
+                            {t("settings_theme_help")}
+                        </span>
                     </div>
                     <Segmented
                         aria-label={t("settings_theme")}
@@ -411,10 +419,12 @@ export default function Settings() {
 
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>{t("settings_language")}</Text>
-                        <Text type="secondary">
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
+                            {t("settings_language")}
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_language_help")}
-                        </Text>
+                        </span>
                     </div>
                     <Select
                         aria-label={t("settings_language")}
@@ -437,12 +447,12 @@ export default function Settings() {
 
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
                             {t("settings_terminal_copy_notification")}
-                        </Text>
-                        <Text type="secondary">
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_terminal_copy_notification_help")}
-                        </Text>
+                        </span>
                     </div>
                     <Switch
                         checked={showTerminalCopyNotification}
@@ -458,19 +468,23 @@ export default function Settings() {
                             <ApiOutlined />
                         </div>
                         <div>
-                            <Title level={4}>{t("settings_server")}</Title>
-                            <Text type="secondary">
+                            <h4 className="webssh-typography webssh-typography-title">
+                                {t("settings_server")}
+                            </h4>
+                            <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                                 {t("settings_server_description")}
-                            </Text>
+                            </span>
                         </div>
                     </div>
 
                     <div className="WebSSH-Settings-Row">
                         <div className="WebSSH-Settings-RowText">
-                            <Text strong>{t("settings_server_port")}</Text>
-                            <Text type="secondary">
+                            <span className="webssh-typography webssh-typography-text webssh-typography-strong">
+                                {t("settings_server_port")}
+                            </span>
+                            <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                                 {t("settings_server_port_help")}
-                            </Text>
+                            </span>
                         </div>
                         <div className="WebSSH-Stack">
                             <InputNumber
@@ -502,21 +516,23 @@ export default function Settings() {
                         <CodeOutlined />
                     </div>
                     <div>
-                        <Title level={4}>{t("settings_terminal")}</Title>
-                        <Text type="secondary">
+                        <h4 className="webssh-typography webssh-typography-title">
+                            {t("settings_terminal")}
+                        </h4>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_terminal_description")}
-                        </Text>
+                        </span>
                     </div>
                 </div>
 
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
                             {t("settings_terminal_selection_copy")}
-                        </Text>
-                        <Text type="secondary">
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_terminal_selection_copy_help")}
-                        </Text>
+                        </span>
                     </div>
                     <Switch
                         checked={terminalSelectionCopyEnabled}
@@ -526,12 +542,12 @@ export default function Settings() {
 
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
                             {t("settings_terminal_right_click_action")}
-                        </Text>
-                        <Text type="secondary">
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_terminal_right_click_action_help")}
-                        </Text>
+                        </span>
                     </div>
                     <Segmented
                         aria-label={t("settings_terminal_right_click_action")}
@@ -560,12 +576,12 @@ export default function Settings() {
 
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
                             {t("settings_terminal_middle_click_paste")}
-                        </Text>
-                        <Text type="secondary">
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_terminal_middle_click_paste_help")}
-                        </Text>
+                        </span>
                     </div>
                     <Switch
                         checked={terminalMiddleClickPasteEnabled}
@@ -575,10 +591,12 @@ export default function Settings() {
 
                 <div className="WebSSH-Settings-Row WebSSH-Settings-TerminalThemesRow">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>{t("settings_terminal_colors")}</Text>
-                        <Text type="secondary">
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
+                            {t("settings_terminal_colors")}
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_terminal_colors_help")}
-                        </Text>
+                        </span>
                     </div>
                     <div className="WebSSH-Settings-TerminalThemes">
                         {renderTerminalTheme("light")}
@@ -593,19 +611,23 @@ export default function Settings() {
                         <AimOutlined />
                     </div>
                     <div>
-                        <Title level={4}>{t("settings_targets")}</Title>
-                        <Text type="secondary">
+                        <h4 className="webssh-typography webssh-typography-title">
+                            {t("settings_targets")}
+                        </h4>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_targets_description")}
-                        </Text>
+                        </span>
                     </div>
                 </div>
 
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>{t("settings_target_double_click")}</Text>
-                        <Text type="secondary">
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
+                            {t("settings_target_double_click")}
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_target_double_click_help")}
-                        </Text>
+                        </span>
                     </div>
                     <Segmented
                         aria-label={t("settings_target_double_click")}
@@ -635,19 +657,23 @@ export default function Settings() {
                         <LayoutOutlined />
                     </div>
                     <div>
-                        <Title level={4}>{t("settings_navigation")}</Title>
-                        <Text type="secondary">
+                        <h4 className="webssh-typography webssh-typography-title">
+                            {t("settings_navigation")}
+                        </h4>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_navigation_description")}
-                        </Text>
+                        </span>
                     </div>
                 </div>
 
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>{t("settings_sidebar_collapsed")}</Text>
-                        <Text type="secondary">
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
+                            {t("settings_sidebar_collapsed")}
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_sidebar_collapsed_help")}
-                        </Text>
+                        </span>
                     </div>
                     <Switch
                         checked={sidebarCollapsed}
@@ -662,19 +688,23 @@ export default function Settings() {
                         <DatabaseOutlined />
                     </div>
                     <div>
-                        <Title level={4}>{t("settings_data")}</Title>
-                        <Text type="secondary">
+                        <h4 className="webssh-typography webssh-typography-title">
+                            {t("settings_data")}
+                        </h4>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_data_description")}
-                        </Text>
+                        </span>
                     </div>
                 </div>
 
                 <div className="WebSSH-Settings-Row">
                     <div className="WebSSH-Settings-RowText">
-                        <Text strong>{t("settings_data_transfer")}</Text>
-                        <Text type="secondary">
+                        <span className="webssh-typography webssh-typography-text webssh-typography-strong">
+                            {t("settings_data_transfer")}
+                        </span>
+                        <span className="webssh-typography webssh-typography-text webssh-typography-secondary">
                             {t("settings_data_transfer_help")}
-                        </Text>
+                        </span>
                     </div>
                     <div className="WebSSH-Stack WebSSH-Stack--wrap">
                         <Button

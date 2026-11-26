@@ -1,6 +1,5 @@
 import { DeleteOutlined, KeyOutlined, ReloadOutlined } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { Typography } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,12 +9,11 @@ import DataTable, { type DataTableColumn } from "@/components/DataTable";
 import PageLayout from "@/components/PageLayout";
 import Popconfirm from "@/components/Popconfirm";
 import Tooltip from "@/components/Tooltip";
+import { TypographyText } from "@/components/Typography";
 
 import type { ISshKnownHost } from "@/api";
 
 import "./index.css";
-
-const { Text } = Typography;
 
 export default function SshKnownHosts() {
     const { t } = useTranslation();
@@ -78,13 +76,13 @@ export default function SshKnownHosts() {
                 cell: (value) => {
                     const fingerprint = String(value ?? "");
                     return (
-                        <Text
+                        <TypographyText
                             code
                             copyable={{ text: fingerprint }}
                             ellipsis={{ tooltip: fingerprint }}
                         >
                             {fingerprint}
-                        </Text>
+                        </TypographyText>
                     );
                 },
                 width: 300,
@@ -96,13 +94,13 @@ export default function SshKnownHosts() {
                 cell: (value) => {
                     const publicKey = String(value ?? "");
                     return (
-                        <Text
+                        <TypographyText
                             code
                             copyable={{ text: publicKey }}
                             ellipsis={{ tooltip: publicKey }}
                         >
                             {publicKey}
-                        </Text>
+                        </TypographyText>
                     );
                 },
             },

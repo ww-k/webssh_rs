@@ -4,7 +4,7 @@ import {
     ReloadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { Tag, Typography } from "antd";
+import { Tag } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -22,10 +22,9 @@ import PageLayout from "@/components/PageLayout";
 import Popconfirm from "@/components/Popconfirm";
 import getTargetName from "@/components/Target/getTargetName";
 import Tooltip from "@/components/Tooltip";
+import { TypographyText } from "@/components/Typography";
 
 import type { ISshConnection, ITarget } from "@/api";
-
-const { Text } = Typography;
 
 export default function SshConnections() {
     const { t } = useTranslation();
@@ -94,9 +93,9 @@ export default function SshConnections() {
                 cell: (value) => {
                     const id = String(value ?? "");
                     return (
-                        <Text code copyable={{ text: id }}>
+                        <TypographyText code copyable={{ text: id }}>
                             {id}
-                        </Text>
+                        </TypographyText>
                     );
                 },
             },

@@ -1,0 +1,82 @@
+.webssh-typography {
+    color: var(--ant-color-text);
+}
+
+.webssh-typography-secondary {
+    color: var(--ant-color-text-secondary);
+}
+
+.webssh-typography-text {
+    display: inline;
+}
+
+.webssh-typography-strong {
+    font-weight: 600;
+}
+
+.webssh-typography-code {
+    padding: 0.1em 0.35em;
+    border: 1px solid var(--ant-color-border-secondary);
+    border-radius: 3px;
+    background: var(--ant-color-fill-tertiary);
+    font-family: var(--ant-font-family-code, monospace);
+    font-size: 0.9em;
+}
+
+.webssh-typography-ellipsis {
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+    white-space: nowrap;
+}
+
+.webssh-typography-copyable {
+    display: inline-flex;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 4px;
+}
+
+.webssh-typography-copyable > .webssh-typography {
+    min-width: 0;
+}
+
+.webssh-typography-copy {
+    flex: 0 0 auto;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 2px;
+    font-size: 12px;
+}
+
+.webssh-typography-title {
+    margin-block: 0 0.5em;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.webssh-typography-title:is(h1) {
+    font-size: 2em;
+}
+
+.webssh-typography-title:is(h2) {
+    font-size: 1.5em;
+}
+
+.webssh-typography-title:is(h3) {
+    font-size: 1.25em;
+}
+
+.webssh-typography-title:is(h4) {
+    font-size: 1em;
+}
+
+.webssh-typography-title:is(h5) {
+    font-size: 0.875em;
+}
+
+.webssh-typography-paragraph {
+    margin-block: 0 1em;
+}

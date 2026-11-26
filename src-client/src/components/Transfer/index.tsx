@@ -15,7 +15,6 @@ import {
 } from "@ant-design/icons";
 import { confirm } from "@ui-sdk/react/alert-dialog";
 import { toast } from "@ui-sdk/react/toast";
-import { Typography } from "antd";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -40,7 +39,6 @@ import type {
     ITransferTreeNode,
 } from "@/api";
 
-const { Text } = Typography;
 type TransferTreeRow = ITransferTreeNode;
 const TRANSFER_ROW_HEIGHT = 40;
 type TransferTypeFilter = "ALL" | ITransferTaskType;
@@ -219,50 +217,38 @@ const TransferProgressCell = memo(
         return (
             <div className="WebSSH-TransferProgress">
                 <div className="WebSSH-TransferProgressMeta">
-                    <Text
-                        className="WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--size"
-                        type="secondary"
-                    >
+                    <span className="webssh-typography webssh-typography-text webssh-typography-secondary WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--size">
                         {batch
                             ? `${record.completed_count}/${record.item_count} · ${formatSize(record.loaded)}/${formatSize(record.total)}`
                             : `${formatSize(record.loaded)}/${formatSize(record.total)}`}
-                    </Text>
+                    </span>
                     {record.status === "RUN" ? (
                         <>
-                            <Text
-                                className="WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--speed"
-                                type="secondary"
-                            >
+                            <span className="webssh-typography webssh-typography-text webssh-typography-secondary WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--speed">
                                 {formatSpeed(record.speed)}
-                            </Text>
-                            <Text
-                                className="WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--remaining"
-                                type="secondary"
-                            >
+                            </span>
+                            <span className="webssh-typography webssh-typography-text webssh-typography-secondary WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--remaining">
                                 {t("transfer_remaining", {
                                     duration: formatDuration(
                                         record.estimated_time,
                                     ),
                                 })}
-                            </Text>
+                            </span>
                         </>
                     ) : (
                         <>
                             {record.status === "FAIL" && (
                                 <Tooltip title={failureReason}>
-                                    <Text
-                                        className="WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--reason"
-                                        type="secondary"
-                                    >
+                                    <span className="webssh-typography webssh-typography-text webssh-typography-secondary WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--reason">
                                         {failureReason}
-                                    </Text>
+                                    </span>
                                 </Tooltip>
                             )}
-                            <Text
-                                className={`WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--status WebSSH-TransferProgressMetaItem--status-${record.status.toLowerCase()}`}
+                            <span
+                                className={`webssh-typography webssh-typography-text WebSSH-TransferProgressMetaItem WebSSH-TransferProgressMetaItem--status WebSSH-TransferProgressMetaItem--status-${record.status.toLowerCase()}`}
                             >
                                 {t(STATUS_TEXT_KEY[record.status])}
-                            </Text>
+                            </span>
                         </>
                     )}
                 </div>

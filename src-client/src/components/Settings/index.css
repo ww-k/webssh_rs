@@ -14,7 +14,7 @@
     margin-bottom: 32px;
 }
 
-.WebSSH-Settings-Header .ant-typography {
+.WebSSH-Settings-Header .webssh-typography {
     margin-bottom: 8px;
 }
 
@@ -30,7 +30,7 @@
     margin-bottom: 8px;
 }
 
-.WebSSH-Settings-SectionHeading .ant-typography {
+.WebSSH-Settings-SectionHeading .webssh-typography {
     display: block;
     margin: 0;
 }
