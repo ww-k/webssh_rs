@@ -5,3 +5,4 @@
 - [] [feat] MCP，支持agent直接操作界面
 - [] [feat] tailf模式，增加一个暂停实时刷新的开关，方便查看已有内容
 - [] [feat] 主页支持分割视图
+- [] [bug] monaco-editor 查找框旁边的图标按钮显示异常
