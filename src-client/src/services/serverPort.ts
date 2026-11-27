@@ -1,17 +1,17 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
-
 export const DEFAULT_SERVER_PORT = 10086;
 
 export function isDesktopApp() {
-    return isTauri();
+    return typeof window !== "undefined" && window.websshDesktop !== undefined;
 }
 
 export async function getServerPort(): Promise<number> {
-    if (!isDesktopApp()) return DEFAULT_SERVER_PORT;
-    return invoke<number>("get_server_port");
+    const bridge = window.websshDesktop;
+    if (!bridge) return DEFAULT_SERVER_PORT;
+    return bridge.getServerPort();
 }
 
 export async function setServerPort(port: number): Promise<void> {
-    if (!isDesktopApp()) return;
-    await invoke("set_server_port", { port });
+    const bridge = window.websshDesktop;
+    if (!bridge) return;
+    await bridge.setServerPort(port);
 }

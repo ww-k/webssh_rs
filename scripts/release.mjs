@@ -8,8 +8,7 @@ const releaseFiles = [
   "package.json",
   "src-client/package.json",
   "src-server/Cargo.toml",
-  "src-tauri/Cargo.toml",
-  "src-tauri/tauri.conf.json",
+  "src-electron/package.json",
   "scripts/release.mjs",
   "README.md",
 ];
@@ -41,11 +40,10 @@ await updateJson("package.json", (manifest) => {
 await updateJson("src-client/package.json", (manifest) => {
   manifest.version = version;
 });
-await updateJson("src-tauri/tauri.conf.json", (config) => {
+await updateJson("src-electron/package.json", (config) => {
   config.version = version;
 });
 await updateCargo("src-server/Cargo.toml");
-await updateCargo("src-tauri/Cargo.toml");
 
 const addResult = runGit(["add", "--", ...releaseFiles]);
 if (addResult.status !== 0) {

@@ -1,0 +1,84 @@
+{
+    "name": "webssh_rs_electron",
+    "productName": "Shrug",
+    "version": "0.6.0",
+    "private": true,
+    "description": "Shrug desktop application",
+    "author": "ww-k",
+    "main": "main.cjs",
+    "scripts": {
+        "dev": "electron --no-sandbox --disable-gpu --disable-gpu-sandbox .",
+        "build": "electron-builder",
+        "build:dir": "electron-builder --dir"
+    },
+    "dependencies": {
+        "electron-updater": "^6.8.11"
+    },
+    "devDependencies": {
+        "electron": "^45.5.0",
+        "electron-builder": "^26.18.1",
+        "icon-gen": "5.0.0"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "electron",
+            "electron-winstaller"
+        ]
+    },
+    "build": {
+        "appId": "io.github.ww-k.webssh-rs",
+        "productName": "Shrug",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "main.cjs",
+            "preload.cjs",
+            "package.json",
+            "assets/**/*"
+        ],
+        "extraResources": [
+            {
+                "from": "resources/server",
+                "to": "server",
+                "filter": [
+                    "webssh_rs_server*"
+                ]
+            }
+        ],
+        "asar": true,
+        "publish": [
+            {
+                "provider": "github",
+                "owner": "ww-k",
+                "repo": "webssh_rs"
+            }
+        ],
+        "mac": {
+            "target": [
+                "dmg"
+            ],
+            "category": "public.app-category.developer-tools",
+            "icon": "assets/icon.icns"
+        },
+        "win": {
+            "target": [
+                "nsis"
+            ],
+            "icon": "assets/icon.ico"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        },
+        "linux": {
+            "target": [
+                "AppImage",
+                "deb",
+                "rpm"
+            ],
+            "category": "Development",
+            "icon": "assets/icon.png"
+        }
+    }
+}

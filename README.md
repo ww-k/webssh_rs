@@ -1,14 +1,14 @@
 # Shrug
 
-Shrug 是一个基于 Web 的 SSH 客户端，支持终端连接、远程文件管理、SFTP 文件传输、端口转发和多目标配置。项目可以作为浏览器应用运行，也可以通过 Tauri 打包为桌面应用。
+Shrug 是一个基于 Web 的 SSH 客户端，支持终端连接、远程文件管理、SFTP 文件传输、端口转发和多目标配置。项目可以作为浏览器应用运行，也可以通过 Electron 打包为桌面应用。
 
 仓库内部包名、环境变量和兼容标识仍使用 `webssh_rs` / `WEBSSH_RS_*` 命名。
 
 ## 技术栈
 
-- **前端**：React 18、TypeScript、Rsbuild、Ant Design、Zustand、xterm.js、Socket.IO Client
+- **前端**：React 19、TypeScript、Rsbuild、Ant Design、Zustand、@wterm、Socket.IO Client
 - **后端**：Rust、Axum、Tokio、SeaORM、SQLite、russh、socketioxide
-- **桌面端**：Tauri 2，内嵌 Rust 后端并加载前端界面
+- **桌面端**：Electron，启动 Rust 后端并加载其 HTTP 界面
 - **格式化与检查**：Biome
 
 ## 项目结构
@@ -17,7 +17,7 @@ Shrug 是一个基于 Web 的 SSH 客户端，支持终端连接、远程文件�
 .
 ├── src-client/       # React 前端
 ├── src-server/       # Axum 后端和 Rust 测试
-├── src-tauri/        # Tauri 桌面应用
+├── src-electron/     # Electron 桌面应用
 ├── scripts/          # 根目录开发和构建编排脚本
 ├── agents/           # 与具体 AI 工具无关的开发角色说明
 ├── biome.json        # Biome 配置
@@ -31,29 +31,36 @@ Shrug 是一个基于 Web 的 SSH 客户端，支持终端连接、远程文件�
 - Node.js 22 或更高版本
 - pnpm 10 或更高版本
 - Rust stable toolchain
-- 桌面开发或打包需要满足 [Tauri 系统依赖](https://v2.tauri.app/start/prerequisites/)
+- 桌面开发或打包需要 Node.js、Rust 和 Electron builder 所需的平台工具链
 
 ## 安装
 
-在仓库根目录执行：
-
-```bash
-pnpm install
-```
-
-根目录依赖包含 Tauri CLI，前端依赖单独安装在 `src-client/`。首次运行 `pnpm dev` 或 `pnpm build` 时，编排脚本也会检查并安装前端依赖。
-
-## 开发
-
-### 桌面模式
-
-启动前端开发服务器、Rust 后端和 Tauri 桌面窗口：
+在仓库根目录执行开发或构建命令即可。编排脚本会按需安装 `src-client/` 和 `src-electron/` 的依赖：
 
 ```bash
 pnpm dev
 ```
 
-The Tauri embedded server uses port `10086` by default. Set
+Electron 依赖单独安装在 `src-electron/`，前端依赖单独安装在 `src-client/`。
+
+如果 Electron runtime 尚未下载，可手动执行：
+
+```bash
+cd src-electron
+pnpm install
+```
+
+## 开发
+
+### 桌面模式
+
+启动前端开发服务器、Rust 后端和 Electron 桌面窗口：
+
+```bash
+pnpm dev
+```
+
+The Electron embedded server uses port `10086` by default. Set
 `WEBSSH_RS_SERVER_PORT` in the root `.env` file to choose another fixed port.
 If that port is unavailable, the desktop app falls back to an available port.
 
@@ -75,7 +82,7 @@ pnpm run dev:mock
 
 如需修改前端开发端口，可复制 `.env.template` 为根目录的 `.env` 后调整 `WEBSSH_RS_CLIENT_PORT`。
 
-开发脚本会加载项目根目录的 `.env` 文件。桌面模式和浏览器模式默认使用固定的 `10086` 端口，也可以通过 `WEBSSH_RS_SERVER_PORT` 修改；如果端口被占用，Tauri 会回退到系统分配的可用端口。前端开发服务器默认使用 3000 端口，也可以通过 `WEBSSH_RS_CLIENT_PORT` 修改。
+开发脚本会加载项目根目录的 `.env` 文件。桌面模式和浏览器模式默认使用固定的 `10086` 端口，也可以通过 `WEBSSH_RS_SERVER_PORT` 修改；如果端口被占用，server 会回退到系统分配的可用端口。前端开发服务器默认使用 3000 端口，也可以通过 `WEBSSH_RS_CLIENT_PORT` 修改。
 
 ### 单独运行前端
 
@@ -95,9 +102,10 @@ WEBSSH_RS_SERVER_PORT=18080 pnpm dev
 根目录命令：
 
 ```bash
-pnpm build                # 构建前端并打包 Tauri 应用
-pnpm build:debug          # 构建带源码映射和 DevTools 的 debug Tauri 应用
-pnpm build:nobundle       # 构建前端和 Tauri 二进制，但不生成安装包
+pnpm build                # 构建前端、Rust server 并打包 Electron 应用
+pnpm build:debug          # 构建带源码映射和 DevTools 的 debug Electron 应用
+pnpm build:nobundle       # 构建前端、Rust server 和 Electron unpacked 目录
+pnpm gen-icons             # 从设计稿生成 Electron 图标资源
 pnpm gen-docs             # 生成 OpenAPI 文档
 ```
 
@@ -129,9 +137,9 @@ cargo fmt --check         # 检查 Rust 格式
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `WEBSSH_RS_SERVER_PORT` | `10086`（Tauri、浏览器开发、独立 server） | 后端监听端口 |
+| `WEBSSH_RS_SERVER_PORT` | `10086`（Electron、浏览器开发、独立 server） | 后端监听端口 |
 | `WEBSSH_RS_CLIENT_PORT` | `3000` | 前端开发服务器端口（`pnpm dev`） |
-| `WEBSSH_RS_DB_PATH` | 系统数据目录下的 `webssh_rs_server/db.sqlite` | SQLite 数据库路径；Tauri 会使用应用数据目录中的 `db.sqlite` |
+| `WEBSSH_RS_DB_PATH` | 系统数据目录下的 `webssh_rs_server/db.sqlite` | SQLite 数据库路径；Electron 会使用应用数据目录中的 `db.sqlite` |
 | `WEBSSH_RS_CHECK_SERVER_KEY` | `accept-new` | SSH 主机密钥策略，可选 `accept-new`、`strict`、`disabled` |
 | `WEBSSH_RS_TRANSFER_TASK_CONCURRENCY` | `3` | 并行传输任务数量，必须是正整数 |
 | `WEBSSH_RS_TRANSFER_CHUNK_SIZE` | `10485760` | 传输分块大小，单位为字节，必须是正整数 |
@@ -175,7 +183,7 @@ cargo run --manifest-path src-server/Cargo.toml
 GitHub Actions 会在推送 `v*` 格式的 tag 后构建并创建 GitHub Release，构建目标包括：
 
 - macOS Apple Silicon：`.dmg`
-- Windows：`.msi` 和 `.exe`
+- Windows：NSIS `.exe`
 - Linux：`.AppImage`、`.deb` 和 `.rpm`
 
 发布示例：
@@ -187,7 +195,7 @@ git tag v0.5.0
 git push origin v0.5.0
 ```
 
-工作流文件位于 `.github/workflows/release.yml`。
+工作流文件位于 `.github/workflows/release.yml`。Windows 使用 NSIS `.exe`；当前不配置代码签名，Electron 自动更新仅在已配置发布源时启用。
 
 ## 许可证
 

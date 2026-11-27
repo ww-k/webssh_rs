@@ -68,13 +68,23 @@ impl Deref for AppState {
 
 pub async fn run_server() {
     init_logging();
-    let port = std::env::var("WEBSSH_RS_SERVER_PORT")
+    let requested_port = std::env::var("WEBSSH_RS_SERVER_PORT")
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(DEFAULT_SERVER_PORT);
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
-        .await
-        .unwrap();
+    let listener = match tokio::net::TcpListener::bind(("127.0.0.1", requested_port)).await {
+        Ok(listener) => listener,
+        Err(error) => {
+            tracing::warn!(
+                requested_port,
+                %error,
+                "configured server port is unavailable; falling back to a dynamic port"
+            );
+            tokio::net::TcpListener::bind(("127.0.0.1", 0))
+                .await
+                .expect("failed to bind server on a dynamic port")
+        }
+    };
     run_server_with_listener(listener, std::future::pending()).await;
 }
 

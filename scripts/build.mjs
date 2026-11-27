@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { lstatSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,17 +21,11 @@ const run = (name, args, options) => {
 };
 
 const projectRoot = resolve(fileURLToPath(import.meta.url), "../..");
-const tauriBuildArgs = [
-  resolve(projectRoot, "node_modules/@tauri-apps/cli/tauri.js"),
-  "build",
-];
+if (existsSync(resolve(projectRoot, ".env"))) {
+  process.loadEnvFile(resolve(projectRoot, ".env"));
+}
 const isDebugBuild = process.argv.includes("--debug");
-if (isDebugBuild) {
-  tauriBuildArgs.push("--debug");
-}
-if (process.argv.includes("--no-bundle")) {
-  tauriBuildArgs.push("--no-bundle");
-}
+const noBundle = process.argv.includes("--no-bundle");
 
 const env = {
   ...process.env,
@@ -40,10 +34,17 @@ const env = {
   COLOR: "1",
   NPM_CONFIG_COLOR: "always",
 };
+if (process.env.ELECTRON_OVERRIDE_DIST_PATH) {
+  env.ELECTRON_OVERRIDE_DIST_PATH = process.env.ELECTRON_OVERRIDE_DIST_PATH;
+}
 
 // 确保安装依赖
 run("pnpm", ["i"], {
   cwd: resolve(projectRoot, "./src-client"),
+  env,
+});
+run("pnpm", ["i"], {
+  cwd: resolve(projectRoot, "./src-electron"),
   env,
 });
 
@@ -53,8 +54,31 @@ run("npm", ["run", "build"], {
   env,
 });
 
-// Build and bundle the Tauri application.
-run(process.execPath, tauriBuildArgs, {
+// Build the embedded Rust server used by Electron.
+run("cargo", ["build", "--release", "--manifest-path", "src-server/Cargo.toml"], {
   cwd: projectRoot,
+  env,
+});
+
+const serverResources = resolve(projectRoot, "src-electron/resources/server");
+rmSync(serverResources, { recursive: true, force: true });
+mkdirSync(serverResources, { recursive: true });
+const serverBinary = process.platform === "win32" ? "webssh_rs_server.exe" : "webssh_rs_server";
+cpSync(
+  resolve(projectRoot, "src-server/target/release", serverBinary),
+  resolve(serverResources, serverBinary),
+);
+
+const electronBuilderArgs = [];
+if (process.env.ELECTRON_OVERRIDE_DIST_PATH) {
+  electronBuilderArgs.push(
+    `-c.electronDist=${resolve(
+      projectRoot,
+      process.env.ELECTRON_OVERRIDE_DIST_PATH,
+    )}`,
+  );
+}
+run("npm", ["run", noBundle ? "build:dir" : "build", "--", ...electronBuilderArgs], {
+  cwd: resolve(projectRoot, "src-electron"),
   env,
 });

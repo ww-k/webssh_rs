@@ -45,8 +45,7 @@ const baseEnv = {
   COLOR: "1",
   NPM_CONFIG_COLOR: "always",
 };
-if (mode === "browser") {
-  // Browser development uses the same default port as the standalone server.
+if (mode === "browser" || mode === "desktop") {
   baseEnv.WEBSSH_RS_SERVER_PORT = defaultServerPort;
 }
 if (mode === "mock") {
@@ -63,6 +62,14 @@ try {
     env: baseEnv,
   });
 }
+try {
+  lstatSync(resolve(projectRoot, "./src-electron/node_modules"));
+} catch (_err) {
+  spawnSync("pnpm", ["install"], {
+    cwd: resolve(projectRoot, "./src-electron"),
+    env: baseEnv,
+  });
+}
 
 const children = [];
 let isShuttingDown = false;
@@ -73,16 +80,14 @@ process.on("SIGTERM", () => shutdown(0));
 let serverChild;
 let serverPort;
 if (mode !== "mock") {
-  // Browser mode runs the server directly; desktop mode starts the embedded
-  // server through Tauri. Both report their actual port through the startup log.
-  const serverName = mode === "browser" ? "server" : "tauri";
-  serverChild = startServer(mode, serverName);
+  // Browser and Electron development both run the Rust server directly.
+  serverChild = startServer();
   children.push(serverChild);
 
   try {
     serverPort = await waitForServerPort(serverChild);
   } catch (error) {
-    console.error(`[dev] Failed to start ${serverName}: ${error.message}`);
+    console.error(`[dev] Failed to start server: ${error.message}`);
     shutdown(1);
   }
 }
@@ -106,9 +111,10 @@ if (mode === "browser") {
     `[dev] Browser mode. Open http://localhost:${clientPort} in your browser (API server: ${serverPort}).`,
   );
 } else if (mode === "desktop") {
-  console.log(
-    `[dev] Desktop mode. Tauri server: http://127.0.0.1:${serverPort}.`,
-  );
+  const electronChild = startElectron(serverPort, clientPort);
+  children.push(electronChild);
+  electronChild.on("exit", shutdown);
+  console.log(`[dev] Electron mode. Server: http://127.0.0.1:${serverPort}.`);
 } else {
   console.log(
     `[dev] Mock mode. Open http://localhost:${clientPort} in your browser (API mock enabled).`,
@@ -135,7 +141,7 @@ function terminateProcessTree(child) {
   }
 
   if (isWin32) {
-    // npm and Tauri are launched through cmd.exe on Windows. Killing only the
+    // npm and Electron processes are launched through cmd.exe on Windows. Killing only the
     // wrapper leaves Vite/Rsbuild running and keeps port 3000 occupied.
     spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
       stdio: "ignore",
@@ -164,25 +170,29 @@ function processStdio(name, child) {
   return child;
 }
 
-function startServer(mode, name) {
-  const child =
-    mode === "browser"
-      ? spawn("cargo", ["run"], {
-          cwd: resolve(projectRoot, "./src-server"),
-          env: baseEnv,
-        })
-      : spawn(
-          process.execPath,
-          [
-            resolve(projectRoot, "node_modules/@tauri-apps/cli/tauri.js"),
-            "dev",
-          ],
-          {
-            cwd: projectRoot,
-            env: baseEnv,
-          },
-        );
-  processStdio(name, child);
+function startServer() {
+  const child = spawn("cargo", ["run"], {
+    cwd: resolve(projectRoot, "./src-server"),
+    env: baseEnv,
+    shell: isWin32,
+  });
+  processStdio("server", child);
+  return child;
+}
+
+function startElectron(serverPort, clientPort) {
+  const child = spawn("npm", ["run", "dev"], {
+    cwd: resolve(projectRoot, "src-electron"),
+    env: {
+      ...baseEnv,
+      WEBSSH_RS_EXTERNAL_SERVER: "true",
+      WEBSSH_RS_SERVER_PORT: String(serverPort),
+      WEBSSH_RS_DEV_URL: `http://localhost:${clientPort}/`,
+      WEBSSH_RS_DISABLE_AUTO_UPDATE: "true",
+    },
+    shell: isWin32,
+  });
+  processStdio("electron", child);
   return child;
 }
 

@@ -3,6 +3,7 @@
 
 # build output
 /build/
+/src-electron/dist/
 
 # npm
 npm-debug.log*
