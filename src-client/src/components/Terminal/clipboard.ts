@@ -33,7 +33,10 @@ export function pasteFromClipboard(terminal: WTerm | undefined): void {
             terminal.onData?.(text);
         })
         .finally(() => {
-            terminal.focus();
+            // Let the mouse event finish before restoring focus. Otherwise the
+            // browser's default middle/right-click handling can move focus
+            // away again after this callback runs.
+            window.setTimeout(() => terminal.focus(), 0);
         });
 }
 
@@ -72,6 +75,7 @@ export function enhanceMouseCopyPaste(
             (event.button === 1 && options.middleClickPasteEnabled) ||
             (event.button === 2 && options.rightClickAction === "paste")
         ) {
+            event.preventDefault();
             pasteFromClipboard(terminal);
         }
     };
