@@ -25,12 +25,17 @@ const tauriBuildArgs = [
   resolve(projectRoot, "node_modules/@tauri-apps/cli/tauri.js"),
   "build",
 ];
+const isDebugBuild = process.argv.includes("--debug");
+if (isDebugBuild) {
+  tauriBuildArgs.push("--debug");
+}
 if (process.argv.includes("--no-bundle")) {
   tauriBuildArgs.push("--no-bundle");
 }
 
 const env = {
   ...process.env,
+  ...(isDebugBuild ? { WEBSSH_RS_DEBUG: "true" } : {}),
   FORCE_COLOR: "3", // 强制启用颜色
   COLOR: "1",
   NPM_CONFIG_COLOR: "always",

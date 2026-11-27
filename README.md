@@ -96,6 +96,7 @@ WEBSSH_RS_SERVER_PORT=18080 pnpm dev
 
 ```bash
 pnpm build                # 构建前端并打包 Tauri 应用
+pnpm build:debug          # 构建带源码映射和 DevTools 的 debug Tauri 应用
 pnpm build:nobundle       # 构建前端和 Tauri 二进制，但不生成安装包
 pnpm gen-docs             # 生成 OpenAPI 文档
 ```

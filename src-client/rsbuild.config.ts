@@ -10,6 +10,7 @@ declare const process: {
 
 // 配置是否启用 mock 服务时
 const enableMock = process.env.WEBSSH_RS_MOCK === "true";
+const enableSourceMap = process.env.WEBSSH_RS_DEBUG === "true";
 const configuredServerPort = Number.parseInt(
     process.env.WEBSSH_RS_SERVER_PORT || "",
     10,
@@ -82,6 +83,12 @@ export default defineConfig({
     },
     output: {
         assetPrefix: ".",
+        sourceMap: enableSourceMap
+            ? {
+                  js: "source-map",
+                  css: true,
+              }
+            : false,
     },
     plugins: [pluginReact()],
     resolve: {

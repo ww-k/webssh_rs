@@ -5,6 +5,7 @@ use tokio::sync::oneshot;
 
 const DEFAULT_SERVER_PORT: u16 = 10086;
 const SERVER_PORT_CONFIG_FILE: &str = "server-port";
+const USE_DEV_SERVER: bool = cfg!(debug_assertions) && option_env!("WEBSSH_RS_DEBUG").is_none();
 
 struct ServerShutdown(std::sync::Mutex<Option<oneshot::Sender<()>>>);
 
@@ -119,7 +120,7 @@ pub fn run() {
                     let (server_ready, frontend_ready) =
                         tauri::async_runtime::spawn_blocking(move || {
                             let server_ready = TcpStream::connect(address).is_ok();
-                            let frontend_ready = !cfg!(debug_assertions)
+                            let frontend_ready = !USE_DEV_SERVER
                                 || TcpStream::connect(("localhost", client_port)).is_ok();
                             (server_ready, frontend_ready)
                         })
@@ -127,7 +128,7 @@ pub fn run() {
                         .unwrap_or((false, false));
 
                     if server_ready && frontend_ready {
-                        let app_url = if cfg!(debug_assertions) {
+                        let app_url = if USE_DEV_SERVER {
                             format!("http://localhost:{client_port}/")
                         } else {
                             format!("http://{address}/")
