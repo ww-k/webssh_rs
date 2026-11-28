@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, lstatSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -80,6 +80,11 @@ process.on("SIGTERM", () => shutdown(0));
 let serverChild;
 let serverPort;
 if (mode !== "mock") {
+  // The Rust server embeds this directory at compile time. The client dev
+  // server serves the actual frontend during development, so an empty
+  // directory is sufficient when no production build exists yet.
+  mkdirSync(resolve(projectRoot, "./src-client/dist"), { recursive: true });
+
   // Browser and Electron development both run the Rust server directly.
   serverChild = startServer();
   children.push(serverChild);
