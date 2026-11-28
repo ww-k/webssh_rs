@@ -1,0 +1,93 @@
+[data-slot="switch"].WebSSH-Switch {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    width: 44px;
+    height: 22px;
+    padding: 2px;
+    color: var(--ant-color-text-light-solid);
+    background: var(--ant-color-fill);
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    outline: 0;
+    transition: background 0.2s;
+}
+
+[data-slot="switch"].WebSSH-Switch:hover:not(:disabled) {
+    background: var(--ant-color-text-tertiary);
+}
+
+[data-slot="switch"].WebSSH-Switch[data-checked] {
+    background: var(--ant-color-primary);
+}
+
+[data-slot="switch"].WebSSH-Switch[data-checked]:hover:not(:disabled) {
+    background: var(--ant-color-primary-hover);
+}
+
+[data-slot="switch"].WebSSH-Switch:focus-visible {
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
+}
+
+[data-slot="switch"].WebSSH-Switch[data-disabled] {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+[data-slot="switch-thumb"] {
+    display: block;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    background: var(--ant-color-white);
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgb(0 0 0 / 20%);
+    transform: translateX(0);
+    transition: transform 0.2s;
+}
+
+[data-slot="switch"][data-checked] [data-slot="switch-thumb"] {
+    transform: translateX(22px);
+}
+
+[data-slot="switch"].WebSSH-Switch--loading {
+    position: relative;
+    cursor: wait;
+}
+
+[data-slot="switch"].WebSSH-Switch--loading [data-slot="switch-thumb"] {
+    visibility: hidden;
+}
+
+[data-slot="switch"].WebSSH-Switch--loading::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    content: "";
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: webssh-switch-spin 0.8s linear infinite;
+}
+
+@keyframes webssh-switch-spin {
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-slot="switch"].WebSSH-Switch,
+    [data-slot="switch-thumb"] {
+        transition: none;
+    }
+
+    [data-slot="switch"].WebSSH-Switch--loading::after {
+        animation: none;
+    }
+}

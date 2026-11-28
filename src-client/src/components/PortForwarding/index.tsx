@@ -6,7 +6,7 @@ import {
     ReloadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { Form, InputNumber, Switch } from "antd";
+import { Form, InputNumber } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,6 +27,7 @@ import Input from "@/components/Input";
 import PageLayout from "@/components/PageLayout";
 import Popconfirm from "@/components/Popconfirm";
 import Select from "@/components/Select";
+import Switch from "@/components/Switch";
 import getTargetName from "@/components/Target/getTargetName";
 import Tooltip from "@/components/Tooltip";
 
@@ -256,7 +257,7 @@ export default function PortForwarding() {
                         )}
                         checked={item.enabled}
                         loading={togglingId === item.id}
-                        onChange={() => void toggle(item)}
+                        onCheckedChange={() => void toggle(item)}
                     />
                 ),
             },

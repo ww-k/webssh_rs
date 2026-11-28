@@ -13,7 +13,7 @@ import {
     UploadOutlined,
 } from "@ant-design/icons";
 import { toast } from "@ui-sdk/react/toast";
-import { ColorPicker, InputNumber, Switch } from "antd";
+import { ColorPicker, InputNumber } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -22,6 +22,7 @@ import "./index.css";
 import Button from "@/components/Button";
 import Segmented from "@/components/Segmented";
 import Select from "@/components/Select";
+import Switch from "@/components/Switch";
 import fileSave from "@/helpers/fileSave";
 import renderPrompt, {
     renderImportOptionsPrompt,
@@ -455,8 +456,9 @@ export default function Settings() {
                         </span>
                     </div>
                     <Switch
+                        aria-label={t("settings_terminal_copy_notification")}
                         checked={showTerminalCopyNotification}
-                        onChange={setShowTerminalCopyNotification}
+                        onCheckedChange={setShowTerminalCopyNotification}
                     />
                 </div>
             </section>
@@ -535,8 +537,9 @@ export default function Settings() {
                         </span>
                     </div>
                     <Switch
+                        aria-label={t("settings_terminal_selection_copy")}
                         checked={terminalSelectionCopyEnabled}
-                        onChange={setTerminalSelectionCopyEnabled}
+                        onCheckedChange={setTerminalSelectionCopyEnabled}
                     />
                 </div>
 
@@ -584,8 +587,9 @@ export default function Settings() {
                         </span>
                     </div>
                     <Switch
+                        aria-label={t("settings_terminal_middle_click_paste")}
                         checked={terminalMiddleClickPasteEnabled}
-                        onChange={setTerminalMiddleClickPasteEnabled}
+                        onCheckedChange={setTerminalMiddleClickPasteEnabled}
                     />
                 </div>
 
@@ -676,8 +680,9 @@ export default function Settings() {
                         </span>
                     </div>
                     <Switch
+                        aria-label={t("settings_sidebar_collapsed")}
                         checked={sidebarCollapsed}
-                        onChange={setSidebarCollapsed}
+                        onCheckedChange={setSidebarCollapsed}
                     />
                 </div>
             </section>
