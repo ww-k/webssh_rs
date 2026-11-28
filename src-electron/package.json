@@ -31,6 +31,10 @@
         "directories": {
             "output": "dist"
         },
+        "electronLanguages": [
+            "zh-CN",
+            "en-US"
+        ],
         "files": [
             "main.cjs",
             "preload.cjs",
@@ -63,7 +67,12 @@
         },
         "win": {
             "target": [
-                "nsis"
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
             ],
             "icon": "assets/icon.ico"
         },
