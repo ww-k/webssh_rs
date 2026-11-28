@@ -53,23 +53,37 @@ if (mode === "mock") {
 }
 const isWin32 = process.platform === "win32";
 
-// 确保安装依赖
-try {
-  lstatSync(resolve(projectRoot, "./src-client/node_modules"));
-} catch (_err) {
-  spawnSync("pnpm", ["install"], {
-    cwd: resolve(projectRoot, "./src-client"),
+function ensureDependencies(directory) {
+  const dependencyPath = resolve(projectRoot, directory, "node_modules");
+  try {
+    lstatSync(dependencyPath);
+    return;
+  } catch (_err) {
+    // Install below.
+  }
+
+  const result = spawnSync("pnpm", ["install"], {
+    cwd: resolve(projectRoot, directory),
     env: baseEnv,
+    shell: isWin32,
+    stdio: "inherit",
   });
+
+  if (result.error) {
+    console.error(
+      `[dev] Failed to install dependencies in ${directory}: ${result.error.message}`,
+    );
+    process.exit(1);
+  }
+  if (result.status !== 0) {
+    console.error(`[dev] Dependency installation failed in ${directory}.`);
+    process.exit(result.status ?? 1);
+  }
 }
-try {
-  lstatSync(resolve(projectRoot, "./src-electron/node_modules"));
-} catch (_err) {
-  spawnSync("pnpm", ["install"], {
-    cwd: resolve(projectRoot, "./src-electron"),
-    env: baseEnv,
-  });
-}
+
+// Ensure both development processes can resolve their local binaries.
+ensureDependencies("src-client");
+ensureDependencies("src-electron");
 
 const children = [];
 let isShuttingDown = false;
