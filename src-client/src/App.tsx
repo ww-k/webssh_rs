@@ -37,6 +37,7 @@ export default function App() {
     }, [appTheme]);
 
     useEffect(() => {
+        document.title = "Shrug";
         console.log("App init");
         window.onkeydown = (evt) => {
             console.log(
